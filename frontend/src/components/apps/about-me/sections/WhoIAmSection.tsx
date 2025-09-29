@@ -73,8 +73,8 @@ export default function WhoIAmSection() {
           </p>
           
           <p>
-            Today, I'm working through my MS at Northeastern while actively looking 
-            for Spring 2026 co-ops and full-time opportunities. I'm here to learn, 
+            Today, I&apos;m working through my MS at Northeastern while actively looking 
+            for Spring 2026 co-ops and full-time opportunities. I&apos;m here to learn, 
             grow, and work on projects that actually matter. Always excited about 
             crazy opportunities that push boundaries.
           </p>

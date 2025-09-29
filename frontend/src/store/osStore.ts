@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WindowState, AppType, DisplaySettings } from '../../../../shared/types';
+import type { WindowState, AppType, DisplaySettings } from '../../../shared/types';
 
 interface OSStore {
   // Window Management

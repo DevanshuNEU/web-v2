@@ -32,7 +32,7 @@ export default function WindowManager() {
         
         return (
           <Window key={window.id} window={window}>
-            <AppComponent isMaximized={window.isMaximized} />
+            <AppComponent />
           </Window>
         );
       })}

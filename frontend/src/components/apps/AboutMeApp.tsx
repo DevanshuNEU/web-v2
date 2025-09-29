@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Compass, Lightbulb, Heart, PenTool, Activity, Mail } from 'lucide-react';
+import { User, Compass, Lightbulb, Activity, Mail } from 'lucide-react';
 import { AppPage, StandardCard } from '@/components/ui/standard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

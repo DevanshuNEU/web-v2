@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
-import type { WindowState } from '../../../../../shared/types';
+import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
   window: WindowState;

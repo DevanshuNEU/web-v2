@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { 
   User, 
@@ -11,8 +10,7 @@ import {
   Mail, 
   Terminal, 
   Gamepad2,
-  Settings,
-  Circle
+  Settings
 } from 'lucide-react';
 
 const appIcons = {
@@ -27,7 +25,7 @@ const appIcons = {
 };
 
 export default function Taskbar() {
-  const { windows, activeWindowId, focusWindow, minimizeWindow } = useOSStore();
+  const { windows, activeWindowId, focusWindow } = useOSStore();
   const runningApps = windows.filter(w => w.isOpen);
 
   return (

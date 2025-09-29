@@ -100,7 +100,7 @@ export default function SkillsDashboardApp() {
                         <div className="flex items-center" style={{ gap: '1rem' }}>
                           <h4 className="text-xl font-semibold text-gray-900">{skill.name}</h4>
                           <div className="flex" style={{ gap: '0.5rem' }}>
-                            {skill.isCurrentlyLearning && (
+                            {'isCurrentlyLearning' in skill && skill.isCurrentlyLearning && (
                               <Badge variant="outline" className="bg-brand-yellow/10 text-brand-orange border-brand-orange/30">
                                 Learning
                               </Badge>

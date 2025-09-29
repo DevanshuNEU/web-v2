@@ -13,7 +13,7 @@ import {
   Settings
 } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
-import type { AppType } from '../../../../../shared/types';
+import type { AppType } from '../../../../shared/types';
 
 interface DesktopIconProps {
   appType: AppType;

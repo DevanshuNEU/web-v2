@@ -34,15 +34,15 @@ export default function Desktop({ children }: DesktopProps) {
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
   
-  const wallpaperStyle = getWallpaperStyle(displaySettings.wallpaper);
-  const backgroundColor = wallpapers[displaySettings.wallpaper];
+  const wallpaperStyle = getWallpaperStyle(displaySettings.wallpaper as keyof typeof wallpapers);
+  const backgroundColor = wallpapers[displaySettings.wallpaper as keyof typeof wallpapers];
   
   return (
     <div 
       className="min-h-screen w-full relative overflow-hidden"
       style={{
         backgroundColor: wallpaperStyle ? undefined : backgroundColor,
-        backgroundImage: wallpaperStyle,
+        backgroundImage: wallpaperStyle || undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
