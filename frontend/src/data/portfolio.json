@@ -1,0 +1,227 @@
+{
+  "personalInfo": {
+    "name": "Devanshu Chicholikar",
+    "title": "Software Engineer",
+    "location": "Boston, MA",
+    "email": "chicholikar.d@northeastern.edu",
+    "phone": "(857) 339-8803",
+    "linkedin": "https://www.linkedin.com/in/devanshuchicholikar/",
+    "github": "https://github.com/devanshuNEU",
+    "portfolio": "https://devanshu.dev",
+    "status": "Actively seeking full-time software engineering opportunities",
+    "graduation": "Expected 2026",
+    "degree": "MS in Software Engineering Systems",
+    "university": "Northeastern University"
+  },
+  
+  "bio": {
+    "greeting": "Hey there!",
+    "intro": "I'm a software engineer who loves building scalable, distributed systems that actually make a difference. Currently pursuing my MS at Northeastern while actively seeking opportunities to create awesome software.",
+    "passion": "I get genuinely excited about solving complex problems with clean, efficient code. Whether it's optimizing API performance, automating deployments, or building user-friendly interfaces, I'm all about creating technology that just works.",
+    "personal": "When I'm not coding, you'll probably find me exploring Boston, learning new tech, or working on side projects (like this interactive portfolio you're experiencing right now!)."
+  },
+
+  "achievements": [
+    {
+      "metric": "65%",
+      "description": "API latency reduction through optimization",
+      "color": "orange",
+      "impact": "Improved user experience across thousands of daily users"
+    },
+    {
+      "metric": "99.9%",
+      "description": "Uptime with fault-tolerant AWS design", 
+      "color": "blue",
+      "impact": "Enterprise-grade reliability and availability"
+    },
+    {
+      "metric": "35%",
+      "description": "User engagement increase",
+      "color": "green", 
+      "impact": "Enhanced platform usability and retention"
+    }
+  ],
+
+  "skills": {
+    "categories": [
+      {
+        "name": "Frontend & UI",
+        "icon": "code",
+        "color": "blue",
+        "skills": [
+          {
+            "name": "React/Next.js",
+            "level": 90,
+            "experience": "4+ years",
+            "status": "expert",
+            "projects": ["Financial Copilot", "Portfolio OS"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "TypeScript",
+            "level": 85,
+            "experience": "3+ years", 
+            "status": "advanced",
+            "projects": ["Financial Copilot", "SecureScale"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "Tailwind CSS",
+            "level": 80,
+            "experience": "2+ years",
+            "status": "advanced",
+            "projects": ["Portfolio OS"],
+            "isCurrentlyUsing": true
+          }
+        ]
+      },
+      {
+        "name": "Backend & APIs",
+        "icon": "server",
+        "color": "purple",
+        "skills": [
+          {
+            "name": "Node.js/Express",
+            "level": 85,
+            "experience": "3+ years",
+            "status": "advanced", 
+            "projects": ["MERN Platform"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "Python/Flask",
+            "level": 75,
+            "experience": "2+ years",
+            "status": "intermediate",
+            "projects": ["Financial Copilot"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "Go",
+            "level": 30,
+            "experience": "6 months",
+            "status": "learning",
+            "projects": ["Portfolio OS Backend"],
+            "isCurrentlyLearning": true
+          },
+          {
+            "name": "REST/gRPC APIs",
+            "level": 80,
+            "experience": "3+ years",
+            "status": "advanced",
+            "projects": ["PitneyShipPro", "Financial Copilot"],
+            "isCurrentlyUsing": true
+          }
+        ]
+      },
+      {
+        "name": "Cloud & Infrastructure", 
+        "icon": "cloud",
+        "color": "orange",
+        "skills": [
+          {
+            "name": "AWS",
+            "level": 75,
+            "experience": "2+ years",
+            "status": "intermediate-advanced",
+            "projects": ["SecureScale"],
+            "services": ["EC2", "S3", "RDS", "Lambda", "VPC", "IAM", "CloudWatch"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "Terraform",
+            "level": 70,
+            "experience": "1+ years",
+            "status": "intermediate",
+            "projects": ["SecureScale"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "Docker/Kubernetes",
+            "level": 65,
+            "experience": "2+ years", 
+            "status": "intermediate",
+            "projects": ["Financial Copilot", "SecureScale"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "CI/CD",
+            "level": 80,
+            "experience": "2+ years",
+            "status": "advanced",
+            "projects": ["SecureScale", "Financial Copilot"],
+            "tools": ["GitHub Actions", "Jenkins"],
+            "isCurrentlyUsing": true
+          }
+        ]
+      },
+      {
+        "name": "Database & Data",
+        "icon": "database",
+        "color": "green", 
+        "skills": [
+          {
+            "name": "PostgreSQL",
+            "level": 75,
+            "experience": "3+ years",
+            "status": "advanced",
+            "projects": ["Financial Copilot", "SecureScale"],
+            "isCurrentlyUsing": true
+          },
+          {
+            "name": "MongoDB",
+            "level": 70,
+            "experience": "2+ years",
+            "status": "intermediate",
+            "projects": ["MERN Platform"],
+            "isCurrentlyUsing": false
+          },
+          {
+            "name": "Redis",
+            "level": 60,
+            "experience": "1+ years",
+            "status": "intermediate",
+            "projects": ["Performance Optimization"],
+            "isCurrentlyUsing": true
+          }
+        ]
+      }
+    ],
+    
+    "currentlyLearning": [
+      {
+        "name": "Advanced Kubernetes",
+        "progress": 40,
+        "timeframe": "Next 3 months",
+        "reason": "Container orchestration at scale"
+      },
+      {
+        "name": "Go/Golang",
+        "progress": 60,
+        "timeframe": "Currently active",
+        "reason": "High-performance backend services"
+      },
+      {
+        "name": "System Design",
+        "progress": 55,
+        "timeframe": "Ongoing",
+        "reason": "Scalable architecture patterns"
+      }
+    ],
+
+    "tools": [
+      {
+        "category": "Development",
+        "items": ["VS Code", "Git", "Docker", "Postman", "Jest", "Cypress"]
+      },
+      {
+        "category": "Cloud", 
+        "items": ["AWS Console", "Terraform", "GitHub Actions", "Vercel", "Railway"]
+      },
+      {
+        "category": "Monitoring",
+        "items": ["Prometheus", "Grafana", "CloudWatch", "EFK Stack"]
+      }
+    ]
+  }
+}
