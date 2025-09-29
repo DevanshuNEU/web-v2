@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-import { MapPin, Calendar, Mail, Github, Linkedin, GraduationCap } from 'lucide-react';
+import { MapPin, GraduationCap, Mail, Github, Linkedin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StandardCard } from '@/components/ui/standard';
@@ -63,7 +63,7 @@ export default function WhoIAmSection() {
           <p>
             I was eight years old when my father brought home our first laptop. 
             Watching that machine do incredible things with just a few clicks completely 
-            blew my mind. The curiosity didn't stop there - it only grew stronger.
+            blew my mind. The curiosity did not stop there - it only grew stronger.
           </p>
           
           <p>
@@ -73,8 +73,8 @@ export default function WhoIAmSection() {
           </p>
           
           <p>
-            Today, I&apos;m working through my MS at Northeastern while actively looking 
-            for Spring 2026 co-ops and full-time opportunities. I&apos;m here to learn, 
+            Today, I am working through my MS at Northeastern while actively looking 
+            for Spring 2026 co-ops and full-time opportunities. I am here to learn, 
             grow, and work on projects that actually matter. Always excited about 
             crazy opportunities that push boundaries.
           </p>
@@ -84,22 +84,22 @@ export default function WhoIAmSection() {
       {/* Current Focus */}
       <StandardCard>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          What I'm About
+          What I Am About
         </h2>
         
         <div className="space-y-4 text-gray-700">
           <p>
             I genuinely enjoy building systems that work reliably at scale. 
-            Whether it's optimizing APIs for 65% latency reduction or architecting 
-            fault-tolerant infrastructure with 99.9% uptime, I care about the details 
-            that make software actually usable.
+            Whether it is optimizing APIs for better performance or architecting 
+            fault-tolerant infrastructure, I care about the details that make 
+            software actually usable.
           </p>
           
           <p>
-            Right now I'm looking for Spring 2026 co-ops and genuinely excited about 
-            full-time opportunities where I can learn, grow, and work on meaningful projects 
-            with great teams. Always open to discussing technology, sharing experiences, 
-            or collaborating on interesting problems.
+            Currently in my MS program at Northeastern, actively looking for 
+            Spring 2026 co-ops and always excited about full-time opportunities. 
+            I am here to learn, grow, and work on projects that push boundaries 
+            and make a real impact.
           </p>
         </div>
       </StandardCard>
@@ -107,7 +107,7 @@ export default function WhoIAmSection() {
       {/* Quick Connect */}
       <StandardCard>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Let's Connect
+          Let us Connect
         </h2>
         
         <div className="flex flex-wrap gap-3">
