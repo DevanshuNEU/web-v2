@@ -23,11 +23,13 @@ export default function Window({ window, children }: WindowProps) {
 
   const isActive = activeWindowId === window.id;
   const isDragging = React.useRef(false);
+  const [isDraggingState, setIsDraggingState] = React.useState(false);
   const dragOffset = React.useRef({ x: 0, y: 0 });
 
   const handleMouseDown = (e: React.MouseEvent) => {
     focusWindow(window.id);
     isDragging.current = true;
+    setIsDraggingState(true);
     dragOffset.current = {
       x: e.clientX - window.position.x,
       y: e.clientY - window.position.y
@@ -58,6 +60,7 @@ export default function Window({ window, children }: WindowProps) {
 
     const handleMouseUp = () => {
       isDragging.current = false;
+      setIsDraggingState(false);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -90,12 +93,19 @@ export default function Window({ window, children }: WindowProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      animate={{ 
+        opacity: 1, 
+        scale: isDraggingState ? 1.02 : 1, 
+        y: 0,
+        ...windowStyle
+      }}
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
       transition={{ 
         type: "spring",
         damping: 25,
-        stiffness: 300
+        stiffness: 300,
+        opacity: { duration: 0.2 },
+        scale: { duration: 0.2 }
       }}
       className={`
         absolute
@@ -109,7 +119,6 @@ export default function Window({ window, children }: WindowProps) {
         before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
       `}
       style={{
-        ...windowStyle,
         zIndex: window.zIndex,
       }}
       onClick={() => focusWindow(window.id)}

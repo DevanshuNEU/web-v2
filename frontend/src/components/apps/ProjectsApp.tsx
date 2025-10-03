@@ -2,10 +2,14 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Github, Calendar, TrendingUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AppPage, StandardCard, Section, Grid } from '@/components/ui/standard';
+import { 
+  ExternalLink, 
+  Github, 
+  Calendar, 
+  TrendingUp,
+  Code,
+  Sparkles
+} from 'lucide-react';
 
 const projects = [
   {
@@ -13,22 +17,23 @@ const projects = [
     name: 'Financial Copilot',
     tagline: 'Because manual bookkeeping is so 2019',
     description: 'A fintech platform that uses OCR and NLP to automate receipt processing',
-    story: `Ever tried managing receipts manually? Yeah, it's painful. That's why I built Financial Copilot - a platform that actually understands your receipts and turns them into organized financial data automatically.
-
-The cool part? It uses OCR to read receipts (even the blurry ones), NLP to understand what everything means, and then organizes it all in a way that actually makes sense. No more shoebox full of crumpled receipts.
-
-Built with React 18 and TypeScript on the frontend because type safety matters, and Flask on the backend because sometimes Python just gets the job done. The whole thing runs in Docker containers with proper CI/CD because deploying manually is also very 2019.`,
-    
+    story: [
+      "Ever tried managing receipts manually? Yeah, it's painful. That's why I built Financial Copilot - a platform that actually understands your receipts and turns them into organized financial data automatically.",
+      "The cool part? It uses OCR to read receipts (even the blurry ones), NLP to understand what everything means, and then organizes it all in a way that actually makes sense. No more shoebox full of crumpled receipts.",
+      "Built with React 18 and TypeScript on the frontend because type safety matters, and Flask on the backend because sometimes Python just gets the job done. The whole thing runs in Docker containers with proper CI/CD because deploying manually is also very 2019."
+    ],
     technologies: ['React 18', 'TypeScript', 'Flask', 'PostgreSQL', 'OpenAI API', 'Docker', 'GitHub Actions'],
     achievements: [
-      { text: 'Reduced manual bookkeeping by 60%', detail: 'Because nobody has time for manual data entry' },
-      { text: 'Sub-200ms response times', detail: 'With smart caching and database optimization' },
-      { text: 'Automated deployments', detail: 'Safe rollbacks and staged rollouts included' },
-      { text: 'OCR + NLP integration', detail: 'Turns messy receipts into clean data' }
+      { metric: '60%', label: 'Reduced manual bookkeeping', detail: 'Because nobody has time for manual data entry' },
+      { metric: '<200ms', label: 'Response times', detail: 'With smart caching and database optimization' },
+      { metric: '100%', label: 'Automated deployments', detail: 'Safe rollbacks and staged rollouts included' },
+      { metric: 'OCR+NLP', label: 'Integration', detail: 'Turns messy receipts into clean data' }
     ],
     period: 'Jun 2025 - Present',
     type: 'Full-Stack',
-    status: 'In Development'
+    status: 'active',
+    github: '#',
+    demo: '#'
   },
   
   {
@@ -36,22 +41,23 @@ Built with React 18 and TypeScript on the frontend because type safety matters, 
     name: 'SecureScale',
     tagline: 'Infrastructure that actually stays up',
     description: 'Multi-AZ AWS infrastructure with Terraform automation',
-    story: `You know what's harder than writing code? Making sure it stays running in production. SecureScale is my answer to that problem - a completely automated AWS infrastructure setup that's designed to not break at 3 AM.
-
-The whole thing is Infrastructure as Code using Terraform, which means no more "it works on my machine" problems. Multi-AZ setup across different availability zones, automated CI/CD pipelines, comprehensive monitoring, and cost optimization that actually saves money.
-
-The best part? We achieved 99.9% uptime, which sounds like marketing speak but is actually measured. And yes, I obsess over uptime metrics because downtime is expensive and embarrassing.`,
-    
+    story: [
+      "You know what's harder than writing code? Making sure it stays running in production. SecureScale is my answer to that problem - a completely automated AWS infrastructure setup that's designed to not break at 3 AM.",
+      "The whole thing is Infrastructure as Code using Terraform, which means no more 'it works on my machine' problems. Multi-AZ setup across different availability zones, automated CI/CD pipelines, comprehensive monitoring, and cost optimization that actually saves money.",
+      "The best part? We achieved 99.9% uptime, which sounds like marketing speak but is actually measured. And yes, I obsess over uptime metrics because downtime is expensive and embarrassing."
+    ],
     technologies: ['AWS', 'Terraform', 'GitHub Actions', 'CloudWatch', 'Docker', 'PostgreSQL'],
     achievements: [
-      { text: '99.9% uptime achieved', detail: 'With fault-tolerant multi-AZ design' },
-      { text: '85% reduction in deployment effort', detail: 'Automation beats manual work every time' },
-      { text: '65% faster releases', detail: 'Blue-green deployments with zero downtime' },
-      { text: '30% cost reduction', detail: 'Through rightsizing and smart resource allocation' }
+      { metric: '99.9%', label: 'Uptime achieved', detail: 'With fault-tolerant multi-AZ design' },
+      { metric: '85%', label: 'Reduction in deployment effort', detail: 'Automation beats manual work every time' },
+      { metric: '65%', label: 'Faster releases', detail: 'Blue-green deployments with zero downtime' },
+      { metric: '30%', label: 'Cost reduction', detail: 'Through rightsizing and smart resource allocation' }
     ],
     period: 'Jan 2025 - Apr 2025',
     type: 'Infrastructure',
-    status: 'Completed'
+    status: 'completed',
+    github: '#',
+    demo: '#'
   }
 ];
 
@@ -59,147 +65,126 @@ export default function ProjectsApp() {
   const [selectedProject, setSelectedProject] = useState(projects[0]);
 
   return (
-    <AppPage>
-      {/* Header */}
-      <StandardCard>
-        <h1 className="text-4xl font-bold text-gray-900" style={{ marginBottom: '0.75rem' }}>
-          My Projects
-        </h1>
-        <p className="text-xl text-gray-600" style={{ marginBottom: '2rem' }}>
-          Things I've built that I'm actually proud of
-        </p>
+    <div className="h-full flex flex-col bg-surface/30">
+      {/* Header with project tabs */}
+      <div className="glass-subtle border-b border-white/10 p-6">
+        <h1 className="text-2xl font-bold text-text mb-2">My Projects</h1>
+        <p className="text-text-secondary mb-6">Things I've built that I'm actually proud of</p>
 
-        {/* Simple Project Navigation */}
-        <div className="flex" style={{ gap: '1rem', marginBottom: '2rem' }}>
+        <div className="flex gap-3">
           {projects.map((project) => (
-            <Button
+            <button
               key={project.id}
-              variant={selectedProject.id === project.id ? "default" : "outline"}
               onClick={() => setSelectedProject(project)}
-              className="text-sm"
+              className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium
+                        ${selectedProject.id === project.id
+                          ? 'bg-accent text-white'
+                          : 'bg-surface/50 text-text-secondary hover:bg-surface/80 hover:text-text'
+                        }`}
             >
               {project.name}
-            </Button>
+            </button>
           ))}
         </div>
-      </StandardCard>
+      </div>
 
-      {/* Selected Project Details */}
-      <motion.div
-        key={selectedProject.id}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        {/* Project Header */}
-        <StandardCard delay={0.1}>
-          <div className="flex items-start justify-between" style={{ marginBottom: '2rem' }}>
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold text-gray-900" style={{ marginBottom: '0.75rem' }}>
-                {selectedProject.name}
-              </h2>
-              <p className="text-xl text-gray-600" style={{ marginBottom: '1rem' }}>
-                {selectedProject.tagline}
-              </p>
-              <p className="text-lg text-gray-700 leading-8">
-                {selectedProject.description}
-              </p>
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        <motion.div
+          key={selectedProject.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6 max-w-4xl"
+        >
+          {/* Project Hero */}
+          <div className="glass-subtle rounded-2xl p-6 border border-white/10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold text-text mb-2">{selectedProject.name}</h2>
+                <p className="text-xl text-text-secondary mb-4">{selectedProject.tagline}</p>
+                <p className="text-text-secondary">{selectedProject.description}</p>
+              </div>
+              
+              <div className="flex gap-2 ml-4">
+                <button className="p-2 rounded-lg glass-subtle border border-white/20 hover:border-accent/50 transition-all hover:scale-105 text-text">
+                  <Github size={18} />
+                </button>
+                <button className="p-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all hover:scale-105">
+                  <ExternalLink size={18} />
+                </button>
+              </div>
             </div>
-            
-            <div className="flex" style={{ gap: '0.75rem', marginLeft: '2rem' }}>
-              <Button variant="outline" size="sm">
-                <Github style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
-                Code
-              </Button>
-              <Button size="sm">
-                <ExternalLink style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
-                Demo
-              </Button>
+
+            <div className="flex items-center gap-4 text-sm text-text-secondary pt-4 border-t border-white/10">
+              <span className="flex items-center gap-2">
+                <Calendar size={14} />
+                {selectedProject.period}
+              </span>
+              <span className="px-2 py-1 rounded-full bg-surface/50 text-xs font-medium">
+                {selectedProject.type}
+              </span>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium
+                              ${selectedProject.status === 'active' 
+                                ? 'bg-green-500/10 text-green-600' 
+                                : 'bg-blue-500/10 text-blue-600'
+                              }`}>
+                {selectedProject.status === 'active' ? '🟢 Active' : '✅ Completed'}
+              </span>
             </div>
           </div>
-          
-          <div className="flex items-center text-sm text-gray-500 pt-6 border-t border-gray-200" style={{ gap: '1rem' }}>
-            <span className="flex items-center" style={{ gap: '0.5rem' }}>
-              <Calendar size={16} />
-              {selectedProject.period}
-            </span>
-            <Badge variant="secondary">{selectedProject.type}</Badge>
-            <Badge 
-              variant="outline"
-              className={
-                selectedProject.status === 'In Development' 
-                  ? 'bg-brand-orange/10 text-brand-orange border-brand-orange/30' 
-                  : 'bg-brand-green/10 text-brand-green border-brand-green/30'
-              }
-            >
-              {selectedProject.status}
-            </Badge>
+
+          {/* The Story */}
+          <div className="glass-subtle rounded-2xl p-6 border border-white/10">
+            <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+              <Sparkles size={18} className="text-accent" />
+              The Story
+            </h3>
+            <div className="space-y-4 text-text-secondary leading-relaxed">
+              {selectedProject.story.map((paragraph, idx) => (
+                <p key={idx}>{paragraph}</p>
+              ))}
+            </div>
           </div>
-        </StandardCard>
 
-        {/* Project Story */}
-        <StandardCard delay={0.2}>
-          <Section title="The story">
-            {selectedProject.story.split('\n\n').map((paragraph, index) => (
-              <p 
-                key={index} 
-                className="text-base text-gray-700 leading-8" 
-                style={{ marginBottom: '1.5rem' }}
-              >
-                {paragraph}
-              </p>
-            ))}
-          </Section>
-        </StandardCard>
-
-        {/* Technologies */}
-        <StandardCard delay={0.3}>
-          <Section title="Built with">
-            <div className="flex flex-wrap" style={{ gap: '0.75rem' }}>
+          {/* Technologies */}
+          <div className="glass-subtle rounded-2xl p-6 border border-white/10">
+            <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+              <Code size={18} className="text-accent" />
+              Built With
+            </h3>
+            <div className="flex flex-wrap gap-2">
               {selectedProject.technologies.map((tech) => (
-                <Badge 
-                  key={tech} 
-                  variant="outline" 
-                  className="bg-gray-50 border-gray-300 text-gray-700"
-                  style={{ padding: '0.5rem 0.75rem' }}
+                <span
+                  key={tech}
+                  className="px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-sm font-medium"
                 >
                   {tech}
-                </Badge>
+                </span>
               ))}
             </div>
-          </Section>
-        </StandardCard>
+          </div>
 
-        {/* Key Results */}
-        <StandardCard delay={0.4}>
-          <Section title="Key results">
-            <Grid columns={2}>
-              {selectedProject.achievements.map((achievement, index) => (
-                <div 
-                  key={index} 
-                  className="flex bg-brand-green/8 rounded-xl border border-brand-green/20 h-full"
-                  style={{ padding: '1.5rem', gap: '1rem' }}
+          {/* Achievements */}
+          <div className="glass-subtle rounded-2xl p-6 border border-white/10">
+            <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+              <TrendingUp size={18} className="text-accent" />
+              Key Results
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {selectedProject.achievements.map((achievement, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20"
                 >
-                  <div 
-                    className="bg-brand-green/15 rounded-xl flex-shrink-0 flex items-center justify-center"
-                    style={{ padding: '0.75rem' }}
-                  >
-                    <TrendingUp className="text-brand-green" style={{ width: '1.5rem', height: '1.5rem' }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900" style={{ marginBottom: '0.5rem' }}>
-                      {achievement.text}
-                    </p>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {achievement.detail}
-                    </p>
-                  </div>
+                  <div className="text-3xl font-bold text-accent mb-1">{achievement.metric}</div>
+                  <div className="text-sm font-semibold text-text mb-1">{achievement.label}</div>
+                  <div className="text-xs text-text-secondary">{achievement.detail}</div>
                 </div>
               ))}
-            </Grid>
-          </Section>
-        </StandardCard>
-      </motion.div>
-    </AppPage>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
   );
 }

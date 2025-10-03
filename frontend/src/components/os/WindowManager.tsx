@@ -8,6 +8,7 @@ import AboutMeApp from '@/components/apps/AboutMeApp';
 import ProjectsApp from '@/components/apps/ProjectsApp';
 import SkillsDashboardApp from '@/components/apps/SkillsDashboardApp';
 import ContactApp from '@/components/apps/ContactApp';
+import SettingsApp from '@/components/apps/SettingsApp';
 
 // App component mapping
 const appComponents = {
@@ -15,10 +16,10 @@ const appComponents = {
   'projects': ProjectsApp,
   'skills-dashboard': SkillsDashboardApp,
   'contact': ContactApp,
+  'display-options': SettingsApp,
   'network-monitor': () => <div className="p-6">Network Monitor - Coming Soon</div>,
   'terminal': () => <div className="p-6">Terminal - Coming Soon</div>,
   'games': () => <div className="p-6">Games - Coming Soon</div>,
-  'display-options': () => <div className="p-6">Display Options - Coming Soon</div>
 };
 
 export default function WindowManager() {

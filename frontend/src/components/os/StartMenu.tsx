@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, 
   FolderOpen, 
@@ -52,15 +53,31 @@ export function StartMenu({ open, onClose }: StartMenuProps) {
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[998] backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Start Menu */}
-      <div className="fixed bottom-20 left-8 z-[999] w-[600px]">
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/20 dark:bg-black/40 z-[998] backdrop-blur-sm"
+            onClick={onClose}
+          />
+          
+          {/* Start Menu */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ 
+              type: "spring",
+              damping: 20,
+              stiffness: 300
+            }}
+            className="fixed bottom-20 left-8 z-[999] w-[600px]"
+          >
         <Command 
           className="rounded-2xl border border-white/20 dark:border-white/10 
                      shadow-glass-xl glass-heavy overflow-hidden"
@@ -80,11 +97,14 @@ export function StartMenu({ open, onClose }: StartMenuProps) {
             {/* All Apps */}
             <CommandGroup heading="Apps" className="text-text-secondary">
               <div className="grid grid-cols-4 gap-3 p-4">
-                {allApps.map((app) => {
+                {allApps.map((app, index) => {
                   const IconComponent = app.icon;
                   return (
-                    <button
+                    <motion.button
                       key={app.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
                       onClick={() => handleSelectApp(app.id)}
                       className="flex flex-col items-center gap-2 p-3 rounded-xl
                                 hover:bg-surface/50 transition-all duration-200
@@ -97,7 +117,7 @@ export function StartMenu({ open, onClose }: StartMenuProps) {
                       <span className="text-xs font-medium text-text text-center">
                         {app.name}
                       </span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -128,7 +148,9 @@ export function StartMenu({ open, onClose }: StartMenuProps) {
             </CommandGroup>
           </CommandList>
         </Command>
-      </div>
-    </>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

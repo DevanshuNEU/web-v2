@@ -3,6 +3,7 @@
 import React from 'react';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { AnimatedBackground } from './AnimatedBackground';
+import { DesktopContextMenu } from './DesktopContextMenu';
 import Taskbar from './Taskbar';
 
 interface DesktopProps {
@@ -10,21 +11,19 @@ interface DesktopProps {
 }
 
 export default function Desktop({ children }: DesktopProps) {
-  // Initialize keyboard shortcuts
   useKeyboardShortcuts();
   
   return (
-    <div className="min-h-screen w-full relative overflow-hidden">
-      {/* Animated Background */}
-      <AnimatedBackground />
-      
-      {/* Desktop content area */}
-      <div className="relative z-10 h-screen pb-16">
-        {children}
+    <DesktopContextMenu>
+      <div className="min-h-screen w-full relative overflow-hidden">
+        <AnimatedBackground />
+        
+        <div className="relative z-10 h-screen pb-16">
+          {children}
+        </div>
+        
+        <Taskbar />
       </div>
-      
-      {/* Taskbar */}
-      <Taskbar />
-    </div>
+    </DesktopContextMenu>
   );
 }

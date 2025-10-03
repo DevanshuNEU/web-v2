@@ -33,8 +33,9 @@ function DesktopIcon({ appType, icon: Icon, label, gradient, position }: Desktop
     <motion.div
       className="absolute cursor-pointer group"
       style={{ left: position.x, top: position.y }}
-      whileHover={{ scale: 1.05 }}
+      whileHover={{ scale: 1.08, y: -4 }}
       whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       onDoubleClick={() => openWindow(appType)}
     >
       <div className="flex flex-col items-center gap-2 p-2">

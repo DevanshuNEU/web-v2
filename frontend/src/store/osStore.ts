@@ -63,9 +63,9 @@ const defaultWindowConfigs: Record<AppType, Partial<WindowState>> = {
     position: { x: 220, y: 160 }
   },
   'display-options': {
-    title: 'Display Options',
-    size: { width: 550, height: 450 },
-    position: { x: 350, y: 200 }
+    title: 'Settings',
+    size: { width: 650, height: 550 },
+    position: { x: 350, y: 150 }
   }
 };
 

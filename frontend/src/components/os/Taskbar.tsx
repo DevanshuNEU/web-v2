@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
+import { toast } from 'sonner';
 import { StartMenu } from './StartMenu';
 import { 
   User, 
@@ -114,7 +115,11 @@ export default function Taskbar() {
       <div className="flex items-center gap-3">
         {/* Theme Toggle Button */}
         <button
-          onClick={toggleMode}
+          onClick={() => {
+            toggleMode();
+            const newMode = mode === 'dark' ? 'light' : 'dark';
+            toast.success(`Switched to ${newMode === 'dark' ? 'Dark' : 'Light'} Mode`);
+          }}
           className="p-2 rounded-lg hover:bg-surface/50 transition-all duration-200 text-text hover:scale-105"
           title={mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
