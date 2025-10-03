@@ -94,7 +94,7 @@ export default function ProjectsApp() {
           key={selectedProject.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6 max-w-4xl"
+          className="space-y-6 w-full"
         >
           {/* Project Hero */}
           <div className="glass-subtle rounded-2xl p-6 border border-white/10">

@@ -92,7 +92,7 @@ export default function SkillsDashboardApp() {
           key={activeCategory}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 gap-4 max-w-4xl"
+          className="grid grid-cols-2 gap-4 w-full"
         >
           {skillsData.categories[activeCategory].skills.map((skill, idx) => (
             <motion.div

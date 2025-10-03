@@ -73,7 +73,7 @@ function IntroSection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-6 max-w-3xl"
+      className="p-8 space-y-6 w-full"
     >
       {/* Hero */}
       <div className="text-center mb-8">
@@ -83,12 +83,12 @@ function IntroSection() {
           transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
           className="mb-6 inline-block"
         >
-          <div className="w-32 h-32 rounded-full overflow-hidden ring-4 ring-accent/20 shadow-xl">
+          <div className="w-40 h-40 rounded-full overflow-hidden ring-4 ring-accent/20 shadow-xl">
             <Image
               src="/devanshu-photo.png"
               alt="Devanshu Chicholikar"
-              width={128}
-              height={128}
+              width={160}
+              height={160}
               className="w-full h-full object-cover"
             />
           </div>
@@ -165,7 +165,7 @@ function JourneySection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-6 max-w-3xl"
+      className="p-8 space-y-6 w-full"
     >
       <div className="glass-subtle rounded-2xl p-6 border border-white/10">
         <h2 className="text-2xl font-bold text-text mb-4">My Journey</h2>
@@ -181,7 +181,7 @@ function ExcitesSection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-6 max-w-3xl"
+      className="p-8 space-y-6 w-full"
     >
       <div className="glass-subtle rounded-2xl p-6 border border-white/10">
         <h2 className="text-2xl font-bold text-text mb-4">What Excites Me</h2>
@@ -197,7 +197,7 @@ function CurrentlySection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-6 max-w-3xl"
+      className="p-8 space-y-6 w-full"
     >
       <div className="glass-subtle rounded-2xl p-6 border border-white/10">
         <h2 className="text-2xl font-bold text-text mb-4">Currently</h2>
@@ -213,7 +213,7 @@ function ContactSection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 space-y-6 max-w-3xl"
+      className="p-8 space-y-6 w-full"
     >
       <div className="glass-subtle rounded-2xl p-6 border border-white/10">
         <h2 className="text-2xl font-bold text-text mb-4">Let's Connect</h2>
