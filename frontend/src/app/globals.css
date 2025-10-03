@@ -129,6 +129,7 @@ body {
     background: var(--glass-bg-subtle);
     backdrop-filter: blur(var(--glass-blur-subtle)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(180%);
+    will-change: backdrop-filter;
   }
   
   .glass-medium {
