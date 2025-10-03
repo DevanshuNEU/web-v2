@@ -81,7 +81,7 @@ export default function Window({ window, children }: WindowProps) {
         left: 0,
         top: 0,
         width: '100vw',
-        height: 'calc(100vh - 64px)',
+        height: 'calc(100vh - 88px)', // Account for floating taskbar (64px) + bottom margin (24px)
       }
     : {
         left: window.position.x,
@@ -141,10 +141,10 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               closeWindow(window.id);
             }}
-            className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors group relative"
+            className="w-4 h-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors group relative"
             title="Close"
           >
-            <X size={8} className="absolute inset-0 m-auto text-red-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <X size={10} className="absolute inset-0 m-auto text-red-900 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
           
           <button
@@ -152,10 +152,10 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               minimizeWindow(window.id);
             }}
-            className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors group relative"
+            className="w-4 h-4 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors group relative"
             title="Minimize"
           >
-            <Minus size={8} className="absolute inset-0 m-auto text-yellow-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Minus size={10} className="absolute inset-0 m-auto text-yellow-900 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
           
           <button
@@ -163,10 +163,10 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               maximizeWindow(window.id);
             }}
-            className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors group relative"
+            className="w-4 h-4 rounded-full bg-green-500 hover:bg-green-600 transition-colors group relative"
             title="Maximize"
           >
-            <Square size={6} className="absolute inset-0 m-auto text-green-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Square size={8} className="absolute inset-0 m-auto text-green-900 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         </div>
         
