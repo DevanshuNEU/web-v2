@@ -15,14 +15,18 @@ import {
 import { useOSStore } from '@/store/osStore';
 import type { AppType } from '../../../../shared/types';
 
-interface DesktopIconProps {
+interface IconConfig {
   appType: AppType;
-  icon: React.ReactNode;
+  icon: React.ElementType;
   label: string;
+  gradient: string;
+}
+
+interface DesktopIconProps extends IconConfig {
   position: { x: number; y: number };
 }
 
-function DesktopIcon({ appType, icon, label, position }: DesktopIconProps) {
+function DesktopIcon({ appType, icon: Icon, label, gradient, position }: DesktopIconProps) {
   const { openWindow } = useOSStore();
 
   return (
@@ -31,13 +35,20 @@ function DesktopIcon({ appType, icon, label, position }: DesktopIconProps) {
       style={{ left: position.x, top: position.y }}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      onClick={() => openWindow(appType)}
+      onDoubleClick={() => openWindow(appType)}
     >
-      <div className="flex flex-col items-center space-y-2 p-3 rounded-xl hover:bg-gray-100 transition-colors">
-        <div className="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-700 shadow-sm hover:shadow-md transition-shadow">
-          {icon}
+      <div className="flex flex-col items-center gap-2 p-2">
+        {/* Icon with gradient background */}
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center
+                        shadow-lg group-hover:shadow-xl transition-all duration-200
+                        ${gradient}`}>
+          <Icon size={28} className="text-white drop-shadow-md" />
         </div>
-        <span className="text-xs text-gray-700 font-medium text-center max-w-16 leading-tight">
+        
+        {/* Label with background for readability */}
+        <span className="text-xs font-medium text-center px-2 py-1 rounded-md
+                       bg-surface/80 backdrop-blur-sm shadow-sm
+                       text-text max-w-[80px] leading-tight">
           {label}
         </span>
       </div>
@@ -46,74 +57,83 @@ function DesktopIcon({ appType, icon, label, position }: DesktopIconProps) {
 }
 
 export default function DesktopIcons() {
-  const icons: Array<Omit<DesktopIconProps, 'position'> & { x: number; y: number }> = [
+  const iconConfigs: Array<Omit<DesktopIconProps, 'position'> & { x: number; y: number }> = [
     {
       appType: 'about-me',
-      icon: <User size={24} />,
+      icon: User,
       label: 'About Me',
+      gradient: 'bg-gradient-to-br from-blue-500 to-blue-600',
       x: 50,
       y: 50
     },
     {
       appType: 'projects',
-      icon: <FolderOpen size={24} />,
+      icon: FolderOpen,
       label: 'Projects',
+      gradient: 'bg-gradient-to-br from-orange-500 to-orange-600',
       x: 50,
-      y: 150
+      y: 170
     },
     {
       appType: 'skills-dashboard',
-      icon: <Activity size={24} />,
+      icon: Activity,
       label: 'Skills',
+      gradient: 'bg-gradient-to-br from-purple-500 to-purple-600',
       x: 50,
-      y: 250
+      y: 290
     },
     {
       appType: 'network-monitor',
-      icon: <Monitor size={24} />,
+      icon: Monitor,
       label: 'Network',
-      x: 150,
+      gradient: 'bg-gradient-to-br from-teal-500 to-teal-600',
+      x: 170,
       y: 50
     },
     {
       appType: 'contact',
-      icon: <Mail size={24} />,
+      icon: Mail,
       label: 'Contact',
-      x: 150,
-      y: 150
+      gradient: 'bg-gradient-to-br from-pink-500 to-pink-600',
+      x: 170,
+      y: 170
     },
     {
       appType: 'terminal',
-      icon: <Terminal size={24} />,
+      icon: Terminal,
       label: 'Terminal',
-      x: 150,
-      y: 250
+      gradient: 'bg-gradient-to-br from-gray-700 to-gray-800',
+      x: 170,
+      y: 290
     },
     {
       appType: 'games',
-      icon: <Gamepad2 size={24} />,
+      icon: Gamepad2,
       label: 'Games',
-      x: 250,
+      gradient: 'bg-gradient-to-br from-green-500 to-green-600',
+      x: 290,
       y: 50
     },
     {
       appType: 'display-options',
-      icon: <Settings size={24} />,
+      icon: Settings,
       label: 'Display',
-      x: 250,
-      y: 150
+      gradient: 'bg-gradient-to-br from-red-500 to-red-600',
+      x: 290,
+      y: 170
     }
   ];
 
   return (
     <>
-      {icons.map((iconProps) => (
+      {iconConfigs.map((config) => (
         <DesktopIcon
-          key={iconProps.appType}
-          appType={iconProps.appType}
-          icon={iconProps.icon}
-          label={iconProps.label}
-          position={{ x: iconProps.x, y: iconProps.y }}
+          key={config.appType}
+          appType={config.appType}
+          icon={config.icon}
+          label={config.label}
+          gradient={config.gradient}
+          position={{ x: config.x, y: config.y }}
         />
       ))}
     </>

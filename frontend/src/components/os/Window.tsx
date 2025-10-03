@@ -48,7 +48,7 @@ export default function Window({ window, children }: WindowProps) {
           e.clientX - dragOffset.current.x
         ));
         const newY = Math.max(0, Math.min(
-          viewportHeight - window.size.height - 80, // Account for taskbar
+          viewportHeight - window.size.height - 80,
           e.clientY - dragOffset.current.y
         ));
         
@@ -60,7 +60,6 @@ export default function Window({ window, children }: WindowProps) {
       isDragging.current = false;
     };
 
-    // Always add listeners, check dragging state inside handlers
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
@@ -90,16 +89,24 @@ export default function Window({ window, children }: WindowProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      transition={{ 
+        type: "spring",
+        damping: 25,
+        stiffness: 300
+      }}
       className={`
         absolute
-        rounded-lg shadow-lg border border-window-border
-        ${isActive ? 'shadow-xl' : 'shadow-md'}
+        rounded-xl overflow-hidden
+        glass-medium
+        border border-white/20 dark:border-white/10
+        shadow-glass-lg
+        ${isActive ? 'ring-1 ring-accent/20 dark:ring-accent/30 shadow-glass-xl' : ''}
         ${window.isMaximized ? 'rounded-none' : ''}
-        overflow-hidden
+        before:absolute before:inset-x-0 before:top-0 before:h-px
+        before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
       `}
       style={{
         ...windowStyle,
@@ -107,34 +114,39 @@ export default function Window({ window, children }: WindowProps) {
       }}
       onClick={() => focusWindow(window.id)}
     >
-      {/* Window Titlebar */}
+      {/* Window Titlebar - Extra Blur */}
       <div 
         className={`
-          window-titlebar flex items-center justify-between px-4 py-3 
-          bg-window-titlebar border-b border-window-border
-          ${window.isMaximized ? 'rounded-none' : 'rounded-t-lg'}
+          flex items-center justify-between px-4 py-3 
+          glass-heavy
+          border-b border-white/10 dark:border-white/5
+          ${window.isMaximized ? 'rounded-none' : 'rounded-t-xl'}
           cursor-move select-none
         `}
         onMouseDown={handleMouseDown}
       >
-        {/* Window Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 bg-gradient-to-br from-brand-orange to-brand-pink rounded-full" />
-          <span className="font-medium text-content-primary text-sm">
-            {window.title}
-          </span>
-        </div>
-
-        {/* Window Controls */}
-        <div className="flex items-center space-x-2">
+        {/* macOS Traffic Light Controls - LEFT SIDE */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              closeWindow(window.id);
+            }}
+            className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors group relative"
+            title="Close"
+          >
+            <X size={8} className="absolute inset-0 m-auto text-red-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+          
           <button
             onClick={(e) => {
               e.stopPropagation();
               minimizeWindow(window.id);
             }}
-            className="w-6 h-6 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center transition-colors"
+            className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors group relative"
+            title="Minimize"
           >
-            <Minus size={12} className="text-yellow-800" />
+            <Minus size={8} className="absolute inset-0 m-auto text-yellow-900 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
           
           <button
@@ -142,25 +154,26 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               maximizeWindow(window.id);
             }}
-            className="w-6 h-6 rounded-full bg-green-400 hover:bg-green-500 flex items-center justify-center transition-colors"
+            className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors group relative"
+            title="Maximize"
           >
-            <Square size={10} className="text-green-800" />
-          </button>
-          
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              closeWindow(window.id);
-            }}
-            className="w-6 h-6 rounded-full bg-red-400 hover:bg-red-500 flex items-center justify-center transition-colors"
-          >
-            <X size={12} className="text-red-800" />
+            <Square size={6} className="absolute inset-0 m-auto text-green-900 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         </div>
+        
+        {/* Window Title - CENTER */}
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <span className="font-medium text-text text-sm">
+            {window.title}
+          </span>
+        </div>
+        
+        {/* Empty right side for symmetry */}
+        <div className="w-[72px]"></div>
       </div>
 
       {/* Window Content */}
-      <div className="flex-1 overflow-hidden h-full">
+      <div className="flex-1 overflow-auto h-full bg-surface/50">
         {children}
       </div>
     </motion.div>

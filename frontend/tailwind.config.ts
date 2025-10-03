@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -8,9 +9,18 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // PostHog brand colors - clean and professional
       colors: {
-        // Primary PostHog brand palette
+        // Theme-aware colors using CSS variables
+        bg: 'rgb(var(--color-bg) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        text: {
+          DEFAULT: 'rgb(var(--color-text) / <alpha-value>)',
+          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
+        },
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+        
+        // Legacy brand colors (keep for compatibility)
         brand: {
           orange: '#f54e00',
           yellow: '#f9e71e', 
@@ -20,39 +30,55 @@ const config: Config = {
           green: '#00b14f'
         },
         
-        // PostHog background system (light mode primary)
-        background: {
-          primary: '#faf9f6',    // PostHog's off-white
-          secondary: '#ffffff',   // Pure white for windows
-          accent: '#f5f5f4'      // Subtle gray for cards
+        // shadcn compatibility
+        background: 'rgb(var(--background) / <alpha-value>)',
+        foreground: 'rgb(var(--foreground) / <alpha-value>)',
+        card: {
+          DEFAULT: 'rgb(var(--card) / <alpha-value>)',
+          foreground: 'rgb(var(--card-foreground) / <alpha-value>)',
         },
-        
-        // Text colors for excellent readability
-        content: {
-          primary: '#1f1f1f',    // Near black for main text
-          secondary: '#6b7280',  // Gray for supporting text
-          muted: '#9ca3af'       // Light gray for hints
+        primary: {
+          DEFAULT: 'rgb(var(--primary) / <alpha-value>)',
+          foreground: 'rgb(var(--primary-foreground) / <alpha-value>)',
         },
-        
-        // Window system colors
-        window: {
-          border: '#e5e7eb',     // Clean borders
-          shadow: 'rgba(0, 0, 0, 0.05)', // Subtle shadows
-          titlebar: '#f8fafc'    // Clean titlebar background
-        }
+        secondary: {
+          DEFAULT: 'rgb(var(--secondary) / <alpha-value>)',
+          foreground: 'rgb(var(--secondary-foreground) / <alpha-value>)',
+        },
+        muted: {
+          DEFAULT: 'rgb(var(--muted) / <alpha-value>)',
+          foreground: 'rgb(var(--muted-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'rgb(var(--destructive) / <alpha-value>)',
+          foreground: 'rgb(var(--destructive-foreground) / <alpha-value>)',
+        },
+        ring: 'rgb(var(--ring) / <alpha-value>)',
       },
       
-      // Clean, readable typography like PostHog
+      backdropBlur: {
+        subtle: 'var(--glass-blur-subtle)',
+        medium: 'var(--glass-blur-medium)',
+        heavy: 'var(--glass-blur-heavy)',
+        extreme: 'var(--glass-blur-extreme)',
+      },
+      
+      boxShadow: {
+        'glass-sm': 'var(--shadow-sm)',
+        'glass-md': 'var(--shadow-md)',
+        'glass-lg': 'var(--shadow-lg)',
+        'glass-xl': 'var(--shadow-xl)',
+      },
+      
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['SF Mono', 'Monaco', 'Consolas', 'monospace']
+        sans: ['var(--font-geist-sans)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'SF Mono', 'Monaco', 'Consolas', 'monospace']
       },
       
-      // Smooth, professional animations
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',
-        'window-appear': 'windowAppear 0.25s ease-out'
+        'scale-in': 'scaleIn 0.3s ease-out',
       },
       
       keyframes: {
@@ -61,25 +87,23 @@ const config: Config = {
           '100%': { opacity: '1' }
         },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
         },
-        windowAppear: {
-          '0%': { opacity: '0', transform: 'scale(0.96)' },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
           '100%': { opacity: '1', transform: 'scale(1)' }
         }
       },
       
-      // Clean spacing system
-      spacing: {
-        '18': '4.5rem',
-        '88': '22rem'
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       }
     },
   },
-  plugins: [],
-  // Light mode as default
-  darkMode: 'class',
+  plugins: [require("tailwindcss-animate")],
 };
 
 export default config;

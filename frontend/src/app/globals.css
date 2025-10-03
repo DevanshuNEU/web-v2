@@ -2,154 +2,248 @@
 @tailwind components;
 @tailwind utilities;
 
-/* PostHog-inspired light mode default */
+/* ============================================
+   PORTFOLIO OS - THEME SYSTEM
+   ============================================ */
+
 :root {
-  --background: #faf9f6;     /* PostHog's signature off-white */
-  --foreground: #1f1f1f;     /* Clean dark text */
-  --card: #ffffff;           /* Pure white for cards/windows */
-  --card-foreground: #1f1f1f;
-  --primary: #f54e00;        /* PostHog orange */
-  --primary-foreground: #ffffff;
-  --secondary: #f5f5f4;      /* Light gray background */
-  --secondary-foreground: #1f1f1f;
-  --muted: #f5f5f4;         /* Subtle background variation */
-  --muted-foreground: #6b7280;
-  --destructive: #ef4444;   /* Red for destructive actions */
-  --destructive-foreground: #ffffff;
-  --border: #e5e7eb;        /* Clean borders */
-  --ring: #f54e00;          /* Focus ring using primary color */
-  --radius: 0.75rem;        /* Modern border radius */        --sidebar: hsl(0 0% 98%);        --sidebar-foreground: hsl(240 5.3% 26.1%);        --sidebar-primary: hsl(240 5.9% 10%);        --sidebar-primary-foreground: hsl(0 0% 98%);        --sidebar-accent: hsl(240 4.8% 95.9%);        --sidebar-accent-foreground: hsl(240 5.9% 10%);        --sidebar-border: hsl(220 13% 91%);        --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  /* Base colors - Light mode */
+  --color-bg: 245 245 247;           /* #f5f5f7 - Light gray background */
+  --color-surface: 255 255 255;      /* #ffffff - White surfaces */
+  --color-text: 29 29 31;            /* #1d1d1f - Dark text */
+  --color-text-secondary: 110 110 115; /* #6e6e73 - Secondary text */
+  --color-border: 210 210 215;       /* #d2d2d7 - Borders */
+  
+  /* Accent color - User controlled (default: iOS Blue) */
+  --color-accent: 0 122 255;         /* #007AFF */
+  
+  /* Glass effect levels - Light mode */
+  --glass-bg-subtle: rgba(255, 255, 255, 0.8);
+  --glass-bg-medium: rgba(255, 255, 255, 0.6);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.4);
+  --glass-bg-extreme: rgba(255, 255, 255, 0.3);
+  
+  --glass-blur-subtle: 20px;
+  --glass-blur-medium: 40px;
+  --glass-blur-heavy: 60px;
+  --glass-blur-extreme: 80px;
+  
+  /* Wallpaper tint - Extracted from wallpaper */
+  --wallpaper-tint: 0 122 255;       /* Default to accent */
+  --wallpaper-tint-alpha: 0.1;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+  
+  /* Legacy variables for shadcn compatibility */
+  --background: 245 245 247;
+  --foreground: 29 29 31;
+  --card: 255 255 255;
+  --card-foreground: 29 29 31;
+  --primary: 0 122 255;
+  --primary-foreground: 255 255 255;
+  --secondary: 245 245 247;
+  --secondary-foreground: 29 29 31;
+  --muted: 245 245 247;
+  --muted-foreground: 110 110 115;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --border: 210 210 215;
+  --ring: 0 122 255;
+  --radius: 0.75rem;
 }
 
-/* Optional dark mode variables */
 .dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --card: #1a1a1a;
-  --card-foreground: #ededed;
-  --secondary: #262626;
-  --secondary-foreground: #ededed;
-  --muted: #262626;
-  --muted-foreground: #a1a1aa;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #404040;
-  --ring: #f54e00;
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  /* Base colors - Dark mode */
+  --color-bg: 0 0 0;                 /* #000000 - True black (OLED friendly) */
+  --color-surface: 28 28 30;         /* #1c1c1e - Dark surfaces */
+  --color-text: 245 245 247;         /* #f5f5f7 - Light text */
+  --color-text-secondary: 152 152 157; /* #98989d - Secondary text */
+  --color-border: 56 56 58;          /* #38383a - Borders */
+  
+  /* Accent stays same but shows differently on dark */
+  
+  /* Glass effect levels - Dark mode */
+  --glass-bg-subtle: rgba(0, 0, 0, 0.6);
+  --glass-bg-medium: rgba(0, 0, 0, 0.4);
+  --glass-bg-heavy: rgba(0, 0, 0, 0.3);
+  --glass-bg-extreme: rgba(0, 0, 0, 0.2);
+  
+  /* Wallpaper tint stronger in dark */
+  --wallpaper-tint-alpha: 0.15;
+  
+  /* Shadows - Darker in dark mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.6);
+  
+  /* Legacy variables for shadcn compatibility */
+  --background: 0 0 0;
+  --foreground: 245 245 247;
+  --card: 28 28 30;
+  --card-foreground: 245 245 247;
+  --primary: 0 122 255;
+  --primary-foreground: 255 255 255;
+  --secondary: 28 28 30;
+  --secondary-foreground: 245 245 247;
+  --muted: 28 28 30;
+  --muted-foreground: 152 152 157;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --border: 56 56 58;
+  --ring: 0 122 255;
 }
 
-/* Clean reset - but don't kill padding/margins completely */
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
-/* Only reset margins/padding on specific elements that need it */
 body, h1, h2, h3, h4, h5, h6, p, ul, ol, li {
   margin: 0;
 }
 
-/* Preserve padding on utility classes */
-
-/* Body styling for OS environment */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-  background: var(--background);
-  color: var(--foreground);
-  overflow: hidden;
-  line-height: 1.6;
-  font-size: 16px; /* Base font size */
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: rgb(var(--color-bg));
+  color: rgb(var(--color-text));
+  overflow: hidden; /* OS environment */
+  height: 100vh;
+  width: 100vw;
 }
 
-/* PostHog-style typography - clean and readable */
-h1 { 
-  font-size: 2.5rem; 
-  font-weight: 700; 
-  line-height: 1.2; 
-  letter-spacing: -0.025em;
-  margin-bottom: 0.5rem;
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+@layer utilities {
+  /* Glass effect utilities */
+  .glass-subtle {
+    background: var(--glass-bg-subtle);
+    backdrop-filter: blur(var(--glass-blur-subtle)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(180%);
+  }
+  
+  .glass-medium {
+    background: var(--glass-bg-medium);
+    backdrop-filter: blur(var(--glass-blur-medium)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-medium)) saturate(180%);
+  }
+  
+  .glass-heavy {
+    background: var(--glass-bg-heavy);
+    backdrop-filter: blur(var(--glass-blur-heavy)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-heavy)) saturate(180%);
+  }
+  
+  .glass-extreme {
+    background: var(--glass-bg-extreme);
+    backdrop-filter: blur(var(--glass-blur-extreme)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-extreme)) saturate(180%);
+  }
+  
+  /* Text utilities */
+  .text-primary {
+    color: rgb(var(--color-text));
+  }
+  
+  .text-secondary {
+    color: rgb(var(--color-text-secondary));
+  }
+  
+  .text-accent {
+    color: rgb(var(--color-accent));
+  }
+  
+  /* Background utilities */
+  .bg-surface {
+    background: rgb(var(--color-surface));
+  }
+  
+  .bg-accent {
+    background: rgb(var(--color-accent));
+  }
+  
+  /* Border utilities */
+  .border-default {
+    border-color: rgb(var(--color-border));
+  }
 }
 
-h2 { 
-  font-size: 1.875rem; 
-  font-weight: 600; 
-  line-height: 1.3; 
-  letter-spacing: -0.02em;
-  margin-bottom: 1rem;
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-h3 { 
-  font-size: 1.25rem; 
-  font-weight: 600; 
-  line-height: 1.4; 
-  margin-bottom: 0.75rem;
-}
-
-p {
-  font-size: 1rem;
-  line-height: 1.75; /* Much more generous line spacing */
-  margin-bottom: 1.25rem;
-  color: #374151; /* Proper gray for readability */
-}
-
-/* Fix text spacing issues */
-.space-y-6 > * + * {
-  margin-top: 1.5rem !important;
-}
-
-.space-y-4 > * + * {
-  margin-top: 1rem !important;
-}
-
-.space-y-3 > * + * {
-  margin-top: 0.75rem !important;
-}
-
-/* Clean scrollbars for content areas */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--color-text-secondary), 0.3);
+  border-radius: 4px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--color-text-secondary), 0.5);
 }
 
-/* Prevent unwanted interactions */
-img, svg {
-  user-select: none;
-  pointer-events: none;
+/* ============================================
+   SELECTION STYLING
+   ============================================ */
+
+::selection {
+  background: rgb(var(--color-accent) / 0.3);
+  color: rgb(var(--color-text));
 }
 
-/* Focus styles for accessibility */
-button:focus,
-input:focus,
-textarea:focus {
-  outline: 2px solid var(--primary);
+/* ============================================
+   FOCUS STYLES
+   ============================================ */
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
   outline-offset: 2px;
 }
 
-@theme inline {
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
