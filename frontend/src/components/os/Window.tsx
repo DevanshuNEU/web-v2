@@ -113,6 +113,7 @@ export default function Window({ window, children }: WindowProps) {
         glass-medium
         border border-white/20 dark:border-white/10
         shadow-glass-lg
+        flex flex-col
         ${isActive ? 'ring-1 ring-accent/20 dark:ring-accent/30 shadow-glass-xl' : ''}
         ${window.isMaximized ? 'rounded-none' : ''}
         before:absolute before:inset-x-0 before:top-0 before:h-px
@@ -182,7 +183,7 @@ export default function Window({ window, children }: WindowProps) {
       </div>
 
       {/* Window Content */}
-      <div className="flex-1 overflow-auto h-full bg-surface/50">
+      <div className="flex-1 overflow-auto bg-surface/50" style={{ minHeight: 0 }}>
         {children}
       </div>
     </motion.div>
