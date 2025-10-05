@@ -2,6 +2,14 @@ node_modules
 DEVELOPMENT.md
 REVAMP.md
 
+# Planning docs (local only)
+CHECKLIST.md
+PLANNING_SUMMARY.md
+VISUAL_ARCHITECTURE.md
+VISUAL_CONCEPT.md
+PHASE_0_AUDIT.md
+PERFORMANCE.md
+
 # Next.js
 frontend/.next/
 frontend/out/
