@@ -19,7 +19,7 @@ export default function SnakeGame() {
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const gameLoopRef = useRef<NodeJS.Timeout>();
+  const gameLoopRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Detect window size and adjust canvas
   useEffect(() => {
