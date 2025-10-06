@@ -77,7 +77,13 @@ export const useThemeStore = create<ThemeStore>()(
       // Initial state
       mode: 'dark',
       accentColor: ACCENT_COLORS.blue,
-      wallpaper: DEFAULT_WALLPAPERS[1], // Start with dark gradient
+      wallpaper: {
+        id: 'dark-mountain',
+        name: 'Mountain Night',
+        type: 'static',
+        theme: 'dark',
+        imageUrl: '/wallpapers/Wallpaper 4.png'
+      },
       wallpaperTint: null,
       
       // Actions

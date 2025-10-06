@@ -32,8 +32,7 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
       <ContextMenuContent className="w-56 glass-heavy border border-white/20 dark:border-white/10 shadow-glass-xl">
         <ContextMenuItem 
           onClick={() => {
-            // Will implement wallpaper selector later
-            console.log('Change wallpaper clicked');
+            openWindow('display-options');
           }}
           className="cursor-pointer text-text"
         >

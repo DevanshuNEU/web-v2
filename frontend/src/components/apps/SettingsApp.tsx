@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTheme, ACCENT_COLORS } from '@/store/themeStore';
 import { toast } from 'sonner';
+import { WallpaperPicker } from '@/components/shared/WallpaperPicker';
 import {
   Tabs,
   TabsContent,
@@ -105,17 +106,8 @@ export default function SettingsApp() {
             </p>
           </div>
 
-          {/* Wallpaper Section - Placeholder */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-text">Wallpaper</h3>
-            <button
-              className="w-full p-4 rounded-xl border-2 border-border hover:border-accent/50 
-                       transition-all duration-200 text-text-secondary hover:text-text"
-              onClick={() => toast.info('Wallpaper selector coming soon!')}
-            >
-              Change Wallpaper (Coming Soon)
-            </button>
-          </div>
+          {/* Wallpaper Section */}
+          <WallpaperPicker />
         </TabsContent>
 
         {/* About Settings */}
