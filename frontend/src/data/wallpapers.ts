@@ -7,21 +7,21 @@ export const wallpapers: Wallpaper[] = [
     name: 'Mountain Night',
     type: 'static',
     theme: 'dark',
-    imageUrl: '/wallpapers/Wallpaper 4.png'
+    imageUrl: '/wallpapers/dark-mountainNight.png'
   },
   {
     id: 'dark-abstract',
     name: 'Dark Abstract',
     type: 'static',
     theme: 'dark',
-    imageUrl: '/wallpapers/Wallpaper 6.png'
+    imageUrl: '/wallpapers/dark-abstract.png'
   },
   {
-    id: 'dark-wall',
+    id: 'dark-minimalist',
     name: 'Dark Minimalist',
     type: 'static',
     theme: 'dark',
-    imageUrl: '/wallpapers/WAALL.png'
+    imageUrl: '/wallpapers/dark-minimilist.png'
   },
   
   // LIGHT MODE WALLPAPERS
@@ -30,21 +30,21 @@ export const wallpapers: Wallpaper[] = [
     name: 'Desert Dunes',
     type: 'static',
     theme: 'light',
-    imageUrl: '/wallpapers/Wallpapar 9.png'
+    imageUrl: '/wallpapers/light-dessert.png'
   },
   {
-    id: 'light-lake',
-    name: 'Peaceful Lake',
+    id: 'light-abstract',
+    name: 'Light Abstract',
     type: 'static',
     theme: 'light',
-    imageUrl: '/wallpapers/Wallpaper 10.png'
+    imageUrl: '/wallpapers/light-abstract.png'
   },
   {
     id: 'light-mountains',
     name: 'Mountain Vista',
     type: 'static',
     theme: 'light',
-    imageUrl: '/wallpapers/Wallpaper 11.png'
+    imageUrl: '/wallpapers/light-mountainVista.png'
   }
 ];
 
