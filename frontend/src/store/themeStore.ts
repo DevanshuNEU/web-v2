@@ -75,24 +75,37 @@ export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
       // Initial state
-      mode: 'dark',
+      mode: 'light',
       accentColor: ACCENT_COLORS.blue,
       wallpaper: {
-        id: 'dark-mountain',
-        name: 'Mountain Night',
+        id: 'light-mountains',
+        name: 'Mountain Vista',
         type: 'static',
-        theme: 'dark',
-        imageUrl: '/wallpapers/Wallpaper 4.png'
+        theme: 'light',
+        imageUrl: '/wallpapers/Wallpaper 11.png'
       },
       wallpaperTint: null,
       
       // Actions
       toggleMode: () =>
-        set((state) => ({
-          mode: state.mode === 'light' ? 'dark' : 'light'
-        })),
+        set((state) => {
+          const newMode = state.mode === 'light' ? 'dark' : 'light';
+          // Auto-switch wallpaper when theme changes
+          const defaultWallpaper = newMode === 'dark' 
+            ? { id: 'dark-mountain', name: 'Mountain Night', type: 'static' as const, theme: 'dark' as const, imageUrl: '/wallpapers/Wallpaper 4.png' }
+            : { id: 'light-mountains', name: 'Mountain Vista', type: 'static' as const, theme: 'light' as const, imageUrl: '/wallpapers/Wallpaper 11.png' };
+          return {
+            mode: newMode,
+            wallpaper: defaultWallpaper
+          };
+        }),
       
-      setMode: (mode) => set({ mode }),
+      setMode: (mode) => {
+        const defaultWallpaper = mode === 'dark' 
+          ? { id: 'dark-mountain', name: 'Mountain Night', type: 'static' as const, theme: 'dark' as const, imageUrl: '/wallpapers/Wallpaper 4.png' }
+          : { id: 'light-mountains', name: 'Mountain Vista', type: 'static' as const, theme: 'light' as const, imageUrl: '/wallpapers/Wallpaper 11.png' };
+        set({ mode, wallpaper: defaultWallpaper });
+      },
       
       setAccent: (color) => set({ accentColor: color }),
       
