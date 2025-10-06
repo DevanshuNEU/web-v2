@@ -9,10 +9,8 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { 
-  Image, 
   Palette, 
   RefreshCw,
-  Settings
 } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 
@@ -30,16 +28,6 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
       </ContextMenuTrigger>
       
       <ContextMenuContent className="w-56 glass-heavy border border-white/20 dark:border-white/10 shadow-glass-xl">
-        <ContextMenuItem 
-          onClick={() => {
-            openWindow('display-options');
-          }}
-          className="cursor-pointer text-text"
-        >
-          <Image className="mr-2 h-4 w-4" />
-          <span>Change Wallpaper</span>
-        </ContextMenuItem>
-        
         <ContextMenuItem 
           onClick={() => openWindow('display-options')}
           className="cursor-pointer text-text"
