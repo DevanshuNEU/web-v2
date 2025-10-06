@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portfolio OS | Devanshu Agnihotri",
-  description: "Interactive portfolio showcasing software engineering projects in an operating system interface",
+  title: "Devanshu Chicholikar",
+  description:
+    "Interactive portfolio showcasing software engineering projects in an operating system interface",
 };
 
 export default function RootLayout({
@@ -27,8 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
           {children}
           <Toaster />
