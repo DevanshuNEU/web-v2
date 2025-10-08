@@ -4,12 +4,12 @@ A PostHog-inspired portfolio website that mimics an operating system interface. 
 
 ## Features
 
-- 🖥️ Desktop-style interface with draggable windows
-- 📱 Responsive design for all devices  
-- 🎮 Interactive games and easter eggs
-- 📊 Real-time GitHub integration
-- 🎨 PostHog-inspired aesthetics
-- ⚡ Fast, modern web technologies
+-  Desktop-style interface with draggable windows
+-  Responsive design for all devices  
+-  Interactive games and easter eggs
+-  Real-time GitHub integration
+-  PostHog-inspired aesthetics
+-  Fast, modern web technologies
 
 ## Tech Stack
 
@@ -25,10 +25,6 @@ A PostHog-inspired portfolio website that mimics an operating system interface. 
 - TypeScript
 - Prisma ORM
 - SQLite Database
-
-## Development
-
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed development log and progress tracking.
 
 ## Getting Started
 
@@ -60,8 +56,6 @@ portfolio-os/
 ## Deployment
 
 - **Frontend:** Vercel
-- **Backend:** Railway
-- **Database:** SQLite (Railway-hosted)
 
 ## License
 
