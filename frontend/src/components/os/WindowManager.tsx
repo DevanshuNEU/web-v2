@@ -13,6 +13,7 @@ const ContactApp = lazy(() => import('@/components/apps/ContactApp'));
 const SettingsApp = lazy(() => import('@/components/apps/SettingsApp'));
 const TerminalApp = lazy(() => import('@/components/apps/TerminalApp'));
 const SnakeGame = lazy(() => import('@/components/apps/SnakeGame'));
+const AnalyticsApp = lazy(() => import('@/components/apps/AnalyticsApp'));
 
 // Loading component
 function WindowLoading() {
@@ -32,7 +33,7 @@ const appComponents = {
   'display-options': SettingsApp,
   'terminal': TerminalApp,
   'games': SnakeGame,
-  'network-monitor': () => <div className="p-6 text-text">Network Monitor - Coming Soon</div>,
+  'analytics': AnalyticsApp,
 };
 
 export default function WindowManager() {

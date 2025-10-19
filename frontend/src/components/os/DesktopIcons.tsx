@@ -6,7 +6,7 @@ import {
   User, 
   FolderOpen, 
   Activity, 
-  Monitor, 
+  BarChart3, 
   Mail, 
   Terminal, 
   Gamepad2,
@@ -84,10 +84,10 @@ export default function DesktopIcons() {
       y: 290
     },
     {
-      appType: 'network-monitor',
-      icon: Monitor,
-      label: 'Network',
-      gradient: 'bg-gradient-to-br from-teal-500 to-teal-600',
+      appType: 'analytics',
+      icon: BarChart3,
+      label: 'Analytics',
+      gradient: 'bg-gradient-to-br from-teal-500 to-cyan-600',
       x: 170,
       y: 50
     },

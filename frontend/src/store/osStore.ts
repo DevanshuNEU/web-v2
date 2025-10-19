@@ -42,9 +42,9 @@ const defaultWindowConfigs: Record<AppType, Partial<WindowState>> = {
     size: { width: 700, height: 550 },
     position: { x: 200, y: 140 }
   },
-  'network-monitor': {
-    title: 'Network Monitor.app',
-    size: { width: 650, height: 500 },
+  'analytics': {
+    title: 'Analytics.app',
+    size: { width: 900, height: 650 },
     position: { x: 250, y: 160 }
   },
   'contact': {

@@ -17,7 +17,7 @@ export type AppType =
   | 'about-me'
   | 'projects'
   | 'skills-dashboard'
-  | 'network-monitor'
+  | 'analytics'
   | 'contact'
   | 'terminal'
   | 'games'
