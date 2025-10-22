@@ -41,7 +41,7 @@ export default function WindowManager() {
   const visibleWindows = windows.filter(w => w.isOpen && !w.isMinimized);
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="popLayout">
       {visibleWindows.map((window) => {
         const AppComponent = appComponents[window.appType];
         

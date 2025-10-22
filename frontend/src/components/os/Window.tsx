@@ -77,10 +77,6 @@ export default function Window({ window, children }: WindowProps) {
     };
   }, [window.id, window.size, window.isMaximized, updateWindowPosition]);
 
-  if (window.isMinimized) {
-    return null;
-  }
-
   const windowStyle = window.isMaximized 
     ? {
         left: 0,
@@ -97,20 +93,47 @@ export default function Window({ window, children }: WindowProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      layout
+      initial={{ opacity: 0, scale: 0.92, y: 30 }}
       animate={{ 
         opacity: 1, 
         scale: isDraggingState ? 1.02 : 1, 
         y: 0,
-        ...windowStyle
       }}
-      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      exit={{ 
+        opacity: 0, 
+        scale: 0.88, 
+        y: 20,
+        transition: {
+          duration: 0.25,
+          ease: [0.4, 0, 1, 1] // Fast exit with easeIn
+        }
+      }}
       transition={{ 
+        layout: {
+          type: "spring",
+          damping: 22,
+          stiffness: 140,
+          mass: 0.9
+        },
         type: "spring",
-        damping: 25,
-        stiffness: 300,
-        opacity: { duration: 0.2 },
-        scale: { duration: 0.2 }
+        damping: 20,
+        stiffness: 120,
+        mass: 0.8,
+        opacity: { 
+          duration: 0.35,
+          ease: "easeOut"
+        },
+        scale: { 
+          duration: isDraggingState ? 0.15 : 0.4,
+          ease: [0.16, 1, 0.3, 1] // Smooth easeOutExpo
+        },
+        y: {
+          type: "spring",
+          damping: 20,
+          stiffness: 120,
+          mass: 0.8
+        }
       }}
       className={`
         absolute
@@ -119,6 +142,8 @@ export default function Window({ window, children }: WindowProps) {
         border border-white/20 dark:border-white/10
         shadow-glass-lg
         flex flex-col
+        will-change-transform
+        transition-[border-radius] duration-[450ms] ease-out
         ${isActive ? 'ring-1 ring-accent/20 dark:ring-accent/30 shadow-glass-xl' : ''}
         ${window.isMaximized ? 'rounded-none' : ''}
         before:absolute before:inset-x-0 before:top-0 before:h-px
@@ -126,6 +151,7 @@ export default function Window({ window, children }: WindowProps) {
       `}
       style={{
         zIndex: window.zIndex,
+        ...windowStyle
       }}
       onClick={() => focusWindow(window.id)}
     >
@@ -135,6 +161,7 @@ export default function Window({ window, children }: WindowProps) {
           flex items-center justify-between px-4 py-3 
           glass-heavy
           border-b border-white/10 dark:border-white/5
+          transition-[border-radius] duration-[450ms] ease-out
           ${window.isMaximized ? 'rounded-none' : 'rounded-t-xl'}
           cursor-move select-none
         `}
