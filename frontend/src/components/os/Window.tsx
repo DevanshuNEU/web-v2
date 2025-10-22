@@ -27,6 +27,12 @@ export default function Window({ window, children }: WindowProps) {
   const dragOffset = React.useRef({ x: 0, y: 0 });
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start dragging if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
+      return;
+    }
+    
     focusWindow(window.id);
     isDragging.current = true;
     setIsDraggingState(true);
@@ -35,7 +41,6 @@ export default function Window({ window, children }: WindowProps) {
       y: e.clientY - window.position.y
     };
     
-    e.preventDefault();
     e.stopPropagation();
   };
 
@@ -135,39 +140,48 @@ export default function Window({ window, children }: WindowProps) {
         `}
         onMouseDown={handleMouseDown}
       >
-        {/* macOS Traffic Light Controls - LEFT SIDE */}
-        <div className="flex items-center gap-2">
+        {/* Window Controls - LEFT SIDE */}
+        <div className="flex items-center gap-1.5 p-1 -m-1">
           <button
+            onMouseDown={(e) => {
+              e.stopPropagation(); // Prevent drag from starting
+            }}
             onClick={(e) => {
               e.stopPropagation();
               closeWindow(window.id);
             }}
-            className="w-4 h-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors group relative"
+            className="w-6 h-6 rounded-md bg-red-500/90 hover:bg-red-600 transition-all group relative flex items-center justify-center"
             title="Close"
           >
-            <X size={10} className="absolute inset-0 m-auto text-red-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <X size={12} className="text-white opacity-70 group-hover:opacity-100 transition-opacity" />
           </button>
           
           <button
+            onMouseDown={(e) => {
+              e.stopPropagation(); // Prevent drag from starting
+            }}
             onClick={(e) => {
               e.stopPropagation();
               minimizeWindow(window.id);
             }}
-            className="w-4 h-4 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors group relative"
+            className="w-6 h-6 rounded-md bg-yellow-500/90 hover:bg-yellow-600 transition-all group relative flex items-center justify-center"
             title="Minimize"
           >
-            <Minus size={10} className="absolute inset-0 m-auto text-yellow-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Minus size={12} className="text-white opacity-70 group-hover:opacity-100 transition-opacity" />
           </button>
           
           <button
+            onMouseDown={(e) => {
+              e.stopPropagation(); // Prevent drag from starting
+            }}
             onClick={(e) => {
               e.stopPropagation();
               maximizeWindow(window.id);
             }}
-            className="w-4 h-4 rounded-full bg-green-500 hover:bg-green-600 transition-colors group relative"
+            className="w-6 h-6 rounded-md bg-green-500/90 hover:bg-green-600 transition-all group relative flex items-center justify-center"
             title="Maximize"
           >
-            <Square size={8} className="absolute inset-0 m-auto text-green-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Square size={10} className="text-white opacity-70 group-hover:opacity-100 transition-opacity" />
           </button>
         </div>
         
@@ -179,7 +193,7 @@ export default function Window({ window, children }: WindowProps) {
         </div>
         
         {/* Empty right side for symmetry */}
-        <div className="w-[72px]"></div>
+        <div className="w-[84px]"></div>
       </div>
 
       {/* Window Content */}
