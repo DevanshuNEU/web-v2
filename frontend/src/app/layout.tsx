@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://devanshuchichilokar.me'),
+  metadataBase: new URL('https://devanshuchicholikar.me'),
   title: {
     default: 'Devanshu Chicholikar | Software Engineer',
     template: '%s | Devanshu Chicholikar'
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://devanshuchichilokar.me',
+    url: 'https://devanshuchicholikar.me',
     title: 'Devanshu Chicholikar | Software Engineer',
     description: 'Software Engineer specializing in full-stack development, distributed systems, and cloud infrastructure.',
     siteName: 'Devanshu Chicholikar Portfolio',
@@ -76,6 +76,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="google-site-verification" content="EDjK9mEz6aRzLlHgen2Mr76WGHxL5iKMqypx_4oR-iM" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://devanshuchichilokar.me/sitemap.xml
+Sitemap: https://devanshuchicholikar.me/sitemap.xml

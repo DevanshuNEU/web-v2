@@ -9,8 +9,8 @@ export default function Home() {
     '@type': 'Person',
     name: 'Devanshu Chicholikar',
     jobTitle: 'Software Engineer',
-    url: 'https://devanshuchichilokar.me',
-    image: 'https://devanshuchichilokar.me/devanshu-photo.png',
+    url: 'https://devanshuchicholikar.me',
+    image: 'https://devanshuchicholikar.me/devanshu-photo.png',
     sameAs: [
       'https://www.linkedin.com/in/devanshuchicholikar/',
       'https://github.com/devanshuNEU'
