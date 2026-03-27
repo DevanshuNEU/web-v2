@@ -57,7 +57,7 @@ const components = {
   'analytics': lazy(() => import('@/components/apps/AnalyticsApp')),
   'contact': lazy(() => import('@/components/apps/ContactApp')),
   'terminal': lazy(() => import('@/components/apps/TerminalApp')),
-  'games': lazy(() => import('@/components/apps/SnakeGame')),
+  'games': lazy(() => import('@/components/apps/GamesApp')),
   'display-options': lazy(() => import('@/components/apps/SettingsApp')),
   // New apps — components will be created in later sprints
   'file-explorer': lazy(() => import('@/components/apps/FileExplorerApp')),
