@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * ResumeApp — Interactive Resume Viewer
+ * ResumeApp — Interactive Resume + PDF Viewer
  *
- * A styled, scannable resume with section nav, print support, and
- * a download link. Reads clean, looks great, no BS.
+ * Two modes: polished interactive view with section nav,
+ * and a raw PDF viewer showing the actual file.
  */
 
 import { useState } from 'react';
@@ -12,57 +12,47 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download, Mail, MapPin, Github, Linkedin,
   Briefcase, GraduationCap, Code2, FolderGit2, ExternalLink,
+  FileText, LayoutList,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
-// Data
+// Data — from actual resume
 // ---------------------------------------------------------------------------
 
 const RESUME = {
   name: 'Devanshu Chicholikar',
   title: 'Software Engineer',
-  tagline: 'MS Software Engineering @ Northeastern · Open to Spring 2026 Co-op + Full-time',
+  tagline: 'MS Software Engineering @ Northeastern · Open to 2026 roles',
   contact: {
     email: 'chicholikar.d@northeastern.edu',
+    phone: '(857) 339-8803',
     location: 'Boston, MA',
     github: 'github.com/DevanshuNEU',
     linkedin: 'linkedin.com/in/devanshuchicholikar',
   },
-  summary: 'Full-stack engineer with 3+ years building production systems across React, Node.js, AWS, and Python. Passionate about distributed systems, developer tooling, and building things that actually ship. Currently pursuing an MS in Software Engineering at Northeastern University.',
+  summary: 'Full-stack engineer with production experience across React, Node.js, AWS, and Python. Passionate about cloud-native systems, AI tooling, and building things that actually ship. Currently pursuing MS in Software Engineering Systems at Northeastern, GPA 3.85. Teaching cloud computing to 60+ graduate students as a TA while building open-source AI infra on the side.',
 
   experience: [
     {
       company: 'Northeastern University',
-      role: 'Graduate Research Assistant',
-      period: 'Jan 2025 — Present',
+      role: 'Graduate Teaching Assistant — Cloud Computing & Networks',
+      period: 'Sep 2025 — Present',
       location: 'Boston, MA',
       bullets: [
-        'Researching distributed systems resilience patterns for microservice architectures',
-        'Building a code intelligence platform (OpenCodeIntel) for semantic code search at scale',
-        'Co-authoring paper on automated CLAUDE.md generation from static code analysis',
+        'Instruct 60+ graduate students on AWS infrastructure, Terraform IaC, and distributed systems; deliver weekly hands-on sessions covering VPC, load balancing, auto-scaling, and fault-tolerant design',
+        'Authored lab curriculum for Docker containerization, GitHub Actions CI/CD, and infra automation; adopted as official course content across 3 sections serving 180+ students',
+        'Lead system design reviews for 15 student teams; standardized evaluation criteria across 3 TAs, reducing grade disputes 40%',
       ],
     },
     {
-      company: 'Capgemini',
-      role: 'Software Engineer',
+      company: 'Jaksh Enterprise',
+      role: 'Software Engineer — Backend / Full Stack',
       period: 'Aug 2022 — Jul 2024',
-      location: 'Pune, India',
+      location: 'Remote',
       bullets: [
-        'Led migration of a monolithic Java application to microservices on AWS ECS, reducing deployment time by 60%',
-        'Built real-time ML feature pipeline processing 500K events/day using Kafka and Redis',
-        'Designed multi-tier AWS infrastructure with Terraform, achieving 99.95% uptime SLA',
-        'Mentored 3 junior engineers and established team-wide TypeScript coding standards',
-      ],
-    },
-    {
-      company: 'Persistent Systems',
-      role: 'Software Engineer Intern',
-      period: 'Jan 2022 — Jul 2022',
-      location: 'Pune, India',
-      bullets: [
-        'Built RESTful APIs with Flask serving 50K+ daily requests, reducing latency by 35%',
-        'Implemented automated test suite with 85% code coverage using pytest and GitHub Actions',
-        'Contributed to frontend migration from jQuery to React, improving bundle size by 40%',
+        'Architected production e-commerce platform handling 12K+ monthly users and 15K+ daily API requests using MERN stack; reduced page load from 3.2s to 2.6s, driving 35% conversion lift',
+        'Designed zero-downtime CI/CD pipeline using GitHub Actions, Docker, and CI test gates; compressed sprint releases from 2 weeks to 3 days at 99.5% deployment success rate',
+        'Reduced API p95 latency 65% (800ms → 280ms) via async queues, PostgreSQL B-tree indexing, and Redis caching; checkout completion up 18% during peak traffic',
       ],
     },
   ],
@@ -71,40 +61,58 @@ const RESUME = {
     {
       institution: 'Northeastern University',
       degree: 'MS, Software Engineering Systems',
-      period: '2024 — 2026',
+      period: 'Sept 2024 — May 2026',
       location: 'Boston, MA',
-      detail: 'Distributed Systems · Cloud Computing · Algorithms · Software Architecture',
+      detail: 'GPA: 3.85 · Network Structures & Cloud Computing · Generative AI · MLOps · Database Management · Algorithms',
     },
     {
-      institution: 'Savitribai Phule Pune University',
-      degree: 'BE, Computer Engineering',
-      period: '2018 — 2022',
-      location: 'Pune, India',
-      detail: 'GPA: 8.7 / 10 · Data Structures · OS · Databases · Computer Networks',
+      institution: 'Dhirubhai Ambani Institute of ICT',
+      degree: 'B.Tech, Information & Communication Technology',
+      period: 'Aug 2018 — May 2022',
+      location: 'Gujarat, India',
+      detail: 'Computer Networks · Operating Systems · Data Structures · Databases',
     },
   ],
 
   skills: [
-    { category: 'Languages',        items: ['TypeScript', 'Python', 'Java', 'SQL', 'Go'] },
-    { category: 'Frontend',         items: ['React', 'Next.js', 'Tailwind CSS', 'Framer Motion'] },
-    { category: 'Backend',          items: ['Node.js', 'Flask', 'Spring Boot', 'PostgreSQL', 'Redis'] },
-    { category: 'Cloud / DevOps',   items: ['AWS (EC2, S3, Lambda, ECS, RDS)', 'Docker', 'Terraform', 'GitHub Actions'] },
-    { category: 'Tools',            items: ['Git', 'PostHog', 'GraphQL', 'Kafka', 'pgvector'] },
+    { category: 'Languages',      items: ['JavaScript', 'TypeScript', 'Python', 'SQL', 'Java'] },
+    { category: 'Frontend',       items: ['React', 'Next.js', 'Tailwind CSS', 'shadcn/ui', 'Zustand', 'HTML5', 'CSS3'] },
+    { category: 'Backend',        items: ['Node.js', 'Express.js', 'PostgreSQL', 'MongoDB', 'FastAPI', 'Flask', 'GraphQL', 'Redis', 'Prisma', 'Microservices'] },
+    { category: 'AI / ML',        items: ['LangChain', 'RAG', 'pgvector', 'Pinecone', 'OpenAI API', 'Voyage AI', 'Cohere', 'Tree-sitter', 'MCP Protocol'] },
+    { category: 'Cloud / DevOps', items: ['AWS (EC2, S3, RDS, Lambda, VPC, ALB, ASG, KMS)', 'Terraform', 'Docker', 'Kubernetes', 'Vercel', 'Supabase', 'GitHub Actions', 'Packer', 'Prometheus', 'Grafana'] },
   ],
 
   projects: [
-    { name: 'devOS', desc: 'Desktop OS portfolio with windowed apps, analytics, and custom wallpapers. Next.js 15, React 19, Zustand.', link: 'devanshuchicholikar.me' },
-    { name: 'Financial Copilot', desc: 'AI financial assistant for students. Parses bank statements, integrates Plaid, provides NL budgeting advice.', link: 'github.com/DevanshuNEU/financial-copilot' },
-    { name: 'SecureScale', desc: 'Production-grade AWS infra with Terraform — ECS, RDS, Vault, auto-scaling, full CI/CD.', link: 'github.com/DevanshuNEU/securescale' },
-    { name: 'Saar', desc: 'CLI tool that auto-generates CLAUDE.md from codebase static analysis using AST parsing and tree-sitter.', link: 'github.com/DevanshuNEU/saar' },
+    {
+      name: 'OpenCodeIntel',
+      tech: 'FastAPI · React · pgvector · LangChain · MCP Protocol',
+      period: 'Sep 2024 — Present',
+      desc: 'Open-source AI code intelligence platform. Hybrid RAG pipeline (vector + BM25 + Cohere reranking), Tree-sitter AST parsing for 8 languages, 87.5% Hit@1 accuracy. MCP server powers Claude with 6 semantic tools.',
+      link: 'github.com/DevanshuNEU/opencodeintel',
+    },
+    {
+      name: 'SecureScale',
+      tech: 'AWS · Terraform · Packer · GitHub Actions · Lambda',
+      period: 'Jan 2025 — Apr 2025',
+      desc: 'Production-grade multi-AZ AWS infra: VPC, ALB, ASG, RDS, S3. Defense-in-depth with 4 KMS keys, IAM least-privilege, zero-downtime CI/CD. Provisioning from 2 hours to 10 minutes. Cloud spend down 30%.',
+      link: 'github.com/DevanshuNEU/securescale',
+    },
+    {
+      name: 'devOS',
+      tech: 'Next.js 15 · React 19 · Zustand · Framer Motion',
+      period: '2025 — Present',
+      desc: 'This portfolio, built as a desktop OS. Windowed apps, analytics, RPG skill tree, arcade games, and a Finder-style project browser.',
+      link: 'devanshuchicholikar.me',
+    },
   ],
 };
 
-const SECTIONS = ['Summary', 'Experience', 'Education', 'Skills', 'Projects'] as const;
+const SECTIONS = ['Experience', 'Education', 'Skills', 'Projects', 'Summary'] as const;
 type Section = typeof SECTIONS[number];
+type ViewMode = 'interactive' | 'pdf';
 
 // ---------------------------------------------------------------------------
-// Components
+// Sub-components
 // ---------------------------------------------------------------------------
 
 function SectionHeading({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
@@ -132,6 +140,7 @@ function Bullet({ text }: { text: string }) {
 
 export default function ResumeApp() {
   const [activeSection, setActiveSection] = useState<Section>('Experience');
+  const [viewMode, setViewMode] = useState<ViewMode>('interactive');
 
   const sectionVariants = {
     hidden: { opacity: 0, y: 12 },
@@ -154,15 +163,49 @@ export default function ResumeApp() {
             <p className="text-accent text-sm font-medium">{RESUME.title}</p>
             <p className="text-text-secondary text-xs mt-0.5">{RESUME.tagline}</p>
           </div>
-          {/* Contact + Download */}
+
+          {/* Right actions */}
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <a
-              href="mailto:chicholikar.d@northeastern.edu"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors text-xs font-medium text-accent"
-            >
-              <Download size={12} />
-              Download PDF
-            </a>
+            {/* View toggle + Download */}
+            <div className="flex items-center gap-2">
+              {/* View mode toggle */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-white/6 border border-white/10">
+                <button
+                  onClick={() => setViewMode('interactive')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'interactive'
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text'
+                  }`}
+                >
+                  <LayoutList size={11} />
+                  Interactive
+                </button>
+                <button
+                  onClick={() => setViewMode('pdf')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'pdf'
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text'
+                  }`}
+                >
+                  <FileText size={11} />
+                  PDF
+                </button>
+              </div>
+
+              {/* Download */}
+              <a
+                href="/resume.pdf"
+                download="Devanshu_Chicholikar_Resume.pdf"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors text-xs font-medium text-accent"
+              >
+                <Download size={12} />
+                Download
+              </a>
+            </div>
+
+            {/* Contact row */}
             <div className="flex gap-3">
               <span className="flex items-center gap-1 text-xs text-text-secondary">
                 <Mail size={11} /> {RESUME.contact.email}
@@ -184,151 +227,179 @@ export default function ResumeApp() {
           </div>
         </div>
 
-        {/* Nav */}
-        <div className="flex gap-1 mt-4">
-          {SECTIONS.map(section => (
-            <button
-              key={section}
-              onClick={() => setActiveSection(section)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                activeSection === section
-                  ? 'bg-accent text-white'
-                  : 'text-text-secondary hover:text-text hover:bg-white/8'
-              }`}
-            >
-              {section}
-            </button>
-          ))}
-        </div>
+        {/* Section nav — only in interactive mode */}
+        {viewMode === 'interactive' && (
+          <div className="flex gap-1 mt-4">
+            {SECTIONS.map(section => (
+              <button
+                key={section}
+                onClick={() => setActiveSection(section)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  activeSection === section
+                    ? 'bg-accent text-white'
+                    : 'text-text-secondary hover:text-text hover:bg-white/8'
+                }`}
+              >
+                {section}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-5">
-        <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait">
+        {viewMode === 'pdf' ? (
           <motion.div
-            key={activeSection}
-            variants={sectionVariants}
-            initial="hidden"
-            animate="visible"
+            key="pdf"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 overflow-hidden"
           >
-
-            {/* Summary */}
-            {activeSection === 'Summary' && (
-              <motion.div variants={itemVariants}>
-                <SectionHeading icon={Code2} title="Summary" />
-                <p className="text-sm text-text-secondary leading-relaxed max-w-2xl">
-                  {RESUME.summary}
-                </p>
-              </motion.div>
-            )}
-
-            {/* Experience */}
-            {activeSection === 'Experience' && (
-              <div className="space-y-6">
-                <SectionHeading icon={Briefcase} title="Experience" />
-                {RESUME.experience.map((job, idx) => (
-                  <motion.div key={idx} variants={itemVariants} className="relative pl-4">
-                    {/* Timeline line */}
-                    <div className="absolute left-0 top-2 bottom-0 w-px bg-white/10" />
-                    <div className="absolute left-[-3px] top-[7px] w-2 h-2 rounded-full bg-accent" />
-
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div>
-                        <h3 className="font-semibold text-text text-sm">{job.role}</h3>
-                        <p className="text-accent text-xs font-medium">{job.company}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-text-secondary font-mono">{job.period}</p>
-                        <p className="text-xs text-text-secondary">{job.location}</p>
-                      </div>
-                    </div>
-                    <ul className="space-y-1 mt-2">
-                      {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
-                    </ul>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
-            {/* Education */}
-            {activeSection === 'Education' && (
-              <div className="space-y-5">
-                <SectionHeading icon={GraduationCap} title="Education" />
-                {RESUME.education.map((edu, idx) => (
-                  <motion.div key={idx} variants={itemVariants} className="glass-subtle rounded-xl p-4 border border-white/10">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-text text-sm">{edu.institution}</h3>
-                        <p className="text-accent text-xs font-medium mt-0.5">{edu.degree}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-text-secondary font-mono">{edu.period}</p>
-                        <p className="text-xs text-text-secondary">{edu.location}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-text-secondary mt-2 leading-relaxed">{edu.detail}</p>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
-            {/* Skills */}
-            {activeSection === 'Skills' && (
-              <div className="space-y-4">
-                <SectionHeading icon={Code2} title="Skills" />
-                {RESUME.skills.map((group, idx) => (
-                  <motion.div key={idx} variants={itemVariants}>
-                    <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                      {group.category}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.items.map(skill => (
-                        <span
-                          key={skill}
-                          className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/6 text-text border border-white/10 hover:border-accent/40 hover:text-accent transition-colors cursor-default"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
-            {/* Projects */}
-            {activeSection === 'Projects' && (
-              <div className="space-y-4">
-                <SectionHeading icon={FolderGit2} title="Projects" />
-                {RESUME.projects.map((proj, idx) => (
-                  <motion.div
-                    key={idx}
-                    variants={itemVariants}
-                    className="glass-subtle rounded-xl p-4 border border-white/10 hover:border-accent/30 transition-colors group"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-text text-sm group-hover:text-accent transition-colors">
-                        {proj.name}
-                      </h3>
-                      <a
-                        href={`https://${proj.link}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-text-secondary hover:text-accent transition-colors flex-shrink-0"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
-                    </div>
-                    <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{proj.desc}</p>
-                    <p className="text-xs text-accent/60 mt-1.5 font-mono">{proj.link}</p>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-
+            <iframe
+              src="/resume.pdf"
+              className="w-full h-full border-0"
+              title="Resume PDF"
+            />
           </motion.div>
-        </AnimatePresence>
-      </div>
+        ) : (
+          <motion.div
+            key="interactive"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 overflow-auto p-5"
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                variants={sectionVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {/* Experience */}
+                {activeSection === 'Experience' && (
+                  <div className="space-y-6">
+                    <SectionHeading icon={Briefcase} title="Experience" />
+                    {RESUME.experience.map((job, idx) => (
+                      <motion.div key={idx} variants={itemVariants} className="relative pl-4">
+                        <div className="absolute left-0 top-2 bottom-0 w-px bg-white/10" />
+                        <div className="absolute left-[-3px] top-[7px] w-2 h-2 rounded-full bg-accent" />
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div>
+                            <h3 className="font-semibold text-text text-sm">{job.role}</h3>
+                            <p className="text-accent text-xs font-medium">{job.company}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-text-secondary font-mono">{job.period}</p>
+                            <p className="text-xs text-text-secondary">{job.location}</p>
+                          </div>
+                        </div>
+                        <ul className="space-y-1 mt-2">
+                          {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
+                        </ul>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Education */}
+                {activeSection === 'Education' && (
+                  <div className="space-y-5">
+                    <SectionHeading icon={GraduationCap} title="Education" />
+                    {RESUME.education.map((edu, idx) => (
+                      <motion.div key={idx} variants={itemVariants} className="glass-subtle rounded-xl p-4 border border-white/10">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="font-semibold text-text text-sm">{edu.institution}</h3>
+                            <p className="text-accent text-xs font-medium mt-0.5">{edu.degree}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-text-secondary font-mono">{edu.period}</p>
+                            <p className="text-xs text-text-secondary">{edu.location}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-text-secondary mt-2 leading-relaxed">{edu.detail}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Skills */}
+                {activeSection === 'Skills' && (
+                  <div className="space-y-4">
+                    <SectionHeading icon={Code2} title="Skills" />
+                    {RESUME.skills.map((group, idx) => (
+                      <motion.div key={idx} variants={itemVariants}>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                          {group.category}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.items.map(skill => (
+                            <span
+                              key={skill}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/6 text-text border border-white/10 hover:border-accent/40 hover:text-accent transition-colors cursor-default"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Projects */}
+                {activeSection === 'Projects' && (
+                  <div className="space-y-4">
+                    <SectionHeading icon={FolderGit2} title="Projects" />
+                    {RESUME.projects.map((proj, idx) => (
+                      <motion.div
+                        key={idx}
+                        variants={itemVariants}
+                        className="glass-subtle rounded-xl p-4 border border-white/10 hover:border-accent/30 transition-colors group"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div>
+                            <h3 className="font-semibold text-text text-sm group-hover:text-accent transition-colors">
+                              {proj.name}
+                            </h3>
+                            <p className="text-xs text-accent/70 font-mono mt-0.5">{proj.tech}</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-xs text-text-secondary font-mono">{proj.period}</span>
+                            <a
+                              href={`https://${proj.link}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-text-secondary hover:text-accent transition-colors"
+                            >
+                              <ExternalLink size={13} />
+                            </a>
+                          </div>
+                        </div>
+                        <p className="text-xs text-text-secondary leading-relaxed mt-2">{proj.desc}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Summary */}
+                {activeSection === 'Summary' && (
+                  <motion.div variants={itemVariants}>
+                    <SectionHeading icon={Code2} title="Summary" />
+                    <p className="text-sm text-text-secondary leading-relaxed max-w-2xl">
+                      {RESUME.summary}
+                    </p>
+                  </motion.div>
+                )}
+
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

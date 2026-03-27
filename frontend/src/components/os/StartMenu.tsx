@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, Palette } from 'lucide-react';
+import { Image } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { getStartMenuApps, getAppLabel } from '@/lib/appRegistry';
 import {
@@ -108,21 +108,6 @@ export function StartMenu({ open, onClose }: StartMenuProps) {
                   </div>
                 </CommandGroup>
 
-                {/* Quick Actions */}
-                <CommandGroup
-                  heading="Quick Actions"
-                  className="text-text-secondary border-t border-white/10"
-                >
-                  <CommandItem
-                    onSelect={() => {
-                      handleSelectApp('display-options');
-                    }}
-                    className="cursor-pointer text-text"
-                  >
-                    <Palette className="mr-2 h-4 w-4" />
-                    <span>Personalize</span>
-                  </CommandItem>
-                </CommandGroup>
               </CommandList>
             </Command>
           </motion.div>

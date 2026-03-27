@@ -39,7 +39,7 @@ const GAMES = [
   {
     id: '2048' as GameId,
     title: '2048',
-    subtitle: 'The one you said you\'d stop playing',
+    subtitle: "The one you said you'd stop playing",
     description: 'Arrow keys / WASD. Reach 2048. Or just 256. No judgment.',
     color: '#f59e0b',
     emoji: '🔢',
@@ -106,7 +106,7 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Back bar shared by all games
+// Shared game header
 // ---------------------------------------------------------------------------
 
 function GameHeader({
@@ -145,24 +145,29 @@ function GameHeader({
 }
 
 // ---------------------------------------------------------------------------
-// SNAKE
+// SNAKE — ref-based game state to avoid React 19 strict mode issues
 // ---------------------------------------------------------------------------
 
 const SNAKE_GRID = 20;
 
 function SnakeGameView({ onBack }: { onBack: () => void }) {
   const [cellSize, setCellSize] = useState(18);
-  const [snake, setSnake] = useState([{ x: 10, y: 10 }]);
-  const [food, setFood] = useState({ x: 15, y: 15 });
-  const [direction, setDirection] = useState<'UP'|'DOWN'|'LEFT'|'RIGHT'>('RIGHT');
-  const [status, setStatus] = useState<'idle'|'playing'|'paused'|'over'>('idle');
+  const [status, setStatus] = useState<'idle' | 'playing' | 'paused' | 'over'>('idle');
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(() => parseInt(localStorage.getItem('devos-snake-hs') ?? '0'));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loopRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const dirRef = useRef(direction);
-  dirRef.current = direction;
+
+  // All mutable game state lives in refs — no nested setState issues
+  const dirRef = useRef<'UP' | 'DOWN' | 'LEFT' | 'RIGHT'>('RIGHT');
+  const snakeRef = useRef([{ x: 10, y: 10 }]);
+  const foodRef = useRef({ x: 15, y: 15 });
+  const scoreRef = useRef(0);
+  const statusRef = useRef<'idle' | 'playing' | 'paused' | 'over'>('idle');
+
+  // Sync status ref so loop can read it without stale closure
+  useEffect(() => { statusRef.current = status; }, [status]);
 
   useEffect(() => {
     const obs = new ResizeObserver(() => {
@@ -174,53 +179,105 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
     return () => obs.disconnect();
   }, []);
 
-  const randFood = useCallback(() => ({
+  const randPos = () => ({
     x: Math.floor(Math.random() * SNAKE_GRID),
     y: Math.floor(Math.random() * SNAKE_GRID),
-  }), []);
+  });
 
-  const startGame = useCallback(() => {
-    setSnake([{ x: 10, y: 10 }]);
-    setFood(randFood());
-    setDirection('RIGHT');
-    setScore(0);
-    setStatus('playing');
-  }, [randFood]);
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const cs = cellSize;
+    const s = SNAKE_GRID * cs;
+    const snake = snakeRef.current;
+    const food = foodRef.current;
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, s, s);
+
+    // Checkerboard
+    ctx.fillStyle = '#1a1a1a';
+    for (let x = 0; x < SNAKE_GRID; x++) {
+      for (let y = 0; y < SNAKE_GRID; y++) {
+        if ((x + y) % 2 === 0) ctx.fillRect(x * cs, y * cs, cs, cs);
+      }
+    }
+
+    // Snake
+    snake.forEach((seg, i) => {
+      ctx.fillStyle = i === 0 ? '#4ade80' : '#22c55e';
+      ctx.beginPath();
+      ctx.roundRect(seg.x * cs + 1, seg.y * cs + 1, cs - 2, cs - 2, 3);
+      ctx.fill();
+    });
+
+    // Food
+    ctx.fillStyle = '#f87171';
+    ctx.beginPath();
+    ctx.roundRect(food.x * cs + 2, food.y * cs + 2, cs - 4, cs - 4, cs / 2);
+    ctx.fill();
+  }, [cellSize]);
 
   const loop = useCallback(() => {
-    setSnake(prev => {
-      const head = { ...prev[0] };
-      if (dirRef.current === 'UP') head.y--;
-      if (dirRef.current === 'DOWN') head.y++;
-      if (dirRef.current === 'LEFT') head.x--;
-      if (dirRef.current === 'RIGHT') head.x++;
-      if (head.x < 0 || head.x >= SNAKE_GRID || head.y < 0 || head.y >= SNAKE_GRID ||
-          prev.some(s => s.x === head.x && s.y === head.y)) {
-        setStatus('over');
-        setScore(s => {
-          const ns = s;
-          setBest(b => {
-            const nb = Math.max(b, ns);
-            localStorage.setItem('devos-snake-hs', nb.toString());
-            return nb;
-          });
-          return s;
-        });
-        return prev;
-      }
-      const next = [head, ...prev];
-      setFood(f => {
-        if (head.x === f.x && head.y === f.y) {
-          setScore(s => s + 1);
-          return randFood();
-        }
-        next.pop();
-        return f;
-      });
-      return next;
-    });
-  }, [randFood]);
+    if (statusRef.current !== 'playing') return;
 
+    const snake = snakeRef.current;
+    const food = foodRef.current;
+    const dir = dirRef.current;
+
+    const head = { ...snake[0] };
+    if (dir === 'UP') head.y--;
+    if (dir === 'DOWN') head.y++;
+    if (dir === 'LEFT') head.x--;
+    if (dir === 'RIGHT') head.x++;
+
+    // Collision check
+    if (
+      head.x < 0 || head.x >= SNAKE_GRID ||
+      head.y < 0 || head.y >= SNAKE_GRID ||
+      snake.some(s => s.x === head.x && s.y === head.y)
+    ) {
+      clearInterval(loopRef.current);
+      setStatus('over');
+      const finalScore = scoreRef.current;
+      setBest(b => {
+        const nb = Math.max(b, finalScore);
+        localStorage.setItem('devos-snake-hs', nb.toString());
+        return nb;
+      });
+      return;
+    }
+
+    const next = [head, ...snake];
+
+    if (head.x === food.x && head.y === food.y) {
+      // Ate food — grow
+      const newScore = scoreRef.current + 1;
+      scoreRef.current = newScore;
+      setScore(newScore);
+      foodRef.current = randPos();
+    } else {
+      next.pop();
+    }
+
+    snakeRef.current = next;
+    draw();
+  }, [draw]);
+
+  const startGame = useCallback(() => {
+    clearInterval(loopRef.current);
+    snakeRef.current = [{ x: 10, y: 10 }];
+    foodRef.current = randPos();
+    scoreRef.current = 0;
+    dirRef.current = 'RIGHT';
+    setScore(0);
+    setStatus('playing');
+    draw();
+  }, [draw]);
+
+  // Start/stop interval when status changes
   useEffect(() => {
     if (status === 'playing') {
       loopRef.current = setInterval(loop, 140);
@@ -228,46 +285,36 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
     }
   }, [status, loop]);
 
+  // Redraw when cell size changes
+  useEffect(() => { draw(); }, [draw]);
+
+  // Keyboard handler
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const map: Record<string, 'UP'|'DOWN'|'LEFT'|'RIGHT'> = {
+      const map: Record<string, 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'> = {
         ArrowUp: 'UP', w: 'UP', W: 'UP',
         ArrowDown: 'DOWN', s: 'DOWN', S: 'DOWN',
         ArrowLeft: 'LEFT', a: 'LEFT', A: 'LEFT',
         ArrowRight: 'RIGHT', d: 'RIGHT', D: 'RIGHT',
       };
-      const opp: Record<string, string> = { UP:'DOWN', DOWN:'UP', LEFT:'RIGHT', RIGHT:'LEFT' };
+      const opp: Record<string, string> = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' };
       const d = map[e.key];
       if (d && d !== opp[dirRef.current]) {
         e.preventDefault();
-        setDirection(d);
+        dirRef.current = d;
       }
-      if (e.key === ' ') { e.preventDefault(); setStatus(s => s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s); }
+      if (e.key === ' ') {
+        e.preventDefault();
+        setStatus(s => {
+          const next = s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s;
+          statusRef.current = next;
+          return next;
+        });
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d'); if (!ctx) return;
-    const s = SNAKE_GRID * cellSize;
-    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, s, s);
-    ctx.fillStyle = '#1a1a1a';
-    for (let x = 0; x < SNAKE_GRID; x++) for (let y = 0; y < SNAKE_GRID; y++) {
-      if ((x + y) % 2 === 0) ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-    }
-    snake.forEach((seg, i) => {
-      ctx.fillStyle = i === 0 ? '#4ade80' : '#22c55e';
-      ctx.beginPath();
-      ctx.roundRect(seg.x * cellSize + 1, seg.y * cellSize + 1, cellSize - 2, cellSize - 2, 3);
-      ctx.fill();
-    });
-    ctx.fillStyle = '#f87171';
-    ctx.beginPath();
-    ctx.roundRect(food.x * cellSize + 2, food.y * cellSize + 2, cellSize - 4, cellSize - 4, cellSize / 2);
-    ctx.fill();
-  }, [snake, food, cellSize]);
 
   const canvasSize = SNAKE_GRID * cellSize;
 
@@ -276,8 +323,12 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
       <GameHeader title="Snake" score={score} best={best} onBack={onBack} onReset={startGame} />
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-4 bg-surface/20 overflow-hidden">
         <div className="relative">
-          <canvas ref={canvasRef} width={canvasSize} height={canvasSize}
-            className="rounded-xl shadow-2xl border border-white/10" />
+          <canvas
+            ref={canvasRef}
+            width={canvasSize}
+            height={canvasSize}
+            className="rounded-xl shadow-2xl border border-white/10"
+          />
           {status !== 'playing' && (
             <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm">
               {status === 'idle' && (
@@ -356,17 +407,23 @@ function flood(board: MSCell[][], r: number, c: number) {
   }
 }
 
-const MS_NUM_COLORS = ['', '#3b82f6','#16a34a','#ef4444','#7c3aed','#b91c1c','#0891b2','#000','#6b7280'];
+const MS_NUM_COLORS = ['', '#3b82f6', '#16a34a', '#ef4444', '#7c3aed', '#b91c1c', '#0891b2', '#000', '#6b7280'];
 
 function MinesweeperGame({ onBack }: { onBack: () => void }) {
   const [board, setBoard] = useState<MSCell[][] | null>(null);
-  const [status, setStatus] = useState<'idle'|'playing'|'won'|'lost'>('idle');
+  const [status, setStatus] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [flags, setFlags] = useState(0);
   const [time, setTime] = useState(0);
   const [best, setBest] = useState(() => parseInt(localStorage.getItem('devos-ms-hs') ?? '0'));
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  const reset = () => { setBoard(null); setStatus('idle'); setFlags(0); setTime(0); clearInterval(timerRef.current); };
+  const reset = () => {
+    clearInterval(timerRef.current);
+    setBoard(null);
+    setStatus('idle');
+    setFlags(0);
+    setTime(0);
+  };
 
   useEffect(() => {
     if (status === 'playing') {
@@ -387,13 +444,17 @@ function MinesweeperGame({ onBack }: { onBack: () => void }) {
     if (b[r][c].flagged || b[r][c].revealed) return;
     if (b[r][c].mine) {
       b.forEach(row => row.forEach(cell => { if (cell.mine) cell.revealed = true; }));
-      setBoard(b); setStatus('lost'); clearInterval(timerRef.current); return;
+      setBoard(b);
+      setStatus('lost');
+      clearInterval(timerRef.current);
+      return;
     }
     flood(b, r, c);
     setBoard(b);
     const remaining = b.flat().filter(cell => !cell.mine && !cell.revealed).length;
     if (remaining === 0) {
-      setStatus('won'); clearInterval(timerRef.current);
+      setStatus('won');
+      clearInterval(timerRef.current);
       setBest(prev => {
         const nb = prev === 0 ? time : Math.min(prev, time);
         localStorage.setItem('devos-ms-hs', nb.toString());
@@ -412,10 +473,16 @@ function MinesweeperGame({ onBack }: { onBack: () => void }) {
   };
 
   const cellColor = (cell: MSCell) => {
-    if (!cell.revealed) return cell.flagged ? 'bg-red-500/20 border-red-500/40' : 'bg-white/8 border-white/15 hover:bg-white/14 cursor-pointer';
+    if (!cell.revealed) return cell.flagged
+      ? 'bg-red-500/20 border-red-500/40'
+      : 'bg-white/8 border-white/15 hover:bg-white/14 cursor-pointer';
     if (cell.mine) return 'bg-red-600 border-red-500';
     return 'bg-white/4 border-white/8';
   };
+
+  const displayBoard = board ?? Array.from({ length: MS_ROWS }, () =>
+    Array.from({ length: MS_COLS }, () => ({ mine: false, revealed: false, flagged: false, adjacent: 0 }))
+  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -426,10 +493,11 @@ function MinesweeperGame({ onBack }: { onBack: () => void }) {
       >
         <div className="text-xs text-text-secondary font-mono w-12 text-center">{String(time).padStart(3, '0')}s</div>
       </GameHeader>
+
       <div className="flex-1 flex items-center justify-center p-6 bg-surface/20 overflow-hidden">
         <div className="relative">
           <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${MS_COLS}, 1fr)` }}>
-            {(board ?? Array.from({ length: MS_ROWS }, () => Array.from({ length: MS_COLS }, () => ({ mine: false, revealed: false, flagged: false, adjacent: 0 })))).map((row, r) =>
+            {displayBoard.map((row, r) =>
               row.map((cell, c) => (
                 <button
                   key={`${r}-${c}`}
@@ -438,14 +506,16 @@ function MinesweeperGame({ onBack }: { onBack: () => void }) {
                   onContextMenu={e => handleRight(e, r, c)}
                 >
                   {cell.flagged && !cell.revealed ? '🚩' :
-                   cell.revealed && cell.mine ? '💣' :
-                   cell.revealed && cell.adjacent > 0 ? (
-                     <span style={{ color: MS_NUM_COLORS[cell.adjacent] }}>{cell.adjacent}</span>
-                   ) : null}
+                    cell.revealed && cell.mine ? '💣' :
+                      cell.revealed && cell.adjacent > 0 ? (
+                        <span style={{ color: MS_NUM_COLORS[cell.adjacent] }}>{cell.adjacent}</span>
+                      ) : null}
                 </button>
               ))
             )}
           </div>
+
+          {/* Game over / won overlay */}
           {(status === 'won' || status === 'lost') && (
             <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm">
               <div className="text-center space-y-3">
@@ -457,13 +527,16 @@ function MinesweeperGame({ onBack }: { onBack: () => void }) {
               </div>
             </div>
           )}
+
+          {/* Idle hint — pointer-events-none so clicks pass through to cells */}
           {status === 'idle' && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm">
-              <p className="text-white/80 text-sm">Click any cell to start</p>
+            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 backdrop-blur-[2px] pointer-events-none">
+              <p className="text-white/80 text-sm font-medium">Click any cell to start</p>
             </div>
           )}
         </div>
       </div>
+
       <div className="text-center py-2 text-xs text-text-secondary border-t border-white/10">
         Left click to reveal · Right click to flag
       </div>
@@ -510,19 +583,18 @@ function slideRow(row: number[]): { row: number[]; score: number } {
   return { row: merged, score };
 }
 
-function move(g: TGrid, dir: 'left'|'right'|'up'|'down'): { grid: TGrid; score: number; moved: boolean } {
+function move(g: TGrid, dir: 'left' | 'right' | 'up' | 'down'): { grid: TGrid; score: number; moved: boolean } {
   let total = 0, moved = false;
   const ng: TGrid = g.map(r => [...r]);
-  const slide = (row: number[]) => slideRow(row);
   if (dir === 'left') {
     for (let r = 0; r < 4; r++) {
-      const { row, score } = slide(ng[r]);
+      const { row, score } = slideRow(ng[r]);
       if (row.some((v, i) => v !== ng[r][i])) moved = true;
       ng[r] = row; total += score;
     }
   } else if (dir === 'right') {
     for (let r = 0; r < 4; r++) {
-      const { row, score } = slide([...ng[r]].reverse());
+      const { row, score } = slideRow([...ng[r]].reverse());
       const rev = row.reverse();
       if (rev.some((v, i) => v !== ng[r][i])) moved = true;
       ng[r] = rev; total += score;
@@ -530,14 +602,14 @@ function move(g: TGrid, dir: 'left'|'right'|'up'|'down'): { grid: TGrid; score: 
   } else if (dir === 'up') {
     for (let c = 0; c < 4; c++) {
       const col = ng.map(r => r[c]);
-      const { row, score } = slide(col);
+      const { row, score } = slideRow(col);
       if (row.some((v, i) => v !== col[i])) moved = true;
       row.forEach((v, r) => { ng[r][c] = v; }); total += score;
     }
   } else {
     for (let c = 0; c < 4; c++) {
       const col = ng.map(r => r[c]).reverse();
-      const { row, score } = slide(col);
+      const { row, score } = slideRow(col);
       const rev = row.reverse();
       if (rev.some((v, i) => v !== ng[ng.length - 1 - i]?.[c])) moved = true;
       rev.forEach((v, r) => { ng[r][c] = v; }); total += score;
@@ -570,7 +642,7 @@ function TwoZeroFourEight({ onBack }: { onBack: () => void }) {
 
   const reset = () => { setGrid(newGrid()); setScore(0); setWon(false); setOver(false); };
 
-  const doMove = useCallback((dir: 'left'|'right'|'up'|'down') => {
+  const doMove = useCallback((dir: 'left' | 'right' | 'up' | 'down') => {
     if (over) return;
     setGrid(g => {
       const { grid: ng, score: ds, moved } = move(g, dir);
@@ -586,7 +658,7 @@ function TwoZeroFourEight({ onBack }: { onBack: () => void }) {
         return ns;
       });
       if (ng.flat().includes(2048)) setWon(true);
-      const hasMoves = (['left','right','up','down'] as const).some(d => move(ng, d).moved);
+      const hasMoves = (['left', 'right', 'up', 'down'] as const).some(d => move(ng, d).moved);
       if (!hasMoves) setOver(true);
       return ng;
     });
@@ -594,11 +666,11 @@ function TwoZeroFourEight({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const map: Record<string, 'left'|'right'|'up'|'down'> = {
-        ArrowLeft:'left', a:'left', A:'left',
-        ArrowRight:'right', d:'right', D:'right',
-        ArrowUp:'up', w:'up', W:'up',
-        ArrowDown:'down', s:'down', S:'down',
+      const map: Record<string, 'left' | 'right' | 'up' | 'down'> = {
+        ArrowLeft: 'left', a: 'left', A: 'left',
+        ArrowRight: 'right', d: 'right', D: 'right',
+        ArrowUp: 'up', w: 'up', W: 'up',
+        ArrowDown: 'down', s: 'down', S: 'down',
       };
       const d = map[e.key];
       if (d) { e.preventDefault(); doMove(d); }
@@ -607,8 +679,7 @@ function TwoZeroFourEight({ onBack }: { onBack: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [doMove]);
 
-  // Touch support
-  const touchStart = useRef<{x:number;y:number}|null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const onTouchStart = (e: React.TouchEvent) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (!touchStart.current) return;
