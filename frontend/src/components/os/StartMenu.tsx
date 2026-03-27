@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { getStartMenuApps, getAppLabel } from '@/lib/appRegistry';
 import {
@@ -10,7 +9,6 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandInput,
-  CommandItem,
   CommandList,
 } from '@/components/ui/command';
 import type { AppType } from '../../../../shared/types';

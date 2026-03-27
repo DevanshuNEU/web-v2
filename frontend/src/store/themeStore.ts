@@ -90,15 +90,15 @@ export const useThemeStore = create<ThemeStore>()(
       toggleMode: () =>
         set((state) => {
           const newMode = state.mode === "light" ? "dark" : "light";
-          // Auto-switch wallpaper when theme changes
           const defaultWallpaper =
             newMode === "dark"
               ? {
-                  id: "dark-mountain",
-                  name: "Mountain Night",
-                  type: "static" as const,
+                  id: "dark-particles",
+                  name: "Neural Network",
+                  type: "animated" as const,
                   theme: "dark" as const,
-                  imageUrl: "/wallpapers/dark-mountainNight.png",
+                  thumbnail: "linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 50%,#0a1a2a 100%)",
+                  animatedConfig: { colors: ["#4facfe", "#00f2fe"], speed: 1, pattern: "particles" as const },
                 }
               : {
                   id: "light-mountains",
@@ -107,21 +107,19 @@ export const useThemeStore = create<ThemeStore>()(
                   theme: "light" as const,
                   imageUrl: "/wallpapers/light-mountainVista.png",
                 };
-          return {
-            mode: newMode,
-            wallpaper: defaultWallpaper,
-          };
+          return { mode: newMode, wallpaper: defaultWallpaper };
         }),
 
       setMode: (mode) => {
         const defaultWallpaper =
-          mode === "light"
+          mode === "dark"
             ? {
-                id: "dark-mountain",
-                name: "Mountain Night",
-                type: "static" as const,
+                id: "dark-particles",
+                name: "Neural Network",
+                type: "animated" as const,
                 theme: "dark" as const,
-                imageUrl: "/wallpapers/dark-mountainNight.png",
+                thumbnail: "linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 50%,#0a1a2a 100%)",
+                animatedConfig: { colors: ["#4facfe", "#00f2fe"], speed: 1, pattern: "particles" as const },
               }
             : {
                 id: "light-mountains",
