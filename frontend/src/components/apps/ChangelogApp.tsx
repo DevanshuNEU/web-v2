@@ -109,7 +109,7 @@ const RELEASES: Release[] = [
     codename: 'Launch',
     summary: 'It\'s alive. First public release. Definitely no bugs.',
     changes: [
-      { type: 'release', text: 'Initial public release of devanshuchicholikar.me' },
+      { type: 'release', text: 'Initial public release of devanshuchicholikar.com' },
       { type: 'feature', text: 'Static portfolio with About, Projects, Skills, and Contact sections' },
       { type: 'feature', text: 'Responsive layout with Tailwind CSS' },
       { type: 'feature', text: 'GitHub Actions CI/CD pipeline to Vercel' },

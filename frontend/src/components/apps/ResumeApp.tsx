@@ -102,7 +102,7 @@ const RESUME = {
       tech: 'Next.js 15 · React 19 · Zustand · Framer Motion',
       period: '2025 — Present',
       desc: 'This portfolio, built as a desktop OS. Windowed apps, analytics, RPG skill tree, arcade games, and a Finder-style project browser.',
-      link: 'devanshuchicholikar.me',
+      link: 'devanshuchicholikar.com',
     },
   ],
 };

@@ -41,7 +41,7 @@ const PROJECTS: Project[] = [
     category: 'Frontend',
     tech: ['Next.js 15', 'React 19', 'TypeScript', 'Tailwind CSS', 'Framer Motion', 'Zustand', 'PostHog'],
     github: 'https://github.com/DevanshuNEU/portfolio',
-    live: 'https://devanshuchicholikar.me',
+    live: 'https://devanshuchicholikar.com',
     stars: 12,
     status: 'production',
     highlight: true,
