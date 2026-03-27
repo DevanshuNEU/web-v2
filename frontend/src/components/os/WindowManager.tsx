@@ -12,6 +12,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { appRegistry } from '@/lib/appRegistry';
+import { playSound } from '@/hooks/useSoundEffects';
 import Window from './Window';
 import AppLoader from './AppLoader';
 import type { AppType } from '../../../../shared/types';
@@ -58,10 +59,14 @@ export default function WindowManager() {
     // Defer store updates to avoid triggering useSyncExternalStore during commit
     const timer = setTimeout(() => {
       const { trackAppOpen, trackAppClose } = useAnalyticsStore.getState();
-      newWindows.forEach(w => trackAppOpen(w.appType));
+      newWindows.forEach(w => {
+        trackAppOpen(w.appType);
+        playSound('windowOpen');
+      });
       closedIds.forEach(id => {
         const appType = id.split('-').slice(0, -1).join('-') as AppType;
         trackAppClose(appType);
+        playSound('windowClose');
       });
     }, 0);
 

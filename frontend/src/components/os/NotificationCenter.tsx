@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useNotificationStore } from '@/store/notificationStore';
 import { notifications as notifCopy } from '@/data/copy';
+import { playSound } from '@/hooks/useSoundEffects';
 
 export default function NotificationCenter() {
   const notifications = useNotificationStore(state => state.notifications);
@@ -19,6 +20,7 @@ export default function NotificationCenter() {
     hasShownWelcome.current = true;
 
     const timer = setTimeout(() => {
+      playSound('notify');
       push({
         title: notifCopy.welcome.title,
         body: notifCopy.welcome.body,

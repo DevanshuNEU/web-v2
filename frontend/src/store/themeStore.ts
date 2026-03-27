@@ -15,7 +15,7 @@ export interface Wallpaper {
   animatedConfig?: {
     colors: string[];
     speed: number;
-    pattern: "mesh" | "radial" | "wave";
+    pattern: "mesh" | "radial" | "wave" | "particles" | "starfield";
   };
 }
 
