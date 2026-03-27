@@ -7,5 +7,6 @@
       "runtimeArgs": ["run", "dev", "--workspace=frontend"],
       "port": 3000
     }
-  ]
+  ],
+  "autoVerify": false
 }
