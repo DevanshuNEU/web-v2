@@ -1,62 +1,69 @@
-# Portfolio OS
+# devOS
 
-A PostHog-inspired portfolio website that mimics an operating system interface. Built with Next.js and designed to be engaging, interactive, and accessible to everyone.
+> A portfolio disguised as an operating system. Because a PDF résumé felt like a downgrade.
 
-## Features
+[Live →](https://devanshuchicholikar.com) · Built by Devanshu Chicholikar · devOS v2.1
 
--  Desktop-style interface with draggable windows
--  Responsive design for all devices  
--  Interactive games and easter eggs
--  Real-time GitHub integration
--  PostHog-inspired aesthetics
--  Fast, modern web technologies
+---
+
+## What is this?
+
+Most portfolios are a hero section, a skill bar at 87%, and a contact form that quietly `console.log`s your message into the void.
+
+This is a desktop OS simulator. You boot it up, open windows, play games, browse my repos, and (hopefully) conclude that hiring me is a good idea.
+
+## The Apps
+
+| App | What it does |
+|-----|-------------|
+| **About Me** | The person behind the pixels |
+| **Projects** | Things I shipped |
+| **Skill Tree** | XP earned over the years |
+| **Analytics** | What you did here. Transparent, I promise. |
+| **Ping Me** | Let's talk |
+| **Terminal** | For the CLI-curious. Try `hire devanshu`. |
+| **Arcade** | Procrastination station |
+| **Preferences** | Make it yours |
+| **Finder** | Browse my repos |
+| **Resume** | The formal version of me |
+| **Changelog** | What changed and when |
 
 ## Tech Stack
 
-**Frontend:**
-- Next.js 15 with App Router
-- TypeScript
-- Tailwind CSS
-- Framer Motion
-- Zustand
+**Frontend:** Next.js 15 · TypeScript · Tailwind CSS · Framer Motion · Zustand
+**Backend:** Node.js · Express · Prisma · SQLite
+**Deployed on:** Vercel (obviously)
 
-**Backend:**
-- Node.js with Express
-- TypeScript
-- Prisma ORM
-- SQLite Database
+No duct tape. Minimal regrets.
 
-## Getting Started
+## Running locally
 
-### Frontend
 ```bash
-cd frontend
-npm install
-npm run dev
+# Frontend
+cd frontend && npm install && npm run dev
+
+# Backend (optional — analytics only)
+cd backend && npm install && npm run dev
 ```
 
-### Backend
-```bash
-cd backend
-npm install
-npm run dev
-```
+Opens at `http://localhost:3000`. Boots faster than my actual machine.
 
-## Project Structure
+## Structure
 
 ```
-portfolio-os/
-├── frontend/          # Next.js application
-├── backend/           # Node.js API server
-├── shared/            # Shared TypeScript types
-├── DEVELOPMENT.md     # Development tracking
-└── README.md         # This file
+web-v2/
+├── frontend/     # Next.js — the OS you see
+├── backend/      # Express — the API you don't
+├── shared/       # TypeScript types both sides agree on
+└── README.md     # The one you're reading
 ```
 
-## Deployment
+## Why?
 
-- **Frontend:** Vercel
+Because I had a free weekend, strong opinions about portfolio design, and a deep conviction that a PDF is no way to show off software skills.
 
-## License
+devOS is searchable, playable, and themeable. If that doesn't get me a callback, nothing will.
 
-MIT License - see LICENSE file for details.
+---
+
+MIT. Use it, fork it, don't plagiarize the copy — I worked hard on those one-liners.
