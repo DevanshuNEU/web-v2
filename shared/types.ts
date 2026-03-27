@@ -13,7 +13,7 @@ export interface WindowState {
   appType: AppType;
 }
 
-export type AppType = 
+export type AppType =
   | 'about-me'
   | 'projects'
   | 'skills-dashboard'
@@ -21,7 +21,10 @@ export type AppType =
   | 'contact'
   | 'terminal'
   | 'games'
-  | 'display-options';
+  | 'display-options'
+  | 'file-explorer'
+  | 'resume'
+  | 'changelog';
 
 // API Types
 export interface AnalyticsEvent {

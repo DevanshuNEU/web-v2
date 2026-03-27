@@ -12,16 +12,12 @@ interface WindowProps {
 }
 
 export default function Window({ window, children }: WindowProps) {
-  const { 
-    closeWindow, 
-    focusWindow, 
-    minimizeWindow, 
-    maximizeWindow,
-    updateWindowPosition,
-    activeWindowId 
-  } = useOSStore();
-
-  const isActive = activeWindowId === window.id;
+  const closeWindow = useOSStore(state => state.closeWindow);
+  const focusWindow = useOSStore(state => state.focusWindow);
+  const minimizeWindow = useOSStore(state => state.minimizeWindow);
+  const maximizeWindow = useOSStore(state => state.maximizeWindow);
+  const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
+  const isActive = useOSStore(state => state.activeWindowId === window.id);
   const isDragging = React.useRef(false);
   const [isDraggingState, setIsDraggingState] = React.useState(false);
   const dragOffset = React.useRef({ x: 0, y: 0 });

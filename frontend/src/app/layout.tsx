@@ -1,9 +1,20 @@
+/**
+ * Root Layout
+ * 
+ * App-wide providers and configuration:
+ * - PostHog analytics
+ * - Vercel analytics
+ * - Theme provider
+ * - Toast notifications
+ */
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,6 +79,31 @@ export const metadata: Metadata = {
   },
 };
 
+// JSON-LD structured data for SEO
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Devanshu Chicholikar',
+  jobTitle: 'Software Engineer',
+  url: 'https://devanshuchicholikar.me',
+  image: 'https://devanshuchicholikar.me/devanshu-photo.png',
+  sameAs: [
+    'https://www.linkedin.com/in/devanshuchicholikar/',
+    'https://github.com/DevanshuNEU',
+    'https://github.com/OpenCodeIntel',
+  ],
+  alumniOf: {
+    '@type': 'CollegeOrUniversity',
+    name: 'Northeastern University',
+  },
+  description:
+    'Software Engineer specializing in full-stack development, distributed systems, and cloud infrastructure',
+  knowsAbout: [
+    'JavaScript', 'TypeScript', 'React', 'Node.js', 'AWS',
+    'Cloud Computing', 'Distributed Systems', 'Python', 'Docker', 'Terraform',
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -79,15 +115,44 @@ export default function RootLayout({
         <meta name="google-site-verification" content="EDjK9mEz6aRzLlHgen2Mr76WGHxL5iKMqypx_4oR-iM" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <PostHogProvider>
           <ThemeProvider>
             {children}
             <Toaster />
           </ThemeProvider>
         </PostHogProvider>
+
+        {/* Hidden semantic content for crawlers */}
+        <div className="sr-only">
+          <h1>Devanshu Chicholikar - Software Engineer</h1>
+          <p>
+            MS Software Engineering student at Northeastern University,
+            specializing in full-stack development with React, TypeScript,
+            Node.js, and AWS. Building scalable distributed systems and
+            cloud infrastructure.
+          </p>
+          <h2>Projects</h2>
+          <ul>
+            <li>devOS - Interactive desktop-style portfolio with Next.js 15</li>
+            <li>OpenCodeIntel - Code intelligence platform</li>
+            <li>Financial Copilot - AI financial intelligence platform</li>
+            <li>SecureScale - Production AWS infrastructure with Terraform</li>
+            <li>Saar - Auto-generate CLAUDE.md from static analysis</li>
+          </ul>
+          <h2>Contact</h2>
+          <p>Email: chicholikar.d@northeastern.edu</p>
+          <p>Location: Boston, MA</p>
+          <p>GitHub: github.com/DevanshuNEU</p>
+          <p>LinkedIn: linkedin.com/in/devanshuchicholikar</p>
+        </div>
+
+        <Analytics />
       </body>
     </html>
   );

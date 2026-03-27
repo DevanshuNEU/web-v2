@@ -4,7 +4,11 @@ import { useEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
 
 export function useKeyboardShortcuts() {
-  const { openWindow, focusWindow, closeWindow, windows, activeWindowId } = useOSStore();
+  const openWindow = useOSStore(state => state.openWindow);
+  const focusWindow = useOSStore(state => state.focusWindow);
+  const closeWindow = useOSStore(state => state.closeWindow);
+  const windows = useOSStore(state => state.windows);
+  const activeWindowId = useOSStore(state => state.activeWindowId);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

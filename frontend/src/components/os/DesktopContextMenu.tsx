@@ -19,7 +19,7 @@ interface DesktopContextMenuProps {
 }
 
 export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
-  const { openWindow } = useOSStore();
+  const openWindow = useOSStore(state => state.openWindow);
 
   return (
     <ContextMenu>
