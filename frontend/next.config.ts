@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Tell Next.js the monorepo root so file tracing works correctly on Vercel
+  outputFileTracingRoot: path.join(__dirname, ".."),
+
   eslint: {
-    // Disable ESLint during builds to avoid deployment failures
     ignoreDuringBuilds: true,
   },
   
