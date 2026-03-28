@@ -1,378 +1,389 @@
 'use client';
 
-/**
- * SkillsDashboardApp — RPG Skill Tree
- *
- * Visual skill tree with SVG connections, animated nodes, and category
- * color coding. Inspired by Path of Exile and RPG talent trees.
- */
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
 
-// ---------------------------------------------------------------------------
-// Data
-// ---------------------------------------------------------------------------
+/* ─────────────────────────────────────────────────────────────────── */
+/* Data                                                                */
+/* ─────────────────────────────────────────────────────────────────── */
 
-interface SkillNode {
+interface Skill {
   id: string;
   name: string;
-  category: 'language' | 'frontend' | 'backend' | 'cloud' | 'tool';
-  level: number;      // 1–5
-  xp: string;        // e.g. "3 yrs"
+  category: 'language' | 'frontend' | 'backend' | 'cloud' | 'ai' | 'tool';
+  level: number;   // 1–5
+  xp: string;
   description: string;
-  deps: string[];     // ids of prerequisite nodes
-  col: number;        // grid column (0-indexed)
-  row: number;        // grid row (0-indexed)
+  deps: string[];  // prerequisite skill ids
 }
 
-const SKILLS: SkillNode[] = [
-  // --- Languages (col 0) ---
-  { id: 'ts',       name: 'TypeScript',     category: 'language', level: 5, xp: '3 yrs', description: 'Primary language for all frontend and Node.js work. Strict mode always on.',                       deps: [],          col: 0, row: 0 },
-  { id: 'python',   name: 'Python',         category: 'language', level: 5, xp: '4 yrs', description: 'ML pipelines, Flask APIs, scripts, and data engineering.',                                         deps: [],          col: 0, row: 2 },
-  { id: 'java',     name: 'Java',           category: 'language', level: 4, xp: '2 yrs', description: 'Spring Boot microservices and enterprise patterns.',                                                  deps: [],          col: 0, row: 4 },
-  { id: 'sql',      name: 'SQL',            category: 'language', level: 5, xp: '3 yrs', description: 'Complex queries, window functions, query optimisation, migrations.',                                  deps: [],          col: 0, row: 6 },
+const SKILLS: Skill[] = [
+  // ── Languages ──────────────────────────────────────────────────────
+  { id: 'ts',         name: 'TypeScript',       category: 'language', level: 5, xp: '3 yrs',   description: 'Primary language for all frontend and Node.js work. Strict mode always on.', deps: [] },
+  { id: 'python',     name: 'Python',           category: 'language', level: 5, xp: '4 yrs',   description: 'ML pipelines, Flask APIs, scripts, and data engineering.', deps: [] },
+  { id: 'java',       name: 'Java',             category: 'language', level: 4, xp: '2 yrs',   description: 'Spring Boot microservices and enterprise patterns.', deps: [] },
+  { id: 'sql',        name: 'SQL',              category: 'language', level: 5, xp: '3 yrs',   description: 'Complex queries, window functions, query optimisation, migrations.', deps: [] },
 
-  // --- Frontend (col 1) ---
-  { id: 'react',    name: 'React / Next.js', category: 'frontend', level: 5, xp: '3 yrs', description: 'App Router, RSC, suspense, streaming. This portfolio runs on Next.js 15.',                        deps: ['ts'],      col: 1, row: 0 },
-  { id: 'tailwind', name: 'Tailwind CSS',   category: 'frontend', level: 5, xp: '2 yrs', description: 'Utility-first styling, custom design systems, dark mode.',                                          deps: ['ts'],      col: 1, row: 1 },
-  { id: 'framer',   name: 'Framer Motion',  category: 'frontend', level: 4, xp: '1 yr',  description: 'Spring physics, layout animations, gesture-driven UI.',                                              deps: ['react'],   col: 1, row: 2 }, // moved up
+  // ── Frontend ───────────────────────────────────────────────────────
+  { id: 'react',      name: 'React / Next.js',  category: 'frontend', level: 5, xp: '3 yrs',   description: 'App Router, RSC, Suspense, streaming. This portfolio runs on Next.js 15.', deps: ['ts'] },
+  { id: 'tailwind',   name: 'Tailwind CSS',     category: 'frontend', level: 5, xp: '2 yrs',   description: 'Utility-first styling, custom design systems, dark mode.', deps: ['ts'] },
+  { id: 'framer',     name: 'Framer Motion',    category: 'frontend', level: 4, xp: '1 yr',    description: 'Spring physics, layout animations, gesture-driven UI.', deps: ['react'] },
 
-  // --- Backend (col 2) ---
-  { id: 'node',     name: 'Node.js',        category: 'backend',  level: 5, xp: '3 yrs', description: 'REST APIs, event-driven services, WebSockets.',                                                      deps: ['ts'],      col: 2, row: 0 },
-  { id: 'flask',    name: 'Flask',          category: 'backend',  level: 4, xp: '2 yrs', description: 'RESTful Python APIs, ML model serving, blueprint architecture.',                                      deps: ['python'],  col: 2, row: 2 },
-  { id: 'postgres', name: 'PostgreSQL',     category: 'backend',  level: 5, xp: '3 yrs', description: 'Schema design, indexing, full-text search, row-level security.',                                     deps: ['sql'],     col: 2, row: 4 },
-  { id: 'redis',    name: 'Redis',          category: 'backend',  level: 3, xp: '1 yr',  description: 'Caching layers, pub/sub messaging, session storage.',                                                 deps: ['postgres'], col: 2, row: 5 },
-  { id: 'spring',   name: 'Spring Boot',    category: 'backend',  level: 4, xp: '2 yrs', description: 'Microservices, dependency injection, JPA/Hibernate.',                                                deps: ['java'],    col: 2, row: 3 },
+  // ── Backend ────────────────────────────────────────────────────────
+  { id: 'node',       name: 'Node.js',          category: 'backend',  level: 5, xp: '3 yrs',   description: 'REST APIs, event-driven services, WebSockets.', deps: ['ts'] },
+  { id: 'fastapi',    name: 'FastAPI',          category: 'backend',  level: 5, xp: '2 yrs',   description: 'Async Python APIs — primary backend for all AI/ML services. Pydantic schemas.', deps: ['python'] },
+  { id: 'flask',      name: 'Flask',            category: 'backend',  level: 4, xp: '2 yrs',   description: 'RESTful Python APIs, ML model serving, blueprint architecture.', deps: ['python'] },
+  { id: 'postgres',   name: 'PostgreSQL',       category: 'backend',  level: 5, xp: '3 yrs',   description: 'Schema design, indexing, full-text search, row-level security.', deps: ['sql'] },
+  { id: 'redis',      name: 'Redis',            category: 'backend',  level: 3, xp: '1 yr',    description: 'Caching layers, pub/sub messaging, session storage.', deps: ['postgres'] },
+  { id: 'spring',     name: 'Spring Boot',      category: 'backend',  level: 4, xp: '2 yrs',   description: 'Microservices, dependency injection, JPA/Hibernate.', deps: ['java'] },
 
-  // --- Cloud (col 3) ---
-  { id: 'aws',      name: 'AWS',            category: 'cloud',    level: 4, xp: '2 yrs', description: 'EC2, S3, Lambda, RDS, VPC, IAM — production-grade architecture.',                                   deps: ['node'],    col: 3, row: 0 },
-  { id: 'docker',   name: 'Docker',         category: 'cloud',    level: 4, xp: '2 yrs', description: 'Multi-stage builds, Compose orchestration, optimised images.',                                       deps: ['node'],    col: 3, row: 1 },
-  { id: 'terraform',name: 'Terraform',      category: 'cloud',    level: 4, xp: '1.5 yrs','description': 'IaC for AWS — modules, state management, remote backends.',                                       deps: ['aws'],     col: 3, row: 2 },
-  { id: 'cicd',     name: 'CI/CD',          category: 'cloud',    level: 4, xp: '2 yrs', description: 'GitHub Actions, automated testing, deploy pipelines.',                                               deps: ['docker'],  col: 3, row: 3 },
+  // ── Cloud / DevOps ─────────────────────────────────────────────────
+  { id: 'aws',        name: 'AWS',              category: 'cloud',    level: 5, xp: '2 yrs',   description: 'EC2, S3, Lambda, RDS, VPC, ALB, ASG, KMS, IAM — production-grade multi-AZ architecture.', deps: ['node'] },
+  { id: 'gcp',        name: 'GCP',              category: 'cloud',    level: 4, xp: '1.5 yrs', description: 'Cloud Run, Pub/Sub, Firestore, Vertex AI — serverless event-driven pipelines at 1000+ RPM.', deps: ['python'] },
+  { id: 'docker',     name: 'Docker',           category: 'cloud',    level: 4, xp: '2 yrs',   description: 'Multi-stage builds, Compose orchestration, optimised images.', deps: ['node'] },
+  { id: 'k8s',        name: 'Kubernetes',       category: 'cloud',    level: 3, xp: '1 yr',    description: 'Deployments, services, ingress, resource limits, rolling updates.', deps: ['docker'] },
+  { id: 'terraform',  name: 'Terraform',        category: 'cloud',    level: 4, xp: '1.5 yrs', description: 'IaC for AWS — modules, state management, remote backends. 99.9% uptime achieved.', deps: ['aws'] },
+  { id: 'cicd',       name: 'CI / CD',          category: 'cloud',    level: 4, xp: '2 yrs',   description: 'GitHub Actions, automated testing, zero-downtime deploy pipelines.', deps: ['docker'] },
+  { id: 'prometheus', name: 'Observability',    category: 'cloud',    level: 3, xp: '1 yr',    description: 'Prometheus + Grafana dashboards, CloudWatch alarms, distributed tracing.', deps: ['aws'] },
 
-  // --- Tools (col 4) ---
-  { id: 'git',      name: 'Git',            category: 'tool',     level: 5, xp: '4 yrs', description: 'Rebasing, bisect, worktrees, hooks. Git is muscle memory.',                                          deps: ['ts'],      col: 4, row: 0 },
-  { id: 'graphql',  name: 'GraphQL',        category: 'tool',     level: 3, xp: '1 yr',  description: 'Schema-first design, Apollo Client, DataLoader.',                                                    deps: ['node'],    col: 4, row: 1 },
-  { id: 'posthog',  name: 'PostHog',        category: 'tool',     level: 4, xp: '1 yr',  description: 'Product analytics, feature flags, session replay. Powers this portfolio.',                           deps: ['react'],   col: 4, row: 2 },
+  // ── AI / ML Engineering ────────────────────────────────────────────
+  { id: 'rag',        name: 'RAG Pipelines',    category: 'ai',       level: 5, xp: '1.5 yrs', description: 'Hybrid retrieval: vector + BM25 + Cohere reranking. 87.5% Hit@1 on OpenCodeIntel.', deps: ['python', 'postgres'] },
+  { id: 'langchain',  name: 'LangChain',        category: 'ai',       level: 5, xp: '1.5 yrs', description: 'Chains, agents, memory, tools. Used for agentic code-intelligence pipelines.', deps: ['python'] },
+  { id: 'openai',     name: 'OpenAI API',       category: 'ai',       level: 5, xp: '2 yrs',   description: 'GPT-4o, embeddings, function calling, structured outputs. Both completion and embedding APIs.', deps: ['python', 'ts'] },
+  { id: 'pgvector',   name: 'pgvector',         category: 'ai',       level: 5, xp: '1.5 yrs', description: 'Vector similarity search directly in Postgres. IVFFlat + HNSW indexing for sub-50ms retrieval.', deps: ['postgres', 'rag'] },
+  { id: 'mcp',        name: 'MCP Protocol',     category: 'ai',       level: 4, xp: '1 yr',    description: 'Model Context Protocol — built MCP servers that give Claude semantic code-search tools.', deps: ['langchain', 'ts'] },
+  { id: 'embeddings', name: 'Embeddings',       category: 'ai',       level: 5, xp: '1.5 yrs', description: 'OpenAI, Voyage AI, Cohere — embedding models, reranking, semantic similarity at scale.', deps: ['openai'] },
+  { id: 'treesitter', name: 'Tree-sitter',      category: 'ai',       level: 4, xp: '1 yr',    description: 'AST parsing across 8 languages for code intelligence. Extracts functions, classes, symbols.', deps: ['python'] },
+  { id: 'llmeval',    name: 'LLM Evaluation',   category: 'ai',       level: 4, xp: '1 yr',    description: 'Hit@k, MRR, NDCG metrics. Built eval pipelines to systematically measure retrieval quality.', deps: ['rag'] },
+  { id: 'vertexai',   name: 'Vertex AI',        category: 'ai',       level: 3, xp: '1 yr',    description: 'Model deployment, batch prediction, and managed endpoints on GCP.', deps: ['gcp'] },
+
+  // ── Tools ──────────────────────────────────────────────────────────
+  { id: 'git',        name: 'Git',              category: 'tool',     level: 5, xp: '4 yrs',   description: 'Rebasing, bisect, worktrees, hooks. Git is muscle memory.', deps: ['ts'] },
+  { id: 'graphql',    name: 'GraphQL',          category: 'tool',     level: 3, xp: '1 yr',    description: 'Schema-first design, Apollo Client, DataLoader.', deps: ['node'] },
+  { id: 'posthog',    name: 'PostHog',          category: 'tool',     level: 4, xp: '1 yr',    description: 'Product analytics, feature flags, session replay. Powers this portfolio.', deps: ['react'] },
 ];
 
-const CATEGORY_COLORS: Record<SkillNode['category'], string> = {
-  language: '#6366f1', // indigo
-  frontend: '#06b6d4', // cyan
-  backend:  '#10b981', // emerald
-  cloud:    '#f59e0b', // amber
-  tool:     '#ec4899', // pink
+const CAT_COLOR: Record<Skill['category'], string> = {
+  language: '#818cf8',   // indigo
+  frontend: '#22d3ee',   // cyan
+  backend:  '#34d399',   // emerald
+  cloud:    '#fbbf24',   // amber
+  ai:       '#c084fc',   // violet — stands out as the "new power"
+  tool:     '#f472b6',   // pink
 };
 
-const CATEGORY_LABELS: Record<SkillNode['category'], string> = {
-  language: 'Languages',
+const CAT_LABEL: Record<Skill['category'], string> = {
+  language: 'Language',
   frontend: 'Frontend',
   backend:  'Backend',
   cloud:    'Cloud / DevOps',
+  ai:       'AI / ML Eng',
   tool:     'Tools',
 };
 
-// ---------------------------------------------------------------------------
-// Layout constants
-// ---------------------------------------------------------------------------
+const LEVEL_LABEL = ['', 'Beginner', 'Familiar', 'Proficient', 'Advanced', 'Expert'];
 
-const NODE_W = 110;
-const NODE_H = 44;
-const COL_GAP = 160;
-const ROW_GAP = 72;
-const PAD = 24;
+const CATEGORIES = ['all', 'ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as const;
+type FilterCat = typeof CATEGORIES[number];
 
-function nodeX(col: number) { return PAD + col * (NODE_W + COL_GAP); }
-function nodeY(row: number) { return PAD + row * ROW_GAP; }
-function nodeCX(col: number) { return nodeX(col) + NODE_W / 2; }
-function nodeCY(row: number) { return nodeY(row) + NODE_H / 2; }
+/* ─────────────────────────────────────────────────────────────────── */
+/* Arc progress ring                                                   */
+/* ─────────────────────────────────────────────────────────────────── */
 
-const SVG_W = nodeX(5) + PAD;
-const SVG_H = nodeY(7) + NODE_H + PAD;
+const R = 20;
+const CX = 26;
+const CY = 26;
+const CIRC = 2 * Math.PI * R; // 125.7
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function LevelDots({ level, color }: { level: number; color: string }) {
+function ArcRing({ level, color, delay }: { level: number; color: string; delay: number }) {
+  const offset = CIRC * (1 - level / 5);
   return (
-    <div className="flex gap-0.5">
-      {[1,2,3,4,5].map(i => (
-        <div
-          key={i}
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: i <= level ? color : 'rgba(255,255,255,0.15)' }}
-        />
-      ))}
-    </div>
+    <svg width="52" height="52" viewBox="0 0 52 52" style={{ overflow: 'visible' }}>
+      {/* Subtle outer glow ring */}
+      <circle cx={CX} cy={CY} r={R + 3} fill="none" strokeWidth="1" stroke={color} strokeOpacity="0.08" />
+      {/* Track */}
+      <circle cx={CX} cy={CY} r={R} fill="none" strokeWidth="3.5" stroke="rgba(255,255,255,0.07)" />
+      {/* Filled arc */}
+      <motion.circle
+        cx={CX} cy={CY} r={R}
+        fill="none"
+        strokeWidth="3.5"
+        stroke={color}
+        strokeLinecap="round"
+        strokeDasharray={CIRC}
+        initial={{ strokeDashoffset: CIRC }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1.1, delay, ease: [0.16, 1, 0.3, 1] }}
+        style={{ transformOrigin: `${CX}px ${CY}px`, transform: 'rotate(-90deg)' }}
+      />
+      {/* Center percentage */}
+      <text
+        x={CX} y={CY + 1}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="10"
+        fontWeight="700"
+        fill={color}
+      >
+        {level * 20}%
+      </text>
+    </svg>
   );
 }
 
-function SkillTooltip({ skill, onClose }: { skill: SkillNode; onClose: () => void }) {
-  const color = CATEGORY_COLORS[skill.category];
+/* ─────────────────────────────────────────────────────────────────── */
+/* Skill card                                                          */
+/* ─────────────────────────────────────────────────────────────────── */
+
+interface CardState {
+  mode: 'normal' | 'active' | 'related' | 'dim';
+}
+
+function SkillCard({
+  skill, cardState, idx, onHover, onLeave,
+}: {
+  skill: Skill;
+  cardState: CardState;
+  idx: number;
+  onHover: (s: Skill) => void;
+  onLeave: () => void;
+}) {
+  const color = CAT_COLOR[skill.category];
+  const { mode } = cardState;
+
+  const opacity   = mode === 'dim' ? 0.28 : 1;
+  const elevation = mode === 'active' ? -8 : mode === 'related' ? -4 : 0;
+  const scale     = mode === 'active' ? 1.04 : mode === 'related' ? 1.01 : mode === 'dim' ? 0.97 : 1;
+
+  const borderColor = mode === 'active'  ? `${color}90`
+                    : mode === 'related' ? `${color}50`
+                    : 'rgba(255,255,255,0.08)';
+
+  const shadow = mode === 'active'
+    ? `0 16px 40px ${color}30, 0 0 0 1px ${color}50`
+    : mode === 'related'
+    ? `0 8px 24px ${color}18, 0 0 0 1px ${color}30`
+    : '0 2px 8px rgba(0,0,0,0.12)';
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9, y: 8 }}
-      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-      className="absolute z-50 w-56 glass-heavy rounded-xl p-4 shadow-glass-xl border"
-      style={{
-        borderColor: `${color}40`,
-        top: nodeCY(skill.row) - 20,
-        left: nodeX(skill.col) + NODE_W + 12,
-      }}
+      layout
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ opacity, y: elevation, scale, transition: { duration: 0.25, ease: 'easeOut' } }}
+      exit={{ opacity: 0, scale: 0.85, y: 10, transition: { duration: 0.18 } }}
+      transition={{ delay: idx * 0.035, type: 'spring', damping: 20, stiffness: 200 }}
+      onMouseEnter={() => onHover(skill)}
+      onMouseLeave={onLeave}
+      className="relative rounded-2xl overflow-hidden cursor-default select-none"
+      style={{ border: `1px solid ${borderColor}`, boxShadow: shadow }}
     >
-      <button
-        onClick={onClose}
-        className="absolute top-2 right-2 text-text-secondary hover:text-text transition-colors"
-      >
-        <X size={12} />
-      </button>
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-        <span className="font-bold text-text text-sm">{skill.name}</span>
-      </div>
-      <div className="flex items-center gap-2 mb-3">
-        <LevelDots level={skill.level} color={color} />
-        <span className="text-xs text-text-secondary">{skill.xp}</span>
-      </div>
-      <p className="text-xs text-text-secondary leading-relaxed">{skill.description}</p>
-      <div className="mt-2 text-xs font-medium capitalize" style={{ color }}>
-        {CATEGORY_LABELS[skill.category]}
+      {/* Gradient background tint from category color */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: `radial-gradient(circle at 20% 20%, ${color}12 0%, transparent 65%)` }}
+      />
+
+      {/* Top accent line */}
+      <div className="relative h-[3px] w-full" style={{ background: color, opacity: mode === 'dim' ? 0.4 : 1 }} />
+
+      {/* Active glow pulse */}
+      {mode === 'active' && (
+        <motion.div
+          className="absolute inset-0 pointer-events-none rounded-2xl"
+          animate={{ opacity: [0.06, 0.14, 0.06] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ background: color }}
+        />
+      )}
+
+      {/* Card body */}
+      <div className="relative p-4">
+        <div className="flex items-start gap-3 mb-3">
+          {/* Arc ring */}
+          <div className="flex-shrink-0">
+            <ArcRing level={skill.level} color={color} delay={idx * 0.04} />
+          </div>
+
+          {/* Name + meta */}
+          <div className="flex-1 min-w-0 pt-1">
+            <h3
+              className="font-bold leading-tight text-[14px] transition-colors"
+              style={{ color: mode === 'active' ? color : 'rgb(var(--color-text))' }}
+            >
+              {skill.name}
+            </h3>
+            <p className="text-[10px] text-text-secondary mt-0.5 font-medium">
+              {skill.xp}
+            </p>
+            {/* Level dots */}
+            <div className="flex gap-1 mt-2">
+              {[1, 2, 3, 4, 5].map(i => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: idx * 0.035 + i * 0.05, type: 'spring', stiffness: 400 }}
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: i <= skill.level ? color : 'rgba(255,255,255,0.1)' }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Category + level label */}
+        <div className="flex items-center justify-between mb-2.5">
+          <span
+            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+            style={{ background: `${color}15`, color }}
+          >
+            {CAT_LABEL[skill.category]}
+          </span>
+          <span className="text-[10px] text-text-secondary font-medium">
+            {LEVEL_LABEL[skill.level]}
+          </span>
+        </div>
+
+        {/* Description */}
+        <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
+          {skill.description}
+        </p>
+
+        {/* Dependency hint when related */}
+        {(mode === 'related') && skill.deps.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-2 pt-2 border-t flex items-center gap-1"
+            style={{ borderColor: `${color}20` }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+            <span className="text-[10px]" style={{ color }}>prerequisite</span>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
-
-const CATEGORIES = ['language', 'frontend', 'backend', 'cloud', 'tool'] as const;
+/* ─────────────────────────────────────────────────────────────────── */
+/* Main                                                                */
+/* ─────────────────────────────────────────────────────────────────── */
 
 export default function SkillsDashboardApp() {
-  const [selected, setSelected] = useState<SkillNode | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [filter, setFilter] = useState<SkillNode['category'] | 'all'>('all');
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [filter, setFilter]   = useState<FilterCat>('all');
+  const [hovered, setHovered] = useState<Skill | null>(null);
 
-  const visibleSkills = filter === 'all'
+  const visible = filter === 'all'
     ? SKILLS
     : SKILLS.filter(s => s.category === filter);
 
-  const visibleIds = new Set(visibleSkills.map(s => s.id));
+  const getCardState = (skill: Skill): CardState => {
+    if (!hovered) return { mode: 'normal' };
+    if (skill.id === hovered.id) return { mode: 'active' };
+    // Is this skill a prerequisite of the hovered skill?
+    if (hovered.deps.includes(skill.id)) return { mode: 'related' };
+    // Does the hovered skill unlock this one?
+    if (skill.deps.includes(hovered.id)) return { mode: 'related' };
+    return { mode: 'dim' };
+  };
 
-  // Build edges
-  const edges: { from: SkillNode; to: SkillNode }[] = [];
-  SKILLS.forEach(skill => {
-    skill.deps.forEach(depId => {
-      const dep = SKILLS.find(s => s.id === depId);
-      if (dep && visibleIds.has(skill.id) && visibleIds.has(dep.id)) {
-        edges.push({ from: dep, to: skill });
-      }
-    });
+  /* Category stats */
+  const catStats = (['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as Skill['category'][]).map(cat => {
+    const skills = SKILLS.filter(s => s.category === cat);
+    const avg = skills.reduce((a, b) => a + b.level, 0) / skills.length;
+    return { cat, count: skills.length, avg };
   });
 
   return (
-    <div className="h-full flex flex-col bg-surface/20 overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-transparent">
 
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 pt-5 pb-4 glass-subtle border-b border-white/10">
-        <div className="flex items-center justify-between mb-4">
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 px-5 pt-5 pb-4 border-b border-white/8 dark:border-white/6">
+
+        {/* Title row */}
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-text">Skill Tree</h1>
-            <p className="text-text-secondary text-xs mt-0.5">
-              {SKILLS.length} skills unlocked. Click any node to inspect.
+            <h1 className="text-xl font-bold text-text">Skills</h1>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {SKILLS.length} skills across 6 domains · hover to trace dependency chains
             </p>
           </div>
-          {/* Legend */}
-          <div className="flex gap-3 flex-wrap justify-end">
-            {CATEGORIES.map(cat => (
+
+          {/* Category legend */}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            {(['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as Skill['category'][]).map(cat => (
               <div key={cat} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[cat] }} />
-                <span className="text-xs text-text-secondary">{CATEGORY_LABELS[cat]}</span>
+                <div className="w-2 h-2 rounded-full" style={{ background: CAT_COLOR[cat] }} />
+                <span className="text-[10px] text-text-secondary hidden sm:block">{CAT_LABEL[cat]}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Filter tabs */}
+        {/* Filter pills */}
         <div className="flex gap-1.5 flex-wrap">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              filter === 'all'
-                ? 'bg-accent text-white'
-                : 'bg-surface/50 text-text-secondary hover:text-text hover:bg-surface/80'
-            }`}
-          >
-            All
-          </button>
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className="px-3 py-1 rounded-full text-xs font-medium transition-all"
-              style={{
-                background: filter === cat ? CATEGORY_COLORS[cat] : 'rgba(255,255,255,0.06)',
-                color: filter === cat ? 'white' : 'var(--color-text-secondary)',
-              }}
-            >
-              {CATEGORY_LABELS[cat]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tree canvas */}
-      <div className="flex-1 overflow-auto p-4">
-        <div style={{ position: 'relative', width: SVG_W, minWidth: SVG_W }}>
-          <svg
-            ref={svgRef}
-            width={SVG_W}
-            height={SVG_H}
-            style={{ display: 'block', overflow: 'visible' }}
-          >
-            {/* Connection lines */}
-            {edges.map(({ from, to }) => {
-              const x1 = nodeCX(from.col);
-              const y1 = nodeCY(from.row);
-              const x2 = nodeX(to.col);
-              const y2 = nodeCY(to.row);
-              const mx = (x1 + x2) / 2;
-              const isHighlit = hovered === from.id || hovered === to.id;
-              const color = CATEGORY_COLORS[to.category];
-              return (
-                <motion.path
-                  key={`${from.id}-${to.id}`}
-                  d={`M ${x1 + NODE_W / 2} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-                  fill="none"
-                  stroke={isHighlit ? color : 'currentColor'}
-                  strokeOpacity={isHighlit ? 0.9 : 0.15}
-                  strokeWidth={isHighlit ? 2 : 1.5}
-                  strokeDasharray={isHighlit ? '0' : '4 3'}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 1 }}
-                  transition={{ duration: 0.6, delay: 0.1 }}
-                />
-              );
-            })}
-
-            {/* Nodes */}
-            {visibleSkills.map((skill, idx) => {
-              const x = nodeX(skill.col);
-              const y = nodeY(skill.row);
-              const cx = x + NODE_W / 2;
-              const cy = y + NODE_H / 2;
-              const color = CATEGORY_COLORS[skill.category];
-              const isHov = hovered === skill.id;
-              const isSel = selected?.id === skill.id;
-
-              return (
-                <motion.g
-                  key={skill.id}
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'spring', delay: idx * 0.04, damping: 16, stiffness: 200 }}
-                  onMouseEnter={() => setHovered(skill.id)}
-                  onMouseLeave={() => setHovered(null)}
-                  onClick={() => setSelected(isSel ? null : skill)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {/* Glow on hover */}
-                  {(isHov || isSel) && (
-                    <motion.ellipse
-                      cx={cx} cy={cy} rx={NODE_W * 0.55} ry={NODE_H * 0.8}
-                      fill={color}
-                      opacity={0.15}
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1.1 }}
-                      transition={{ repeat: Infinity, repeatType: 'reverse', duration: 1.2 }}
-                    />
-                  )}
-
-                  {/* Node background */}
-                  <rect
-                    x={x} y={y}
-                    width={NODE_W} height={NODE_H}
-                    rx={10}
-                    fill={isSel ? `${color}22` : isHov ? `${color}15` : 'rgba(255,255,255,0.05)'}
-                    stroke={isSel ? color : isHov ? `${color}80` : 'rgba(255,255,255,0.15)'}
-                    strokeWidth={isSel ? 2 : 1.5}
-                  />
-
-                  {/* Left accent bar */}
-                  <rect x={x + 2} y={y + 8} width={3} height={NODE_H - 16} rx={2} fill={color} opacity={0.8} />
-
-                  {/* Skill name */}
-                  <text
-                    x={x + 14} y={y + 16}
-                    fontSize="11"
-                    fontWeight="600"
-                    fill="var(--color-text)"
-                    dominantBaseline="middle"
-                  >
-                    {skill.name.length > 14 ? skill.name.slice(0, 13) + '…' : skill.name}
-                  </text>
-
-                  {/* XP badge */}
-                  <text
-                    x={x + 14} y={y + 30}
-                    fontSize="9"
-                    fill="var(--color-text-secondary)"
-                    dominantBaseline="middle"
-                  >
-                    {skill.xp}
-                  </text>
-
-                  {/* Level dots */}
-                  {[0,1,2,3,4].map(i => (
-                    <circle
-                      key={i}
-                      cx={x + NODE_W - 16 + i * 6 - (4 * 6) / 2 + 3}
-                      cy={y + NODE_H / 2}
-                      r={2.5}
-                      fill={i < skill.level ? color : 'rgba(255,255,255,0.12)'}
-                    />
-                  ))}
-                </motion.g>
-              );
-            })}
-          </svg>
-
-          {/* Tooltip overlay (HTML, not SVG for better glass styling) */}
-          <AnimatePresence>
-            {selected && (
-              <div
-                className="pointer-events-none"
-                style={{ position: 'absolute', inset: 0 }}
+          {CATEGORIES.map(cat => {
+            const isActive = filter === cat;
+            const color = cat === 'all' ? 'rgb(var(--color-accent))' : CAT_COLOR[cat as Skill['category']];
+            return (
+              <button
+                key={cat}
+                onClick={() => setFilter(cat)}
+                className="px-3 py-1 rounded-full text-[11px] font-semibold transition-all capitalize"
+                style={{
+                  background: isActive ? color : 'rgba(255,255,255,0.06)',
+                  color: isActive ? 'white' : 'rgb(var(--color-text-secondary))',
+                  boxShadow: isActive ? `0 2px 8px ${color}40` : 'none',
+                  border: `1px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.08)'}`,
+                }}
               >
-                <div className="pointer-events-auto">
-                  <SkillTooltip skill={selected} onClose={() => setSelected(null)} />
-                </div>
-              </div>
-            )}
-          </AnimatePresence>
+                {cat === 'all' ? 'All' : CAT_LABEL[cat as Skill['category']]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Footer stat bar */}
-      <div className="flex-shrink-0 px-6 py-3 glass-subtle border-t border-white/10 flex gap-6">
-        {CATEGORIES.map(cat => {
-          const count = SKILLS.filter(s => s.category === cat).length;
-          const avgLevel = SKILLS.filter(s => s.category === cat).reduce((a, b) => a + b.level, 0) / count;
+      {/* ── Card grid ── */}
+      <div className="flex-1 overflow-auto p-5">
+        <motion.div
+          layout
+          className="grid gap-3"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
+        >
+          <AnimatePresence mode="popLayout">
+            {visible.map((skill, idx) => (
+              <SkillCard
+                key={skill.id}
+                skill={skill}
+                cardState={getCardState(skill)}
+                idx={idx}
+                onHover={setHovered}
+                onLeave={() => setHovered(null)}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* ── Footer stat bar ── */}
+      <div className="flex-shrink-0 px-5 py-3 border-t border-white/8 dark:border-white/6 flex gap-5 flex-wrap">
+        {catStats.map(({ cat, count, avg }) => {
+          const color = CAT_COLOR[cat];
           return (
             <div key={cat} className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[cat] }} />
-              <span className="text-xs text-text-secondary">{count} skills</span>
-              <div className="flex gap-0.5">
-                {[1,2,3,4,5].map(i => (
-                  <div key={i} className="w-1 h-1 rounded-full"
-                    style={{ background: i <= Math.round(avgLevel) ? CATEGORY_COLORS[cat] : 'rgba(255,255,255,0.1)' }} />
-                ))}
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+              <span className="text-[11px] text-text-secondary">{count} {CAT_LABEL[cat]}</span>
+              {/* Mini avg bar */}
+              <div className="w-12 h-1 rounded-full bg-white/10 overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: color }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(avg / 5) * 100}%` }}
+                  transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+                />
               </div>
             </div>
           );
