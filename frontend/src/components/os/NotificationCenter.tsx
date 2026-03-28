@@ -12,9 +12,8 @@ export default function NotificationCenter() {
   const push = useNotificationStore(state => state.push);
   const dismiss = useNotificationStore(state => state.dismiss);
   const hasShownWelcome = useRef(false);
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Welcome notification after a short delay
+  // Brief welcome notification on first load
   useEffect(() => {
     if (hasShownWelcome.current) return;
     hasShownWelcome.current = true;
@@ -24,35 +23,11 @@ export default function NotificationCenter() {
       push({
         title: notifCopy.welcome.title,
         body: notifCopy.welcome.body,
-        dismissAfter: 8000,
+        dismissAfter: 4000,
       });
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [push]);
-
-  // Idle nudge after 45 seconds
-  useEffect(() => {
-    const resetIdle = () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = setTimeout(() => {
-        push({
-          title: notifCopy.idleNudge.title,
-          body: notifCopy.idleNudge.body,
-          dismissAfter: 8000,
-        });
-      }, 45000);
-    };
-
-    resetIdle();
-    window.addEventListener('mousemove', resetIdle);
-    window.addEventListener('keydown', resetIdle);
-
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      window.removeEventListener('mousemove', resetIdle);
-      window.removeEventListener('keydown', resetIdle);
-    };
   }, [push]);
 
   return (

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
-import type { WindowState, AppType, DisplaySettings } from '../../../shared/types';
+import type { WindowState, AppType } from '../../../shared/types';
 
 interface OSStore {
   // Boot
@@ -13,9 +13,6 @@ interface OSStore {
   nextZIndex: number;
   windowCounter: number;
 
-  // Display Settings
-  displaySettings: DisplaySettings;
-
   // Window Actions
   openWindow: (appType: AppType, customProps?: Partial<WindowState>) => void;
   closeWindow: (windowId: string) => void;
@@ -24,10 +21,6 @@ interface OSStore {
   maximizeWindow: (windowId: string) => void;
   updateWindowPosition: (windowId: string, position: { x: number; y: number }) => void;
   updateWindowSize: (windowId: string, size: { width: number; height: number }) => void;
-
-  // Display Actions
-  updateDisplaySettings: (settings: Partial<DisplaySettings>) => void;
-  toggleTheme: () => void;
 }
 
 export const useOSStore = create<OSStore>((set, get) => ({
@@ -40,14 +33,6 @@ export const useOSStore = create<OSStore>((set, get) => ({
   activeWindowId: null,
   nextZIndex: 1000,
   windowCounter: 1,
-
-  displaySettings: {
-    theme: 'light',
-    wallpaper: 'posthog-clean',
-    animationsEnabled: true,
-    soundEnabled: false,
-    analyticsEnabled: true,
-  },
 
   // Window Actions — reads defaults from appRegistry
   openWindow: (appType: AppType, customProps = {}) => {
@@ -154,22 +139,6 @@ export const useOSStore = create<OSStore>((set, get) => ({
       windows: state.windows.map(window =>
         window.id === windowId ? { ...window, size } : window
       ),
-    }));
-  },
-
-  // Display Actions
-  updateDisplaySettings: (settings: Partial<DisplaySettings>) => {
-    set(state => ({
-      displaySettings: { ...state.displaySettings, ...settings },
-    }));
-  },
-
-  toggleTheme: () => {
-    set(state => ({
-      displaySettings: {
-        ...state.displaySettings,
-        theme: state.displaySettings.theme === 'light' ? 'dark' : 'light',
-      },
     }));
   },
 }));
