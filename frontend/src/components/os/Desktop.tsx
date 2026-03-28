@@ -4,6 +4,7 @@ import React from 'react';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { AnimatedBackground } from './AnimatedBackground';
 import { DesktopContextMenu } from './DesktopContextMenu';
+import MenuBar from './MenuBar';
 import Taskbar from './Taskbar';
 
 interface DesktopProps {
@@ -12,16 +13,20 @@ interface DesktopProps {
 
 export default function Desktop({ children }: DesktopProps) {
   useKeyboardShortcuts();
-  
+
   return (
     <DesktopContextMenu>
       <div className="min-h-screen w-full relative overflow-hidden">
         <AnimatedBackground />
-        
-        <div className="relative z-10 h-screen pb-16">
+
+        {/* Menu bar at top */}
+        <MenuBar />
+
+        {/* Content area — inset by menu bar (28px) at top and dock (~72px) at bottom */}
+        <div className="relative z-10 h-screen pt-7 pb-20">
           {children}
         </div>
-        
+
         <Taskbar />
       </div>
     </DesktopContextMenu>

@@ -218,6 +218,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Remove focus outline on elements that handle their own focus styles */
+[data-no-focus-ring]:focus-visible {
+  outline: none;
+}
+
 /* ============================================
    ANIMATIONS
    ============================================ */

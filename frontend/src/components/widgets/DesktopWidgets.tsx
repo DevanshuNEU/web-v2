@@ -59,10 +59,9 @@ export function DesktopWidgets() {
   const dateColor    = isDark ? 'text-white/45'  : 'text-gray-600/70';
   const quoteColor   = isDark ? 'text-white/30'  : 'text-gray-700/55';
   const authorColor  = isDark ? 'text-white/20'  : 'text-gray-500/50';
-  const versionColor = isDark ? 'text-white/18'  : 'text-gray-400/60';
 
   return (
-    <div className="absolute right-5 top-5 flex flex-col items-end gap-3 pointer-events-none select-none z-[1]">
+    <div className="absolute right-5 top-10 flex flex-col items-end gap-3 pointer-events-none select-none z-[1]">
 
       {/* Clock card */}
       <div className={`rounded-2xl border backdrop-blur-md px-5 py-4 text-right ${card}`}>
@@ -97,8 +96,6 @@ export function DesktopWidgets() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Footer */}
-        <p className={`text-[9px] font-mono tracking-widest mt-3 ${versionColor}`}>devOS v2.1</p>
       </div>
 
     </div>

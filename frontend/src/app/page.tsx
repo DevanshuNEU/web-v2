@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
 import Desktop from '@/components/os/Desktop';
 import WindowManager from '@/components/os/WindowManager';
-import DesktopIcons from '@/components/os/DesktopIcons';
+import StageManager from '@/components/os/StageManager';
 import BootSequence from '@/components/os/BootSequence';
 import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
@@ -39,8 +39,8 @@ export default function Home() {
 
       {isBooted && (
         <Desktop>
+          <StageManager />
           <WindowManager />
-          <DesktopIcons />
           <NotificationCenter />
           <DesktopWidgets />
         </Desktop>
