@@ -179,12 +179,12 @@ body {
 }
 
 /* ============================================
-   SCROLLBAR STYLING
+   SCROLLBAR STYLING — thin macOS overlay style
    ============================================ */
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -192,12 +192,69 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(var(--color-text-secondary), 0.3);
-  border-radius: 4px;
+  background: rgba(var(--color-text-secondary), 0.25);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--color-text-secondary), 0.5);
+  background: rgba(var(--color-text-secondary), 0.45);
+}
+
+/* ============================================
+   APP CHROME — macOS inner chrome utilities
+   ============================================ */
+
+/* Sidebar: slightly distinct from content area */
+.app-sidebar {
+  background: rgba(0, 0, 0, 0.025);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+.dark .app-sidebar {
+  background: rgba(255, 255, 255, 0.025);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Nav item base */
+.app-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgb(var(--color-text-secondary));
+  transition: background 120ms, color 120ms;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+  border: none;
+  background: transparent;
+}
+.app-nav-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgb(var(--color-text));
+}
+.dark .app-nav-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.app-nav-item.active {
+  background: rgb(var(--color-accent) / 0.12);
+  color: rgb(var(--color-accent));
+  font-weight: 500;
+}
+
+/* Toolbar separator */
+.app-toolbar {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.dark .app-toolbar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* ============================================
