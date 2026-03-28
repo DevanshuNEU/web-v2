@@ -12,11 +12,11 @@ import {
   Sparkles,
   Calendar,
   ChevronRight,
-  Filter,
   Loader2,
   FolderOpen,
 } from 'lucide-react';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
+import { projectMeta } from '@/data/projectMeta';
 
 // ---------------------------------------------------------------------------
 // Status badge
@@ -308,27 +308,61 @@ function EmptyState() {
 }
 
 // ---------------------------------------------------------------------------
+// Static fallback from projectMeta (always works, no API needed)
+// ---------------------------------------------------------------------------
+
+function buildStaticRepos(): EnrichedRepo[] {
+  return Object.entries(projectMeta).map(([name, meta]) => ({
+    name,
+    displayName: meta.displayName,
+    tagline: meta.tagline,
+    description: meta.descriptionOverride ?? meta.tagline,
+    htmlUrl: `https://github.com/DevanshuNEU/${name}`,
+    homepage: null,
+    language: meta.extraTech?.[0] ?? null,
+    stars: 0,
+    forks: 0,
+    topics: meta.extraTech ?? [],
+    updatedAt: new Date().toISOString(),
+    featured: meta.featured,
+    category: meta.category,
+    status: meta.status,
+    story: meta.story,
+    achievements: meta.achievements,
+    extraTech: meta.extraTech ?? [],
+    org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
 export default function ProjectsApp() {
   const [repos, setRepos] = useState<EnrichedRepo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/github/repos')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: EnrichedRepo[]) => {
-        setRepos(data);
-        // Auto-select first featured
-        const first = data.find(r => r.featured);
+        // If API returned empty (rate-limited), fall back to static data
+        const resolved = Array.isArray(data) && data.length > 0 ? data : buildStaticRepos();
+        setRepos(resolved);
+        const first = resolved.find(r => r.featured);
         if (first) setSelected(first.name);
         setLoading(false);
       })
       .catch(() => {
-        setError('Could not fetch projects. GitHub API may be rate-limited.');
+        // API failed entirely — use static fallback, no error shown
+        const fallback = buildStaticRepos();
+        setRepos(fallback);
+        const first = fallback.find(r => r.featured);
+        if (first) setSelected(first.name);
         setLoading(false);
       });
   }, []);
@@ -340,28 +374,6 @@ export default function ProjectsApp() {
       <div className="h-full flex items-center justify-center gap-3 text-text-secondary">
         <Loader2 size={18} className="animate-spin text-accent" />
         <span className="text-sm">Fetching repos from GitHub...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center p-6">
-        <div className="text-center space-y-2">
-          <p className="text-sm text-text-secondary">{error}</p>
-          <p className="text-xs text-text-secondary/60">
-            Try refreshing, or check out{' '}
-            <a
-              href="https://github.com/DevanshuNEU"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
-              github.com/DevanshuNEU
-            </a>{' '}
-            directly.
-          </p>
-        </div>
       </div>
     );
   }

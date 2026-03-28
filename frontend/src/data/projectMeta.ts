@@ -251,15 +251,17 @@ export const projectMeta: Record<string, ProjectMeta> = {
 
 /** Get all featured projects in display order */
 export function getFeaturedProjects(): string[] {
-  return Object.entries(projectMeta)
-    .filter(([, m]) => m.featured)
-    .sort((a, b) => {
-      // Org projects first, then personal, then active before completed
-      const order = { org: 0, personal: 1, meta: 2 };
-      const catDiff = order[a[1].category] - order[b[1].category];
-      if (catDiff !== 0) return catDiff;
-      const statusOrder = { active: 0, experimental: 1, completed: 2 };
-      return statusOrder[a[1].status] - statusOrder[b[1].status];
-    })
-    .map(([name]) => name);
+  const explicit = [
+    'saar',
+    'opencodeintel',
+    'financial-copilot',
+    'mem-machines',
+    'testpulse-ai',
+    'moderationkit',
+  ];
+  // Append any featured projects not explicitly listed, preserving declaration order
+  const rest = Object.keys(projectMeta).filter(
+    k => projectMeta[k].featured && !explicit.includes(k)
+  );
+  return [...explicit, ...rest].filter(k => k in projectMeta);
 }
