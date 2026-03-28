@@ -1,15 +1,6 @@
 'use client';
 
-/**
- * Taskbar
- *
- * macOS-style floating dock with magnification effect.
- * - Start menu button
- * - Running apps with dock magnification
- * - System tray (theme toggle, clock)
- */
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   motion,
   useMotionValue,
@@ -19,163 +10,201 @@ import {
 } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
-import { useAnalyticsStore } from '@/store/analyticsStore';
-import { appRegistry, getAppLabel } from '@/lib/appRegistry';
-import { toastMessages } from '@/data/copy';
-import { toast } from 'sonner';
-import { StartMenu } from './StartMenu';
-import { Sun, Moon, Grid3x3 } from 'lucide-react';
+import { appRegistry, getPinnedApps, getAppLabel } from '@/lib/appRegistry';
+import AppIcon from './AppIcon';
+import { Launchpad } from './Launchpad';
+import { LayoutGrid } from 'lucide-react';
 import type { AppType } from '../../../../shared/types';
 
-// ---------------------------------------------------------------------------
-// Dock Icon with magnification
-// ---------------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
 
-function useDockMagnification(mouseX: MotionValue<number>, ref: React.RefObject<HTMLButtonElement | null>) {
+const BASE_SIZE = 48;   // resting icon size in px
+const MAX_SIZE  = 72;   // max icon size at peak magnification
+const MAG_RANGE = 140;  // px radius of magnification effect
+
+/* ------------------------------------------------------------------ */
+/*  Magnification hook — returns a spring-smoothed scale MotionValue  */
+/* ------------------------------------------------------------------ */
+
+function useDockMagnification(
+  mouseX: MotionValue<number>,
+  ref: React.RefObject<HTMLDivElement | null>
+) {
   const distance = useTransform(mouseX, (val: number) => {
     const el = ref.current;
-    if (!el || val === -1) return 150;
+    if (!el || val === -1) return MAG_RANGE + 1;
     const rect = el.getBoundingClientRect();
     return Math.abs(val - (rect.left + rect.width / 2));
   });
 
-  const scale = useTransform(distance, [0, 150], [1.5, 1]);
-  const smoothScale = useSpring(scale, { damping: 20, stiffness: 200 });
-
-  return smoothScale;
+  const scale = useTransform(distance, [0, MAG_RANGE], [MAX_SIZE / BASE_SIZE, 1]);
+  return useSpring(scale, { damping: 18, stiffness: 220, mass: 0.6 });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Dock icon                                                          */
+/*                                                                     */
+/*  Two-layer approach so magnification actually pushes neighbors:     */
+/*    outer div  — animated WIDTH in the flex layout (pushes others)   */
+/*    inner btn  — visual SCALE (grows upward via origin-bottom)       */
+/* ------------------------------------------------------------------ */
 
 interface DockIconProps {
   appType: AppType;
-  windowId: string;
-  isActive: boolean;
-  isMinimized: boolean;
   mouseX: MotionValue<number>;
+  onClick: () => void;
+  isRunning: boolean;
+  isMinimized?: boolean;
 }
 
-function DockIcon({ appType, windowId, isActive, isMinimized, mouseX }: DockIconProps) {
-  const focusWindow = useOSStore(state => state.focusWindow);
-  const ref = useRef<HTMLButtonElement>(null);
+function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized }: DockIconProps) {
+  // ref lives on the outer div so getBoundingClientRect reflects the layout box
+  const ref = useRef<HTMLDivElement>(null);
   const scale = useDockMagnification(mouseX, ref);
 
-  const registration = appRegistry[appType];
-  if (!registration) return null;
-  const IconComponent = registration.icon;
+  // Drive the outer div's width from the same scale so flex layout expands
+  const layoutWidth = useTransform(scale, (s) => Math.round(s * BASE_SIZE));
+
+  const reg = appRegistry[appType];
+  if (!reg) return null;
+
   const label = getAppLabel(appType);
 
   return (
-    <motion.button
+    // Outer: layout-affecting width, fixed height = BASE_SIZE
+    <motion.div
       ref={ref}
-      style={{ scale }}
-      onClick={() => focusWindow(windowId)}
-      className={`
-        relative p-2.5 rounded-lg cursor-pointer
-        transition-colors duration-200
-        hover:bg-surface/50
-        ${isActive && !isMinimized ? 'bg-accent/10 text-accent' : 'text-text-secondary'}
-        ${isMinimized ? 'opacity-50' : ''}
-      `}
-      title={label.windowTitle}
+      style={{ width: layoutWidth, height: BASE_SIZE }}
+      className="relative flex-shrink-0 flex items-end justify-center"
     >
-      <IconComponent size={20} />
-      {!isMinimized && (
-        <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent" />
-      )}
-    </motion.button>
+      {/* Inner: visual scale only, grows upward */}
+      <motion.button
+        style={{ scale, originY: 1 }}
+        onClick={onClick}
+        className={`relative cursor-pointer ${isMinimized ? 'opacity-40' : ''}`}
+        title={label.windowTitle}
+      >
+        <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={BASE_SIZE} />
+
+        {isRunning && !isMinimized && (
+          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/80" />
+        )}
+      </motion.button>
+    </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/*  Separator                                                          */
+/* ------------------------------------------------------------------ */
+
+function DockDivider() {
+  return (
+    <div
+      className="w-px bg-white/20 mx-1 self-stretch flex-shrink-0"
+      style={{ minHeight: BASE_SIZE }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Taskbar (Dock)                                                     */
+/* ------------------------------------------------------------------ */
 
 export default function Taskbar() {
-  const windows = useOSStore(state => state.windows);
-  const activeWindowId = useOSStore(state => state.activeWindowId);
-  const { mode, toggleMode } = useTheme();
-  const trackEvent = useAnalyticsStore(state => state.trackEvent);
+  const windows = useOSStore(s => s.windows);
+  const openWindow = useOSStore(s => s.openWindow);
+  const focusWindow = useOSStore(s => s.focusWindow);
+  const { mode } = useTheme();
 
-  const runningApps = windows.filter(w => w.isOpen);
-  const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [launchpadOpen, setLaunchpadOpen] = useState(false);
   const mouseX = useMotionValue(-1);
 
-  // Live clock
-  const [time, setTime] = useState(new Date());
+  const pinnedApps = getPinnedApps().map(a => a.appType);
+  const pinnedSet = new Set(pinnedApps);
+  const runningUnpinned = windows.filter(w => w.isOpen && !pinnedSet.has(w.appType));
 
-  useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Handle theme toggle with personality
-  const handleThemeToggle = () => {
-    const newMode = mode === 'dark' ? 'light' : 'dark';
-    toggleMode();
-    trackEvent('theme_change', `Switched to ${newMode} mode`, { theme: newMode });
-    toast.success(newMode === 'dark' ? toastMessages.themeDark : toastMessages.themeLight);
+  const handleDockIconClick = (appType: AppType) => {
+    const win = windows.find(w => w.appType === appType && w.isOpen);
+    if (win) focusWindow(win.id);
+    else openWindow(appType);
   };
 
   return (
     <>
-      <StartMenu open={startMenuOpen} onClose={() => setStartMenuOpen(false)} />
+      <Launchpad open={launchpadOpen} onClose={() => setLaunchpadOpen(false)} />
 
+      {/* Dock shelf — overflow-visible so scaled icons show above the shelf */}
       <div
-        className="fixed bottom-2 left-1/2 -translate-x-1/2 h-16 px-4 z-50
-                    w-[calc(100%-2rem)] max-w-7xl
-                    glass-heavy
-                    bg-white/10 dark:bg-white/5
-                    border border-white/20 dark:border-white/10
-                    rounded-2xl
-                    shadow-glass-xl
-                    flex items-center justify-between"
+        className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50
+                   flex items-end gap-1 px-2.5 pb-2 pt-2
+                   rounded-2xl overflow-visible
+                   max-w-[calc(100vw-2rem)]"
+        style={{
+          background: mode === 'dark'
+            ? 'rgba(30, 30, 30, 0.5)'
+            : 'rgba(243, 243, 243, 0.55)',
+          backdropFilter: 'blur(55px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(55px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          boxShadow: mode === 'dark'
+            ? '0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset'
+            : '0 8px 32px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.5) inset',
+        }}
         onMouseMove={(e) => mouseX.set(e.clientX)}
         onMouseLeave={() => mouseX.set(-1)}
       >
-        {/* Left: Start Button */}
-        <div className="flex items-center">
-          <button
-            onClick={() => setStartMenuOpen(!startMenuOpen)}
-            className={`p-2 rounded-lg transition-all duration-200 hover:scale-105
-                       ${startMenuOpen ? 'bg-accent/20 text-accent' : 'text-text hover:bg-surface/50'}`}
-            title="Start Menu"
-          >
-            <Grid3x3 size={20} />
-          </button>
-        </div>
+        {/* Launchpad button */}
+        <button
+          onClick={() => setLaunchpadOpen(!launchpadOpen)}
+          className={`
+            flex-shrink-0 rounded-[11px] flex items-center justify-center
+            transition-all duration-150 cursor-pointer
+            ${launchpadOpen
+              ? 'bg-white/25 dark:bg-white/20'
+              : 'bg-white/10 dark:bg-white/8 hover:bg-white/20 dark:hover:bg-white/15'}
+          `}
+          style={{ width: BASE_SIZE, height: BASE_SIZE }}
+          title="Launchpad"
+        >
+          <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
+        </button>
 
-        {/* Center: Running Apps with Dock Magnification */}
-        <div className="flex items-center justify-center gap-1 flex-1">
-          {runningApps.length === 0 ? (
-            <div className="text-xs text-text-secondary/50">
-              Desktop&apos;s looking clean. Too clean.
-            </div>
-          ) : (
-            runningApps.map((window) => (
+        <DockDivider />
+
+        {/* Pinned apps */}
+        {pinnedApps.map((appType) => {
+          const win = windows.find(w => w.appType === appType && w.isOpen);
+          return (
+            <DockIcon
+              key={appType}
+              appType={appType}
+              mouseX={mouseX}
+              onClick={() => handleDockIconClick(appType)}
+              isRunning={!!win}
+              isMinimized={win?.isMinimized}
+            />
+          );
+        })}
+
+        {/* Running non-pinned apps */}
+        {runningUnpinned.length > 0 && (
+          <>
+            <DockDivider />
+            {runningUnpinned.map((win) => (
               <DockIcon
-                key={window.id}
-                appType={window.appType}
-                windowId={window.id}
-                isActive={activeWindowId === window.id}
-                isMinimized={window.isMinimized}
+                key={win.id}
+                appType={win.appType}
                 mouseX={mouseX}
+                onClick={() => focusWindow(win.id)}
+                isRunning
+                isMinimized={win.isMinimized}
               />
-            ))
-          )}
-        </div>
-
-        {/* Right: System Tray */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleThemeToggle}
-            className="p-2 rounded-lg hover:bg-surface/50 transition-all duration-200 text-text hover:scale-105"
-            title={mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <div className="text-sm font-medium text-text min-w-[60px] text-right">
-            {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </div>
-        </div>
+            ))}
+          </>
+        )}
       </div>
     </>
   );
