@@ -152,92 +152,80 @@ export default function ResumeApp() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-surface/20 overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Top bar */}
-      <div className="flex-shrink-0 px-5 py-4 glass-subtle border-b border-white/10">
-        <div className="flex items-start justify-between gap-4">
+      {/* ── Top bar ── */}
+      <div className="flex-shrink-0 px-5 py-4 app-toolbar border-b">
+        <div className="flex items-center justify-between gap-4">
+
           {/* Identity */}
-          <div>
-            <h1 className="text-xl font-bold text-text">{RESUME.name}</h1>
-            <p className="text-accent text-sm font-medium">{RESUME.title}</p>
-            <p className="text-text-secondary text-xs mt-0.5">{RESUME.tagline}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold text-text leading-tight">{RESUME.name}</h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
+                {RESUME.title}
+              </span>
+            </div>
+            <p className="text-text-secondary text-[11px] mt-0.5">{RESUME.tagline}</p>
+            {/* Contact links inline */}
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              {[
+                { href: `mailto:${RESUME.contact.email}`, icon: Mail,    label: RESUME.contact.email },
+                { href: `https://${RESUME.contact.github}`, icon: Github, label: RESUME.contact.github },
+                { href: `https://${RESUME.contact.linkedin}`, icon: Linkedin, label: 'LinkedIn' },
+                { href: '#', icon: MapPin, label: RESUME.contact.location },
+              ].map(({ href, icon: Icon, label }) => (
+                <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined}
+                   rel="noopener noreferrer"
+                   className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent transition-colors">
+                  <Icon size={10} className="flex-shrink-0" />{label}
+                </a>
+              ))}
+            </div>
           </div>
 
-          {/* Right actions */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            {/* View toggle + Download */}
-            <div className="flex items-center gap-2">
-              {/* View mode toggle */}
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-white/6 border border-white/10">
+          {/* Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* View toggle */}
+            <div className="flex items-center p-0.5 rounded-lg bg-black/[0.05] dark:bg-white/[0.06] border border-black/8 dark:border-white/10">
+              {(['interactive', 'pdf'] as const).map(mode => (
                 <button
-                  onClick={() => setViewMode('interactive')}
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                    viewMode === 'interactive'
+                    viewMode === mode
                       ? 'bg-accent text-white shadow-sm'
                       : 'text-text-secondary hover:text-text'
                   }`}
                 >
-                  <LayoutList size={11} />
-                  Interactive
+                  {mode === 'interactive' ? <LayoutList size={11} /> : <FileText size={11} />}
+                  {mode === 'interactive' ? 'Interactive' : 'PDF'}
                 </button>
-                <button
-                  onClick={() => setViewMode('pdf')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                    viewMode === 'pdf'
-                      ? 'bg-accent text-white shadow-sm'
-                      : 'text-text-secondary hover:text-text'
-                  }`}
-                >
-                  <FileText size={11} />
-                  PDF
-                </button>
-              </div>
-
-              {/* Download */}
-              <a
-                href="/resume.pdf"
-                download="Devanshu_Chicholikar_Resume.pdf"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors text-xs font-medium text-accent"
-              >
-                <Download size={12} />
-                Download
-              </a>
+              ))}
             </div>
-
-            {/* Contact row */}
-            <div className="flex gap-3">
-              <span className="flex items-center gap-1 text-xs text-text-secondary">
-                <Mail size={11} /> {RESUME.contact.email}
-              </span>
-              <span className="flex items-center gap-1 text-xs text-text-secondary">
-                <MapPin size={11} /> {RESUME.contact.location}
-              </span>
-            </div>
-            <div className="flex gap-3">
-              <a href={`https://${RESUME.contact.github}`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
-                <Github size={11} /> {RESUME.contact.github}
-              </a>
-              <a href={`https://${RESUME.contact.linkedin}`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
-                <Linkedin size={11} /> LinkedIn
-              </a>
-            </div>
+            {/* Download */}
+            <a
+              href="/resume.pdf"
+              download="Devanshu_Chicholikar_Resume.pdf"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90 transition-opacity shadow-sm"
+            >
+              <Download size={12} />
+              Download
+            </a>
           </div>
         </div>
 
-        {/* Section nav — only in interactive mode */}
+        {/* Section tabs */}
         {viewMode === 'interactive' && (
-          <div className="flex gap-1 mt-4">
+          <div className="flex gap-1 mt-3">
             {SECTIONS.map(section => (
               <button
                 key={section}
                 onClick={() => setActiveSection(section)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
                   activeSection === section
-                    ? 'bg-accent text-white'
-                    : 'text-text-secondary hover:text-text hover:bg-white/8'
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-text-secondary hover:text-text hover:bg-black/5 dark:hover:bg-white/8'
                 }`}
               >
                 {section}
@@ -280,27 +268,34 @@ export default function ResumeApp() {
               >
                 {/* Experience */}
                 {activeSection === 'Experience' && (
-                  <div className="space-y-6">
+                  <div>
                     <SectionHeading icon={Briefcase} title="Experience" />
-                    {RESUME.experience.map((job, idx) => (
-                      <motion.div key={idx} variants={itemVariants} className="relative pl-4">
-                        <div className="absolute left-0 top-2 bottom-0 w-px bg-white/10" />
-                        <div className="absolute left-[-3px] top-[7px] w-2 h-2 rounded-full bg-accent" />
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div>
-                            <h3 className="font-semibold text-text text-sm">{job.role}</h3>
-                            <p className="text-accent text-xs font-medium">{job.company}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs text-text-secondary font-mono">{job.period}</p>
-                            <p className="text-xs text-text-secondary">{job.location}</p>
-                          </div>
-                        </div>
-                        <ul className="space-y-1 mt-2">
-                          {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
-                        </ul>
-                      </motion.div>
-                    ))}
+                    <div className="relative">
+                      {/* Gradient timeline line */}
+                      <div className="absolute left-[7px] top-2 bottom-2 w-px"
+                           style={{ background: 'linear-gradient(to bottom, rgb(var(--color-accent)), transparent)' }} />
+                      <div className="space-y-7">
+                        {RESUME.experience.map((job, idx) => (
+                          <motion.div key={idx} variants={itemVariants} className="relative pl-8">
+                            {/* Dot */}
+                            <div className="absolute left-[3px] top-[6px] w-[9px] h-[9px] rounded-full border-2 border-accent bg-surface" />
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <h3 className="font-semibold text-text text-sm leading-tight">{job.role}</h3>
+                                <p className="text-accent text-xs font-semibold mt-0.5">{job.company}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-[11px] text-text-secondary font-mono">{job.period}</p>
+                                <p className="text-[11px] text-text-secondary">{job.location}</p>
+                              </div>
+                            </div>
+                            <ul className="space-y-1.5 mt-2">
+                              {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
+                            </ul>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
