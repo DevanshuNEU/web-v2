@@ -133,32 +133,58 @@ const STATUS_LABELS: Record<Project['status'], string> = {
   archived:   'Archived',
 };
 
+const CATEGORY_ICON_COLORS: Record<string, { bg: string; icon: string }> = {
+  'Frontend':      { bg: '#06b6d4', icon: '#ffffff' },
+  'Full Stack':    { bg: '#6366f1', icon: '#ffffff' },
+  'Cloud / DevOps':{ bg: '#f59e0b', icon: '#ffffff' },
+  'Tools / CLI':   { bg: '#10b981', icon: '#ffffff' },
+  'Systems':       { bg: '#ef4444', icon: '#ffffff' },
+  'Data / ML':     { bg: '#ec4899', icon: '#ffffff' },
+  'Other':         { bg: '#8b5cf6', icon: '#ffffff' },
+};
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
 function FileIcon({ project, selected }: { project: Project; selected: boolean }) {
+  const palette = CATEGORY_ICON_COLORS[project.category] ?? CATEGORY_ICON_COLORS['Other'];
+  const statusColor = STATUS_COLORS[project.status];
+
   return (
     <div className={`
       flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer select-none
-      transition-all duration-150 group
+      transition-all duration-150
       ${selected
-        ? 'bg-accent/20 ring-1 ring-accent/50'
-        : 'hover:bg-white/5 active:bg-white/10'
-      }
+        ? 'bg-accent/15 ring-1 ring-accent/40'
+        : 'hover:bg-black/5 dark:hover:bg-white/5 active:scale-95'}
     `}>
+      {/* Colored icon block — macOS app icon style */}
       <div className="relative">
-        <FileCode2
-          size={44}
-          strokeWidth={1}
-          className={selected ? 'text-accent' : 'text-text-secondary group-hover:text-text transition-colors'}
+        <div
+          className="w-12 h-12 rounded-[11px] flex items-center justify-center shadow-sm"
+          style={{
+            background: `linear-gradient(145deg, ${palette.bg}dd, ${palette.bg}99)`,
+            boxShadow: `0 2px 8px ${palette.bg}50, inset 0 1px 1px rgba(255,255,255,0.3)`,
+          }}
+        >
+          <FileCode2 size={22} strokeWidth={1.5} style={{ color: palette.icon }} />
+        </div>
+        {/* Status dot */}
+        <div
+          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface"
+          style={{ background: statusColor }}
+          title={STATUS_LABELS[project.status]}
         />
+        {/* Highlight star */}
         {project.highlight && (
-          <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-accent" />
+          <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-surface flex items-center justify-center">
+            <span style={{ fontSize: 6, color: 'white', lineHeight: 1 }}>★</span>
+          </div>
         )}
       </div>
-      <span className={`text-xs text-center leading-tight max-w-[72px] break-words ${
-        selected ? 'text-accent font-medium' : 'text-text-secondary group-hover:text-text transition-colors'
+      <span className={`text-[11px] text-center leading-tight max-w-[68px] break-words ${
+        selected ? 'text-accent font-semibold' : 'text-text-secondary'
       }`}>
         {project.name}
       </span>
@@ -283,30 +309,32 @@ export default function FileExplorerApp() {
     <div className="h-full flex bg-surface/20 overflow-hidden">
 
       {/* Sidebar */}
-      <div className="w-44 flex-shrink-0 border-r border-white/10 glass-subtle flex flex-col overflow-hidden">
-        <div className="p-3 pt-4">
-          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-2 mb-2">
+      <div className="w-44 flex-shrink-0 app-sidebar flex flex-col overflow-hidden">
+        <div className="px-3 pt-4 pb-2 border-b border-black/6 dark:border-white/6">
+          <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest px-1">
             Favorites
           </p>
+        </div>
+        <div className="flex-1 p-2 pt-2 space-y-0.5 overflow-auto">
           {CATEGORIES.map(cat => {
             const isActive = activeCategory === cat;
             const count = cat === 'All'
               ? PROJECTS.length
               : PROJECTS.filter(p => p.category === cat).length;
+            const palette = cat === 'All' ? null : CATEGORY_ICON_COLORS[cat];
             return (
               <button
                 key={cat}
                 onClick={() => { setActiveCategory(cat); setSelected(null); }}
-                className={`
-                  w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all text-xs
-                  ${isActive ? 'bg-accent/20 text-accent font-medium' : 'text-text-secondary hover:bg-white/5 hover:text-text'}
-                `}
+                className={`app-nav-item ${isActive ? 'active' : ''}`}
+                style={isActive && palette ? { background: `${palette.bg}18`, color: palette.bg } : undefined}
               >
-                {isActive ? <FolderOpen size={13} /> : <Folder size={13} />}
-                <span className="flex-1 truncate">{cat}</span>
-                <span className={`text-xs tabular-nums ${isActive ? 'text-accent/70' : 'text-text-secondary/50'}`}>
-                  {count}
-                </span>
+                {isActive
+                  ? <FolderOpen size={13} style={{ flexShrink: 0, color: palette?.bg }} />
+                  : <Folder size={13} style={{ flexShrink: 0 }} />
+                }
+                <span className="flex-1 truncate text-[12px]">{cat}</span>
+                <span className="text-[10px] tabular-nums opacity-50">{count}</span>
               </button>
             );
           })}
