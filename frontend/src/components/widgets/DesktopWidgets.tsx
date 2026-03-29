@@ -19,7 +19,7 @@ const QUOTES = [
   { text: 'Simplicity is the soul of efficiency.', author: 'Austin Freeman' },
   { text: 'The best code is no code at all.', author: 'Jeff Atwood' },
   { text: 'Deleted code is debugged code.', author: 'Jeff Sickel' },
-  { text: 'It\'s not a bug — it\'s an undocumented feature.', author: 'Anonymous' },
+  { text: "It's not a bug, it's an undocumented feature.", author: 'Anonymous' },
   { text: 'One of the best programming skills you can have is knowing when to walk away for a while.', author: 'Oscar Godson' },
   { text: 'Walking on water and developing software from a spec are easy if both are frozen.', author: 'Edward V. Berard' },
 ];
@@ -92,7 +92,7 @@ export function DesktopWidgets() {
             <p className={`text-[10px] leading-relaxed italic ${quoteColor}`}>
               &ldquo;{quote.text}&rdquo;
             </p>
-            <p className={`text-[9px] ${authorColor}`}>— {quote.author}</p>
+            <p className={`text-[9px] ${authorColor}`}>· {quote.author}</p>
           </motion.div>
         </AnimatePresence>
 

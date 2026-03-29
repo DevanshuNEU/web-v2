@@ -28,7 +28,7 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
       <ContextMenuContent className="w-60 border border-white/12 shadow-glass-xl" style={{ background: 'rgba(28, 28, 32, 0.88)', backdropFilter: 'blur(40px) saturate(160%)', WebkitBackdropFilter: 'blur(40px) saturate(160%)' }}>
         {/* Flavour header — not clickable */}
         <ContextMenuLabel className="text-[11px] font-normal text-text-secondary px-2 py-1.5 leading-tight select-none">
-          devOS — right-click as a service
+          devOS · right-click as a service
         </ContextMenuLabel>
 
         <ContextMenuSeparator className="bg-white/10" />

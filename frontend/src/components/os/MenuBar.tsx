@@ -22,7 +22,7 @@ const DEV_STATUSES = [
   'null pointer? never heard of her.',
   'localhost:3000 is home',
   'building in public',
-  'cloud, AI, fullstack — pick all three',
+  'cloud, AI, fullstack. pick all three.',
 ];
 
 export default function MenuBar() {

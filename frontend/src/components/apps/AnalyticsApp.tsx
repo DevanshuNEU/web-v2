@@ -156,7 +156,7 @@ export default function AnalyticsApp() {
                     : 'bg-accent/20 text-accent hover:bg-accent/30'
                 }`}
               >
-                {isOptedOut ? 'Tracking Disabled — Click to Enable' : 'Disable Tracking'}
+                {isOptedOut ? 'Tracking Disabled · Click to Enable' : 'Disable Tracking'}
               </button>
             </div>
           </div>

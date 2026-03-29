@@ -244,7 +244,7 @@ function AboutSection() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-text mb-0.5">devOS</h2>
-        <p className="text-sm text-text-secondary">Version 2.1.0 — Sprint 4</p>
+        <p className="text-sm text-text-secondary">Version 2.1.0 · Sprint 4</p>
         <p className="text-xs text-text-secondary mt-0.5">Built by Devanshu Chicholikar</p>
       </div>
 
@@ -268,7 +268,7 @@ function AboutSection() {
             'Finder-style File Explorer with color-coded icons',
             'Interactive Resume + PDF viewer',
             'Arcade: Snake, Minesweeper, 2048',
-            'PostHog analytics — fully transparent, real data',
+            'PostHog analytics. Fully transparent, real data.',
           ].map(item => (
             <li key={item} className="flex items-start gap-2">
               <span className="text-accent mt-0.5 flex-shrink-0">·</span>

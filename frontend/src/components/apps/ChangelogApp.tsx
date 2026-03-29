@@ -55,7 +55,7 @@ const RELEASES: Release[] = [
     summary: 'Complete rebuild from v1. New architecture, new design system, new everything.',
     highlight: true,
     changes: [
-      { type: 'release', text: 'devOS v2 — full ground-up rebuild in Next.js 15 with React 19 and App Router' },
+      { type: 'release', text: 'devOS v2: full ground-up rebuild in Next.js 15 with React 19 and App Router' },
       { type: 'feature', text: 'Desktop OS simulator with draggable, resizable windows and Cmd+W shortcuts' },
       { type: 'feature', text: 'macOS-style dock with spring physics magnification effect' },
       { type: 'feature', text: 'Boot sequence animation with terminal-style log lines' },
@@ -98,7 +98,7 @@ const RELEASES: Release[] = [
     summary: 'About Me got a proper redesign. Less wall of text, more human.',
     changes: [
       { type: 'feature', text: 'About Me redesigned with sidebar navigation and section-based layout' },
-      { type: 'feature', text: 'What Excites Me section — actual opinions, not buzzwords' },
+      { type: 'feature', text: 'What Excites Me section: actual opinions, not buzzwords' },
       { type: 'feature', text: 'Currently section with real-time status from Notion' },
       { type: 'refactor', text: 'Projects section rebuilt with filterable grid and modal details' },
     ],

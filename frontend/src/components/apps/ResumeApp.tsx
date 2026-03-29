@@ -35,8 +35,8 @@ const RESUME = {
   experience: [
     {
       company: 'Northeastern University',
-      role: 'Graduate Teaching Assistant — Cloud Computing & Networks',
-      period: 'Sep 2025 — Present',
+      role: 'Graduate Teaching Assistant, Cloud Computing & Networks',
+      period: 'Sep 2025 – Present',
       location: 'Boston, MA',
       bullets: [
         'Instruct 60+ graduate students on AWS infrastructure, Terraform IaC, and distributed systems; deliver weekly hands-on sessions covering VPC, load balancing, auto-scaling, and fault-tolerant design',
@@ -46,8 +46,8 @@ const RESUME = {
     },
     {
       company: 'Jaksh Enterprise',
-      role: 'Software Engineer — Backend / Full Stack',
-      period: 'Aug 2022 — Jul 2024',
+      role: 'Software Engineer, Backend / Full Stack',
+      period: 'Aug 2022 – Jul 2024',
       location: 'Remote',
       bullets: [
         'Architected production e-commerce platform handling 12K+ monthly users and 15K+ daily API requests using MERN stack; reduced page load from 3.2s to 2.6s, driving 35% conversion lift',
@@ -61,14 +61,14 @@ const RESUME = {
     {
       institution: 'Northeastern University',
       degree: 'MS, Software Engineering Systems',
-      period: 'Sept 2024 — May 2026',
+      period: 'Sept 2024 – May 2026',
       location: 'Boston, MA',
       detail: 'GPA: 3.85 · Network Structures & Cloud Computing · Generative AI · MLOps · Database Management · Algorithms',
     },
     {
       institution: 'Dhirubhai Ambani Institute of ICT',
       degree: 'B.Tech, Information & Communication Technology',
-      period: 'Aug 2018 — May 2022',
+      period: 'Aug 2018 – May 2022',
       location: 'Gujarat, India',
       detail: 'Computer Networks · Operating Systems · Data Structures · Databases',
     },
@@ -86,21 +86,21 @@ const RESUME = {
     {
       name: 'OpenCodeIntel',
       tech: 'FastAPI · React · pgvector · LangChain · MCP Protocol',
-      period: 'Sep 2024 — Present',
+      period: 'Sep 2024 – Present',
       desc: 'Open-source AI code intelligence platform. Hybrid RAG pipeline (vector + BM25 + Cohere reranking), Tree-sitter AST parsing for 8 languages, 87.5% Hit@1 accuracy. MCP server powers Claude with 6 semantic tools.',
       link: 'github.com/DevanshuNEU/opencodeintel',
     },
     {
       name: 'SecureScale',
       tech: 'AWS · Terraform · Packer · GitHub Actions · Lambda',
-      period: 'Jan 2025 — Apr 2025',
+      period: 'Jan 2025 – Apr 2025',
       desc: 'Production-grade multi-AZ AWS infra: VPC, ALB, ASG, RDS, S3. Defense-in-depth with 4 KMS keys, IAM least-privilege, zero-downtime CI/CD. Provisioning from 2 hours to 10 minutes. Cloud spend down 30%.',
       link: 'github.com/DevanshuNEU/securescale',
     },
     {
       name: 'devOS',
       tech: 'Next.js 15 · React 19 · Zustand · Framer Motion',
-      period: '2025 — Present',
+      period: '2025 – Present',
       desc: 'This portfolio, built as a desktop OS. Windowed apps, analytics, RPG skill tree, arcade games, and a Finder-style project browser.',
       link: 'devanshuchicholikar.com',
     },
