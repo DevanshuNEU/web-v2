@@ -12,6 +12,8 @@ export default function NotificationCenter() {
   const push = useNotificationStore(state => state.push);
   const dismiss = useNotificationStore(state => state.dismiss);
   const hasShownWelcome = useRef(false);
+  const hasShownIdleNudge = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Brief welcome notification on first load
   useEffect(() => {
@@ -30,8 +32,39 @@ export default function NotificationCenter() {
     return () => clearTimeout(timer);
   }, [push]);
 
+  // Idle nudge — fires after 30s of no mouse/keyboard activity
+  useEffect(() => {
+    const resetIdle = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (hasShownIdleNudge.current) return;
+
+      idleTimerRef.current = setTimeout(() => {
+        if (hasShownIdleNudge.current) return;
+        hasShownIdleNudge.current = true;
+        playSound('notify');
+        push({
+          title: notifCopy.idleNudge.title,
+          body: notifCopy.idleNudge.body,
+          dismissAfter: 6000,
+        });
+      }, 30_000);
+    };
+
+    resetIdle(); // start on mount
+    window.addEventListener('mousemove', resetIdle, { passive: true });
+    window.addEventListener('keydown', resetIdle, { passive: true });
+    window.addEventListener('click', resetIdle, { passive: true });
+
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('keydown', resetIdle);
+      window.removeEventListener('click', resetIdle);
+    };
+  }, [push]);
+
   return (
-    <div className="fixed top-4 right-4 z-[900] flex flex-col gap-3 max-w-sm">
+    <div className="fixed top-9 right-4 z-[900] flex flex-col gap-3 max-w-sm">
       <AnimatePresence mode="popLayout">
         {notifications.map((notif) => (
           <motion.div

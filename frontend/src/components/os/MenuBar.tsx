@@ -1,12 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/store/themeStore';
 import { useOSStore } from '@/store/osStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { getAppLabel } from '@/lib/appRegistry';
 import { isSoundEnabled, setSoundEnabled } from '@/hooks/useSoundEffects';
 import { Sun, Moon, Wifi, Volume2, VolumeX, BatteryMedium } from 'lucide-react';
+
+// Rotates when the desktop is idle (no focused window)
+const DEV_STATUSES = [
+  'devOS',
+  'probably debugging prod',
+  'shipping. always shipping.',
+  'coffee → code → repeat',
+  'forward deployed, always',
+  'RAG pipeline. not a salad.',
+  'open to opportunities',
+  'git push --force-with-feelings',
+  'null pointer? never heard of her.',
+  'localhost:3000 is home',
+  'building in public',
+  'cloud, AI, fullstack — pick all three',
+];
 
 export default function MenuBar() {
   const { mode, toggleMode } = useTheme();
@@ -33,7 +50,23 @@ export default function MenuBar() {
   const activeWindow = windows.find(w => w.id === activeWindowId && w.isOpen);
   const activeAppLabel = activeWindow
     ? getAppLabel(activeWindow.appType).windowTitle
-    : 'devOS';
+    : null;
+
+  // Rotating status — only shown when no app is focused
+  const [statusIdx, setStatusIdx] = useState(0);
+  const [statusKey, setStatusKey] = useState(0);
+  const rotateRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (activeAppLabel) return; // stop rotating when an app is focused
+    rotateRef.current = setInterval(() => {
+      setStatusIdx(i => (i + 1) % DEV_STATUSES.length);
+      setStatusKey(k => k + 1);
+    }, 3800);
+    return () => { if (rotateRef.current) clearInterval(rotateRef.current); };
+  }, [activeAppLabel]);
+
+  const displayLabel = activeAppLabel ?? DEV_STATUSES[statusIdx];
 
   const handleThemeToggle = () => {
     const next = mode === 'dark' ? 'light' : 'dark';
@@ -59,14 +92,26 @@ export default function MenuBar() {
           : '1px solid rgba(0,0,0,0.08)',
       }}
     >
-      {/* Left — active app name */}
-      <div className="flex items-center">
-        <span
-          className="text-[13px] font-semibold tracking-[-0.01em]"
-          style={{ color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.80)' }}
-        >
-          {activeAppLabel}
-        </span>
+      {/* Left — active app name or rotating dev status */}
+      <div className="flex items-center overflow-hidden" style={{ minWidth: 0, maxWidth: 320 }}>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={activeAppLabel ? `app-${activeAppLabel}` : `status-${statusKey}`}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="text-[13px] font-semibold tracking-[-0.01em] whitespace-nowrap"
+            style={{
+              color: activeAppLabel
+                ? (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.80)')
+                : (isDark ? 'rgba(255,255,255,0.52)' : 'rgba(0,0,0,0.42)'),
+              fontStyle: activeAppLabel ? 'normal' : 'italic',
+            }}
+          >
+            {displayLabel}
+          </motion.span>
+        </AnimatePresence>
       </div>
 
       {/* Right — system tray */}
