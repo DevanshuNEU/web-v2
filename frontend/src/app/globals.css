@@ -280,6 +280,14 @@ body {
   outline: none;
 }
 
+/* Radix UI menus (context menu, dropdown) handle their own hover states — no outline needed */
+[data-radix-collection-item]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="option"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* ============================================
    ANIMATIONS
    ============================================ */
