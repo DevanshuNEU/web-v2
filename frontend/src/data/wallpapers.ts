@@ -33,6 +33,14 @@ export const wallpapers: Wallpaper[] = [
   // DARK — Animated
   // -------------------------------------------------------------------------
   {
+    id: 'dark-signal-grid',
+    name: 'Signal Grid',
+    type: 'animated',
+    theme: 'dark',
+    thumbnail: 'linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)',
+    animatedConfig: { colors: ['#f97316', '#06b6d4', '#8b5cf6'], speed: 1, pattern: 'grid' },
+  },
+  {
     id: 'dark-particles',
     name: 'Neural Network',
     type: 'animated',

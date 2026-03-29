@@ -15,7 +15,7 @@ export interface Wallpaper {
   animatedConfig?: {
     colors: string[];
     speed: number;
-    pattern: "mesh" | "radial" | "wave" | "particles" | "starfield";
+    pattern: "mesh" | "radial" | "wave" | "particles" | "starfield" | "grid";
   };
 }
 
@@ -75,14 +75,15 @@ export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
       // Initial state
-      mode: "light",
+      mode: "dark",
       accentColor: ACCENT_COLORS.blue,
       wallpaper: {
-        id: "light-mountains",
-        name: "Mountain Vista",
-        type: "static",
-        theme: "light",
-        imageUrl: "/wallpapers/light-mountainVista.png",
+        id: "dark-signal-grid",
+        name: "Signal Grid",
+        type: "animated",
+        theme: "dark",
+        thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
+        animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
       },
       wallpaperTint: null,
 
@@ -93,12 +94,12 @@ export const useThemeStore = create<ThemeStore>()(
           const defaultWallpaper =
             newMode === "dark"
               ? {
-                  id: "dark-particles",
-                  name: "Neural Network",
+                  id: "dark-signal-grid",
+                  name: "Signal Grid",
                   type: "animated" as const,
                   theme: "dark" as const,
-                  thumbnail: "linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 50%,#0a1a2a 100%)",
-                  animatedConfig: { colors: ["#4facfe", "#00f2fe"], speed: 1, pattern: "particles" as const },
+                  thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
+                  animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
                 }
               : {
                   id: "light-mountains",
@@ -114,12 +115,12 @@ export const useThemeStore = create<ThemeStore>()(
         const defaultWallpaper =
           mode === "dark"
             ? {
-                id: "dark-particles",
-                name: "Neural Network",
+                id: "dark-signal-grid",
+                name: "Signal Grid",
                 type: "animated" as const,
                 theme: "dark" as const,
-                thumbnail: "linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 50%,#0a1a2a 100%)",
-                animatedConfig: { colors: ["#4facfe", "#00f2fe"], speed: 1, pattern: "particles" as const },
+                thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
+                animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
               }
             : {
                 id: "light-mountains",
