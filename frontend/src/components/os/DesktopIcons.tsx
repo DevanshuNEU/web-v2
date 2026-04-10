@@ -105,7 +105,17 @@ function DesktopIcon({ appType, icon: Icon, label, iconColor, delay }: DesktopIc
 
 export default function DesktopIcons() {
   return (
-    <div className="absolute top-5 left-5 flex flex-col gap-4 z-[1]">
+    {/*
+     * Positioning note: this component is rendered inside a `relative` div that
+     * starts at y=0. `absolute` children ignore that div's `pt-7` (menu bar
+     * padding), so we must clear the menu bar manually.
+     *
+     * Menu bar height: h-7 = 28px.
+     * top-9 = 36px → 28px menu bar + 8px breathing room.
+     *
+     * If the menu bar height ever changes, update top-9 here to match.
+     */}
+    <div className="absolute top-9 left-5 flex flex-col gap-4 z-[1]">
       {DESKTOP_APP_TYPES.map((appType, i) => {
         const reg = appRegistry[appType];
         if (!reg) return null;
