@@ -1,8 +1,19 @@
 'use client';
 
 /**
- * DesktopWidgets — Clock + rotating dev quotes
- * Top-right corner of the desktop, theme-aware so it reads on any wallpaper.
+ * DesktopWidgets — rotating dev quotes card, top-right corner of the desktop.
+ *
+ * Positioning notes:
+ *   - The menu bar is 28px tall (h-7).
+ *   - NotificationCenter renders at top-9 (36px). A typical notification card
+ *     is ~90px tall, ending at ~126px from the top.
+ *   - This widget starts at top-[130px] so notifications have clear space above
+ *     it and never overlap on initial page load.
+ *
+ * Clock note:
+ *   - The menu bar already shows the full date + time in the system tray.
+ *   - This widget therefore skips the clock and focuses on the quotes rotator,
+ *     which is the part that adds personality and isn't duplicated elsewhere.
  */
 
 import { useState, useEffect } from 'react';
@@ -25,61 +36,33 @@ const QUOTES = [
 ];
 
 export function DesktopWidgets() {
-  const [time, setTime] = useState<Date | null>(null);
   const [quoteIdx, setQuoteIdx] = useState(0);
   const { mode } = useTheme();
 
   const isDark = mode === 'dark';
 
+  // Rotate quotes every 18 seconds
   useEffect(() => {
-    setTime(new Date());
-    const t = setInterval(() => setTime(new Date()), 1000);
+    const t = setInterval(() => setQuoteIdx(i => (i + 1) % QUOTES.length), 18_000);
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    const t = setInterval(() => setQuoteIdx(i => (i + 1) % QUOTES.length), 18000);
-    return () => clearInterval(t);
-  }, []);
+  const quote = QUOTES[quoteIdx];
 
-  const hours   = time?.getHours().toString().padStart(2, '0')   ?? '--';
-  const minutes = time?.getMinutes().toString().padStart(2, '0') ?? '--';
-  const seconds = time?.getSeconds().toString().padStart(2, '0') ?? '--';
-  const date    = time?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) ?? '';
-  const quote   = QUOTES[quoteIdx];
-
-  // Theme-aware pill card — frosted glass so it reads on any wallpaper
-  const card = isDark
-    ? 'bg-black/25 border-white/10'
-    : 'bg-white/40 border-black/8';
-
-  const clockColor   = isDark ? 'text-white/80'  : 'text-gray-800/80';
-  const sepColor     = isDark ? 'text-white/25'  : 'text-gray-500/40';
-  const secColor     = isDark ? 'text-white/35'  : 'text-gray-500/50';
-  const dateColor    = isDark ? 'text-white/45'  : 'text-gray-600/70';
-  const quoteColor   = isDark ? 'text-white/30'  : 'text-gray-700/55';
-  const authorColor  = isDark ? 'text-white/20'  : 'text-gray-500/50';
+  // Theme-aware frosted glass card
+  const card        = isDark ? 'bg-black/25 border-white/10'    : 'bg-white/40 border-black/8';
+  const quoteColor  = isDark ? 'text-white/40'                  : 'text-gray-700/60';
+  const authorColor = isDark ? 'text-white/25'                  : 'text-gray-500/55';
 
   return (
-    <div className="absolute right-5 top-10 flex flex-col items-end gap-3 pointer-events-none select-none z-[1]">
-
-      {/* Clock card */}
-      <div className={`rounded-2xl border backdrop-blur-md px-5 py-4 text-right ${card}`}>
-        {/* Time */}
-        <div className="font-mono leading-none tracking-tight" style={{ fontSize: 'clamp(36px, 4vw, 60px)' }}>
-          <span className={`font-extralight ${clockColor}`}>{hours}</span>
-          <span className={`font-extralight ${sepColor}`}>:</span>
-          <span className={`font-extralight ${clockColor}`}>{minutes}</span>
-          <span className={`font-extralight text-xl ml-2 align-baseline ${secColor}`}>{seconds}</span>
-        </div>
-
-        {/* Date */}
-        <div className={`text-xs font-medium tracking-wide mt-1.5 ${dateColor}`}>{date}</div>
-
-        {/* Divider */}
-        <div className={`my-3 h-px ${isDark ? 'bg-white/10' : 'bg-black/8'}`} />
-
-        {/* Quote */}
+    /*
+     * top-[130px] — clears the menu bar (28px) + a full notification card (~90px)
+     *               so the welcome notification never overlaps this widget.
+     * pointer-events-none / select-none — widget is decorative; clicks pass through
+     *   to windows underneath.
+     */
+    <div className="absolute right-5 top-[130px] pointer-events-none select-none z-[1]">
+      <div className={`rounded-2xl border backdrop-blur-md px-5 py-4 text-right max-w-[240px] ${card}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={quoteIdx}
@@ -87,7 +70,7 @@ export function DesktopWidgets() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.5, ease: 'easeInOut' }}
-            className="max-w-[220px] ml-auto space-y-1"
+            className="space-y-1.5"
           >
             <p className={`text-[10px] leading-relaxed italic ${quoteColor}`}>
               &ldquo;{quote.text}&rdquo;
@@ -95,9 +78,7 @@ export function DesktopWidgets() {
             <p className={`text-[9px] ${authorColor}`}>· {quote.author}</p>
           </motion.div>
         </AnimatePresence>
-
       </div>
-
     </div>
   );
 }
