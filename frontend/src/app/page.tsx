@@ -8,37 +8,56 @@ import StageManager from '@/components/os/StageManager';
 import BootSequence from '@/components/os/BootSequence';
 import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
+import MobileFallback from '@/components/os/MobileFallback';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
- * Unlike sessionStorage (cleared on tab close), localStorage persists so
- * About Me only auto-opens on the first-ever visit, not every page refresh.
+ * Unlike sessionStorage (cleared on tab close), localStorage persists across
+ * sessions so About Me only auto-opens on the absolute first visit.
  */
 const FIRST_VISIT_KEY = 'devos-first-visit';
 
+/**
+ * Screen width below which we show the mobile fallback instead of the
+ * full macOS desktop simulation. 768px matches Tailwind's `md` breakpoint.
+ * The desktop sim relies on hover/drag interactions that don't work on touch.
+ */
+const MOBILE_BREAKPOINT = 768;
+
 export default function Home() {
-  const isBooted     = useOSStore(state => state.isBooted);
-  const setBooted    = useOSStore(state => state.setBooted);
-  const openWindow   = useOSStore(state => state.openWindow);
-  const [mounted, setMounted] = useState(false);
+  const isBooted   = useOSStore(state => state.isBooted);
+  const setBooted  = useOSStore(state => state.setBooted);
+  const openWindow = useOSStore(state => state.openWindow);
+
+  // mounted guards against SSR/hydration mismatch — window is undefined on the server
+  const [mounted,  setMounted]  = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Detect mobile on mount and on resize
+    const check = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    check();
+    window.addEventListener('resize', check);
+
     setMounted(true);
-    // Skip the boot sequence if the user already saw it this session
+
+    // Skip boot animation if the user already saw it this browser session
     if (sessionStorage.getItem('devos-booted') === '1') {
       setBooted();
     }
+
+    return () => window.removeEventListener('resize', check);
   }, [setBooted]);
 
   useEffect(() => {
     if (!isBooted) return;
 
-    // Persist boot state for this browser session (skips animation on refresh)
+    // Remember that boot ran this session so refreshes skip the animation
     sessionStorage.setItem('devos-booted', '1');
 
     // Auto-open About Me on the very first visit ever.
-    // A brief delay lets the desktop finish its mount animation first so the
-    // window entrance feels intentional rather than janky.
+    // A short delay lets the desktop finish mounting so the window entrance
+    // feels smooth rather than appearing mid-animation.
     if (!localStorage.getItem(FIRST_VISIT_KEY)) {
       localStorage.setItem(FIRST_VISIT_KEY, '1');
       const timer = setTimeout(() => openWindow('about-me'), 700);
@@ -48,6 +67,9 @@ export default function Home() {
 
   // Avoid hydration mismatch — render nothing until client mounts
   if (!mounted) return null;
+
+  // Mobile users get a clean, touch-friendly layout instead of the desktop sim
+  if (isMobile) return <MobileFallback />;
 
   return (
     <>
