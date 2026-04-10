@@ -71,23 +71,111 @@ function MatrixRain({ onDone }: { onDone: () => void }) {
 
 // ---------------------------------------------------------------------------
 // Hire animation
+//
+// Staged reveal: "processing" checks appear one by one (150ms apart), then
+// the contact card fades in after all checks pass. This rewards the visitor
+// who typed the command and makes the payoff feel earned.
 // ---------------------------------------------------------------------------
 
+const HIRE_CHECKS = [
+  { label: 'vibe check',            result: 'passed' },
+  { label: 'github activity',       result: 'impressive' },
+  { label: 'distributed systems',   result: 'yes' },
+  { label: 'ships on time',         result: 'usually' },
+  { label: 'coffee dependency',     result: 'critical (healthy)' },
+  { label: 'open to opportunities', result: 'very much so' },
+];
+
 function HireOutput() {
+  const [visibleChecks, setVisibleChecks] = useState(0);
+  const [showContact,   setShowContact]   = useState(false);
+
+  useEffect(() => {
+    // Reveal each check line 150ms apart
+    HIRE_CHECKS.forEach((_, i) => {
+      const t = setTimeout(() => setVisibleChecks(i + 1), i * 150);
+      return () => clearTimeout(t);
+    });
+    // Show contact block after all checks complete + a short pause
+    const contactTimer = setTimeout(
+      () => setShowContact(true),
+      HIRE_CHECKS.length * 150 + 300
+    );
+    return () => clearTimeout(contactTimer);
+  }, []);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="my-2 p-4 border border-green-500/30 rounded-lg bg-green-500/5"
-    >
-      <div className="text-green-400 text-lg font-bold mb-2">[ hire devanshu ]</div>
-      <div className="space-y-1 text-sm text-gray-300">
-        <div><span className="text-green-600/70 mr-2">mail</span><a href="mailto:chicholikar.d@northeastern.edu" className="text-blue-400 hover:underline">chicholikar.d@northeastern.edu</a></div>
-        <div><span className="text-green-600/70 mr-2">link</span><a href="https://linkedin.com/in/devanshuchicholikar" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">linkedin.com/in/devanshuchicholikar</a></div>
-        <div><span className="text-green-600/70 mr-2">code</span><a href="https://github.com/DevanshuNEU" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">github.com/DevanshuNEU</a></div>
-        <div className="pt-2 text-green-400/80 italic">Seriously though, let&apos;s talk.</div>
-      </div>
-    </motion.div>
+    <div className="my-2 font-mono text-sm space-y-0.5">
+      {/* Processing header */}
+      <div className="text-green-400/60 mb-2">$ hire devanshu --evaluate</div>
+
+      {/* Animated check lines */}
+      {HIRE_CHECKS.slice(0, visibleChecks).map(({ label, result }, i) => (
+        <motion.div
+          key={label}
+          initial={{ opacity: 0, x: -6 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex gap-2"
+        >
+          <span className="text-green-500">✓</span>
+          <span className="text-green-400/50 w-40 flex-shrink-0">{label}</span>
+          <span className="text-green-300/80">{result}</span>
+        </motion.div>
+      ))}
+
+      {/* Contact block — fades in after all checks */}
+      <AnimatePresence>
+        {showContact && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="mt-4 p-4 border border-green-500/30 rounded-lg bg-green-500/5"
+          >
+            <div className="text-green-400 font-bold mb-3">
+              ACCESS GRANTED: candidate approved for hire
+            </div>
+            <div className="space-y-1.5 text-sm">
+              <div>
+                <span className="text-green-600/60 mr-3 inline-block w-6">@</span>
+                <a
+                  href="mailto:chicholikar.d@northeastern.edu"
+                  className="text-blue-400 hover:underline"
+                >
+                  chicholikar.d@northeastern.edu
+                </a>
+              </div>
+              <div>
+                <span className="text-green-600/60 mr-3 inline-block w-6">in</span>
+                <a
+                  href="https://linkedin.com/in/devanshuchicholikar"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline"
+                >
+                  linkedin.com/in/devanshuchicholikar
+                </a>
+              </div>
+              <div>
+                <span className="text-green-600/60 mr-3 inline-block w-6">{'{}'}</span>
+                <a
+                  href="https://github.com/DevanshuNEU"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline"
+                >
+                  github.com/DevanshuNEU
+                </a>
+              </div>
+            </div>
+            <div className="mt-3 text-green-400/60 italic text-xs">
+              Seriously though, let&apos;s build something.
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
