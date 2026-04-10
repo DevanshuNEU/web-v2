@@ -1,12 +1,40 @@
 'use client';
 
+/**
+ * DesktopIcons — macOS-style shortcut icons on the desktop surface.
+ *
+ * Intentionally a curated short list — NOT the full pinned-dock set.
+ * Desktop icons should be the highest-value shortcuts for first-time visitors.
+ * Keep this to 3-4 max; everything else lives in the dock or Launchpad.
+ *
+ * To change which apps appear here, edit DESKTOP_APP_TYPES below.
+ * Single-click opens the app (macOS Finder uses double-click, but single-click
+ * is more intuitive for web visitors who expect click = action).
+ */
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
-import { getPinnedApps, getAppLabel } from '@/lib/appRegistry';
+import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import type { AppType } from '../../../../shared/types';
 
-// Statically defined so Tailwind can include all classes at build time
+// ---------------------------------------------------------------------------
+// Curated desktop app list
+// ---------------------------------------------------------------------------
+
+/**
+ * These three give a first-time visitor everything they need:
+ *   About Me  — who is this person?
+ *   Resume    — the document recruiters actually want
+ *   Projects  — proof of work
+ */
+const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'resume', 'projects'];
+
+// ---------------------------------------------------------------------------
+// Color map — must list all iconColor values used in appRegistry so Tailwind
+// includes these classes at build time (dynamic class names get purged).
+// ---------------------------------------------------------------------------
+
 const COLOR_CLASSES: Record<string, { bg: string; icon: string }> = {
   blue:   { bg: 'bg-blue-500/10   dark:bg-blue-500/15',   icon: 'text-blue-500'   },
   orange: { bg: 'bg-orange-500/10 dark:bg-orange-500/15', icon: 'text-orange-500' },
@@ -21,32 +49,40 @@ const COLOR_CLASSES: Record<string, { bg: string; icon: string }> = {
   indigo: { bg: 'bg-indigo-500/10 dark:bg-indigo-500/15', icon: 'text-indigo-500' },
 };
 
+// ---------------------------------------------------------------------------
+// Single icon
+// ---------------------------------------------------------------------------
+
 interface DesktopIconProps {
   appType: AppType;
   icon: React.ElementType;
   label: string;
   iconColor: string;
+  /** Staggered mount animation delay (seconds) */
+  delay: number;
 }
 
-function DesktopIcon({ appType, icon: Icon, label, iconColor }: DesktopIconProps) {
+function DesktopIcon({ appType, icon: Icon, label, iconColor, delay }: DesktopIconProps) {
   const openWindow = useOSStore(state => state.openWindow);
   const colors = COLOR_CLASSES[iconColor] ?? COLOR_CLASSES.blue;
 
   return (
     <motion.button
       className="flex flex-col items-center gap-1.5 w-[68px] cursor-pointer group"
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.3, ease: 'easeOut' }}
+      whileHover={{ scale: 1.06 }}
+      whileTap={{ scale: 0.94 }}
       onClick={() => openWindow(appType)}
-      title={label}
+      title={`Open ${label}`}
     >
       <div
         className={`
           w-12 h-12 rounded-xl flex items-center justify-center
           backdrop-blur-sm border border-white/20 dark:border-white/10
-          shadow-sm group-hover:shadow-md
-          transition-shadow duration-200
+          shadow-sm group-hover:shadow-md group-hover:border-white/30
+          transition-all duration-200
           ${colors.bg}
         `}
       >
@@ -63,20 +99,25 @@ function DesktopIcon({ appType, icon: Icon, label, iconColor }: DesktopIconProps
   );
 }
 
-export default function DesktopIcons() {
-  const desktopApps = getPinnedApps();
+// ---------------------------------------------------------------------------
+// Grid
+// ---------------------------------------------------------------------------
 
+export default function DesktopIcons() {
   return (
-    <div className="absolute top-5 left-5 grid grid-cols-2 gap-x-3 gap-y-4 z-[1]">
-      {desktopApps.map((app) => {
-        const label = getAppLabel(app.appType);
+    <div className="absolute top-5 left-5 flex flex-col gap-4 z-[1]">
+      {DESKTOP_APP_TYPES.map((appType, i) => {
+        const reg = appRegistry[appType];
+        if (!reg) return null;
+        const label = getAppLabel(appType);
         return (
           <DesktopIcon
-            key={app.appType}
-            appType={app.appType}
-            icon={app.icon}
+            key={appType}
+            appType={appType}
+            icon={reg.icon}
             label={label.title}
-            iconColor={app.iconColor}
+            iconColor={reg.iconColor}
+            delay={i * 0.08}
           />
         );
       })}
