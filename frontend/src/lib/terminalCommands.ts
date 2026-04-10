@@ -7,6 +7,7 @@
  *   - { type: 'special'; id: string }  — renders a custom component in the terminal
  */
 
+import { runRecruiterTour } from './recruiterTour';
 import type { AppType } from '../../../shared/types';
 
 export type CommandResult =
@@ -33,6 +34,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '║  skills        Things I know               ║',
     '║  contact       How to reach me             ║',
     '║  hire devanshu A very good idea            ║',
+    '║  tour          Recruiter guided tour       ║',
     '║  open <app>    Open an app window          ║',
     '║  theme <mode>  dark | light                ║',
     '║  github        My GitHub stats             ║',
@@ -205,6 +207,18 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  [TypeScript] [Python] [AWS] [Docker] [Terraform]',
     '',
   ],
+
+  // Recruiter tour — auto-opens About Me → Projects → Resume in sequence
+  tour: () => {
+    runRecruiterTour();
+    return [
+      'Starting recruiter tour...',
+      'About Me → Projects → Resume  (watch the desktop)',
+      '',
+      '  Shortcut: Cmd+Shift+T  anytime.',
+      '',
+    ];
+  },
 
   matrix: () => ({ type: 'special', id: 'matrix' }),
 

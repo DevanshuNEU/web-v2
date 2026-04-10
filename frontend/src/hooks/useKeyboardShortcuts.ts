@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
+import { runRecruiterTour } from '@/lib/recruiterTour';
 
 export function useKeyboardShortcuts() {
   const openWindow = useOSStore(state => state.openWindow);
@@ -41,6 +42,11 @@ export function useKeyboardShortcuts() {
             if (activeWindowId) {
               closeWindow(activeWindowId);
             }
+            break;
+          case 'T':
+            // Cmd+Shift+T → Recruiter Tour (Shift makes key uppercase)
+            e.preventDefault();
+            runRecruiterTour();
             break;
         }
       }
