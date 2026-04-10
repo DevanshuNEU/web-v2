@@ -50,10 +50,12 @@ const CATEGORY_META: Record<SpotlightCategory, { label: string; icon: React.Elem
 function ResultRow({
   item,
   isSelected,
+  isDark,
   onSelect,
 }: {
   item: SpotlightItem;
   isSelected: boolean;
+  isDark: boolean;
   onSelect: () => void;
 }) {
   const meta = CATEGORY_META[item.category];
@@ -65,16 +67,16 @@ function ResultRow({
       className={`
         w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors duration-75
         ${isSelected
-          ? 'bg-white/10 dark:bg-white/8'
-          : 'hover:bg-white/6 dark:hover:bg-white/5'}
+          ? isDark ? 'bg-white/10' : 'bg-black/6'
+          : isDark ? 'hover:bg-white/6' : 'hover:bg-black/4'}
       `}
     >
       <Icon size={14} className={`flex-shrink-0 ${meta.color}`} />
       <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-white/90 truncate block">{item.title}</span>
-        <span className="text-[11px] text-white/40 truncate block leading-snug">{item.subtitle}</span>
+        <span className={`text-sm font-medium truncate block ${isDark ? 'text-white/90' : 'text-gray-900'}`}>{item.title}</span>
+        <span className={`text-[11px] truncate block leading-snug ${isDark ? 'text-white/40' : 'text-gray-500'}`}>{item.subtitle}</span>
       </div>
-      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.color} bg-white/5 flex-shrink-0`}>
+      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.color} ${isDark ? 'bg-white/5' : 'bg-black/5'} flex-shrink-0`}>
         {meta.label}
       </span>
     </button>
@@ -222,17 +224,16 @@ export default function Spotlight() {
           {/* Search panel */}
           <motion.div
             key="spotlight-panel"
-            initial={{ opacity: 0, scale: 0.96, y: -12 }}
-            animate={{ opacity: 1, scale: 1,    y: 0    }}
-            exit={{ opacity: 0, scale: 0.96,    y: -12  }}
+            initial={{ opacity: 0, scale: 0.96, x: '-50%', y: 'calc(-50% - 12px)' }}
+            animate={{ opacity: 1, scale: 1,    x: '-50%', y: '-50%'               }}
+            exit={{ opacity: 0, scale: 0.96,    x: '-50%', y: 'calc(-50% - 12px)'  }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className={`
-              fixed z-[9001] left-1/2 -translate-x-1/2
+              fixed z-[9001] left-1/2 top-1/2
               w-full max-w-[560px] rounded-2xl overflow-hidden
               border shadow-2xl backdrop-blur-2xl
               ${glass}
             `}
-            style={{ top: '18vh' }}
           >
             {/* Input row */}
             <div className="flex items-center gap-3 px-4 py-3.5">
@@ -244,6 +245,8 @@ export default function Spotlight() {
                 onChange={e => handleQueryChange(e.target.value)}
                 placeholder="Search apps, projects, skills, commands..."
                 className={`flex-1 bg-transparent outline-none text-sm ${inputColor}`}
+                style={{ outline: 'none' }}
+                data-no-focus-ring
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -270,6 +273,7 @@ export default function Spotlight() {
                         key={item.id}
                         item={item}
                         isSelected={i === selIdx}
+                        isDark={isDark}
                         onSelect={() => handleSelect(item)}
                       />
                     ))}
@@ -285,7 +289,7 @@ export default function Spotlight() {
                   transition={{ duration: 0.1 }}
                 >
                   <div className={`border-t ${dividerColor}`} />
-                  <p className="text-center text-xs text-white/30 py-6">
+                  <p className={`text-center text-xs py-6 ${isDark ? 'text-white/30' : 'text-gray-400'}`}>
                     No results for &ldquo;{query}&rdquo;
                   </p>
                 </motion.div>
