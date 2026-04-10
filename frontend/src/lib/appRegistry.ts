@@ -153,7 +153,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'amber',
     defaultSize: { width: 650, height: 550 },
     defaultPosition: { x: 200, y: 130 },
-    pinnedToDock: false,
+    pinnedToDock: true,
     launchpad: true,
   },
   'changelog': {
