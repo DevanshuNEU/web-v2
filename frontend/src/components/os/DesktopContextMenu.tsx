@@ -9,7 +9,7 @@ import {
   ContextMenuTrigger,
   ContextMenuLabel,
 } from '@/components/ui/context-menu';
-import { Palette, RefreshCw, FolderOpen, Terminal, User, Coffee } from 'lucide-react';
+import { Palette, RefreshCw, FolderOpen, Terminal, User, Coffee, Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 
 interface DesktopContextMenuProps {
@@ -30,6 +30,21 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
         <ContextMenuLabel className="text-[11px] font-normal text-text-secondary px-2 py-1.5 leading-tight select-none">
           devOS · right-click as a service
         </ContextMenuLabel>
+
+        <ContextMenuSeparator className="bg-white/10" />
+
+        {/* Spotlight search shortcut — triggers the Cmd+K overlay */}
+        <ContextMenuItem
+          onClick={() => {
+            // Dispatch a synthetic keyboard event to open Spotlight
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+          }}
+          className="cursor-pointer text-text focus:bg-white/10 focus:text-text data-[highlighted]:bg-white/10 data-[highlighted]:text-text"
+        >
+          <Search className="mr-2 h-4 w-4 opacity-60" />
+          <span className="flex-1">Search devOS</span>
+          <kbd className="text-[10px] text-text-secondary/50 font-mono ml-2">⌘K</kbd>
+        </ContextMenuItem>
 
         <ContextMenuSeparator className="bg-white/10" />
 

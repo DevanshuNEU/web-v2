@@ -9,6 +9,7 @@ import BootSequence from '@/components/os/BootSequence';
 import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
 import MobileFallback from '@/components/os/MobileFallback';
+import Spotlight from '@/components/os/Spotlight';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -81,6 +82,8 @@ export default function Home() {
           <WindowManager />
           <NotificationCenter />
           <DesktopWidgets />
+          {/* Spotlight search — self-contained, listens for Cmd+K globally */}
+          <Spotlight />
         </Desktop>
       )}
     </>
