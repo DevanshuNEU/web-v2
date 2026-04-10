@@ -10,6 +10,7 @@ import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
 import MobileFallback from '@/components/os/MobileFallback';
 import Spotlight from '@/components/os/Spotlight';
+import AppSwitcher from '@/components/os/AppSwitcher';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -84,6 +85,8 @@ export default function Home() {
           <DesktopWidgets />
           {/* Spotlight search — self-contained, listens for Cmd+K globally */}
           <Spotlight />
+          {/* App switcher — Alt+Tab / Alt+Shift+Tab cycles open windows */}
+          <AppSwitcher />
         </Desktop>
       )}
     </>
