@@ -70,7 +70,7 @@ export default function ResumeApp() {
           {/* Identity */}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold text-text leading-tight">{RESUME.name}</h1>
+              <h1 className="text-xl font-bold text-text leading-tight tracking-tight">{RESUME.name}</h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
                 {RESUME.title}
               </span>
@@ -187,7 +187,7 @@ export default function ResumeApp() {
                         {RESUME.experience.map((job, idx) => (
                           <motion.div key={idx} variants={itemVariants} className="relative pl-8">
                             {/* Dot */}
-                            <div className="absolute left-[3px] top-[6px] w-[9px] h-[9px] rounded-full border-2 border-accent bg-surface" />
+                            <div className="absolute -left-[1px] top-[5px] w-3 h-3 rounded-full bg-accent/40 ring-2 ring-accent/25 ring-offset-1 ring-offset-transparent" />
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <div>
                                 <h3 className="font-semibold text-text text-sm leading-tight">{job.role}</h3>
@@ -232,18 +232,24 @@ export default function ResumeApp() {
 
                 {/* Skills */}
                 {activeSection === 'Skills' && (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <SectionHeading icon={Code2} title="Skills" />
                     {RESUME.skills.map((group, idx) => (
-                      <motion.div key={idx} variants={itemVariants}>
-                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                      <motion.div
+                        key={idx}
+                        variants={itemVariants}
+                        className="glass-subtle rounded-xl p-4 border border-white/10 border-l-2 border-l-accent/50"
+                      >
+                        <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3">
                           {group.category}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {group.items.map(skill => (
                             <span
                               key={skill}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/6 text-text border border-white/10 hover:border-accent/40 hover:text-accent transition-colors cursor-default"
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium
+                                         bg-accent/10 text-accent border border-accent/20
+                                         hover:bg-accent/20 transition-colors cursor-default"
                             >
                               {skill}
                             </span>

@@ -93,7 +93,7 @@ function Sidebar({
   });
 
   return (
-    <div className="w-56 flex-shrink-0 border-r border-white/10 flex flex-col h-full">
+    <div className="w-56 flex-shrink-0 app-sidebar flex flex-col h-full">
       {/* Filter chips */}
       <div className="p-3 border-b border-white/10 flex flex-wrap gap-1">
         {filters.map(f => (
@@ -161,6 +161,7 @@ function Sidebar({
 
 function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
   const allTech = Array.from(new Set([...repo.extraTech, ...repo.topics]));
+  const langColor = repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1';
 
   return (
     <motion.div
@@ -169,51 +170,35 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex-1 overflow-auto p-5 space-y-4"
+      className="flex-1 overflow-auto"
     >
-      {/* Header */}
-      <div className="glass-subtle rounded-xl p-5 border border-white/10">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h2 className="text-xl font-bold text-text">{repo.displayName}</h2>
-              <StatusBadge status={repo.status} />
-            </div>
-            <p className="text-sm text-text-secondary">{repo.tagline}</p>
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {repo.htmlUrl && (
-              <a
-                href={repo.htmlUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg glass-subtle border border-white/20 hover:border-accent/50
-                           transition-all hover:scale-105 text-text"
-                title="View on GitHub"
-              >
-                <Github size={16} />
-              </a>
-            )}
-            {repo.homepage && (
-              <a
-                href={repo.homepage}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-accent text-white hover:bg-accent/90 transition-all hover:scale-105"
-                title="Live Demo"
-              >
-                <ExternalLink size={16} />
-              </a>
-            )}
-          </div>
+      {/* Hero header — full-bleed gradient from language color */}
+      <div
+        className="relative px-6 pt-6 pb-5 border-b border-white/10"
+        style={{
+          background: `linear-gradient(135deg, ${langColor}30 0%, ${langColor}10 50%, transparent 100%)`,
+        }}
+      >
+        {/* Status + org row */}
+        <div className="flex items-center gap-2 mb-3">
+          <StatusBadge status={repo.status} />
+          <span className="text-[10px] text-text-secondary px-2 py-0.5 rounded-full bg-surface/30 border border-white/10">
+            {repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel org' : '@DevanshuNEU'}
+          </span>
         </div>
 
+        {/* Project name */}
+        <h2 className="text-3xl font-bold text-text tracking-tight leading-tight mb-1">
+          {repo.displayName}
+        </h2>
+        <p className="text-base text-text-secondary mb-4 leading-snug">{repo.tagline}</p>
+
         {/* Meta row */}
-        <div className="flex items-center gap-4 text-xs text-text-secondary pt-3 border-t border-white/10 flex-wrap">
+        <div className="flex items-center gap-4 text-xs text-text-secondary mb-4 flex-wrap">
           {repo.language && <LangDot lang={repo.language} />}
           {repo.stars > 0 && (
-            <span className="flex items-center gap-1">
-              <Star size={11} /> {repo.stars}
+            <span className="flex items-center gap-1 font-medium">
+              <Star size={12} className="text-amber-400" /> {repo.stars}
             </span>
           )}
           {repo.forks > 0 && (
@@ -223,13 +208,41 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
           )}
           <span className="flex items-center gap-1">
             <Calendar size={11} />
-            Updated {new Date(repo.updatedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-surface/50 text-[10px]">
-            {repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel org' : '@DevanshuNEU'}
+            {new Date(repo.updatedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
           </span>
         </div>
+
+        {/* CTA buttons */}
+        <div className="flex gap-2">
+          {repo.htmlUrl && (
+            <a
+              href={repo.htmlUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-subtle
+                         border border-white/20 hover:border-accent/50 text-text text-xs font-medium
+                         transition-all hover:scale-[1.02]"
+            >
+              <Github size={13} /> GitHub
+            </a>
+          )}
+          {repo.homepage && (
+            <a
+              href={repo.homepage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                         bg-accent text-white text-xs font-medium
+                         hover:bg-accent/90 transition-all hover:scale-[1.02]"
+            >
+              <ExternalLink size={13} /> Live Demo
+            </a>
+          )}
+        </div>
       </div>
+
+      {/* Scrollable content below the hero */}
+      <div className="p-5 space-y-4">
 
       {/* Story */}
       {repo.story.length > 0 && (
@@ -255,7 +268,8 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
             {allTech.map(tech => (
               <span
                 key={tech}
-                className="px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs font-medium"
+                className="px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs font-medium
+                           border border-accent/20 hover:bg-accent/20 transition-colors cursor-default"
               >
                 {tech}
               </span>
@@ -275,16 +289,20 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
             {repo.achievements.map((a, i) => (
               <div
                 key={i}
-                className="p-3 rounded-lg bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20"
+                className="relative overflow-hidden p-3 rounded-lg glass-subtle border-t-2 border-accent/40 border border-accent/20"
               >
-                <div className="text-xl font-bold text-accent mb-0.5">{a.metric}</div>
-                <div className="text-xs font-semibold text-text mb-0.5">{a.label}</div>
-                <div className="text-[11px] text-text-secondary">{a.detail}</div>
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/8 to-transparent pointer-events-none rounded-lg" />
+                <div className="relative">
+                  <div className="text-2xl font-bold text-accent mb-0.5">{a.metric}</div>
+                  <div className="text-xs font-semibold text-text mb-0.5">{a.label}</div>
+                  <div className="text-[11px] text-text-secondary">{a.detail}</div>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
+      </div>{/* end scrollable content */}
     </motion.div>
   );
 }
