@@ -10,9 +10,8 @@
  */
 
 import { lazy } from 'react';
+import React from 'react';
 import {
-  User,
-  FolderOpen,
   Activity,
   BarChart3,
   Mail,
@@ -20,10 +19,22 @@ import {
   Gamepad2,
   Settings,
   HardDrive,
-  FileText,
   ScrollText,
 } from 'lucide-react';
+import {
+  IdentificationCard,
+  Folders,
+  ReadCvLogo,
+} from '@phosphor-icons/react';
 import type { AppType } from '../../../shared/types';
+
+// Phosphor icon wrappers — bake in the weight so AppIcon gets the right visual style
+const AboutMeIcon = (props: React.SVGProps<SVGSVGElement> & { size?: number }) =>
+  React.createElement(IdentificationCard, { ...props, weight: 'duotone' } as Parameters<typeof IdentificationCard>[0]);
+const ProjectsIcon = (props: React.SVGProps<SVGSVGElement> & { size?: number }) =>
+  React.createElement(Folders, { ...props, weight: 'fill' } as Parameters<typeof Folders>[0]);
+const ResumeIcon = (props: React.SVGProps<SVGSVGElement> & { size?: number }) =>
+  React.createElement(ReadCvLogo, { ...props, weight: 'duotone' } as Parameters<typeof ReadCvLogo>[0]);
 import { appLabels } from '@/data/copy';
 
 export interface AppRegistration {
@@ -68,7 +79,7 @@ const components = {
 export const appRegistry: Record<AppType, AppRegistration> = {
   'about-me': {
     component: components['about-me'],
-    icon: User,
+    icon: AboutMeIcon,
     iconColor: 'blue',
     defaultSize: { width: 600, height: 500 },
     defaultPosition: { x: 100, y: 100 },
@@ -77,7 +88,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   },
   'projects': {
     component: components['projects'],
-    icon: FolderOpen,
+    icon: ProjectsIcon,
     iconColor: 'orange',
     defaultSize: { width: 800, height: 600 },
     defaultPosition: { x: 150, y: 120 },
@@ -124,7 +135,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['games'],
     icon: Gamepad2,
     iconColor: 'green',
-    defaultSize: { width: 600, height: 500 },
+    defaultSize: { width: 620, height: 580 },
     defaultPosition: { x: 220, y: 160 },
     pinnedToDock: false,
     launchpad: true,
@@ -149,7 +160,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   },
   'resume': {
     component: components['resume'],
-    icon: FileText,
+    icon: ResumeIcon,
     iconColor: 'amber',
     defaultSize: { width: 650, height: 550 },
     defaultPosition: { x: 200, y: 130 },
