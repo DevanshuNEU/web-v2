@@ -43,19 +43,11 @@ export default function Home() {
 
     setMounted(true);
 
-    // Skip boot animation if the user already saw it this browser session
-    if (sessionStorage.getItem('devos-booted') === '1') {
-      setBooted();
-    }
-
     return () => window.removeEventListener('resize', check);
   }, [setBooted]);
 
   useEffect(() => {
     if (!isBooted) return;
-
-    // Remember that boot ran this session so refreshes skip the animation
-    sessionStorage.setItem('devos-booted', '1');
 
     // Auto-open About Me on the very first visit ever.
     // A short delay lets the desktop finish mounting so the window entrance

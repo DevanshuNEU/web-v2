@@ -54,7 +54,6 @@ export default function AppIcon({ icon: Icon, colorKey, size }: AppIconProps) {
       <div className="relative z-10 flex items-center justify-center w-full h-full">
         <Icon
           size={iconSize}
-          strokeWidth={1.8}
           style={{
             color: 'white',
             filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))',

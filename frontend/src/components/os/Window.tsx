@@ -142,10 +142,12 @@ export default function Window({ window, children }: WindowProps) {
         will-change-transform
         transition-[border-radius,box-shadow] duration-300 ease-out
         ${window.isMaximized ? 'rounded-none shadow-none' : 'rounded-xl'}
-        ${isActive ? 'shadow-glass-xl' : 'shadow-glass-lg'}
       `}
       style={{
         zIndex: window.zIndex,
+        boxShadow: window.isMaximized ? 'none' : isActive
+          ? `0 0 0 1px rgb(var(--color-accent) / 0.15), 0 20px 60px rgba(0,0,0,0.3)`
+          : `0 8px 32px rgba(0,0,0,0.12)`,
         ...windowStyle,
       }}
       onClick={() => focusWindow(window.id)}
@@ -228,7 +230,7 @@ export default function Window({ window, children }: WindowProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto bg-surface/50" style={{ minHeight: 0 }}>
+      <div className="flex-1 overflow-auto bg-surface/25" style={{ minHeight: 0 }}>
         {children}
       </div>
     </motion.div>

@@ -15,6 +15,7 @@ import AppIcon from './AppIcon';
 import { Launchpad } from './Launchpad';
 import { LayoutGrid } from 'lucide-react';
 import type { AppType } from '../../../../shared/types';
+import FirstVisitHint from './FirstVisitHint';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -120,7 +121,15 @@ export default function Taskbar() {
   const { mode } = useTheme();
 
   const [launchpadOpen, setLaunchpadOpen] = useState(false);
+  const [firstVisit, setFirstVisit] = useState(false);
   const mouseX = useMotionValue(-1);
+
+  // Track whether this is a first-time visitor (for pulse on grid button)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('devos_hint_dismissed')) {
+      setFirstVisit(true);
+    }
+  }, []);
 
   const pinnedApps = getPinnedApps().map(a => a.appType);
   const pinnedSet = new Set(pinnedApps);
@@ -135,6 +144,7 @@ export default function Taskbar() {
   return (
     <>
       <Launchpad open={launchpadOpen} onClose={() => setLaunchpadOpen(false)} />
+      <FirstVisitHint onDismiss={() => setFirstVisit(false)} />
 
       {/* Dock shelf — overflow-visible so scaled icons show above the shelf */}
       <div
@@ -157,20 +167,32 @@ export default function Taskbar() {
         onMouseLeave={() => mouseX.set(-1)}
       >
         {/* Launchpad button */}
-        <button
-          onClick={() => setLaunchpadOpen(!launchpadOpen)}
-          className={`
-            flex-shrink-0 rounded-[11px] flex items-center justify-center
-            transition-all duration-150 cursor-pointer
-            ${launchpadOpen
-              ? 'bg-white/25 dark:bg-white/20'
-              : 'bg-white/10 dark:bg-white/8 hover:bg-white/20 dark:hover:bg-white/15'}
-          `}
-          style={{ width: BASE_SIZE, height: BASE_SIZE }}
-          title="Launchpad"
-        >
-          <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
-        </button>
+        <div className="relative flex-shrink-0" style={{ width: BASE_SIZE, height: BASE_SIZE }}>
+          {/* Pulse ring — only for first-time visitors */}
+          {firstVisit && !launchpadOpen && (
+            <span
+              className="absolute inset-0 rounded-[11px] pointer-events-none animate-ping"
+              style={{ background: 'rgba(59,130,246,0.35)', animationDuration: '1.6s' }}
+            />
+          )}
+          <button
+            onClick={() => {
+              setLaunchpadOpen(!launchpadOpen);
+              setFirstVisit(false);
+              localStorage.setItem('devos_hint_dismissed', '1');
+            }}
+            className={`
+              w-full h-full rounded-[11px] flex items-center justify-center
+              transition-all duration-150 cursor-pointer
+              ${launchpadOpen
+                ? 'bg-white/25 dark:bg-white/20'
+                : 'bg-white/10 dark:bg-white/8 hover:bg-white/20 dark:hover:bg-white/15'}
+            `}
+            title="Launchpad — explore all apps"
+          >
+            <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
+          </button>
+        </div>
 
         <DockDivider />
 

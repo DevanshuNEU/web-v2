@@ -204,14 +204,17 @@ body {
    APP CHROME — macOS inner chrome utilities
    ============================================ */
 
-/* Sidebar: slightly distinct from content area */
+/* Sidebar: distinct glass layer — depth: wallpaper → window glass (40px) → sidebar (8px) → content */
 .app-sidebar {
-  background: rgba(0, 0, 0, 0.025);
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.04);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  will-change: backdrop-filter;
 }
 .dark .app-sidebar {
-  background: rgba(255, 255, 255, 0.025);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Nav item base */
