@@ -14,6 +14,8 @@ interface AppIconProps {
   /** Hide label (e.g. inside dock) */
   hideLabel?: boolean;
   size?: number;
+  /** Override the default label from getAppLabel. Used for iOS-specific names. */
+  label?: string;
 }
 
 /**
@@ -25,9 +27,10 @@ export default function AppIcon({
   onOpen,
   hideLabel = false,
   size = 60,
+  label: labelOverride,
 }: AppIconProps) {
   const reg = appRegistry[appType];
-  const label = getAppLabel(appType).title;
+  const label = labelOverride ?? getAppLabel(appType).title;
   const colors = getIconColors(reg.iconColor);
   const Icon = reg.icon;
 

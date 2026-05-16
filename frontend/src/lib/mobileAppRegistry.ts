@@ -20,6 +20,15 @@ export interface MobileAppRegistration {
   label: string;
 }
 
+/**
+ * Mobile-only label overrides. The desktop variant might be named for its
+ * macOS persona (e.g. "Preferences"); the iOS variant uses the iOS name.
+ * Only override when the mobile label genuinely differs.
+ */
+const MOBILE_LABEL_OVERRIDES: Partial<Record<AppType, string>> = {
+  'display-options': 'Settings',
+};
+
 /** The 4 apps that live in the dock, in left→right order. */
 export const DOCK_ORDER: AppType[] = ['about-me', 'terminal', 'contact', 'resume'];
 
@@ -43,7 +52,7 @@ export function getMobileApp(appType: AppType): MobileAppRegistration {
     component: reg.component,
     icon: reg.icon,
     iconColor: reg.iconColor,
-    label: label.title,
+    label: MOBILE_LABEL_OVERRIDES[appType] ?? label.title,
   };
 }
 

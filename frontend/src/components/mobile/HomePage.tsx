@@ -19,7 +19,7 @@ export default function HomePage({ apps, onOpen }: HomePageProps) {
       <div className="grid grid-cols-4 gap-x-4 gap-y-6">
         {apps.map((app) => (
           <div key={app.appType} className="flex justify-center">
-            <AppIcon appType={app.appType} onOpen={onOpen} />
+            <AppIcon appType={app.appType} onOpen={onOpen} label={app.label} />
           </div>
         ))}
       </div>

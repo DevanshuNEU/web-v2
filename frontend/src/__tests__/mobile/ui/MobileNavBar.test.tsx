@@ -29,6 +29,11 @@ describe('MobileNavBar', () => {
     expect(screen.getByText('Projects')).toBeInTheDocument();
   });
 
+  it('back button aria-label includes the backLabel when present (better a11y)', () => {
+    render(<MobileNavBar title="Detail" onBack={() => {}} backLabel="Projects" />);
+    expect(screen.getByRole('button', { name: 'Back to Projects' })).toBeInTheDocument();
+  });
+
   it('renders an arbitrary right-action node', () => {
     render(
       <MobileNavBar

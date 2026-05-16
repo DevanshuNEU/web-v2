@@ -12,6 +12,16 @@ import {
   Volume2, VolumeX, Sparkles,
 } from 'lucide-react';
 import { isSoundEnabled, setSoundEnabled, playSound } from '@/hooks/useSoundEffects';
+import MobileSettings from './MobileSettings';
+
+interface SettingsAppProps {
+  /**
+   * Render variant. 'desktop' (default) shows the existing sidebar layout used
+   * by the macOS shell. 'mobile' shows the iOS-style Settings app launched
+   * from the phone shell's home screen.
+   */
+  variant?: 'desktop' | 'mobile';
+}
 
 /* ------------------------------------------------------------------ */
 /*  Sidebar nav config                                                 */
@@ -297,7 +307,12 @@ const pageVariants = {
   exit:    { opacity: 0, y: -6, transition: { duration: 0.12, ease: 'easeIn' as const } },
 };
 
-export default function SettingsApp() {
+export default function SettingsApp({ variant = 'desktop' }: SettingsAppProps = {}) {
+  if (variant === 'mobile') return <MobileSettings />;
+  return <DesktopSettings />;
+}
+
+function DesktopSettings() {
   const [active, setActive] = useState<SectionId>('appearance');
 
   return (
