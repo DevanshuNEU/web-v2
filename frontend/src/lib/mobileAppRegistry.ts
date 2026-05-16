@@ -27,20 +27,34 @@ export interface MobileAppRegistration {
  */
 const MOBILE_LABEL_OVERRIDES: Partial<Record<AppType, string>> = {
   'display-options': 'Settings',
+  'github-activity': 'Activity',
 };
 
-/** The 4 apps that live in the dock, in left→right order. */
-export const DOCK_ORDER: AppType[] = ['about-me', 'terminal', 'contact', 'resume'];
+/**
+ * Dock — the 4 apps a first-time visitor (especially a recruiter or founder)
+ * should be able to reach with zero scrolling. About-Me to establish identity,
+ * Projects for the work, Resume for the credentials, Contact to reach out.
+ *
+ * Terminal/Games/FileExplorer were here before but they're easter eggs for
+ * other engineers — they belong on a deeper page, not at the bottom-of-thumb
+ * reach where every visitor lands.
+ */
+export const DOCK_ORDER: AppType[] = ['about-me', 'projects', 'resume', 'contact'];
 
 /**
  * Home page layout. Each page is a list of AppTypes shown in a 4-col grid.
  * The dock is sticky, so dock apps are excluded from page contents.
+ *
+ * Page 1 = supporting evidence for the flagship apps (skills, real analytics,
+ * changelog showing recent shipping cadence). Page 2 = utilities and easter
+ * eggs visitors discover by swiping.
  */
 export const HOME_PAGES: AppType[][] = [
-  // Page 1 — primary apps
-  ['projects', 'skills-dashboard', 'games', 'file-explorer'],
-  // Page 2 — secondary apps + utilities
-  ['analytics', 'changelog', 'display-options'],
+  // Page 1 — supporting evidence. Activity first (top-left) because it's the
+  // single highest-credibility surface: real, live, can't be faked.
+  ['github-activity', 'skills-dashboard', 'analytics', 'changelog'],
+  // Page 2 — utilities, settings, easter eggs
+  ['terminal', 'games', 'file-explorer', 'display-options'],
 ];
 
 /** Resolve full mobile metadata for an app. */
