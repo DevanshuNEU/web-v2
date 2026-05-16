@@ -176,6 +176,7 @@ function formatAppName(appType: AppType): string {
     'file-explorer': 'Finder',
     'resume': 'Resume',
     'changelog': 'Changelog',
+    'github-activity': 'GitHub Activity',
   };
   return names[appType] || appType;
 }

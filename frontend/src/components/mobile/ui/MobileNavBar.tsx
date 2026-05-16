@@ -43,7 +43,7 @@ export default function MobileNavBar({
           <button
             type="button"
             onClick={onBack}
-            aria-label="Back"
+            aria-label={backLabel ? `Back to ${backLabel}` : 'Back'}
             className="touch-target flex items-center gap-0.5 -ml-1 pl-1 pr-2 rounded-md text-accent active:opacity-50 transition-opacity"
           >
             <ChevronLeft size={26} strokeWidth={2.2} />

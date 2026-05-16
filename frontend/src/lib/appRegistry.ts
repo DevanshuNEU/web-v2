@@ -20,6 +20,7 @@ import {
   Settings,
   HardDrive,
   ScrollText,
+  Github,
 } from 'lucide-react';
 import {
   IdentificationCard,
@@ -70,6 +71,7 @@ const components = {
   'file-explorer': lazy(() => import('@/components/apps/FileExplorerApp')),
   'resume': lazy(() => import('@/components/apps/ResumeApp')),
   'changelog': lazy(() => import('@/components/apps/ChangelogApp')),
+  'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
 };
 
 // ---------------------------------------------------------------------------
@@ -173,6 +175,15 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'indigo',
     defaultSize: { width: 600, height: 500 },
     defaultPosition: { x: 250, y: 150 },
+    pinnedToDock: false,
+    launchpad: true,
+  },
+  'github-activity': {
+    component: components['github-activity'],
+    icon: Github,
+    iconColor: 'green',
+    defaultSize: { width: 720, height: 600 },
+    defaultPosition: { x: 180, y: 110 },
     pinnedToDock: false,
     launchpad: true,
   },

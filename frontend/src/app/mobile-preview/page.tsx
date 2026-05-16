@@ -45,6 +45,7 @@ import MobileAppIcon from '@/components/mobile/ui/MobileAppIcon';
 import MobileActionRow from '@/components/mobile/ui/MobileActionRow';
 import IconTile from '@/components/mobile/ui/IconTile';
 import MobileSettings from '@/components/apps/MobileSettings';
+import GitHubActivityApp from '@/components/apps/GitHubActivityApp';
 
 export default function MobilePreviewPage() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -474,6 +475,21 @@ export default function MobilePreviewPage() {
             />
           </div>
         </PhoneFrame>
+      </Group>
+
+      {/* Composed app: GitHub Activity */}
+      <Group title="STEP 2 — GitHub Activity (live data, recruiter's first stop)">
+        <PhoneFrame theme={theme}>
+          <div className="h-[640px]">
+            <GitHubActivityApp variant="mobile" />
+          </div>
+        </PhoneFrame>
+        <p className="text-[12px] text-text-secondary mt-1 leading-relaxed px-1">
+          Pulls from /api/github/activity (10-min cache). Contribution heatmap
+          via the jogruber.de community scraper; events + repos via the GitHub
+          REST API. Degrades gracefully — the calendar section hides itself if
+          the scraper is unreachable.
+        </p>
       </Group>
 
       {/* Composed app: Settings */}

@@ -24,7 +24,8 @@ export type AppType =
   | 'display-options'
   | 'file-explorer'
   | 'resume'
-  | 'changelog';
+  | 'changelog'
+  | 'github-activity';
 
 // API Types
 export interface AnalyticsEvent {
