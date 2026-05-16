@@ -132,7 +132,11 @@ const contentVariants = {
 // Main app
 // ---------------------------------------------------------------------------
 
-export default function AboutMeApp() {
+interface AboutMeAppProps {
+  variant?: 'desktop' | 'mobile';
+}
+
+export default function AboutMeApp({ variant = 'desktop' }: AboutMeAppProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const trackEvent = useAnalyticsStore(state => state.trackEvent);
 
@@ -140,6 +144,10 @@ export default function AboutMeApp() {
     setActiveTab(id);
     trackEvent("section_view", `About Me: ${id}`, { section: id });
   };
+
+  if (variant === 'mobile') {
+    return <AboutMeMobile activeTab={activeTab} onTab={handleTab} />;
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -228,6 +236,71 @@ export default function AboutMeApp() {
             {activeTab === "contact"   && <ContactSection />}
           </motion.div>
         </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile layout — vertical scroll, iOS-Settings-style section rows
+// ---------------------------------------------------------------------------
+
+function AboutMeMobile({
+  activeTab,
+  onTab,
+}: {
+  activeTab: TabId;
+  onTab: (id: TabId) => void;
+}) {
+  return (
+    <div className="h-full overflow-y-auto bg-bg">
+      {/* Hero */}
+      <div className="flex flex-col items-center text-center px-6 pt-8 pb-6">
+        <div
+          className="w-24 h-24 rounded-2xl overflow-hidden border border-white/20"
+          style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}
+        >
+          <Image src={identity.photo} alt={identity.name} width={96} height={96} className="w-full h-full object-cover" />
+        </div>
+        <h1 className="mt-4 text-2xl font-semibold text-text">{identity.name}</h1>
+        <p className="mt-1 text-sm text-text-secondary">{identity.title}</p>
+        <span className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          Available
+        </span>
+        <div className="mt-3 flex items-center gap-4 text-[12px] text-text-secondary">
+          <span className="flex items-center gap-1"><MapPin size={11} />{identity.location}</span>
+          <span className="flex items-center gap-1"><GraduationCap size={11} />{identity.school}</span>
+        </div>
+      </div>
+
+      {/* Section pills (tabs) */}
+      <div className="px-4 mb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
+        {TABS.map(({ id, label }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onTab(id)}
+              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+                isActive
+                  ? 'bg-accent text-white'
+                  : 'bg-black/5 dark:bg-white/8 text-text-secondary'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Section content */}
+      <div className="px-4 pb-10">
+        {activeTab === 'overview'  && <OverviewTab />}
+        {activeTab === 'journey'   && <JourneySection />}
+        {activeTab === 'excites'   && <ExcitesSection />}
+        {activeTab === 'currently' && <CurrentlySection />}
+        {activeTab === 'contact'   && <ContactSection />}
       </div>
     </div>
   );

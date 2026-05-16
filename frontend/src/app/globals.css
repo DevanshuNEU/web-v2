@@ -124,6 +124,23 @@ body {
    ============================================ */
 
 @layer utilities {
+  /* Safe-area utilities — for phone shell with notch / home indicator */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .mt-safe { margin-top: env(safe-area-inset-top); }
+  .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
+  .h-safe-top { height: env(safe-area-inset-top); }
+  .h-safe-bottom { height: env(safe-area-inset-bottom); }
+
+  /* Touch target floor — iOS HIG minimum is 44pt */
+  .touch-target { min-width: 44px; min-height: 44px; }
+
+  /* Hide native scrollbars while preserving scrollability — used by mobile shell */
+  .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+
   /* Glass effect utilities */
   .glass-subtle {
     background: var(--glass-bg-subtle);
@@ -320,6 +337,11 @@ body {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@keyframes wiggle {
+  0%   { transform: rotate(-1.5deg); }
+  100% { transform: rotate(1.5deg);  }
 }
 
 @keyframes loading {
