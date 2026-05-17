@@ -13,6 +13,7 @@ import {
   Folder, FolderOpen, FileCode2, ExternalLink, Github,
   ChevronRight, Star, GitFork, ArrowLeft,
 } from 'lucide-react';
+import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -290,10 +291,127 @@ function DetailPanel({ project, onBack }: { project: Project; onBack: () => void
 }
 
 // ---------------------------------------------------------------------------
+// Mobile — category + file grid root, push to detail
+// ---------------------------------------------------------------------------
+
+function FileGridMobile() {
+  const nav = useMobileNavigation();
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const filtered = activeCategory === 'All'
+    ? PROJECTS
+    : PROJECTS.filter(p => p.category === activeCategory);
+
+  const openDetail = (project: Project) => {
+    nav.push({
+      id: project.id,
+      title: project.name,
+      element: <DetailPanelMobile project={project} />,
+    });
+  };
+
+  return (
+    <div className="h-full overflow-y-auto">
+      {/* Category chips */}
+      <div className="px-4 pt-3 pb-2 flex gap-2 overflow-x-auto hide-scrollbar">
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+              activeCategory === cat
+                ? 'bg-accent text-white'
+                : 'bg-black/5 dark:bg-white/8 text-text-secondary'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* File grid */}
+      <div className="px-3 pb-4 grid grid-cols-4 gap-1">
+        {filtered.map(project => (
+          <button key={project.id} onClick={() => openDetail(project)} className="text-left">
+            <FileIcon project={project} selected={false} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailPanelMobile({ project }: { project: Project }) {
+  const statusColor = STATUS_COLORS[project.status];
+
+  return (
+    <div className="overflow-y-auto pb-6">
+      {/* Hero */}
+      <div className="px-5 pt-5 pb-4 border-b border-white/10">
+        <div className="flex items-start gap-4 mb-3">
+          <div
+            className="w-14 h-14 rounded-[13px] flex-shrink-0 flex items-center justify-center shadow-sm"
+            style={{
+              background: `linear-gradient(145deg, ${CATEGORY_ICON_COLORS[project.category]?.bg ?? '#6366f1'}dd, ${CATEGORY_ICON_COLORS[project.category]?.bg ?? '#6366f1'}99)`,
+            }}
+          >
+            <FileCode2 size={24} strokeWidth={1.5} style={{ color: CATEGORY_ICON_COLORS[project.category]?.icon ?? '#fff' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-text leading-tight">{project.name}</h2>
+            <p className="text-xs text-text-secondary mt-0.5">{project.category}</p>
+            <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: `${statusColor}20`, color: statusColor }}>
+              {STATUS_LABELS[project.status]}
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-text-secondary leading-relaxed">{project.longDescription}</p>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Tech */}
+        <div>
+          <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-2">Tech Stack</p>
+          <div className="flex flex-wrap gap-1.5">
+            {project.tech.map(t => (
+              <span key={t} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent/10 text-accent border border-accent/20">{t}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Links */}
+        <div className="flex gap-2">
+          {project.github && (
+            <a href={project.github} target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1.5 px-4 py-2 rounded-xl glass-subtle border border-white/20 text-text text-sm font-medium active:opacity-70 transition-opacity">
+              <Github size={14} /> GitHub
+            </a>
+          )}
+          {project.live && (
+            <a href={project.live} target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium active:opacity-70 transition-opacity">
+              <ExternalLink size={14} /> Live
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-export default function FileExplorerApp() {
+export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
+  if (variant === 'mobile') {
+    return (
+      <MobilePushView
+        rootView={{ id: 'finder-root', title: 'Finder', element: <FileGridMobile /> }}
+      />
+    );
+  }
+
   const [activeCategory, setActiveCategory] = useState('All');
   const [selected, setSelected] = useState<Project | null>(null);
 

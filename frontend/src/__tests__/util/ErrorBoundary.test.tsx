@@ -143,7 +143,7 @@ describe('ErrorBoundary', () => {
     );
     // First arg of one of the console.error calls should be our prefix.
     const calledWithOurPrefix = consoleSpy.mock.calls.some(
-      (args) => typeof args[0] === 'string' && args[0].includes('[ErrorBoundary · MyApp]')
+      (args: unknown[]) => typeof args[0] === 'string' && args[0].includes('[ErrorBoundary · MyApp]')
     );
     expect(calledWithOurPrefix).toBe(true);
   });

@@ -46,7 +46,7 @@ const SPECS = [
   { key: "Model",      value: "Human, Software Edition"           },
   { key: "Version",    value: "v26.0 (Dec 2026 build)"            },
   { key: "Processor",  value: "TypeScript · React · AWS · Node.js" },
-  { key: "Memory",     value: "16TB of Stack Overflow wisdom"      },
+  { key: "Memory",     value: "16TB of hard-won production lessons"  },
   { key: "Storage",    value: "MS @ Northeastern + B.Tech @ DAIICT"},
   { key: "Serial No.", value: "#OpenToWork"                        },
 ] as const;

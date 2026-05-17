@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Download, Mail, MapPin, Github, Linkedin,
   Briefcase, GraduationCap, Code2, FolderGit2, ExternalLink,
@@ -44,10 +44,171 @@ function Bullet({ text }: { text: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Mobile layout — compact header, scrollable tabs, sticky download CTA
+// ---------------------------------------------------------------------------
+
+function ResumeMobile({
+  activeSection,
+  onSection,
+  sectionVariants,
+  itemVariants,
+}: {
+  activeSection: Section;
+  onSection: (s: Section) => void;
+  sectionVariants: Variants;
+  itemVariants: Variants;
+}) {
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex-shrink-0 px-5 pt-5 pb-3 border-b border-black/6 dark:border-white/6">
+        <h1 className="text-2xl font-bold text-text leading-tight tracking-tight">{RESUME.name}</h1>
+        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20">
+          {RESUME.title}
+        </span>
+        <p className="text-text-secondary text-xs mt-1.5 leading-snug">{RESUME.tagline}</p>
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
+          <a href={`mailto:${RESUME.contact.email}`}
+             className="flex items-center gap-1 text-[11px] text-text-secondary active:text-accent transition-colors">
+            <Mail size={11} className="flex-shrink-0" />{RESUME.contact.email}
+          </a>
+          <a href={`https://${RESUME.contact.linkedin}`} target="_blank" rel="noopener noreferrer"
+             className="flex items-center gap-1 text-[11px] text-text-secondary active:text-accent transition-colors">
+            <Linkedin size={11} className="flex-shrink-0" />LinkedIn
+          </a>
+        </div>
+      </div>
+
+      {/* Section tabs */}
+      <div className="flex-shrink-0 px-4 py-2.5 flex gap-2 overflow-x-auto hide-scrollbar border-b border-black/6 dark:border-white/6">
+        {SECTIONS.map(s => (
+          <button
+            key={s}
+            onClick={() => onSection(s)}
+            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+              activeSection === s
+                ? 'bg-accent text-white'
+                : 'bg-black/5 dark:bg-white/8 text-text-secondary'
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-4">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeSection}
+            variants={sectionVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {activeSection === 'Experience' && (
+              <div>
+                <SectionHeading icon={Briefcase} title="Experience" />
+                <div className="relative">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px"
+                       style={{ background: 'linear-gradient(to bottom, rgb(var(--color-accent)), transparent)' }} />
+                  <div className="space-y-6">
+                    {RESUME.experience.map((job, idx) => (
+                      <motion.div key={idx} variants={itemVariants} className="relative pl-8">
+                        <div className="absolute -left-[1px] top-[5px] w-3 h-3 rounded-full bg-accent/40 ring-2 ring-accent/25 ring-offset-1 ring-offset-transparent" />
+                        <div className="mb-1">
+                          <h3 className="font-semibold text-text text-sm leading-tight">{job.role}</h3>
+                          <p className="text-accent text-xs font-semibold mt-0.5">{job.company}</p>
+                          <p className="text-[11px] text-text-secondary font-mono mt-0.5">{job.period} · {job.location}</p>
+                        </div>
+                        <ul className="space-y-1.5 mt-2">
+                          {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
+                        </ul>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeSection === 'Education' && (
+              <div className="space-y-4">
+                <SectionHeading icon={GraduationCap} title="Education" />
+                {RESUME.education.map((edu, idx) => (
+                  <motion.div key={idx} variants={itemVariants} className="glass-subtle rounded-xl p-4 border border-white/10">
+                    <h3 className="font-semibold text-text text-sm">{edu.institution}</h3>
+                    <p className="text-accent text-xs font-medium mt-0.5">{edu.degree}</p>
+                    <p className="text-xs text-text-secondary font-mono mt-0.5">{edu.period} · {edu.location}</p>
+                    <p className="text-xs text-text-secondary mt-2 leading-relaxed">{edu.detail}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            {activeSection === 'Skills' && (
+              <div className="space-y-3">
+                <SectionHeading icon={Code2} title="Skills" />
+                {RESUME.skills.map((group, idx) => (
+                  <motion.div key={idx} variants={itemVariants}
+                    className="glass-subtle rounded-xl p-4 border border-white/10 border-l-2 border-l-accent/50">
+                    <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3">{group.category}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.items.map(skill => (
+                        <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent/10 text-accent border border-accent/20">{skill}</span>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            {activeSection === 'Projects' && (
+              <div className="space-y-4">
+                <SectionHeading icon={FolderGit2} title="Projects" />
+                {RESUME.projects.map((proj, idx) => (
+                  <motion.div key={idx} variants={itemVariants}
+                    className="glass-subtle rounded-xl p-4 border border-white/10">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div>
+                        <h3 className="font-semibold text-text text-sm">{proj.name}</h3>
+                        <p className="text-xs text-accent/70 font-mono mt-0.5">{proj.tech}</p>
+                      </div>
+                      <a href={`https://${proj.link}`} target="_blank" rel="noopener noreferrer"
+                         className="text-text-secondary active:text-accent transition-colors flex-shrink-0 mt-0.5">
+                        <ExternalLink size={13} />
+                      </a>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed mt-2">{proj.desc}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            {activeSection === 'Summary' && (
+              <motion.div variants={itemVariants}>
+                <SectionHeading icon={Code2} title="Summary" />
+                <p className="text-sm text-text-secondary leading-relaxed">{RESUME.summary}</p>
+              </motion.div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Sticky download CTA */}
+      <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-black/6 dark:border-white/6">
+        <a
+          href="/resume.pdf"
+          download="Devanshu_Chicholikar_Resume.pdf"
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-accent text-white text-sm font-semibold active:opacity-80 transition-opacity shadow-sm"
+        >
+          <Download size={15} />
+          Download PDF
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
-export default function ResumeApp() {
+export default function ResumeApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
   const [activeSection, setActiveSection] = useState<Section>('Experience');
   const [viewMode, setViewMode] = useState<ViewMode>('interactive');
 
@@ -59,6 +220,17 @@ export default function ResumeApp() {
     hidden: { opacity: 0, y: 8 },
     visible: { opacity: 1, y: 0 },
   };
+
+  if (variant === 'mobile') {
+    return (
+      <ResumeMobile
+        activeSection={activeSection}
+        onSection={setActiveSection}
+        sectionVariants={sectionVariants}
+        itemVariants={itemVariants}
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

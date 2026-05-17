@@ -41,7 +41,7 @@ export interface MobileBottomSheetProps {
   hideHandle?: boolean;
   /** Disable backdrop click / Escape / drag dismissal. Default true. */
   dismissible?: boolean;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
 }
 

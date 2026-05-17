@@ -10,10 +10,11 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronUp } from 'lucide-react';
+import { ChevronUp, MapPin } from 'lucide-react';
 import { useMobileStore } from '@/store/mobileStore';
 import { useSwipe } from '@/hooks/useSwipe';
 import { useHaptics } from '@/hooks/useHaptics';
+import { identity } from '@/data/aboutMe';
 import StatusBar from './StatusBar';
 
 export default function LockScreen() {
@@ -48,8 +49,8 @@ export default function LockScreen() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.04, transition: { duration: 0.45, ease: 'easeOut' } }}
-      transition={{ duration: 0.5 }}
+      exit={{ opacity: 0, scale: 1.03, transition: { duration: 0.25, ease: 'easeOut' } }}
+      transition={{ duration: 0.2 }}
       {...handlers}
       className="absolute inset-0 z-40 flex flex-col text-white touch-none"
       style={{
@@ -62,20 +63,28 @@ export default function LockScreen() {
       </div>
 
       {/* Time / date */}
-      <div className="flex-1 flex flex-col items-center justify-start pt-12">
+      <div className="flex-1 flex flex-col items-center justify-start pt-10">
         <p className="text-sm font-medium text-white/70 tracking-wide">{date}</p>
         <p
-          className="mt-1 text-[88px] leading-none tracking-tight"
+          className="mt-1 text-[82px] leading-none tracking-tight"
           style={{ fontWeight: 200 }}
         >
           {time}
         </p>
 
-        {/* devOS badge */}
-        <div className="mt-6 px-3 py-1 rounded-full bg-white/8 border border-white/15 backdrop-blur-md">
-          <p className="text-[11px] font-mono tracking-[0.3em] text-white/70">
-            dev<span className="text-blue-300">OS</span> · v2.0
-          </p>
+        {/* Identity — the one useful thing a recruiter sees before unlocking */}
+        <div className="mt-8 flex flex-col items-center gap-1.5">
+          <p className="text-lg font-semibold text-white/90 tracking-tight">{identity.name}</p>
+          <p className="text-sm text-white/55">{identity.title}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="flex items-center gap-1 text-[12px] text-white/40">
+              <MapPin size={11} />{identity.location}
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-[11px] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Available
+            </span>
+          </div>
         </div>
       </div>
 
@@ -86,7 +95,7 @@ export default function LockScreen() {
             haptics('medium');
             unlock();
           }}
-          className="touch-target flex flex-col items-center gap-2 text-white/55 hover:text-white transition-colors"
+          className="touch-target flex flex-col items-center gap-2 text-white/55 active:text-white transition-colors"
           aria-label="Unlock"
         >
           <motion.div

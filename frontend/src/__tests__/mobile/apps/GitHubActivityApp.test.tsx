@@ -202,7 +202,7 @@ describe('GitHubActivityApp — populated mobile render', () => {
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() => screen.getByText(/Add GitHub Activity app/i));
     const links = screen.getAllByRole('link');
-    links.forEach((l) => {
+    links.forEach((l: HTMLElement) => {
       if (l.getAttribute('href')?.startsWith('https://github.com')) {
         expect(l).toHaveAttribute('target', '_blank');
         expect(l.getAttribute('rel')).toContain('noopener');

@@ -386,7 +386,7 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
   const [cellSize, setCellSize] = useState(18);
   const [status, setStatus] = useState<'idle' | 'playing' | 'paused' | 'over'>('idle');
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(() => parseInt(localStorage.getItem('devos-snake-hs') ?? '0'));
+  const [best, setBest] = useState(() => typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-snake-hs') ?? '0') : 0);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loopRef      = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -905,7 +905,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
   const [elapsed,    setElapsed]    = useState(0);
   const [finalWpm,   setFinalWpm]   = useState(0);
   const [accuracy,   setAccuracy]   = useState(100);
-  const [best,       setBest]       = useState(() => parseInt(localStorage.getItem('devos-typeracer-hs') ?? '0'));
+  const [best,       setBest]       = useState(() => typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-typeracer-hs') ?? '0') : 0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const startRef = useRef<number | null>(null);

@@ -36,7 +36,7 @@ export default function PhoneShell() {
     if (typeof window === 'undefined') return;
     if (!localStorage.getItem(FIRST_VISIT_KEY)) {
       localStorage.setItem(FIRST_VISIT_KEY, '1');
-      const t = setTimeout(() => openApp('about-me'), 600);
+      const t = setTimeout(() => openApp('about-me'), 150);
       return () => clearTimeout(t);
     }
   }, [locked, openApp]);

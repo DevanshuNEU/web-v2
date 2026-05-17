@@ -29,7 +29,7 @@ export const identity = {
   title:        personalInfo.title,
   location:     personalInfo.location,
   school:       `MS at ${personalInfo.university}`,
-  availability: 'Open to Spring 2026 Co-op + Full-time Opportunities',
+  availability: 'Open to Full-time Opportunities',
   photo:        '/devanshu-photo.png',
 } as const;
 

@@ -29,7 +29,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-[11px] font-medium text-text-secondary uppercase tracking-wide">
+      <label htmlFor={id} className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       {children}

@@ -86,7 +86,7 @@ export default function MobileFallback() {
       <header className="mb-8">
         {/* devOS brand */}
         <p className="text-xs font-mono text-white/30 mb-4 tracking-widest uppercase">
-          dev<span className="text-blue-400">OS</span> v2.0
+          dev<span className="text-blue-400">OS</span> v2.1
         </p>
 
         <h1 className="text-3xl font-bold tracking-tight mb-1">
@@ -99,8 +99,7 @@ export default function MobileFallback() {
 
         <p className="mt-4 text-sm text-white/70 leading-relaxed max-w-sm">
           Full-stack engineer focused on distributed systems, cloud infrastructure,
-          and building things that actually scale. Currently open to co-op and
-          full-time roles.
+          and building things that actually scale. Open to full-time roles.
         </p>
       </header>
 

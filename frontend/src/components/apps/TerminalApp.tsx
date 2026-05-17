@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useOSStore } from '@/store/osStore';
+import { useMobileStore } from '@/store/mobileStore';
 import { useTheme } from '@/store/themeStore';
 import { resolveCommand, type CommandResult } from '@/lib/terminalCommands';
+import type { AppType } from '../../../../shared/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -185,10 +187,20 @@ function HireOutput() {
 
 let nextId = 0;
 
-export default function TerminalApp() {
+export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
   const trackEvent = useAnalyticsStore(state => state.trackEvent);
   const openWindow = useOSStore(state => state.openWindow);
+  const openApp = useMobileStore(state => state.openApp);
   const { mode, toggleMode } = useTheme();
+
+  // On mobile, redirect window-open commands to the mobile app system
+  const openWindowOrApp = useCallback((appId: string) => {
+    if (variant === 'mobile') {
+      openApp(appId as AppType);
+    } else {
+      openWindow(appId as AppType);
+    }
+  }, [variant, openApp, openWindow]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([
     {
@@ -253,13 +265,13 @@ export default function TerminalApp() {
       return;
     }
 
-    const ctx = { openWindow, toggleTheme: toggleMode, currentTheme: mode };
+    const ctx = { openWindow: openWindowOrApp, toggleTheme: toggleMode, currentTheme: mode };
     const result = resolved.handler(resolved.args, ctx);
 
     if (Array.isArray(result)) {
       setHistory(prev => [...prev, { id, command: trimmed, output: result }]);
     } else if (result.type === 'action') {
-      if (result.action === 'openWindow') openWindow(result.payload as any);
+      if (result.action === 'openWindow') openWindowOrApp(result.payload as string);
       if (result.action === 'toggleTheme') toggleMode();
       setHistory(prev => [...prev, { id, command: trimmed, output: [] }]);
     } else if (result.type === 'special') {
@@ -271,7 +283,7 @@ export default function TerminalApp() {
     }
 
     setInput('');
-  }, [trackEvent, openWindow, toggleMode, mode]);
+  }, [trackEvent, openWindowOrApp, toggleMode, mode]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -291,7 +303,7 @@ export default function TerminalApp() {
 
   return (
     <div
-      className="h-full bg-black flex flex-col -m-px font-mono text-sm"
+      className={`h-full bg-black flex flex-col -m-px font-mono ${variant === 'mobile' ? 'text-base' : 'text-sm'}`}
       onClick={() => inputRef.current?.focus()}
     >
       <div ref={scrollRef} className="flex-1 overflow-auto p-5 space-y-1 text-green-400">
