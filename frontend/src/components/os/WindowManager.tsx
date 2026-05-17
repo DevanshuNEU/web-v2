@@ -11,7 +11,8 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
-import { appRegistry } from '@/lib/appRegistry';
+import { appRegistry, getAppLabel } from '@/lib/appRegistry';
+import ErrorBoundary from '@/components/util/ErrorBoundary';
 import { playSound } from '@/hooks/useSoundEffects';
 import Window from './Window';
 import AppLoader from './AppLoader';
@@ -84,7 +85,9 @@ export default function WindowManager() {
         return (
           <Window key={window.id} window={window}>
             <Suspense fallback={<AppLoader />}>
-              <AppComponent />
+              <ErrorBoundary key={window.appType} label={getAppLabel(window.appType).title}>
+                <AppComponent />
+              </ErrorBoundary>
             </Suspense>
           </Window>
         );

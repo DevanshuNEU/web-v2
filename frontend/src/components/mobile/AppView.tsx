@@ -11,10 +11,11 @@
 
 import { Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { appRegistry } from '@/lib/appRegistry';
+import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import { useMobileStore } from '@/store/mobileStore';
 import { usePullToDismiss } from '@/hooks/usePullToDismiss';
 import { useHaptics } from '@/hooks/useHaptics';
+import ErrorBoundary from '@/components/util/ErrorBoundary';
 import StatusBar from './StatusBar';
 import type { AppType } from '../../../../shared/types';
 
@@ -63,7 +64,9 @@ export default function AppView() {
                 </div>
               }
             >
-              <MobileAppHost appType={openAppType} />
+              <ErrorBoundary key={openAppType} label={getAppLabel(openAppType).title}>
+                <MobileAppHost appType={openAppType} />
+              </ErrorBoundary>
             </Suspense>
           </div>
         </motion.div>
