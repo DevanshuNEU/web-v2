@@ -33,22 +33,24 @@ export interface ActivityPayload {
 
 export async function GET() {
   const warnings: string[] = [];
+  const errMsg = (err: unknown): string =>
+    err instanceof Error ? err.message : String(err);
 
   const [events, calendar, personalRepos, orgRepos] = await Promise.all([
-    getUserEvents(USER).catch((err) => {
-      warnings.push(`events: ${err.message ?? err}`);
+    getUserEvents(USER).catch((err: unknown) => {
+      warnings.push(`events: ${errMsg(err)}`);
       return [] as ActivityEvent[];
     }),
-    getContributionCalendar(USER).catch((err) => {
-      warnings.push(`calendar: ${err.message ?? err}`);
+    getContributionCalendar(USER).catch((err: unknown) => {
+      warnings.push(`calendar: ${errMsg(err)}`);
       return null;
     }),
-    getUserRepos(USER).catch((err) => {
-      warnings.push(`personal repos: ${err.message ?? err}`);
+    getUserRepos(USER).catch((err: unknown) => {
+      warnings.push(`personal repos: ${errMsg(err)}`);
       return [];
     }),
-    getOrgRepos(ORG).catch((err) => {
-      warnings.push(`org repos: ${err.message ?? err}`);
+    getOrgRepos(ORG).catch((err: unknown) => {
+      warnings.push(`org repos: ${errMsg(err)}`);
       return [];
     }),
   ]);

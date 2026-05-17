@@ -79,8 +79,12 @@ export default function GitHubActivityApp({ variant = 'desktop' }: GitHubActivit
       .then((payload: ActivePayload) => {
         if (!cancelled) setData(payload);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message ?? 'Failed to load activity');
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : String(err) || 'Failed to load activity'
+          );
+        }
       });
     return () => {
       cancelled = true;
@@ -117,7 +121,7 @@ function MobileLayout({ data }: { data: ActivePayload }) {
 
       <StatStrip data={data} />
 
-      {data.calendar && (
+      {data.calendar && data.calendar.days.length > 0 && (
         <section className="px-4 pt-5">
           <SectionHeader title="Contributions" subtitle="Last 12 months" />
           <div className="mt-3 mx-1">
@@ -173,7 +177,7 @@ function DesktopLayout({ data }: { data: ActivePayload }) {
       <div className="p-6 flex flex-col gap-6">
         <StatStrip data={data} />
 
-        {data.calendar && (
+        {data.calendar && data.calendar.days.length > 0 && (
           <section>
             <SectionHeader title="Contributions" subtitle="Last 12 months" />
             <div className="mt-3">
@@ -187,13 +191,21 @@ function DesktopLayout({ data }: { data: ActivePayload }) {
           <section>
             <SectionHeader title="Recent Activity" subtitle="Live public events" />
             <div className="mt-3 rounded-xl bg-surface dark:bg-white/[0.04] overflow-hidden divide-y divide-text-secondary/10">
-              {data.events.slice(0, 10).map((ev) => <EventRow key={ev.id} event={ev} />)}
+              {data.events.length === 0 ? (
+                <EmptyRow text="No recent public events." />
+              ) : (
+                data.events.slice(0, 10).map((ev) => <EventRow key={ev.id} event={ev} />)
+              )}
             </div>
           </section>
           <section>
             <SectionHeader title="Active Repositories" subtitle="Last 60 days" />
             <div className="mt-3 flex flex-col gap-2">
-              {data.activeRepos.map((r) => <RepoRow key={r.fullName} repo={r} />)}
+              {data.activeRepos.length === 0 ? (
+                <EmptyRow text="No recently-pushed repositories." />
+              ) : (
+                data.activeRepos.map((r) => <RepoRow key={r.fullName} repo={r} />)
+              )}
             </div>
           </section>
         </div>
@@ -207,9 +219,16 @@ function DesktopLayout({ data }: { data: ActivePayload }) {
  * ────────────────────────────────────────────────────────────────── */
 
 function StatStrip({ data }: { data: ActivePayload }) {
-  const contributions = data.calendar?.totalLastYear ?? 0;
+  // Calendar-derived stats render as "—" when the calendar fetch failed, so
+  // a visitor doesn't read "0 day streak" and assume Devanshu has stopped
+  // shipping — they correctly read it as "data unavailable."
+  const hasCalendar = data.calendar !== null;
+  const contributionsLabel = hasCalendar
+    ? data.calendar!.totalLastYear.toLocaleString()
+    : '—';
   const streak = data.calendar?.currentStreak ?? 0;
   const longestStreak = data.calendar?.longestStreak ?? 0;
+  const streakLabel = hasCalendar ? streak : '—';
   const activeCount = data.activeRepos.length;
   const totalStars = data.activeRepos.reduce((s, r) => s + r.stars, 0);
 
@@ -217,16 +236,22 @@ function StatStrip({ data }: { data: ActivePayload }) {
     <div className="px-4 mt-1 grid grid-cols-2 gap-2" data-testid="activity-stats">
       <StatCard
         icon={<GitCommit size={16} />}
-        value={contributions.toLocaleString()}
+        value={contributionsLabel}
         label="contributions"
         sub="last 12 months"
         accent="#34d399"
       />
       <StatCard
         icon={<Flame size={16} />}
-        value={streak}
-        label={streak === 1 ? 'day streak' : 'day streak'}
-        sub={longestStreak > streak ? `longest ${longestStreak}` : 'current'}
+        value={streakLabel}
+        label="day streak"
+        sub={
+          !hasCalendar
+            ? 'data unavailable'
+            : longestStreak > streak
+            ? `longest ${longestStreak}`
+            : 'current'
+        }
         accent="#f97316"
       />
       <StatCard

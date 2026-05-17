@@ -157,6 +157,37 @@ describe('GitHubActivityApp — populated mobile render', () => {
     expect(screen.queryByTestId('contribution-heatmap')).not.toBeInTheDocument();
   });
 
+  it('hides the heatmap section when calendar exists but has no days', async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ...SAMPLE_PAYLOAD,
+        calendar: { ...SAMPLE_PAYLOAD.calendar!, days: [] },
+      }),
+    });
+    render(<GitHubActivityApp variant="mobile" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    // No legend strip floating alone.
+    expect(screen.queryByTestId('contribution-heatmap')).not.toBeInTheDocument();
+  });
+
+  it('stat strip shows "—" (not "0") when calendar fetch failed', async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...SAMPLE_PAYLOAD, calendar: null }),
+    });
+    render(<GitHubActivityApp variant="mobile" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    const stats = screen.getByTestId('activity-stats');
+    // Two stat cards (contributions, streak) should show em-dash, not zero.
+    // The other two (active repos, stars) are derived from repos and stay numeric.
+    const emDashes = stats.textContent?.match(/—/g) ?? [];
+    expect(emDashes.length).toBeGreaterThanOrEqual(2);
+    expect(stats).toHaveTextContent(/data unavailable/);
+  });
+
   it('renders each event with a summary line', async () => {
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() =>
@@ -201,6 +232,30 @@ describe('GitHubActivityApp — populated mobile render', () => {
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() => screen.getByTestId('activity-stats'));
     expect(screen.getByText(/No recent public events/i)).toBeInTheDocument();
+  });
+});
+
+describe('GitHubActivityApp — desktop empty states', () => {
+  it('shows an empty-state row when desktop events array is empty', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...SAMPLE_PAYLOAD, events: [] }),
+    });
+    render(<GitHubActivityApp variant="desktop" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    expect(screen.getByText(/No recent public events/i)).toBeInTheDocument();
+  });
+
+  it('shows an empty-state row when desktop activeRepos array is empty', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...SAMPLE_PAYLOAD, activeRepos: [] }),
+    });
+    render(<GitHubActivityApp variant="desktop" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    expect(
+      screen.getByText(/No recently-pushed repositories/i)
+    ).toBeInTheDocument();
   });
 });
 
