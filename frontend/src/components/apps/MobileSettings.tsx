@@ -435,7 +435,7 @@ function AboutView() {
       <div className="px-5 pt-2">
         <h2 className="text-[28px] font-bold text-text">devOS</h2>
         <p className="text-[15px] text-text-secondary mt-0.5">
-          Version 2.1.0 · Sprint 4
+          Version 2.2.0 · Sprint 4
         </p>
         <p className="text-[12px] text-text-secondary mt-1">
           Built by Devanshu Chicholikar
@@ -444,7 +444,7 @@ function AboutView() {
 
       <MobileSection inset header="Device">
         <MobileListRow title="Name" value="Devanshu's iPhone" />
-        <MobileListRow title="Software Version" value="2.1.0" />
+        <MobileListRow title="Software Version" value="2.2.0" />
         <MobileListRow title="Model Name" value="devOS Phone" />
         <MobileListRow title="Build" value="Sprint 4" />
       </MobileSection>
@@ -462,9 +462,9 @@ function AboutView() {
         </div>
       </MobileSection>
 
-      <MobileSection inset header="What's in v2.1" footer="An interactive portfolio built as a desktop OS. Every app is a window into who I am, what I've built, and how I think about software.">
+      <MobileSection inset header="What's in v2.2" footer="An interactive portfolio built as a desktop OS — and now a phone. Every app is a window into who I am, what I've built, and how I think about software.">
         <ul className="px-4 py-3 space-y-2 text-[13px] text-text-secondary">
-          {V21_HIGHLIGHTS.map((item) => (
+          {V22_HIGHLIGHTS.map((item) => (
             <li key={item} className="flex items-start gap-2">
               <span className="text-accent mt-0.5 shrink-0">·</span>
               <span>{item}</span>
@@ -486,15 +486,15 @@ const STACK = [
   'PostHog',
 ];
 
-const V21_HIGHLIGHTS = [
-  'macOS-authentic dock with layout-affecting magnification',
-  'MenuBar with mute toggle, theme switch, live clock',
-  'Launchpad full-screen launcher + Stage Manager',
-  'RPG Skill Tree with SVG Bezier node graph',
-  'Finder-style File Explorer with color-coded icons',
-  'Interactive Resume + PDF viewer',
-  'Arcade: Snake, Minesweeper, 2048',
-  'PostHog analytics. Fully transparent, real data.',
+const V22_HIGHLIGHTS = [
+  'iOS-style phone shell — squircle home screen, paged dock, lock screen',
+  'iOS-style push navigation with edge-swipe back across mobile apps',
+  'Visible Done button in open apps + system back closes the app',
+  'Live GitHub Activity — contribution heatmap, events, active repos',
+  'Fluid type so heroes scale smoothly from 360px Android to desktop',
+  'File Explorer star counts live from /api/github/repos — no stale snapshots',
+  'Native mobile variants for Projects, Resume, Contact, Terminal, Games',
+  'Safe-area handling across notches and home indicators',
 ];
 
 /* ────────────────────────────────────────────────────────────────────

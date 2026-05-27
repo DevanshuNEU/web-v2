@@ -147,11 +147,11 @@ export default function ContactApp() {
 
         {/* Identity */}
         <div className="p-5 flex flex-col items-center gap-3 border-b border-black/6 dark:border-white/6">
-          <div className="w-[72px] h-[72px] rounded-full overflow-hidden ring-2 ring-accent/20 shadow-md flex-shrink-0">
+          <div className="w-[88px] h-[88px] rounded-full overflow-hidden ring-2 ring-accent/20 shadow-md flex-shrink-0">
             <Image
               src="/devanshu-photo.png"
               alt="Devanshu"
-              width={72} height={72}
+              width={88} height={88}
               className="w-full h-full object-cover"
             />
           </div>
@@ -172,7 +172,7 @@ export default function ContactApp() {
             Reach me
           </p>
           {[
-            { href: 'mailto:chicholikar.d@northeastern.edu', icon: Mail,     label: 'chicholikar.d@...' },
+            { href: 'mailto:chicholikar.d@northeastern.edu', icon: Mail,     label: 'chicholikar.d' },
             { href: 'https://github.com/DevanshuNEU',        icon: Github,   label: 'DevanshuNEU' },
             { href: 'https://linkedin.com/in/devanshuchicholikar', icon: Linkedin, label: 'LinkedIn' },
             { href: '#',                                      icon: MapPin,   label: 'Boston, MA' },

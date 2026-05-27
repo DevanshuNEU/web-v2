@@ -163,6 +163,11 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     windowTitle: 'GitHub Activity.app',
     description: 'Live commits, contributions, and current streak',
   },
+  'help': {
+    title: 'Help',
+    windowTitle: 'Help.app',
+    description: 'New here? Start the tour',
+  },
 };
 
 // ---------------------------------------------------------------------------

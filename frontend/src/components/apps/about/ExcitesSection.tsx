@@ -10,7 +10,7 @@ export function ExcitesSection() {
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero */}
       <div className="space-y-6">
-        <h1 className="text-5xl font-bold text-text leading-tight">
+        <h1 className="text-4xl font-semibold text-text leading-tight">
           What gets me
           <br />
           <span className="text-accent">genuinely excited</span>
@@ -26,7 +26,7 @@ export function ExcitesSection() {
         <div className="flex items-start gap-4 mb-5">
           <div className="text-accent flex-shrink-0"><Server size={32} /></div>
           <div className="flex-1 space-y-4">
-            <h2 className="text-2xl font-bold text-text">
+            <h2 className="text-2xl font-semibold text-text">
               Building systems that actually scale
             </h2>
             <p className="text-text-secondary text-lg leading-relaxed">
@@ -47,7 +47,7 @@ export function ExcitesSection() {
       {/* Cloud Infrastructure */}
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-5">
-          <h2 className="text-3xl font-bold text-text">Cloud infrastructure</h2>
+          <h2 className="text-3xl font-semibold text-text">Cloud infrastructure</h2>
           <p className="text-text-secondary text-lg leading-relaxed">
             AWS, Terraform, Kubernetes - this is where code meets reality.
             You're not just writing functions; you're orchestrating entire
@@ -64,7 +64,7 @@ export function ExcitesSection() {
       <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent bg-accent/5">
         <div className="flex items-start gap-3 mb-4">
           <div className="text-accent"><Layers size={24} /></div>
-          <h2 className="text-2xl font-bold text-text">
+          <h2 className="text-2xl font-semibold text-text">
             System design obsession
           </h2>
         </div>
@@ -86,7 +86,7 @@ export function ExcitesSection() {
 
       {/* The Learning Addiction */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-bold text-text">
+        <h2 className="text-3xl font-semibold text-text">
           The learning never stops
         </h2>
 
@@ -144,7 +144,7 @@ export function ExcitesSection() {
         <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
         <div className="relative glass-subtle p-8 border border-accent/20">
           <div className="space-y-5">
-            <h2 className="text-3xl font-bold text-text">
+            <h2 className="text-3xl font-semibold text-text">
               Technology that actually matters
             </h2>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
@@ -170,7 +170,7 @@ export function ExcitesSection() {
       {/* PostHog Inspiration */}
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-4">
-          <h3 className="text-2xl font-bold text-text">
+          <h3 className="text-2xl font-semibold text-text">
             Speaking of things that inspire me
           </h3>
           <p className="text-text-secondary text-lg leading-relaxed">

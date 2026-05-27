@@ -29,7 +29,7 @@ export const identity = {
   title:        personalInfo.title,
   location:     personalInfo.location,
   school:       `MS at ${personalInfo.university}`,
-  availability: 'Open to Full-time Opportunities',
+  availability: 'Open to founding-engineer + AI-engineer roles',
   photo:        '/devanshu-photo.png',
 } as const;
 
@@ -38,8 +38,8 @@ export const identity = {
 // ---------------------------------------------------------------------------
 
 export const quickIntro = [
-  "Hey! I build systems that actually work at scale. Currently finishing my MS at Northeastern while TAing for Network Structures & Cloud Computing.",
-  "I genuinely love solving complex problems - whether it's optimizing APIs, architecting fault-tolerant infrastructure, or building tools that people actually use. The challenge of making complex things work simply? That's what gets me excited.",
+  "Hey! I build AI dev tools at the MCP layer. OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere retrieval) and Saar (a Chrome extension on the Web Store that intercepts Claude.ai SSE streams for context-rot coaching). MS Software Engineering Systems from Northeastern, finished May 2026.",
+  "Before the MCP stuff I TA'd Network Structures & Cloud Computing for 60+ grad students. I genuinely love solving complex problems, whether it's optimizing APIs, architecting fault-tolerant infrastructure, or building tools that people actually use. The challenge of making complex things work simply? That's what gets me excited.",
 ] as const;
 
 export interface OriginCard {

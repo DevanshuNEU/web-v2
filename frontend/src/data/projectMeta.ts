@@ -49,7 +49,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'mem-machines': {
     displayName: 'Mem Machines',
     tagline: 'Serverless pipelines that handle 1000+ RPM without breaking a sweat',
-    featured: true,
+    featured: false,
     category: 'personal',
     status: 'completed',
     story: [
@@ -78,7 +78,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
       "The goal: reduce the time from 'I need to understand this codebase' to 'I actually understand this codebase' from days to minutes.",
     ],
     achievements: [
-      { metric: '11', label: 'GitHub stars', detail: 'And growing' },
+      { metric: 'Hybrid', label: 'AST + lexical retrieval', detail: 'Deep code structure + fast keyword search' },
       { metric: 'Open source', label: 'MIT licensed', detail: 'Built to be forked and extended' },
       { metric: 'Static analysis', label: 'Core feature', detail: 'Deep code structure understanding' },
       { metric: 'API-first', label: 'Design', detail: 'Integrates with any dev workflow' },
@@ -109,7 +109,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'moderationkit': {
     displayName: 'ModerationKit',
     tagline: 'AI content moderation that actually works',
-    featured: true,
+    featured: false,
     category: 'personal',
     status: 'active',
     story: [
@@ -146,7 +146,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'testpulse-ai': {
     displayName: 'TestPulse AI',
     tagline: 'AI-powered test intelligence for Playwright suites',
-    featured: true,
+    featured: false,
     category: 'personal',
     status: 'active',
     story: [
@@ -199,7 +199,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'lco': {
     displayName: 'LCO',
     tagline: 'Local Context Optimizer',
-    featured: false,
+    featured: true,
     category: 'org',
     status: 'active',
     story: [
@@ -252,12 +252,10 @@ export const projectMeta: Record<string, ProjectMeta> = {
 /** Get all featured projects in display order */
 export function getFeaturedProjects(): string[] {
   const explicit = [
+    'lco',
     'saar',
     'opencodeintel',
     'financial-copilot',
-    'mem-machines',
-    'testpulse-ai',
-    'moderationkit',
   ];
   // Append any featured projects not explicitly listed, preserving declaration order
   const rest = Object.keys(projectMeta).filter(

@@ -50,7 +50,7 @@ export default function MobileSection({
       {header && (
         <h2
           data-testid="section-header"
-          className="px-5 mb-1.5 text-[12px] font-medium uppercase tracking-wider text-text-secondary"
+          className="px-5 mb-1.5 text-label font-medium uppercase tracking-wider text-text-secondary"
         >
           {header}
         </h2>
@@ -66,7 +66,7 @@ export default function MobileSection({
       {footer && (
         <p
           data-testid="section-footer"
-          className="px-5 pt-1.5 text-[12px] leading-snug text-text-secondary"
+          className="px-5 pt-1.5 text-label leading-snug text-text-secondary"
         >
           {footer}
         </p>

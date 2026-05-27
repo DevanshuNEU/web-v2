@@ -86,7 +86,7 @@ export default function MobileListRow({
       onClick={isButton && !disabled ? onClick : undefined}
       disabled={isButton ? disabled : undefined}
       aria-disabled={!isButton && disabled ? true : undefined}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left ${
+      className={`w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-left ${
         isButton && !disabled
           ? 'active:bg-black/5 dark:active:bg-white/5 transition-colors'
           : ''
@@ -99,16 +99,16 @@ export default function MobileListRow({
       )}
 
       <span className="flex-1 min-w-0 flex flex-col">
-        <span className={`text-[16px] leading-tight truncate ${titleColor}`}>{title}</span>
+        <span className={`text-title leading-tight truncate ${titleColor}`}>{title}</span>
         {subtitle && (
-          <span className="text-[13px] text-text-secondary leading-tight truncate mt-0.5">
+          <span className="text-meta text-text-secondary leading-tight truncate mt-0.5">
             {subtitle}
           </span>
         )}
       </span>
 
       {value !== undefined && (
-        <span className="text-[15px] text-text-secondary truncate max-w-[140px] flex-shrink-0">
+        <span className="text-body text-text-secondary truncate max-w-[140px] flex-shrink-0">
           {value}
         </span>
       )}

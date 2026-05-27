@@ -41,6 +41,19 @@ export default function PhoneShell() {
     }
   }, [locked, openApp]);
 
+  // System back (Android gesture/button, browser back) closes the open app
+  // instead of leaving the page. Pairs with the history.pushState wired up
+  // inside mobileStore.openApp / closeApp.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPop = () => {
+      const { openAppType, closeAppFromPopstate } = useMobileStore.getState();
+      if (openAppType) closeAppFromPopstate();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const handleOpen = (appType: AppType) => openApp(appType);
 
   return (

@@ -72,7 +72,16 @@ const config: Config = {
         sans: ['var(--font-geist-sans)', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'SF Mono', 'Monaco', 'Consolas', 'monospace']
       },
-      
+
+      fontSize: {
+        display: 'var(--fs-display)',
+        hero:    'var(--fs-hero)',
+        title:   'var(--fs-title)',
+        body:    'var(--fs-body)',
+        meta:    'var(--fs-meta)',
+        label:   'var(--fs-label)',
+      },
+
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',

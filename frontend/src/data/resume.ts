@@ -71,7 +71,7 @@ export const RESUME: ResumeData = {
   // Personal info pulled from portfolio.json — update there, reflects here
   name:    personalInfo.name,
   title:   personalInfo.title,
-  tagline: `MS Software Engineering @ Northeastern · Open to 2026 roles`,
+  tagline: `MS Software Engineering Systems, Northeastern (May 2026) · Building MCP-layer AI dev tools · Open to founding-engineer + AI-engineer roles`,
   contact: {
     email:    personalInfo.email,
     phone:    personalInfo.phone,
@@ -80,18 +80,18 @@ export const RESUME: ResumeData = {
     linkedin: 'linkedin.com/in/devanshuchicholikar',
   },
 
-  summary: 'Full-stack engineer with production experience across React, Node.js, AWS, and Python. Passionate about cloud-native systems, AI tooling, and building things that actually ship. Currently pursuing MS in Software Engineering Systems at Northeastern, GPA 3.85. Teaching cloud computing to 60+ graduate students as a TA while building open-source AI infra on the side.',
+  summary: 'Full-stack engineer building AI dev tools at the MCP layer. OpenCodeIntel is a production MCP server with hybrid AST + BM25 + Cohere retrieval over code symbols (87.5% Hit@1 across 8 languages). Saar is a Chrome extension shipped on the Web Store that intercepts SSE streams on Claude.ai for per-model context-rot warnings. Production experience across React, Node.js, AWS, FastAPI, and pgvector. MS Software Engineering Systems from Northeastern, GPA 3.85, finished May 2026. Previously TA\'d Cloud Computing & Networks for 60+ grad students.',
 
   experience: [
     {
       company:  'Northeastern University',
       role:     'Graduate Teaching Assistant, Cloud Computing & Networks',
-      period:   'Sep 2025 – Present',
+      period:   'Sep 2025 – May 2026',
       location: 'Boston, MA',
       bullets: [
-        'Instruct 60+ graduate students on AWS infrastructure, Terraform IaC, and distributed systems; deliver weekly hands-on sessions covering VPC, load balancing, auto-scaling, and fault-tolerant design',
+        'Instructed 60+ graduate students on AWS infrastructure, Terraform IaC, and distributed systems; delivered weekly hands-on sessions covering VPC, load balancing, auto-scaling, and fault-tolerant design',
         'Authored lab curriculum for Docker containerization, GitHub Actions CI/CD, and infra automation; adopted as official course content across 3 sections serving 180+ students',
-        'Lead system design reviews for 15 student teams; standardized evaluation criteria across 3 TAs, reducing grade disputes 40%',
+        'Led system design reviews for 15 student teams; standardized evaluation criteria across 3 TAs, reducing grade disputes 40%',
       ],
     },
     {

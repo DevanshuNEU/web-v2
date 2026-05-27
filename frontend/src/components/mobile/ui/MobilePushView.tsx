@@ -83,7 +83,7 @@ export interface MobilePushViewProps {
   className?: string;
 }
 
-const SWIPE_BACK_EDGE_PX = 24;
+const SWIPE_BACK_EDGE_PX = 32;
 const SWIPE_BACK_DISMISS_OFFSET_PX = 100;
 const SWIPE_BACK_DISMISS_VELOCITY = 500;
 

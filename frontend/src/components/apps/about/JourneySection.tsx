@@ -10,7 +10,7 @@ export function JourneySection() {
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero Opening */}
       <div className="space-y-6">
-        <h1 className="text-5xl font-bold text-text leading-tight">
+        <h1 className="text-4xl font-semibold text-text leading-tight">
           It started with a laptop
           <br />
           <span className="text-accent">and way too much curiosity</span>
@@ -26,7 +26,7 @@ export function JourneySection() {
         <div className="flex items-start gap-4">
           <div className="text-accent flex-shrink-0"><Zap size={32} /></div>
           <div className="space-y-3">
-            <h3 className="text-2xl font-bold text-text">
+            <h3 className="text-2xl font-semibold text-text">
               Google. Just... Google.
             </h3>
             <p className="text-text-secondary text-lg leading-relaxed">
@@ -49,7 +49,7 @@ export function JourneySection() {
           <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium mb-2">
             ~2005
           </div>
-          <h3 className="text-2xl font-bold text-text">
+          <h3 className="text-2xl font-semibold text-text">
             My friend Rohan had internet
           </h3>
           <p className="text-text-secondary text-lg leading-relaxed">
@@ -73,7 +73,7 @@ export function JourneySection() {
         <div className="flex items-start gap-6">
           <div className="text-accent flex-shrink-0"><Disc size={40} /></div>
           <div className="flex-1 space-y-5">
-            <h3 className="text-2xl font-bold text-text">
+            <h3 className="text-2xl font-semibold text-text">
               Every Friday: Digit magazine day
             </h3>
             <p className="text-text-secondary text-lg leading-relaxed">
@@ -117,7 +117,7 @@ export function JourneySection() {
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="text-accent"><Lightbulb size={32} /></div>
-              <h3 className="text-3xl font-bold text-text">
+              <h3 className="text-3xl font-semibold text-text">
                 Then I discovered Microsoft Encarta
               </h3>
             </div>
@@ -165,7 +165,7 @@ export function JourneySection() {
         <div className="inline-block px-4 py-2 bg-accent/10 rounded-full text-accent font-medium">
           The moment it clicked
         </div>
-        <h2 className="text-4xl font-bold text-text">
+        <h2 className="text-4xl font-semibold text-text">
           10th standard.
           <br />
           <code className="text-3xl px-3 py-1 bg-black/30 rounded font-mono text-accent">
@@ -191,7 +191,7 @@ export function JourneySection() {
           <div className="flex items-start gap-4">
             <div className="text-accent flex-shrink-0"><Clock size={32} /></div>
             <div className="flex-1">
-              <h3 className="text-2xl font-bold text-text mb-3">
+              <h3 className="text-2xl font-semibold text-text mb-3">
                 My first "real" project took 2 months
               </h3>
               <p className="text-text-secondary text-lg leading-relaxed">
@@ -221,7 +221,7 @@ export function JourneySection() {
 
       {/* React & Promises */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-bold text-text">
+        <h2 className="text-3xl font-semibold text-text">
           React confused the hell out of me
         </h2>
 
@@ -264,7 +264,7 @@ export function JourneySection() {
 
       {/* Industry Reality */}
       <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <h2 className="text-2xl font-bold text-text mb-5">
+        <h2 className="text-2xl font-semibold text-text mb-5">
           Then came internships
         </h2>
         <div className="space-y-5 text-text-secondary text-lg leading-relaxed">
@@ -293,27 +293,27 @@ export function JourneySection() {
           <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
             Right now
           </div>
-          <h2 className="text-3xl font-bold text-text">
+          <h2 className="text-3xl font-semibold text-text">
             Northeastern & being a TA
           </h2>
           <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
             <p>
               Came to Northeastern for my MS because I wanted to fill knowledge
-              gaps and learn from people way smarter than me.
+              gaps and learn from people way smarter than me. Finished May 2026.
             </p>
             <p>
-              TAing for Network Structures & Cloud Computing and databases? It's
-              humbling. Try explaining why their AWS infrastructure isn't
+              TA&apos;d Network Structures & Cloud Computing and databases. It was
+              humbling. Try explaining why someone&apos;s AWS infrastructure isn&apos;t
               working at 11 PM. Nothing tests whether you actually understand
               something like teaching it.
             </p>
           </div>
           <div className="glass-subtle rounded-xl p-5 bg-accent/5 border border-accent/20">
             <p className="text-text-secondary">
-              It's exhausting sometimes. Grading assignments, holding office
-              hours, debugging students' code. But when someone's stuck for
-              hours and you help them figure it out? When they actually get it
-              and their code finally works? That feeling's different. Worth it.
+              Exhausting sometimes. Grading assignments, holding office hours,
+              debugging students&apos; code. But when someone was stuck for hours
+              and I helped them figure it out, when they actually got it and
+              their code finally worked? That feeling was different. Worth it.
             </p>
           </div>
         </div>

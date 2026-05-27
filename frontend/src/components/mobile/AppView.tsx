@@ -46,13 +46,25 @@ export default function AppView() {
           transition={{ type: 'spring', stiffness: 380, damping: 36 }}
           className="absolute inset-0 z-30 flex flex-col bg-bg text-text overflow-hidden"
         >
-          {/* Drag handle / status bar */}
+          {/* Drag handle / status bar — pull-down dismisses; "Done" is the visible affordance. */}
           <div
             {...handlers}
             className="flex-shrink-0 pt-safe relative cursor-grab active:cursor-grabbing"
           >
             <StatusBar light={false} />
             <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-9 h-1 rounded-full bg-text-secondary/30" />
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                haptics('light');
+                closeApp();
+              }}
+              aria-label="Close app"
+              className="touch-target absolute top-0 right-2 px-3 flex items-center justify-center text-accent text-[15px] font-medium active:opacity-50 transition-opacity cursor-pointer"
+            >
+              Done
+            </button>
           </div>
 
           {/* App body */}

@@ -21,6 +21,7 @@ import {
   HardDrive,
   ScrollText,
   Github,
+  LifeBuoy,
 } from 'lucide-react';
 import {
   IdentificationCard,
@@ -72,6 +73,7 @@ const components = {
   'resume': lazy(() => import('@/components/apps/ResumeApp')),
   'changelog': lazy(() => import('@/components/apps/ChangelogApp')),
   'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
+  'help': lazy(() => import('@/components/apps/HelpApp')),
 };
 
 // ---------------------------------------------------------------------------
@@ -184,7 +186,16 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'green',
     defaultSize: { width: 720, height: 600 },
     defaultPosition: { x: 180, y: 110 },
-    pinnedToDock: false,
+    pinnedToDock: true,
+    launchpad: true,
+  },
+  'help': {
+    component: components['help'],
+    icon: LifeBuoy,
+    iconColor: 'amber',
+    defaultSize: { width: 760, height: 580 },
+    defaultPosition: { x: 200, y: 100 },
+    pinnedToDock: true,
     launchpad: true,
   },
 };

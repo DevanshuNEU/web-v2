@@ -121,7 +121,7 @@ describe('MobileSettings — drill-downs', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /devanshu chicholikar/i })
     );
-    expect(screen.getByText('Version 2.1.0 · Sprint 4')).toBeInTheDocument();
+    expect(screen.getByText('Version 2.2.0 · Sprint 4')).toBeInTheDocument();
   });
 });
 

@@ -54,6 +54,18 @@
   --border: 210 210 215;
   --ring: 0 122 255;
   --radius: 0.75rem;
+
+  /* Fluid type — clamp upper bounds match existing Tailwind sizes so desktop ≥768px is byte-identical */
+  --fs-display: clamp(28px, 4vw + 14px, 48px);
+  --fs-hero:    clamp(20px, 2.5vw + 12px, 30px);
+  --fs-title:   clamp(15px, 0.6vw + 13px, 18px);
+  --fs-body:    clamp(14px, 0.5vw + 12px, 16px);
+  --fs-meta:    clamp(11px, 0.4vw + 9.5px, 13px);
+  --fs-label:   clamp(10px, 0.4vw + 8.5px, 12px);
+
+  /* Fluid spacing for mobile shell */
+  --sp-hero-pad:  clamp(16px, 3vw + 8px, 24px);
+  --sp-icon-hero: clamp(72px, 18vw, 96px);
 }
 
 .dark {

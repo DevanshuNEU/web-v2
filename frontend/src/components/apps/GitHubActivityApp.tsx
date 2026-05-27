@@ -116,7 +116,7 @@ function MobileLayout({ data }: { data: ActivePayload }) {
           <Github size={12} />
           <span>github.com/{data.username}</span>
         </div>
-        <h1 className="text-[28px] font-bold mt-1">Activity</h1>
+        <h1 className="text-display font-bold mt-1">Activity</h1>
       </header>
 
       <StatStrip data={data} />
@@ -287,14 +287,14 @@ function StatCard({
 }) {
   return (
     <div className="rounded-2xl p-3 bg-surface dark:bg-white/[0.04] flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-[11px] text-text-secondary font-medium uppercase tracking-wide">
+      <div className="flex items-center gap-1.5 text-label text-text-secondary font-medium uppercase tracking-wide">
         <span style={{ color: accent }} className="flex">{icon}</span>
         <span className="truncate">{label}</span>
       </div>
-      <div className="text-[22px] font-semibold text-text leading-none">
+      <div className="text-hero font-semibold text-text leading-none">
         {value}
       </div>
-      <div className="text-[11px] text-text-secondary">{sub}</div>
+      <div className="text-label text-text-secondary">{sub}</div>
     </div>
   );
 }

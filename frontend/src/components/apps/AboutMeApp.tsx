@@ -44,7 +44,7 @@ type TabId = typeof TABS[number]['id'];
 
 const SPECS = [
   { key: "Model",      value: "Human, Software Edition"           },
-  { key: "Version",    value: "v26.0 (Dec 2026 build)"            },
+  { key: "Version",    value: "v26.0 (May 2026 build)"            },
   { key: "Processor",  value: "TypeScript · React · AWS · Node.js" },
   { key: "Memory",     value: "16TB of hard-won production lessons"  },
   { key: "Storage",    value: "MS @ Northeastern + B.Tech @ DAIICT"},
@@ -156,14 +156,14 @@ export default function AboutMeApp({ variant = 'desktop' }: AboutMeAppProps) {
       <div className="flex items-center gap-5 px-6 py-4 border-b border-black/6 dark:border-white/6 flex-shrink-0">
         {/* Photo */}
         <div
-          className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-white/20"
+          className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 border border-white/20"
           style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}
         >
           <Image
             src={identity.photo}
             alt={identity.name}
-            width={64}
-            height={64}
+            width={96}
+            height={96}
             className="w-full h-full object-cover"
           />
         </div>
@@ -255,34 +255,44 @@ function AboutMeMobile({
   return (
     <div className="h-full overflow-y-auto bg-bg">
       {/* Hero */}
-      <div className="flex flex-col items-center text-center px-6 pt-8 pb-6">
+      <div
+        className="flex flex-col items-center text-center pt-8 pb-6"
+        style={{ paddingLeft: 'var(--sp-hero-pad)', paddingRight: 'var(--sp-hero-pad)' }}
+      >
         <div
-          className="w-24 h-24 rounded-2xl overflow-hidden border border-white/20"
-          style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}
+          className="rounded-2xl overflow-hidden border border-white/20"
+          style={{
+            width: 'var(--sp-icon-hero)',
+            height: 'var(--sp-icon-hero)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+          }}
         >
           <Image src={identity.photo} alt={identity.name} width={96} height={96} className="w-full h-full object-cover" />
         </div>
-        <h1 className="mt-4 text-2xl font-semibold text-text">{identity.name}</h1>
+        <h1 className="mt-4 text-hero font-semibold text-text">{identity.name}</h1>
         <p className="mt-1 text-sm text-text-secondary">{identity.title}</p>
-        <span className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-[11px] font-medium">
+        <span className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-label font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
           Available
         </span>
-        <div className="mt-3 flex items-center gap-4 text-[12px] text-text-secondary">
+        <div className="mt-3 flex items-center gap-4 text-meta text-text-secondary">
           <span className="flex items-center gap-1"><MapPin size={11} />{identity.location}</span>
           <span className="flex items-center gap-1"><GraduationCap size={11} />{identity.school}</span>
         </div>
       </div>
 
       {/* Section pills (tabs) */}
-      <div className="px-4 mb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar">
+      <div
+        className="mb-3 flex items-center gap-2 overflow-x-auto hide-scrollbar"
+        style={{ paddingLeft: 'var(--sp-hero-pad)', paddingRight: 'var(--sp-hero-pad)' }}
+      >
         {TABS.map(({ id, label }) => {
           const isActive = activeTab === id;
           return (
             <button
               key={id}
               onClick={() => onTab(id)}
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+              className={`flex-shrink-0 min-w-max px-3.5 py-1.5 rounded-full text-meta font-medium transition-colors ${
                 isActive
                   ? 'bg-accent text-white'
                   : 'bg-black/5 dark:bg-white/8 text-text-secondary'

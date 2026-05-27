@@ -99,7 +99,7 @@ export default function MobileAppIcon({
       {label && (
         <span
           data-testid="app-icon-label"
-          className="text-[11px] leading-tight text-text text-center max-w-[68px] truncate"
+          className="text-label leading-tight text-text text-center max-w-[68px] truncate"
         >
           {label}
         </span>

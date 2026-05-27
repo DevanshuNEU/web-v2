@@ -254,7 +254,7 @@ function AboutSection() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-text mb-0.5">devOS</h2>
-        <p className="text-sm text-text-secondary">Version 2.1.0 · Sprint 4</p>
+        <p className="text-sm text-text-secondary">Version 2.2.0 · Sprint 4</p>
         <p className="text-xs text-text-secondary mt-0.5">Built by Devanshu Chicholikar</p>
       </div>
 
@@ -268,17 +268,17 @@ function AboutSection() {
       </div>
 
       <div className="space-y-1.5">
-        <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">What&apos;s in v2.1</h4>
+        <h4 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">What&apos;s in v2.2</h4>
         <ul className="space-y-1.5 text-xs text-text-secondary">
           {[
-            'macOS-authentic dock with layout-affecting magnification',
-            'MenuBar with mute toggle, theme switch, live clock',
-            'Launchpad full-screen launcher + Stage Manager',
-            'RPG Skill Tree with SVG Bezier node graph',
-            'Finder-style File Explorer with color-coded icons',
-            'Interactive Resume + PDF viewer',
-            'Arcade: Snake, Minesweeper, 2048',
-            'PostHog analytics. Fully transparent, real data.',
+            'iOS-style phone shell — squircle home screen, paged dock, lock screen',
+            'iOS push navigation with edge-swipe back across mobile apps',
+            'Visible Done button in open apps + system back closes the app',
+            'Live GitHub Activity — contribution heatmap, events, active repos',
+            'Fluid type so heroes scale smoothly from 360px Android to desktop',
+            'File Explorer star counts live from /api/github/repos',
+            'Native mobile variants for Projects, Resume, Contact, Terminal, Games',
+            'Safe-area handling across notches and home indicators',
           ].map(item => (
             <li key={item} className="flex items-start gap-2">
               <span className="text-accent mt-0.5 flex-shrink-0">·</span>

@@ -7,13 +7,14 @@
  * a full detail panel with tech stack, links, and description.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Folder, FolderOpen, FileCode2, ExternalLink, Github,
-  ChevronRight, Star, GitFork, ArrowLeft,
+  ChevronRight, Star, ArrowLeft,
 } from 'lucide-react';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
+import type { EnrichedRepo } from '@/app/api/github/repos/route';
 
 // ---------------------------------------------------------------------------
 // Data
@@ -28,9 +29,15 @@ interface Project {
   tech: string[];
   github?: string;
   live?: string;
-  stars?: number;
   status: 'production' | 'active' | 'archived' | 'wip';
   highlight?: boolean;
+}
+
+// Pull the repo name out of a github.com URL so we can match against the API.
+function ghName(url: string | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/github\.com\/[^/]+\/([^/?#]+)/);
+  return m ? m[1].toLowerCase() : null;
 }
 
 const PROJECTS: Project[] = [
@@ -43,7 +50,6 @@ const PROJECTS: Project[] = [
     tech: ['Next.js 15', 'React 19', 'TypeScript', 'Tailwind CSS', 'Framer Motion', 'Zustand', 'PostHog'],
     github: 'https://github.com/DevanshuNEU/portfolio',
     live: 'https://devanshuchicholikar.com',
-    stars: 12,
     status: 'production',
     highlight: true,
   },
@@ -55,7 +61,6 @@ const PROJECTS: Project[] = [
     category: 'Full Stack',
     tech: ['React', 'FastAPI', 'PostgreSQL', 'OpenAI', 'Plaid API', 'Docker', 'AWS'],
     github: 'https://github.com/DevanshuNEU/financial-copilot',
-    stars: 28,
     status: 'active',
     highlight: true,
   },
@@ -67,7 +72,6 @@ const PROJECTS: Project[] = [
     category: 'Cloud / DevOps',
     tech: ['Terraform', 'AWS', 'ECS', 'RDS', 'Vault', 'GitHub Actions', 'CloudWatch'],
     github: 'https://github.com/DevanshuNEU/securescale',
-    stars: 19,
     status: 'production',
     highlight: true,
   },
@@ -79,7 +83,6 @@ const PROJECTS: Project[] = [
     category: 'Tools / CLI',
     tech: ['Python', 'AST Parsing', 'TypeScript', 'Click', 'Tree-sitter'],
     github: 'https://github.com/DevanshuNEU/saar',
-    stars: 41,
     status: 'active',
     highlight: true,
   },
@@ -91,7 +94,6 @@ const PROJECTS: Project[] = [
     category: 'Tools / CLI',
     tech: ['Python', 'Tree-sitter', 'PostgreSQL', 'pgvector', 'FastAPI', 'React'],
     github: 'https://github.com/OpenCodeIntel',
-    stars: 8,
     status: 'wip',
   },
   {
@@ -102,7 +104,6 @@ const PROJECTS: Project[] = [
     category: 'Systems',
     tech: ['Go', 'Raft', 'gRPC', 'protobuf'],
     github: 'https://github.com/DevanshuNEU/distributed-kv',
-    stars: 6,
     status: 'archived',
   },
   {
@@ -113,7 +114,6 @@ const PROJECTS: Project[] = [
     category: 'Data / ML',
     tech: ['Python', 'Apache Kafka', 'Redis', 'pandas', 'scikit-learn', 'Docker'],
     github: 'https://github.com/DevanshuNEU/ml-pipeline',
-    stars: 11,
     status: 'archived',
   },
 ];
@@ -193,8 +193,19 @@ function FileIcon({ project, selected }: { project: Project; selected: boolean }
   );
 }
 
-function DetailPanel({ project, onBack }: { project: Project; onBack: () => void }) {
+function DetailPanel({
+  project,
+  onBack,
+  starsByName,
+}: {
+  project: Project;
+  onBack: () => void;
+  starsByName: Record<string, number>;
+}) {
   const statusColor = STATUS_COLORS[project.status];
+  const stars =
+    starsByName[project.id.toLowerCase()] ??
+    (ghName(project.github) ? starsByName[ghName(project.github)!] : undefined);
 
   return (
     <motion.div
@@ -247,15 +258,11 @@ function DetailPanel({ project, onBack }: { project: Project; onBack: () => void
         </div>
 
         {/* Stats */}
-        {project.stars && (
+        {stars && stars > 0 && (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-sm text-text-secondary">
               <Star size={14} className="text-amber-400" />
-              <span>{project.stars} stars</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-              <GitFork size={14} />
-              <span>{Math.floor(project.stars / 4)} forks</span>
+              <span>{stars} stars</span>
             </div>
           </div>
         )}
@@ -294,7 +301,7 @@ function DetailPanel({ project, onBack }: { project: Project; onBack: () => void
 // Mobile — category + file grid root, push to detail
 // ---------------------------------------------------------------------------
 
-function FileGridMobile() {
+function FileGridMobile({ starsByName }: { starsByName: Record<string, number> }) {
   const nav = useMobileNavigation();
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -306,7 +313,7 @@ function FileGridMobile() {
     nav.push({
       id: project.id,
       title: project.name,
-      element: <DetailPanelMobile project={project} />,
+      element: <DetailPanelMobile project={project} starsByName={starsByName} />,
     });
   };
 
@@ -341,8 +348,17 @@ function FileGridMobile() {
   );
 }
 
-function DetailPanelMobile({ project }: { project: Project }) {
+function DetailPanelMobile({
+  project,
+  starsByName,
+}: {
+  project: Project;
+  starsByName: Record<string, number>;
+}) {
   const statusColor = STATUS_COLORS[project.status];
+  const stars =
+    starsByName[project.id.toLowerCase()] ??
+    (ghName(project.github) ? starsByName[ghName(project.github)!] : undefined);
 
   return (
     <div className="overflow-y-auto pb-6">
@@ -379,6 +395,14 @@ function DetailPanelMobile({ project }: { project: Project }) {
           </div>
         </div>
 
+        {/* Stars */}
+        {stars && stars > 0 && (
+          <div className="flex items-center gap-1.5 text-sm text-text-secondary">
+            <Star size={14} className="text-amber-400" />
+            <span>{stars} stars on GitHub</span>
+          </div>
+        )}
+
         {/* Links */}
         <div className="flex gap-2">
           {project.github && (
@@ -404,16 +428,35 @@ function DetailPanelMobile({ project }: { project: Project }) {
 // ---------------------------------------------------------------------------
 
 export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [selected, setSelected] = useState<Project | null>(null);
+  const [starsByName, setStarsByName] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/github/repos')
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: EnrichedRepo[]) => {
+        if (cancelled || !Array.isArray(data)) return;
+        const map: Record<string, number> = {};
+        for (const r of data) map[r.name.toLowerCase()] = r.stars;
+        setStarsByName(map);
+      })
+      .catch(() => { /* leave map empty — UI just hides star block */ });
+    return () => { cancelled = true; };
+  }, []);
+
   if (variant === 'mobile') {
     return (
       <MobilePushView
-        rootView={{ id: 'finder-root', title: 'Finder', element: <FileGridMobile /> }}
+        rootView={{
+          id: 'finder-root',
+          title: 'Finder',
+          element: <FileGridMobile starsByName={starsByName} />,
+        }}
       />
     );
   }
-
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [selected, setSelected] = useState<Project | null>(null);
 
   const filtered = activeCategory === 'All'
     ? PROJECTS
@@ -507,7 +550,7 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
                 transition={{ type: 'spring', damping: 22, stiffness: 200 }}
                 className="border-l border-white/10 overflow-hidden flex-shrink-0 bg-surface/30"
               >
-                <DetailPanel project={selected} onBack={() => setSelected(null)} />
+                <DetailPanel project={selected} onBack={() => setSelected(null)} starsByName={starsByName} />
               </motion.div>
             )}
           </AnimatePresence>

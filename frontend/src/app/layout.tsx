@@ -132,10 +132,10 @@ export default function RootLayout({
         <div className="sr-only">
           <h1>Devanshu Chicholikar - Software Engineer</h1>
           <p>
-            MS Software Engineering student at Northeastern University,
-            specializing in full-stack development with React, TypeScript,
-            Node.js, and AWS. Building scalable distributed systems and
-            cloud infrastructure.
+            MS Software Engineering Systems graduate from Northeastern University
+            (May 2026), specializing in AI dev tools, MCP servers, and code
+            intelligence. Production experience across React, TypeScript, Node.js,
+            FastAPI, AWS, and pgvector.
           </p>
           <h2>Projects</h2>
           <ul>

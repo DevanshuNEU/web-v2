@@ -8,15 +8,15 @@
     "linkedin": "https://www.linkedin.com/in/devanshuchicholikar/",
     "github": "https://github.com/devanshuNEU",
     "portfolio": "https://devanshu.dev",
-    "status": "Actively seeking full-time software engineering opportunities",
-    "graduation": "Expected 2026",
+    "status": "Open to founding-engineer + AI-engineer roles at AI and dev-tools startups",
+    "graduation": "May 2026",
     "degree": "MS in Software Engineering Systems",
     "university": "Northeastern University"
   },
   
   "bio": {
     "greeting": "Hey there!",
-    "intro": "I'm a software engineer who loves building scalable, distributed systems that actually make a difference. Currently pursuing my MS at Northeastern while actively seeking opportunities to create awesome software.",
+    "intro": "I'm a software engineer building AI dev tools at the MCP layer. OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere retrieval) and Saar (a Chrome extension on the Web Store that intercepts Claude.ai SSE streams for context-rot coaching). Recently finished my MS at Northeastern.",
     "passion": "I get genuinely excited about solving complex problems with clean, efficient code. Whether it's optimizing API performance, automating deployments, or building user-friendly interfaces, I'm all about creating technology that just works.",
     "personal": "When I'm not coding, you'll probably find me exploring Boston, learning new tech, or working on side projects (like this interactive portfolio you're experiencing right now!)."
   },

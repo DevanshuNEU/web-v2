@@ -33,6 +33,23 @@ interface Release {
 
 const RELEASES: Release[] = [
   {
+    version: '2.2.0',
+    date: 'May 2026',
+    codename: 'Pocket',
+    summary: 'Sprint 4. devOS gets a phone. Full iOS-style mobile shell with native-feeling apps, gestures, and live GitHub data.',
+    highlight: true,
+    changes: [
+      { type: 'feature', text: 'PhoneShell + LockScreen — iOS-style mobile shell with paged home screen, dock, and swipe-up unlock' },
+      { type: 'feature', text: 'Mobile primitives: MobileBottomSheet, MobilePushView (with iOS edge-swipe-back), MobileListRow, MobileSection, MobileSegmented' },
+      { type: 'feature', text: 'Native mobile variants for Projects, Resume, Contact, File Explorer, Terminal, and Games' },
+      { type: 'feature', text: 'GitHub Activity app — live contribution heatmap, recent events, and active repos backed by /api/github/activity' },
+      { type: 'feature', text: 'Visible "Done" button in open apps + system-back gesture closes the app instead of leaving the page' },
+      { type: 'feature', text: 'Fluid type tokens (clamp-based) so heroes scale smoothly from 360px Android to desktop' },
+      { type: 'feature', text: 'File Explorer star counts now stream live from /api/github/repos — no more stale snapshots' },
+      { type: 'refactor', text: 'ErrorBoundary wraps each mobile app host so a single crash doesn\'t blank the shell' },
+    ],
+  },
+  {
     version: '2.1.0',
     date: 'Mar 2026',
     codename: 'Constellation',
