@@ -70,6 +70,32 @@ export async function GET() {
       return true;
     });
 
+    // Inject projectMeta-only entries (no GitHub repo) so they always appear
+    for (const [name, meta] of Object.entries(projectMeta)) {
+      if (!seen.has(name)) {
+        unique.push({
+          name,
+          displayName: meta.displayName,
+          tagline: meta.tagline,
+          description: meta.descriptionOverride ?? meta.tagline,
+          htmlUrl: '',
+          homepage: null,
+          language: meta.extraTech?.[0] ?? null,
+          stars: 0,
+          forks: 0,
+          topics: meta.extraTech ?? [],
+          updatedAt: new Date().toISOString(),
+          featured: meta.featured,
+          category: meta.category,
+          status: meta.status,
+          story: meta.story,
+          achievements: meta.achievements,
+          extraTech: meta.extraTech ?? [],
+          org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
+        });
+      }
+    }
+
     return NextResponse.json(unique, {
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' },
     });

@@ -231,6 +231,106 @@ export const projectMeta: Record<string, ProjectMeta> = {
     extraTech: ['AWS', 'Terraform', 'GitHub Actions', 'CloudWatch', 'Docker', 'PostgreSQL'],
   },
 
+  'callbudget': {
+    displayName: 'CallBudget',
+    tagline: 'Teach a pharmacy-finder to call less and find more',
+    featured: true,
+    category: 'personal',
+    status: 'active',
+    story: [
+      "Finding specialty medication in a shortage is genuinely miserable. You call pharmacy after pharmacy, get put on hold, and half the time they say 'in stock' and then it's not. CallBudget fixes the calling problem.",
+      "It reframes the search as Bayesian active sensing: a HistGradientBoosting model ranks pharmacies by predicted stock probability, a voice agent navigates IVRs and hold music, and calibrated abstention suppresses false-positive-in-stock answers — the ones that send patients to empty shelves.",
+      "The result is a 47% reduction in expected calls (4.3 to 2.3 avg) with false-positive rate suppressed from ~10% to ~0%. Shipped as an MCP server so it drops into any agentic workflow. Built on a 19-pharmacy Boston corpus for Adderall XR 20mg, entirely on public data (NPPES, RxNorm, DEA ARCOS) — zero PHI.",
+    ],
+    achievements: [
+      { metric: '47%', label: 'Fewer calls to find', detail: 'Bayesian active sensing vs naive random calling' },
+      { metric: '~0%', label: 'False-positive suppressed', detail: 'Self-consistency voting; safety is a hard constraint' },
+      { metric: 'MCP native', label: 'Ships as MCP server', detail: 'Drops into any agentic workflow via FastMCP' },
+      { metric: 'Zero PHI', label: '100% public data', detail: 'NPPES + RxNorm + DEA ARCOS + FDA/ASHP' },
+    ],
+    extraTech: ['Python', 'scikit-learn', 'DuckDB', 'FastMCP', 'Pipecat', 'Deepgram', 'Optuna', 'Claude API'],
+  },
+
+  'tool-crowding': {
+    displayName: 'Tool Crowding Benchmark',
+    tagline: 'Does adding more MCP servers hurt code retrieval? Here is the experiment.',
+    featured: true,
+    category: 'personal',
+    status: 'experimental',
+    story: [
+      "There is a real question nobody has measured cleanly: when you pile on MCP servers, does discrimination interference degrade code retrieval? Tool Crowding is the pre-registered, open-methodology benchmark designed to answer it.",
+      "The key methodological move: a padded-N=1 control (adapted from Chroma's text-retrieval work) isolates interference from prompt-length effects. The harness varies N as a continuous variable and measures pass@1 degradation. Conflict of interest (built OpenCodeIntel) is disclosed upfront with a mandatory leave-OCI-out sensitivity run.",
+      "Exploratory probes already found something interesting: a task-framing x agent-persona interaction that prior art (RAG-MCP, LongFuncEval, MCPVerse, LiveMCPBench) did not report. The methodology is locked across 10 binding design docs. The sweep is paused — turns out frontier model API bills are real. Will pick up when the budget does.",
+    ],
+    achievements: [
+      { metric: 'Pre-registered', label: 'Before any data', detail: '4 scenario abstracts, locked decision rules, kill criteria' },
+      { metric: '10', label: 'Binding design docs', detail: 'Methodology locked end-to-end before first trial' },
+      { metric: 'New finding', label: 'Framing x persona', detail: 'Not reported by RAG-MCP, LongFuncEval, or MCPVerse' },
+      { metric: 'Paused', label: 'API budget constraint', detail: 'Harness ready; sweep resumes when funds do' },
+    ],
+    extraTech: ['Python', 'pytest', 'Anthropic API', 'Claude Sonnet/Opus', 'Apache 2.0'],
+  },
+
+  'parsewave-terminal-bench': {
+    displayName: 'ParseWave Terminal-Bench',
+    tagline: 'Contract work: LLM debugging benchmarks calibrated to actually discriminate',
+    featured: true,
+    category: 'personal',
+    status: 'completed',
+    story: [
+      "Freelance work for ParseWave. The brief: author a benchmark suite of systems debugging tasks that are hard enough to measure LLM agent reliability — not just pass/fail on obvious bugs.",
+      "Turns out Opus 4.8 passes naive 'find the bug' tasks 4 out of 5 times. That is not a benchmark, that is a tutorial. Tasks here are calibrated to 0-2/5 agent pass rate. Each uses Harbor format: oracle/nop baselines, anti-cheat measures (hash-locked backends, nonce echo), preflight checks.",
+      "Three tasks shipped: nginx-502, fd-leak-emfile, and concurrent-ledger (the one where the winning fix — minimal-scope locking — drops latency from 5.2s to 0.95s and is genuinely non-obvious).",
+    ],
+    achievements: [
+      { metric: '3', label: 'Harbor-verified tasks', detail: 'nginx-502, fd-leak-emfile, concurrent-ledger' },
+      { metric: '0-2/5', label: 'Target agent pass rate', detail: 'Calibrated to discriminate, not tutor' },
+      { metric: '5.2s to 0.95s', label: 'Oracle vs naive on ledger', detail: 'Minimal-scope lock is the non-obvious move' },
+      { metric: 'Gig', label: 'Contract for ParseWave', detail: 'Delivered on spec, Harbor-verified' },
+    ],
+    extraTech: ['Python', 'pytest', 'Go', 'Nginx', 'PostgreSQL', 'Harbor format'],
+  },
+
+  'external-agents-fork': {
+    displayName: 'Entire External Agents',
+    tagline: 'OSS contribution: protocol bridge so any AI coding agent plugs into Entire',
+    featured: true,
+    category: 'personal',
+    status: 'completed',
+    story: [
+      "Open-source contribution to entire.io. Entire gives AI coding agents checkpoint/rewind/lifecycle hooks — External Agents is the protocol layer that lets any agent (Kiro, Amp, Cursor, Claude Code) plug in without native support.",
+      "Subcommand interface over stdin/stdout. Each agent binary implements the protocol contract; the lifecycle harness auto-discovers and builds them all; shared integration tests run across every CLI in one pass.",
+      "Shipped two production agents: Kiro (hooks + transcript analysis) and Amp (hooks + transcript + token calculation + compact transcripts). Three test layers: generic protocol compliance, per-agent unit/build, lifecycle integration.",
+    ],
+    achievements: [
+      { metric: '2', label: 'Agents shipped', detail: 'Kiro and Amp, both protocol-compliant' },
+      { metric: '3-layer', label: 'Test architecture', detail: 'Protocol compliance + agent unit + lifecycle integration' },
+      { metric: 'Auto-discovery', label: 'Lifecycle harness', detail: 'No hardcoded agent list' },
+      { metric: 'OSS', label: 'Contribution to entire.io', detail: 'Apache 2.0, merged upstream' },
+    ],
+    extraTech: ['Go', 'bash', 'Python', 'Entire CLI', 'GitHub Actions'],
+  },
+
+  'bob-wxo-hackathon': {
+    displayName: 'watsonx Test Forge',
+    tagline: 'Hackathon: auto-generate Journey Success test cases for IBM watsonx agents',
+    featured: true,
+    category: 'personal',
+    status: 'completed',
+    story: [
+      "IBM watsonx Orchestrate hackathon. The problem: manually authoring Journey Success test cases for watsonx agents is tedious and error-prone. Test Forge is a multi-tool agent that reads deployed agent specs and generates validated test cases automatically.",
+      "Tool lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Test cases cover happy path, edge cases, and failure scenarios with strict/fuzzy/optional argument matching plus response text keywords — all goals must pass for a test to succeed.",
+      "Built on IBM's ADK + watsonx Orchestrate MCP server, integrated with Bob IDE. Demonstrates manager/collaborator agent composition: manager agents coordinate via named collaborators; collaborator agents own the tools.",
+    ],
+    achievements: [
+      { metric: '4', label: 'Tools implemented', detail: 'list, get_spec, generate, upload with ToolResponse wrapping' },
+      { metric: '13', label: 'Unit tests passing', detail: 'Schema validation, error handling, tool contracts' },
+      { metric: 'Hackathon', label: 'IBM ADK', detail: 'Full deployment pipeline on watsonx Orchestrate' },
+      { metric: 'Journey Success', label: 'Evaluation metric', detail: 'Tool-call + text-keyword matching' },
+    ],
+    extraTech: ['Python', 'IBM watsonx ADK', 'Pydantic', 'pytest', 'Groq/OpenAI LLMs'],
+  },
+
   'web-v2': {
     displayName: "devOS",
     tagline: "You're looking at it right now",
