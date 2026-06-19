@@ -1,15 +1,66 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion, useMotionValue, useSpring } from 'framer-motion';
 import Image from 'next/image';
 import { useTheme } from '@/store/themeStore';
+import { spring } from '@/lib/motion';
+import { tintForHour } from '@/lib/livingDesktop';
+
+// ---------------------------------------------------------------------------
+// Living desktop — cursor parallax + time-of-day ambient tint
+// ---------------------------------------------------------------------------
+
+const PARALLAX = 20; // px the wallpaper drifts toward the cursor
+
+/**
+ * Cursor-reactive parallax. The wallpaper is overscanned (scale 1.06) so the
+ * drift never exposes an edge. Disabled entirely under reduced motion.
+ */
+function useParallax(reduced: boolean) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, spring.cursor);
+  const sy = useSpring(y, spring.cursor);
+
+  useEffect(() => {
+    if (reduced) return;
+    const onMove = (e: PointerEvent) => {
+      x.set((e.clientX / window.innerWidth - 0.5) * PARALLAX);
+      y.set((e.clientY / window.innerHeight - 0.5) * PARALLAX);
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [reduced, x, y]);
+
+  return { x: sx, y: sy, scale: reduced ? 1 : 1.06 };
+}
+
+function TimeOfDayTint() {
+  const [tint, setTint] = useState<string | null>(null);
+  useEffect(() => {
+    const update = () => setTint(tintForHour(new Date().getHours()));
+    update();
+    const t = setInterval(update, 5 * 60 * 1000); // re-evaluate every 5 min
+    return () => clearInterval(t);
+  }, []);
+  if (!tint) return null;
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-0 -z-10 pointer-events-none transition-[background] duration-1000"
+      style={{ background: `radial-gradient(120% 90% at 50% 0%, ${tint}, transparent 70%)` }}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Canvas Animations
 // ---------------------------------------------------------------------------
 
-function ParticlesCanvas({ colors }: { colors: string[] }) {
+function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const parallax = useParallax(reduced);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,7 +118,7 @@ function ParticlesCanvas({ colors }: { colors: string[] }) {
         }
       }
 
-      raf = requestAnimationFrame(draw);
+      if (!reduced) raf = requestAnimationFrame(draw);
     };
     draw();
 
@@ -75,15 +126,22 @@ function ParticlesCanvas({ colors }: { colors: string[] }) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors]);
+  }, [colors, reduced]);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 w-full h-full -z-10" />;
+  return (
+    <motion.canvas
+      ref={canvasRef}
+      className="fixed inset-0 w-full h-full -z-10"
+      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
 
-function StarfieldCanvas({ speed }: { speed: number }) {
+function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const parallax = useParallax(reduced);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -145,7 +203,7 @@ function StarfieldCanvas({ speed }: { speed: number }) {
         ctx.stroke();
       });
 
-      raf = requestAnimationFrame(draw);
+      if (!reduced) raf = requestAnimationFrame(draw);
     };
     draw();
 
@@ -153,15 +211,22 @@ function StarfieldCanvas({ speed }: { speed: number }) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [speed]);
+  }, [speed, reduced]);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 w-full h-full -z-10" />;
+  return (
+    <motion.canvas
+      ref={canvasRef}
+      className="fixed inset-0 w-full h-full -z-10"
+      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
 
-function MeshCanvas({ colors, speed }: { colors: string[]; speed: number }) {
+function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: number; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const parallax = useParallax(reduced);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -205,7 +270,7 @@ function MeshCanvas({ colors, speed }: { colors: string[]; speed: number }) {
         ctx.fill();
       }
 
-      raf = requestAnimationFrame(draw);
+      if (!reduced) raf = requestAnimationFrame(draw);
     };
     draw();
 
@@ -213,17 +278,24 @@ function MeshCanvas({ colors, speed }: { colors: string[]; speed: number }) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors, speed]);
+  }, [colors, speed, reduced]);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 w-full h-full -z-10" />;
+  return (
+    <motion.canvas
+      ref={canvasRef}
+      className="fixed inset-0 w-full h-full -z-10"
+      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Grid — PostHog-inspired dark navy base + drifting color glows + dot grid
 // ---------------------------------------------------------------------------
 
-function GridCanvas({ colors }: { colors: string[] }) {
+function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const parallax = useParallax(reduced);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -312,7 +384,7 @@ function GridCanvas({ colors }: { colors: string[] }) {
         }
       }
 
-      raf = requestAnimationFrame(draw);
+      if (!reduced) raf = requestAnimationFrame(draw);
     };
     draw();
 
@@ -320,9 +392,15 @@ function GridCanvas({ colors }: { colors: string[] }) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors]);
+  }, [colors, reduced]);
 
-  return <canvas ref={canvasRef} className="fixed inset-0 w-full h-full -z-10" />;
+  return (
+    <motion.canvas
+      ref={canvasRef}
+      className="fixed inset-0 w-full h-full -z-10"
+      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -331,17 +409,28 @@ function GridCanvas({ colors }: { colors: string[] }) {
 
 export function AnimatedBackground() {
   const { wallpaper } = useTheme();
+  // When the OS requests reduced motion, canvases render a single static frame
+  // instead of running their requestAnimationFrame loop.
+  const reduced = !!useReducedMotion();
 
   if (!wallpaper) return <div className="fixed inset-0 -z-10 bg-bg" />;
 
   if (wallpaper.type === 'animated' && wallpaper.animatedConfig) {
     const { pattern, colors, speed } = wallpaper.animatedConfig;
 
-    if (pattern === 'particles') return <ParticlesCanvas colors={colors} />;
-    if (pattern === 'starfield') return <StarfieldCanvas speed={speed} />;
-    if (pattern === 'grid')      return <GridCanvas colors={colors} />;
-    // mesh / radial / wave → gradient blobs
-    return <MeshCanvas colors={colors} speed={speed} />;
+    const canvas =
+      pattern === 'particles' ? <ParticlesCanvas colors={colors} reduced={reduced} />
+      : pattern === 'starfield' ? <StarfieldCanvas speed={speed} reduced={reduced} />
+      : pattern === 'grid' ? <GridCanvas colors={colors} reduced={reduced} />
+      // mesh / radial / wave → gradient blobs
+      : <MeshCanvas colors={colors} speed={speed} reduced={reduced} />;
+
+    return (
+      <>
+        {canvas}
+        <TimeOfDayTint />
+      </>
+    );
   }
 
   if (wallpaper.type === 'static' && wallpaper.imageUrl) {
