@@ -5,47 +5,66 @@ import { buildConciergeSystem, MAX_QUERY_LENGTH } from '@/lib/conciergeContext';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Cheapest capable model by default; cost-conscious. Override via env.
+const DEFAULT_MODEL = 'claude-haiku-4-5';
 // Bound the answer (and the cost) — concierge replies are 2-4 sentences.
-const MAX_TOKENS = 400;
-const DEFAULT_MODEL = 'claude-opus-4-8';
+const MAX_TOKENS = 350;
 
-// Per-IP sliding window and a global daily ceiling, both via Upstash. Rate
-// limiting is OPTIONAL: with no Upstash env the route still works (useful for
-// local dev), it just isn't throttled. The API-key check below is the only
-// hard gate.
-const RATE_PER_MINUTE = 6;
-const DAILY_CEILING = 500;
+// Throttle: per-IP sliding window + a global daily ceiling (spend cap).
+const RATE_PER_MINUTE = 5;
+const DAILY_CEILING = 300;
 
-type Limiter = {
-  limit: (ip: string) => Promise<void | { tooMany: boolean }>;
-};
+type Limiter = { limit: (ip: string) => Promise<{ tooMany: boolean } | void> };
 
-let limiterPromise: Promise<Limiter | null> | null = null;
+// In-memory fallback so the concierge is ALWAYS rate-limited, even without
+// Upstash. Per serverless instance (resets on cold start) — fine for a
+// portfolio; set Upstash for durable, cross-instance limiting in production.
+const ipHits = new Map<string, number[]>();
+let dayStamp = '';
+let dayCount = 0;
 
-async function getLimiter(): Promise<Limiter | null> {
+function inMemoryLimit(ip: string): { tooMany: boolean } {
+  const now = Date.now();
+  const recent = (ipHits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  if (recent.length >= RATE_PER_MINUTE) return { tooMany: true };
+  recent.push(now);
+  ipHits.set(ip, recent);
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== dayStamp) { dayStamp = today; dayCount = 0; }
+  dayCount += 1;
+  if (dayCount > DAILY_CEILING) return { tooMany: true };
+  return { tooMany: false };
+}
+
+let limiterPromise: Promise<Limiter> | null = null;
+
+async function getLimiter(): Promise<Limiter> {
   if (limiterPromise) return limiterPromise;
   limiterPromise = (async () => {
-    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-      return null;
+    // Durable path: Upstash (survives cold starts, shared across instances).
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const { Ratelimit } = await import('@upstash/ratelimit');
+      const { Redis } = await import('@upstash/redis');
+      const redis = Redis.fromEnv();
+      const perIp = new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(RATE_PER_MINUTE, '60 s'),
+        prefix: 'concierge:ip',
+      });
+      return {
+        async limit(ip: string) {
+          const { success } = await perIp.limit(ip);
+          if (!success) return { tooMany: true };
+          const dayKey = `concierge:day:${new Date().toISOString().slice(0, 10)}`;
+          const count = await redis.incr(dayKey);
+          if (count === 1) await redis.expire(dayKey, 86400);
+          if (count > DAILY_CEILING) return { tooMany: true };
+        },
+      };
     }
-    const { Ratelimit } = await import('@upstash/ratelimit');
-    const { Redis } = await import('@upstash/redis');
-    const redis = Redis.fromEnv();
-    const perIp = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(RATE_PER_MINUTE, '60 s'),
-      prefix: 'concierge:ip',
-    });
-    return {
-      async limit(ip: string) {
-        const { success } = await perIp.limit(ip);
-        if (!success) return { tooMany: true };
-        const dayKey = `concierge:day:${new Date().toISOString().slice(0, 10)}`;
-        const count = await redis.incr(dayKey);
-        if (count === 1) await redis.expire(dayKey, 86400);
-        if (count > DAILY_CEILING) return { tooMany: true };
-      },
-    };
+    // Always-on in-memory fallback.
+    return { async limit(ip: string) { return inMemoryLimit(ip); } };
   })();
   return limiterPromise;
 }
@@ -70,14 +89,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'query_too_long' }, { status: 413 });
   }
 
-  // Optional throttle + spend ceiling.
+  // Throttle + daily spend ceiling (always on; Upstash if configured).
   const limiter = await getLimiter();
-  if (limiter) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-    const res = await limiter.limit(ip);
-    if (res?.tooMany) {
-      return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-    }
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
+  const limited = await limiter.limit(ip);
+  if (limited?.tooMany) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 
   const client = new Anthropic();

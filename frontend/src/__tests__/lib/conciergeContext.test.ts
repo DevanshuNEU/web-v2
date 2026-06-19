@@ -23,16 +23,17 @@ describe('conciergeContext', () => {
     expect(g).not.toContain('sponsorship');
   });
 
-  it('system prompt carries the rules and the grounding', () => {
+  it('system prompt carries the first-person voice, rules, and grounding', () => {
     const sys = buildConciergeSystem();
-    expect(sys).toContain('devOS Concierge');
+    const lower = sys.toLowerCase();
     expect(sys).toContain('--- CONTEXT ---');
+    // answers as Devanshu, in first person
+    expect(sys).toContain(`You are ${identity.name}`);
+    expect(lower).toContain('first person');
     // the hard rules are stated to the model
-    expect(sys.toLowerCase()).toContain('never mention visa');
-    expect(sys.toLowerCase()).toContain('never call him a "student"');
-    expect(sys.toLowerCase()).toContain('never use em dashes');
-    // grounding is appended
-    expect(sys).toContain(identity.name);
+    expect(lower).toContain('never mention visa');
+    expect(lower).toContain('never describe myself as a "student"');
+    expect(lower).toContain('never use em dashes');
   });
 
   it('caps query length to a sane positive bound', () => {

@@ -108,6 +108,7 @@ export default function Spotlight() {
   const abortRef = useRef<AbortController | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const askPanelRef = useRef<HTMLDivElement>(null);
   const openWindow = useOSStore(state => state.openWindow);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
@@ -142,6 +143,8 @@ export default function Spotlight() {
     const question = q.trim();
     if (!question) return;
     setView('ask'); setAskQuery(question); setAnswer(''); setAskState('loading');
+    // Move focus into the answer region so screen-reader users land on it.
+    setTimeout(() => askPanelRef.current?.focus(), 0);
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -295,47 +298,65 @@ export default function Spotlight() {
 
             {/* Ask view */}
             {view === 'ask' && (
-              <div className={`border-t ${dividerColor} px-4 py-4`}>
+              <motion.div
+                ref={askPanelRef}
+                tabIndex={-1}
+                role="region"
+                aria-label="devOS Concierge answer"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className={`border-t ${dividerColor} px-4 py-4 outline-none`}
+                data-no-focus-ring
+              >
                 <div className="flex items-center gap-1.5 text-[11px] text-accent mb-3">
                   <Sparkles size={12} /> devOS Concierge
                 </div>
 
-                {askState === 'loading' && (
-                  <ThinkingDots isDark={isDark} />
-                )}
+                {askState === 'loading' && <ThinkingDots isDark={isDark} />}
 
                 {(askState === 'streaming' || askState === 'done') && (
-                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isDark ? 'text-white/85' : 'text-gray-800'}`}>
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className={`text-sm leading-relaxed whitespace-pre-wrap ${isDark ? 'text-white/85' : 'text-gray-800'}`}
+                  >
                     {answer}
-                    {askState === 'streaming' && <span className="inline-block w-1.5 h-4 align-text-bottom bg-accent/70 ml-0.5 animate-pulse" />}
+                    {askState === 'streaming' && (
+                      <span className="inline-block w-1.5 h-4 align-text-bottom bg-accent/70 ml-0.5 animate-pulse" />
+                    )}
                   </p>
                 )}
 
-                {askState === 'offline' && (
-                  <p className={`text-sm leading-relaxed ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
-                    The concierge is offline right now. You can still explore everything directly through the apps below.
-                  </p>
-                )}
-                {askState === 'rate_limited' && (
-                  <p className={`text-sm leading-relaxed ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
-                    A lot of questions are coming in right now. Give it a minute and try again, or browse the apps below.
-                  </p>
-                )}
-                {askState === 'error' && (
-                  <p className={`text-sm leading-relaxed ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
-                    Something went wrong reaching the concierge. Try again, or open the apps below.
+                {(askState === 'offline' || askState === 'rate_limited' || askState === 'error') && (
+                  <p role="alert" className={`text-sm leading-relaxed ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
+                    {askState === 'offline' &&
+                      'The concierge is offline right now. You can still explore everything directly through the apps below.'}
+                    {askState === 'rate_limited' &&
+                      'A lot of questions are coming in right now. Give it a minute and try again, or browse the apps below.'}
+                    {askState === 'error' &&
+                      'Something went wrong reaching the concierge. Try again, or open the apps below.'}
                   </p>
                 )}
 
-                {/* Action chips */}
+                {/* Actions */}
                 {askState !== 'loading' && askState !== 'streaming' && (
                   <div className="flex flex-wrap gap-2 mt-4">
+                    {(askState === 'error' || askState === 'rate_limited') && (
+                      <button
+                        onClick={() => enterAsk(askQuery)}
+                        className="text-[12px] px-2.5 py-1.5 rounded-md border border-accent/40 text-accent
+                                   hover:bg-accent/10 active:scale-95 transition cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                    )}
                     {([['about-me', 'About Me'], ['projects', 'Projects'], ['resume', 'Resume']] as [AppType, string][]).map(
                       ([app, label]) => (
                         <button
                           key={app}
                           onClick={() => openApp(app)}
-                          className={`text-[12px] px-2.5 py-1 rounded-md border transition-colors
+                          className={`text-[12px] px-2.5 py-1.5 rounded-md border transition active:scale-95 cursor-pointer
                             ${isDark ? 'border-white/12 text-white/70 hover:bg-white/8' : 'border-black/10 text-gray-600 hover:bg-black/5'}`}
                         >
                           Open {label}
@@ -344,7 +365,7 @@ export default function Spotlight() {
                     )}
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
 
             {/* Search results */}
