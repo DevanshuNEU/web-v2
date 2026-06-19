@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import type { WindowState, AppType } from '../../../shared/types';
 
@@ -21,9 +22,15 @@ interface OSStore {
   maximizeWindow: (windowId: string) => void;
   updateWindowPosition: (windowId: string, position: { x: number; y: number }) => void;
   updateWindowSize: (windowId: string, size: { width: number; height: number }) => void;
+  snapWindow: (
+    windowId: string,
+    bounds: { x: number; y: number; width: number; height: number }
+  ) => void;
 }
 
-export const useOSStore = create<OSStore>((set, get) => ({
+export const useOSStore = create<OSStore>()(
+  persist(
+    (set, get) => ({
   // Boot
   isBooted: false,
   setBooted: () => set({ isBooted: true }),
@@ -141,4 +148,46 @@ export const useOSStore = create<OSStore>((set, get) => ({
       ),
     }));
   },
-}));
+
+  // Snap a window to a computed half/quarter region and bring it to front.
+  snapWindow: (windowId, bounds) => {
+    const currentZIndex = get().nextZIndex;
+    set(state => ({
+      windows: state.windows.map(window =>
+        window.id === windowId
+          ? {
+              ...window,
+              position: { x: bounds.x, y: bounds.y },
+              size: { width: bounds.width, height: bounds.height },
+              isMaximized: false,
+              zIndex: currentZIndex,
+            }
+          : window
+      ),
+      activeWindowId: windowId,
+      nextZIndex: currentZIndex + 1,
+    }));
+  },
+    }),
+    {
+      name: 'portfolio-os-windows', // localStorage key — session layout persistence
+      // Boot state is intentionally NOT persisted: the boot sequence always
+      // replays. Only the window layout is restored.
+      partialize: (state) => ({
+        windows: state.windows,
+        activeWindowId: state.activeWindowId,
+        nextZIndex: state.nextZIndex,
+        windowCounter: state.windowCounter,
+      }),
+      // Drop any persisted window whose app no longer exists in the registry,
+      // so a renamed/removed app can never wedge a restore.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<OSStore>;
+        const windows = (p.windows ?? []).filter(
+          (w) => !!appRegistry[w.appType]
+        );
+        return { ...current, ...p, windows, isBooted: false };
+      },
+    }
+  )
+);

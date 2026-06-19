@@ -6,11 +6,14 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  useReducedMotion,
   type MotionValue,
 } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
 import { appRegistry, getPinnedApps, getAppLabel } from '@/lib/appRegistry';
+import { spring } from '@/lib/motion';
+import { registerDockIcon } from '@/lib/dockRegistry';
 import AppIcon from './AppIcon';
 import { Launchpad } from './Launchpad';
 import { LayoutGrid } from 'lucide-react';
@@ -31,7 +34,8 @@ const MAG_RANGE = 140;  // px radius of magnification effect
 
 function useDockMagnification(
   mouseX: MotionValue<number>,
-  ref: React.RefObject<HTMLDivElement | null>
+  ref: React.RefObject<HTMLDivElement | null>,
+  reduced: boolean
 ) {
   const distance = useTransform(mouseX, (val: number) => {
     const el = ref.current;
@@ -40,8 +44,13 @@ function useDockMagnification(
     return Math.abs(val - (rect.left + rect.width / 2));
   });
 
-  const scale = useTransform(distance, [0, MAG_RANGE], [MAX_SIZE / BASE_SIZE, 1]);
-  return useSpring(scale, { damping: 18, stiffness: 220, mass: 0.6 });
+  // Reduced motion: flat scale, no magnification.
+  const scale = useTransform(
+    distance,
+    [0, MAG_RANGE],
+    reduced ? [1, 1] : [MAX_SIZE / BASE_SIZE, 1]
+  );
+  return useSpring(scale, spring.dock);
 }
 
 /* ------------------------------------------------------------------ */
@@ -58,12 +67,19 @@ interface DockIconProps {
   onClick: () => void;
   isRunning: boolean;
   isMinimized?: boolean;
+  reduced: boolean;
 }
 
-function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized }: DockIconProps) {
+function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }: DockIconProps) {
   // ref lives on the outer div so getBoundingClientRect reflects the layout box
   const ref = useRef<HTMLDivElement>(null);
-  const scale = useDockMagnification(mouseX, ref);
+  const scale = useDockMagnification(mouseX, ref, reduced);
+
+  // Publish this icon's live rect so a minimizing window knows where to genie into.
+  React.useEffect(
+    () => registerDockIcon(appType, () => ref.current?.getBoundingClientRect() ?? null),
+    [appType]
+  );
 
   // Drive the outer div's width from the same scale so flex layout expands
   const layoutWidth = useTransform(scale, (s) => Math.round(s * BASE_SIZE));
@@ -82,10 +98,12 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized }: DockIcon
     >
       {/* Inner: visual scale only, grows upward */}
       <motion.button
+        data-magnetic
         style={{ scale, originY: 1 }}
         onClick={onClick}
         className={`relative cursor-pointer ${isMinimized ? 'opacity-40' : ''}`}
         title={label.windowTitle}
+        aria-label={`${label.windowTitle}${isRunning ? ' (open)' : ''}`}
       >
         <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={BASE_SIZE} />
 
@@ -123,6 +141,7 @@ export default function Taskbar() {
   const [launchpadOpen, setLaunchpadOpen] = useState(false);
   const [firstVisit, setFirstVisit] = useState(false);
   const mouseX = useMotionValue(-1);
+  const reduced = !!useReducedMotion();
 
   // Track whether this is a first-time visitor (for pulse on grid button)
   React.useEffect(() => {
@@ -148,6 +167,8 @@ export default function Taskbar() {
 
       {/* Dock shelf — overflow-visible so scaled icons show above the shelf */}
       <div
+        role="toolbar"
+        aria-label="Dock"
         className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50
                    flex items-end gap-1 px-2.5 pb-2 pt-2
                    rounded-2xl overflow-visible
@@ -176,6 +197,7 @@ export default function Taskbar() {
             />
           )}
           <button
+            data-magnetic
             onClick={() => {
               setLaunchpadOpen(!launchpadOpen);
               setFirstVisit(false);
@@ -207,6 +229,7 @@ export default function Taskbar() {
               onClick={() => handleDockIconClick(appType)}
               isRunning={!!win}
               isMinimized={win?.isMinimized}
+              reduced={reduced}
             />
           );
         })}
@@ -223,6 +246,7 @@ export default function Taskbar() {
                 onClick={() => focusWindow(win.id)}
                 isRunning
                 isMinimized={win.isMinimized}
+                reduced={reduced}
               />
             ))}
           </>

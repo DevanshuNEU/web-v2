@@ -1,9 +1,12 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
+import { spring, INSTANT } from '@/lib/motion';
+import { getDockIconRect } from '@/lib/dockRegistry';
+import { computeSnap, type SnapBounds } from '@/lib/windowSnap';
 import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
@@ -17,10 +20,59 @@ export default function Window({ window, children }: WindowProps) {
   const minimizeWindow = useOSStore(state => state.minimizeWindow);
   const maximizeWindow = useOSStore(state => state.maximizeWindow);
   const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
+  const snapWindow = useOSStore(state => state.snapWindow);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
   const isDragging = React.useRef(false);
   const [isDraggingState, setIsDraggingState] = React.useState(false);
+  const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
+  const snapPreviewRef = React.useRef<SnapBounds | null>(null);
   const dragOffset = React.useRef({ x: 0, y: 0 });
+  const reduced = useReducedMotion();
+  const controls = useAnimationControls();
+  const elRef = React.useRef<HTMLDivElement>(null);
+
+  // Drive open / drag scale through the same controls the genie minimize uses,
+  // so there is one animation owner per window.
+  React.useEffect(() => {
+    controls.start({
+      opacity: 1,
+      x: 0,
+      y: 0,
+      scale: isDraggingState ? 1.02 : 1,
+      skewX: 0,
+      transition: reduced
+        ? INSTANT
+        : {
+            ...spring.window,
+            opacity: { duration: 0.35, ease: 'easeOut' },
+            scale: { duration: isDraggingState ? 0.15 : 0.4, ease: [0.16, 1, 0.3, 1] },
+          },
+    });
+  }, [isDraggingState, reduced, controls]);
+
+  // Genie minimize: fly the window into its dock icon, then commit the state.
+  // Falls back to a plain minimize under reduced motion or if the dock icon
+  // is not currently measurable.
+  const handleMinimize = async () => {
+    const dock = getDockIconRect(window.appType);
+    const el = elRef.current;
+    if (reduced || !dock || !el) {
+      minimizeWindow(window.id);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const dx = dock.left + dock.width / 2 - (r.left + r.width / 2);
+    const dy = dock.top + dock.height / 2 - (r.top + r.height / 2);
+    await controls.start({
+      x: dx,
+      y: dy,
+      scale: 0.06,
+      skewX: 8,
+      opacity: 0,
+      transition: spring.genie,
+    });
+    minimizeWindow(window.id);
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -55,12 +107,25 @@ export default function Window({ window, children }: WindowProps) {
         ));
 
         updateWindowPosition(window.id, { x: newX, y: newY });
+
+        // Preview a snap region when the pointer reaches a screen edge.
+        const snap = computeSnap(e.clientX, e.clientY, viewportWidth, viewportHeight);
+        snapPreviewRef.current = snap;
+        setSnapPreview(snap);
       }
     };
 
     const handleMouseUp = () => {
+      const wasDragging = isDragging.current;
       isDragging.current = false;
       setIsDraggingState(false);
+
+      // Commit a pending snap on release.
+      if (wasDragging && snapPreviewRef.current) {
+        snapWindow(window.id, snapPreviewRef.current);
+      }
+      snapPreviewRef.current = null;
+      setSnapPreview(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -70,7 +135,7 @@ export default function Window({ window, children }: WindowProps) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [window.id, window.size, window.isMaximized, updateWindowPosition]);
+  }, [window.id, window.size, window.isMaximized, updateWindowPosition, snapWindow]);
 
   // Menu bar is h-7 = 28px; dock area is ~60px; keep windows inside those bounds
   const MENUBAR_H = 28;
@@ -91,49 +156,39 @@ export default function Window({ window, children }: WindowProps) {
       };
 
   return (
+    <>
+      {/* Snap-zone preview — shown while dragging toward a screen edge */}
+      {snapPreview && isDraggingState && (
+        <div
+          aria-hidden
+          className="fixed pointer-events-none rounded-xl border-2 z-[9998]"
+          style={{
+            left: snapPreview.x,
+            top: snapPreview.y,
+            width: snapPreview.width,
+            height: snapPreview.height,
+            borderColor: 'rgb(var(--color-accent) / 0.7)',
+            background: 'rgb(var(--color-accent) / 0.12)',
+            backdropFilter: 'blur(2px)',
+          }}
+        />
+      )}
     <motion.div
+      ref={elRef}
       layout
-      initial={{ opacity: 0, scale: 0.92, y: 30 }}
-      animate={{
-        opacity: 1,
-        scale: isDraggingState ? 1.02 : 1,
-        y: 0,
-      }}
-      exit={{
-        opacity: 0,
-        scale: 0.88,
-        y: 20,
-        transition: {
-          duration: 0.25,
-          ease: [0.4, 0, 1, 1],
-        },
-      }}
-      transition={{
-        layout: {
-          type: 'spring',
-          damping: 22,
-          stiffness: 140,
-          mass: 0.9,
-        },
-        type: 'spring',
-        damping: 20,
-        stiffness: 120,
-        mass: 0.8,
-        opacity: {
-          duration: 0.35,
-          ease: 'easeOut',
-        },
-        scale: {
-          duration: isDraggingState ? 0.15 : 0.4,
-          ease: [0.16, 1, 0.3, 1],
-        },
-        y: {
-          type: 'spring',
-          damping: 20,
-          stiffness: 120,
-          mass: 0.8,
-        },
-      }}
+      initial={reduced ? false : { opacity: 0, scale: 0.92, y: 30 }}
+      animate={controls}
+      exit={
+        reduced
+          ? { opacity: 0, transition: INSTANT }
+          : {
+              opacity: 0,
+              scale: 0.88,
+              y: 20,
+              transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
+            }
+      }
+      transition={{ layout: reduced ? INSTANT : spring.windowLayout }}
       className={`
         absolute
         flex flex-col
@@ -187,7 +242,7 @@ export default function Window({ window, children }: WindowProps) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              minimizeWindow(window.id);
+              handleMinimize();
             }}
             className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500
                        transition-colors flex items-center justify-center"
@@ -234,5 +289,6 @@ export default function Window({ window, children }: WindowProps) {
         {children}
       </div>
     </motion.div>
+    </>
   );
 }

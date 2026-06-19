@@ -7,6 +7,7 @@ import { DesktopContextMenu } from './DesktopContextMenu';
 import MenuBar from './MenuBar';
 import Taskbar from './Taskbar';
 import DesktopIcons from './DesktopIcons';
+import Cursor from './Cursor';
 
 interface DesktopProps {
   children?: React.ReactNode;
@@ -18,6 +19,7 @@ export default function Desktop({ children }: DesktopProps) {
   return (
     <DesktopContextMenu>
       <div className="min-h-screen w-full relative overflow-hidden">
+        <Cursor />
         <AnimatedBackground />
 
         {/* Menu bar at top */}
