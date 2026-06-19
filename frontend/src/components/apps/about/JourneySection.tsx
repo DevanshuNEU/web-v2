@@ -5,8 +5,9 @@ import { Zap, Disc, Lightbulb, Palette, Smartphone, Clock } from "lucide-react";
 export function JourneySection() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero Opening */}
       <div className="space-y-6">
@@ -291,7 +292,7 @@ export function JourneySection() {
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-5">
           <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
-            Right now
+            Grad school
           </div>
           <h2 className="text-3xl font-semibold text-text">
             Northeastern & being a TA
@@ -315,6 +316,41 @@ export function JourneySection() {
               and I helped them figure it out, when they actually got it and
               their code finally worked? That feeling was different. Worth it.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Now — building at the MCP layer */}
+      <div className="relative overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
+        <div className="relative glass-subtle p-8 border border-accent/20">
+          <div className="space-y-5">
+            <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
+              Now
+            </div>
+            <h2 className="text-3xl font-semibold text-text">
+              Building at the MCP layer
+            </h2>
+            <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
+              <p>
+                Somewhere along the way, the thing that grabbed me as an 8-year-old
+                came back around. These days I build the workflow layer between LLMs
+                and the real work developers do.
+              </p>
+              <p>
+                <strong className="text-text">OpenCodeIntel</strong> is a production
+                MCP server that gives coding agents real code intelligence: hybrid
+                retrieval over your repo with AST structure, BM25 keywords, and Cohere
+                reranking, so the agent stops guessing about your codebase.{" "}
+                <strong className="text-text">Saar</strong> is a Chrome extension on
+                the Web Store that reads Claude.ai streams to catch context rot before
+                it wrecks an answer.
+              </p>
+              <p className="text-text text-xl font-medium">
+                Same kid, same curiosity. Just pointed at the most interesting layer
+                I&apos;ve found yet.
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -5,8 +5,9 @@ import { Server, Layers, Bot, Rocket } from "lucide-react";
 export function ExcitesSection() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero */}
       <div className="space-y-6">
@@ -21,41 +22,45 @@ export function ExcitesSection() {
         </p>
       </div>
 
-      {/* Systems That Scale */}
+      {/* The MCP layer */}
       <div className="glass-subtle rounded-2xl p-8 border border-white/10">
         <div className="flex items-start gap-4 mb-5">
           <div className="text-accent flex-shrink-0"><Server size={32} /></div>
           <div className="flex-1 space-y-4">
             <h2 className="text-2xl font-semibold text-text">
-              Building systems that actually scale
+              Making LLMs actually useful for developers
             </h2>
             <p className="text-text-secondary text-lg leading-relaxed">
-              There's something satisfying about designing systems that handle
-              10x traffic without breaking. Distributed systems, load balancing,
-              caching strategies - this is the stuff I think about at 2 AM.
+              The thing I can't stop thinking about is the workflow layer between
+              LLMs and the real work developers do. The models are incredible, but
+              they fly blind about your codebase, your context, your intent. Closing
+              that gap is the most interesting problem I've found.
             </p>
             <p className="text-text-secondary text-lg leading-relaxed">
-              It's not just about making things work. It's about making complex
-              things work <em className="text-text">simply</em>. How do you
-              design something that's fault-tolerant, performant, AND
-              maintainable? That puzzle never gets old.
+              That's what OpenCodeIntel is: a production MCP server that gives coding
+              agents real code intelligence instead of letting them guess. Building
+              at the MCP layer isn't just calling a model. It's designing how it
+              thinks about a problem, and it has to be{" "}
+              <em className="text-text">reliable</em> in production, not just a demo.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Cloud Infrastructure */}
+      {/* Retrieval / RAG */}
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-5">
-          <h2 className="text-3xl font-semibold text-text">Cloud infrastructure</h2>
+          <h2 className="text-3xl font-semibold text-text">Retrieval that actually works</h2>
           <p className="text-text-secondary text-lg leading-relaxed">
-            AWS, Terraform, Kubernetes - this is where code meets reality.
-            You're not just writing functions; you're orchestrating entire
-            environments. Automating deployments. Ensuring things stay up.
+            Most RAG is one embedding model and a prayer. I care about the version
+            that holds up: hybrid retrieval that combines AST structure, BM25 keyword
+            search, and reranking, so what comes back is the right context, not the
+            closest-vector vibe.
           </p>
           <p className="text-text-secondary text-lg leading-relaxed">
-            Infrastructure as Code is beautiful. Version-controlled
-            infrastructure. Reproducible environments. Automated scaling.
+            Get retrieval right and the agent stops hallucinating about your code.
+            Get it wrong and no amount of prompt engineering saves you. That's the
+            part that hooks me.
           </p>
         </div>
       </div>

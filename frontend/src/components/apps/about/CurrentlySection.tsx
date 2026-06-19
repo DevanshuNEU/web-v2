@@ -12,8 +12,9 @@ const LIFE_ICONS: Record<string, React.ElementType> = {
 export function CurrentlySection() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
 
       {/* Hero */}
@@ -21,7 +22,7 @@ export function CurrentlySection() {
         <h1 className="text-4xl font-semibold text-text leading-tight">
           Right now <span className="text-accent">in my life</span>
         </h1>
-        <p className="text-xl text-text-secondary max-w-3xl">
+        <p className="text-xl text-text-secondary max-w-3xl leading-relaxed">
           What I&apos;m working on, learning, and dealing with day-to-day.
         </p>
       </div>
@@ -69,6 +70,27 @@ export function CurrentlySection() {
               It was exhausting and energizing at the same time. Their questions forced me to
               rethink things I thought I understood. Teaching really does make you learn things
               at a deeper level.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* What I'm shipping — OCI + Saar */}
+      <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent">
+        <div className="space-y-5">
+          <h2 className="text-2xl font-semibold text-text">What I&apos;m shipping</h2>
+          <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
+            <p>
+              Most of my energy goes into building at the MCP layer right now.{" "}
+              <strong className="text-text">OpenCodeIntel</strong> is a production MCP
+              server that gives coding agents real code intelligence through hybrid
+              AST + BM25 + Cohere retrieval.{" "}
+              <strong className="text-text">Saar</strong> is a Chrome extension on the
+              Web Store that reads Claude.ai streams to catch context rot.
+            </p>
+            <p>
+              Both come from the same itch: making LLMs genuinely useful for the work
+              developers actually do, not just demos.
             </p>
           </div>
         </div>
