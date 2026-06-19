@@ -219,9 +219,7 @@ export default function AboutMeApp({ variant = 'desktop' }: AboutMeAppProps) {
       </div>
 
       {/* ── Content ── */}
-      {/* app-content makes this a query container so section typography scales
-          with the window width (see globals.css → in-window responsive type) */}
-      <div className="flex-1 overflow-auto app-content">
+      <div className="flex-1 overflow-auto">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

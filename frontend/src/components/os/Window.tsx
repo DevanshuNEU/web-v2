@@ -284,8 +284,9 @@ export default function Window({ window, children }: WindowProps) {
         <div className="w-[60px] ml-auto" />
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto bg-surface/25" style={{ minHeight: 0 }}>
+      {/* Content — app-content makes every window a query container so app
+          typography scales with window width (see globals.css → in-window type) */}
+      <div className="flex-1 overflow-auto bg-surface/25 app-content" style={{ minHeight: 0 }}>
         {children}
       </div>
     </motion.div>
