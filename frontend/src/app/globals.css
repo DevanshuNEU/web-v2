@@ -402,3 +402,23 @@ body {
 .cursor-none [contenteditable='true'] {
   cursor: text !important;
 }
+
+/* ============================================
+   IN-WINDOW RESPONSIVE TYPOGRAPHY
+   App content sizes its headings/body off the WINDOW width, not the
+   viewport, so text stays proportionate whether a window is small or
+   maximized. `.app-content` is a query container; the text utilities below
+   become fluid (cqi = 1% of the container's inline size) only inside it.
+   Upper clamp = the original Tailwind size, so a maximized window is
+   unchanged; small windows scale down.
+   ============================================ */
+
+.app-content {
+  container-type: inline-size;
+}
+
+.app-content .text-4xl { font-size: clamp(1.5rem, 4.5cqi, 2.25rem); }
+.app-content .text-3xl { font-size: clamp(1.35rem, 3.8cqi, 1.875rem); }
+.app-content .text-2xl { font-size: clamp(1.15rem, 3cqi, 1.5rem); }
+.app-content .text-xl  { font-size: clamp(1.05rem, 2.4cqi, 1.25rem); }
+.app-content .text-lg  { font-size: clamp(0.95rem, 2cqi, 1.125rem); }
