@@ -34,6 +34,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '║  skills        Things I know               ║',
     '║  contact       How to reach me             ║',
     '║  hire devanshu A very good idea            ║',
+    '║  ask <q>       Ask the AI concierge         ║',
     '║  tour          Recruiter guided tour       ║',
     '║  open <app>    Open an app window          ║',
     '║  theme <mode>  dark | light                ║',
@@ -46,6 +47,25 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '╚═══════════════════════════════════════════╝',
     '',
   ],
+
+  ask: (args) => {
+    const q = args.join(' ').trim();
+    if (!q) {
+      return [
+        'Usage: ask <your question>',
+        '  e.g. ask what did he build with MCP',
+        '',
+      ];
+    }
+    return [
+      `> ${q}`,
+      '',
+      '  The devOS Concierge lives in Spotlight.',
+      '  Press Cmd+K, type your question, and pick "Ask devOS"',
+      '  for a streamed, grounded answer in Devanshu\'s voice.',
+      '',
+    ];
+  },
 
   about: () => [
     '┌──────────────────────────────────────────┐',
