@@ -367,3 +367,38 @@ body {
     transform: translateX(-100%);
   }
 }
+
+/* ============================================
+   REDUCED MOTION — global safety net
+   JS surfaces gate on framer-motion's useReducedMotion(); this neutralizes
+   any remaining CSS animations/transitions (e.g. the dock pulse, loading bar)
+   so the whole shell honors the OS "Reduce Motion" setting.
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   CUSTOM CURSOR
+   .cursor-none is added to <html> only when the custom Cursor is active
+   (fine pointer + motion allowed). Text fields keep a native caret for UX.
+   ============================================ */
+
+.cursor-none,
+.cursor-none * {
+  cursor: none !important;
+}
+
+.cursor-none input,
+.cursor-none textarea,
+.cursor-none [contenteditable='true'] {
+  cursor: text !important;
+}

@@ -82,6 +82,8 @@ export default function MenuBar() {
 
   return (
     <div
+      role="banner"
+      aria-label="System menu bar"
       className="fixed top-0 inset-x-0 z-[999] h-7 flex items-center justify-between px-3 select-none"
       style={{
         background: isDark ? 'rgba(20, 20, 20, 0.72)' : 'rgba(248, 248, 248, 0.72)',
@@ -148,6 +150,8 @@ export default function MenuBar() {
           className="flex items-center justify-center w-7 h-6 rounded-md cursor-pointer
                      hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100"
           title={soundOn ? 'Mute sounds' : 'Unmute sounds'}
+          aria-label={soundOn ? 'Mute sounds' : 'Unmute sounds'}
+          aria-pressed={soundOn}
         >
           {soundOn
             ? <Volume2 size={13} strokeWidth={1.8} style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }} />
@@ -167,6 +171,7 @@ export default function MenuBar() {
           className="flex items-center justify-center w-7 h-6 rounded-md
                      hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100 cursor-pointer"
           title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark
             ? <Sun size={13} strokeWidth={2} style={{ color: 'rgba(255,255,255,0.75)' }} />

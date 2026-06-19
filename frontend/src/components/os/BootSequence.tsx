@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 
 type Phase = 'word-1' | 'word-2' | 'word-3' | 'brand' | 'reveal';
@@ -39,9 +39,18 @@ const wordVariants = {
 
 export default function BootSequence() {
   const setBooted = useOSStore(state => state.setBooted);
+  const reduced = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('word-1');
 
   useEffect(() => {
+    // Reduced motion: skip the cinematic word reveal, land on the brand
+    // briefly, then boot. No drawn-out sequence, no per-word translate.
+    if (reduced) {
+      setPhase('brand');
+      const t = setTimeout(() => setBooted(), 600);
+      return () => clearTimeout(t);
+    }
+
     let elapsed = 0;
     const timers: NodeJS.Timeout[] = [];
 
@@ -56,7 +65,7 @@ export default function BootSequence() {
     timers.push(setTimeout(() => setBooted(), elapsed + 200));
 
     return () => timers.forEach(clearTimeout);
-  }, [setBooted]);
+  }, [setBooted, reduced]);
 
   const currentWord = phase === 'word-1' ? WORDS[0]
     : phase === 'word-2' ? WORDS[1]

@@ -13,8 +13,9 @@
  */
 
 import React, { useRef } from 'react';
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
+import { spring } from '@/lib/motion';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import AppIcon from './AppIcon';
 import type { AppType } from '../../../../shared/types';
@@ -40,6 +41,7 @@ interface DesktopIconProps {
 function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProps) {
   const openWindow = useOSStore(state => state.openWindow);
   const ref = useRef<HTMLButtonElement>(null);
+  const reduced = useReducedMotion();
 
   // Raw motion values (normalized -0.5 to 0.5 relative to icon center)
   const rawX = useMotionValue(0);
@@ -50,14 +52,15 @@ function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProp
   const rotateX = useTransform(rawY, [-0.5, 0.5], [12, -12]); // inverted: tilt toward cursor
 
   // Spring-smooth the rotations for physical damping
-  const springRotateX = useSpring(rotateX, { stiffness: 300, damping: 25, mass: 0.5 });
-  const springRotateY = useSpring(rotateY, { stiffness: 300, damping: 25, mass: 0.5 });
+  const springRotateX = useSpring(rotateX, spring.tilt);
+  const springRotateY = useSpring(rotateY, spring.tilt);
 
   // Brightness increases slightly on hover (light hitting tilted surface)
   const brightness = useMotionValue(1);
   const brightnessStr = useTransform(brightness, (v) => `brightness(${v})`);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (reduced) return; // no tilt under reduced motion
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -74,9 +77,9 @@ function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProp
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={reduced ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.3, ease: 'easeOut' }}
+      transition={reduced ? { duration: 0 } : { delay, duration: 0.3, ease: 'easeOut' }}
       // perspective container — must be on a separate div, not the motion element itself
       style={{ perspective: 600 }}
       className="flex flex-col items-center gap-1.5 w-[72px]"
