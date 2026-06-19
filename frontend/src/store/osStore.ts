@@ -171,6 +171,11 @@ export const useOSStore = create<OSStore>()(
     }),
     {
       name: 'portfolio-os-windows', // localStorage key — session layout persistence
+      // Bump when the persisted shape changes; older blobs are discarded rather
+      // than restored, so a stale layout can never crash a new build.
+      version: 1,
+      // Discard pre-v1 layouts cleanly (no noisy migrate warning, no restore).
+      migrate: () => ({ windows: [], activeWindowId: null, nextZIndex: 1000, windowCounter: 1 }),
       // Boot state is intentionally NOT persisted: the boot sequence always
       // replays. Only the window layout is restored.
       partialize: (state) => ({
@@ -179,14 +184,28 @@ export const useOSStore = create<OSStore>()(
         nextZIndex: state.nextZIndex,
         windowCounter: state.windowCounter,
       }),
-      // Drop any persisted window whose app no longer exists in the registry,
-      // so a renamed/removed app can never wedge a restore.
+      // Defensive rehydration: validate every restored window and fail safe.
+      // A malformed or stale persisted blob must never throw during boot or
+      // hand a broken WindowState to an app. On any doubt, restore nothing.
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<OSStore>;
-        const windows = (p.windows ?? []).filter(
-          (w) => !!appRegistry[w.appType]
-        );
-        return { ...current, ...p, windows, isBooted: false };
+        try {
+          const p = (persisted ?? {}) as Partial<OSStore>;
+          const windows = Array.isArray(p.windows)
+            ? p.windows.filter(
+                (w): w is WindowState =>
+                  !!w &&
+                  typeof w.id === 'string' &&
+                  typeof w.appType === 'string' &&
+                  !!appRegistry[w.appType as AppType] &&
+                  !!w.position && typeof w.position.x === 'number' && typeof w.position.y === 'number' &&
+                  !!w.size && typeof w.size.width === 'number' && typeof w.size.height === 'number'
+              )
+            : [];
+          return { ...current, ...p, windows, isBooted: false };
+        } catch {
+          // Corrupt persisted state: ignore it, boot clean.
+          return { ...current, isBooted: false };
+        }
       },
     }
   )
