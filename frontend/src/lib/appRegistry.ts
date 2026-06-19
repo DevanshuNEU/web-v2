@@ -21,6 +21,7 @@ import {
   HardDrive,
   ScrollText,
   Github,
+  Compass,
   LifeBuoy,
 } from 'lucide-react';
 import {
@@ -73,6 +74,7 @@ const components = {
   'resume': lazy(() => import('@/components/apps/ResumeApp')),
   'changelog': lazy(() => import('@/components/apps/ChangelogApp')),
   'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
+  'browser': lazy(() => import('@/components/apps/BrowserApp')),
   'help': lazy(() => import('@/components/apps/HelpApp')),
 };
 
@@ -186,6 +188,15 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'green',
     defaultSize: { width: 720, height: 600 },
     defaultPosition: { x: 180, y: 110 },
+    pinnedToDock: true,
+    launchpad: true,
+  },
+  'browser': {
+    component: components['browser'],
+    icon: Compass,
+    iconColor: 'sky',
+    defaultSize: { width: 1040, height: 720 },
+    defaultPosition: { x: 160, y: 90 },
     pinnedToDock: true,
     launchpad: true,
   },

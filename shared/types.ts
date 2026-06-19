@@ -26,6 +26,7 @@ export type AppType =
   | 'resume'
   | 'changelog'
   | 'github-activity'
+  | 'browser'
   | 'help';
 
 // API Types
