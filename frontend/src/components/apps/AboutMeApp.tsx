@@ -45,7 +45,7 @@ type TabId = typeof TABS[number]['id'];
 const SPECS = [
   { key: "Model",      value: "Human, Software Edition"           },
   { key: "Version",    value: "v26.0 (May 2026 build)"            },
-  { key: "Processor",  value: "TypeScript · React · AWS · Node.js" },
+  { key: "Processor",  value: "TypeScript · Python · MCP · AWS" },
   { key: "Memory",     value: "16TB of hard-won production lessons"  },
   { key: "Storage",    value: "MS @ Northeastern + B.Tech @ DAIICT"},
   { key: "Serial No.", value: "#OpenToWork"                        },
@@ -54,17 +54,23 @@ const SPECS = [
 function OverviewTab() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="flex flex-col items-center justify-center h-full px-8 py-10 gap-10"
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="flex flex-col items-center px-8 pt-8 pb-10 gap-6"
     >
+      {/* One-line intro — warms the spec sheet, in Devanshu's voice */}
+      <p className="w-full max-w-lg text-center text-sm leading-relaxed text-text-secondary">
+        I build AI dev tools at the MCP layer: production MCP servers, retrieval
+        that actually works, and tools people ship with.
+      </p>
+
       {/* Specs table */}
       <div className="w-full max-w-lg glass-subtle rounded-2xl border border-white/10 overflow-hidden">
         {SPECS.map(({ key, value }, i) => (
           <div
             key={key}
-            className={`flex items-baseline gap-4 px-6 py-3.5 ${
+            className={`flex items-baseline gap-4 px-6 py-2.5 ${
               i < SPECS.length - 1 ? "border-b border-black/5 dark:border-white/5" : ""
             }`}
           >
