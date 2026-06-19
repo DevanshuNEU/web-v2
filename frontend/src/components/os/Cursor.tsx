@@ -83,11 +83,13 @@ export default function Cursor() {
 
   if (!enabled) return null;
 
-  const ringSize = hovering ? 44 : 26;
+  const ringSize = hovering ? 40 : 24;
 
   return (
     <>
-      {/* Ring — spring-followed, grows on interactive hover, contracts on press */}
+      {/* Ring — spring-followed, grows on interactive hover, contracts on press.
+          Accent-colored in both themes (no blend-mode inversion); a dual hairline
+          plus a soft accent glow keep it readable on light, dark, and wallpapers. */}
       <motion.div
         aria-hidden
         className="pointer-events-none fixed top-0 left-0 z-[10000] rounded-full"
@@ -97,28 +99,33 @@ export default function Cursor() {
           translateX: '-50%',
           translateY: '-50%',
           border: '1.5px solid rgb(var(--color-accent))',
-          mixBlendMode: 'difference',
+          backgroundColor: 'rgb(var(--color-accent) / 0.06)',
+          boxShadow:
+            '0 0 0 0.5px rgb(0 0 0 / 0.14), inset 0 0 0 0.5px rgb(255 255 255 / 0.14), 0 0 10px rgb(var(--color-accent) / 0.25)',
         }}
         animate={{
           width: ringSize,
           height: ringSize,
-          opacity: hovering ? 0.9 : 0.6,
-          scale: pressed ? 0.8 : 1,
+          opacity: hovering ? 1 : 0.75,
+          scale: pressed ? 0.82 : 1,
         }}
         transition={spring.cursor}
       />
-      {/* Center dot — tracks the pointer exactly */}
+      {/* Center dot — tracks the pointer exactly; fades as the ring takes over on hover */}
       <motion.div
         aria-hidden
-        className="pointer-events-none fixed top-0 left-0 z-[10000] h-1 w-1 rounded-full"
+        className="pointer-events-none fixed top-0 left-0 z-[10000] rounded-full"
         style={{
           x,
           y,
           translateX: '-50%',
           translateY: '-50%',
+          width: 5,
+          height: 5,
           background: 'rgb(var(--color-accent))',
+          boxShadow: '0 0 0 0.5px rgb(0 0 0 / 0.18)',
         }}
-        animate={{ opacity: hovering ? 0 : 1 }}
+        animate={{ opacity: hovering ? 0 : 1, scale: pressed ? 0.7 : 1 }}
         transition={{ duration: 0.15 }}
       />
     </>
