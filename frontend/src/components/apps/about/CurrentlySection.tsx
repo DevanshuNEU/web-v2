@@ -137,8 +137,8 @@ export function CurrentlySection() {
         <h2 className="text-2xl font-semibold text-text mb-5">Life beyond code</h2>
         <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
           <p>
-            Grad school, TAing, and a job search was a lot to juggle. The routine that came out of it
-            stuck. I still make time for:
+            Grad school, TAing, and an active job search is a lot to juggle. The routine I built
+            around it keeps me sane. I still make time for:
           </p>
           <div className="grid md:grid-cols-2 gap-4 mt-4">
             {lifeItems.map(item => {
