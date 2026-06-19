@@ -13,10 +13,11 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles, ArrowLeft } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
+import { sanitizeVoice } from '@/lib/conciergeContext';
 import {
   searchSpotlight,
   type SpotlightItem,
@@ -112,6 +113,7 @@ export default function Spotlight() {
   const openWindow = useOSStore(state => state.openWindow);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
+  const reduced = useReducedMotion();
 
   const askAvailable = view === 'search' && query.trim().length > 0;
   const selectableCount = (askAvailable ? 1 : 0) + results.length;
@@ -247,6 +249,9 @@ export default function Spotlight() {
   const inputColor = isDark ? 'text-white placeholder-white/30' : 'text-gray-900 placeholder-gray-400';
   const dividerColor = isDark ? 'border-white/8' : 'border-black/6';
 
+  // Client-side em-dash net (defense in depth) + paragraph split for spacing.
+  const answerParas = sanitizeVoice(answer).split(/\n{2,}/).filter(Boolean);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -313,19 +318,29 @@ export default function Spotlight() {
                   <Sparkles size={12} /> devOS Concierge
                 </div>
 
-                {askState === 'loading' && <ThinkingDots isDark={isDark} />}
+                {askState === 'loading' && <ThinkingDots isDark={isDark} reduced={!!reduced} />}
 
                 {(askState === 'streaming' || askState === 'done') && (
-                  <p
+                  <div
                     role="status"
                     aria-live="polite"
-                    className={`text-sm leading-relaxed whitespace-pre-wrap ${isDark ? 'text-white/85' : 'text-gray-800'}`}
+                    className={`text-[13.5px] leading-7 space-y-3 ${isDark ? 'text-white/85' : 'text-gray-800'}`}
                   >
-                    {answer}
-                    {askState === 'streaming' && (
-                      <span className="inline-block w-1.5 h-4 align-text-bottom bg-accent/70 ml-0.5 animate-pulse" />
-                    )}
-                  </p>
+                    {answerParas.map((para, i) => (
+                      <motion.p
+                        key={i}
+                        initial={reduced ? false : { opacity: 0, y: 3 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="whitespace-pre-wrap"
+                      >
+                        {para}
+                        {askState === 'streaming' && i === answerParas.length - 1 && (
+                          <StreamCaret reduced={!!reduced} />
+                        )}
+                      </motion.p>
+                    ))}
+                  </div>
                 )}
 
                 {(askState === 'offline' || askState === 'rate_limited' || askState === 'error') && (
@@ -374,8 +389,10 @@ export default function Spotlight() {
                 {(askAvailable || results.length > 0) && (
                   <motion.div
                     key="results"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    transition={{ duration: 0.1 }}
+                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                    transition={{ duration: 0.12, ease: 'easeOut' }}
                   >
                     <div className={`border-t ${dividerColor}`} />
                     <div className="py-1 max-h-[360px] overflow-auto">
@@ -426,16 +443,28 @@ export default function Spotlight() {
   );
 }
 
-function ThinkingDots({ isDark }: { isDark: boolean }) {
+function ThinkingDots({ isDark, reduced }: { isDark: boolean; reduced: boolean }) {
+  const color = isDark ? 'bg-white/45' : 'bg-gray-400';
   return (
-    <div className="flex items-center gap-1" aria-label="Thinking">
+    <div className="flex items-center gap-1.5 h-4" aria-label="Thinking">
       {[0, 1, 2].map(i => (
-        <span
+        <motion.span
           key={i}
-          className={`w-1.5 h-1.5 rounded-full ${isDark ? 'bg-white/40' : 'bg-gray-400'} animate-pulse`}
-          style={{ animationDelay: `${i * 0.15}s` }}
+          className={`w-1.5 h-1.5 rounded-full ${color}`}
+          animate={reduced ? undefined : { opacity: [0.3, 0.9, 0.3], scale: [0.85, 1, 0.85] }}
+          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
         />
       ))}
     </div>
+  );
+}
+
+function StreamCaret({ reduced }: { reduced: boolean }) {
+  return (
+    <motion.span
+      className="inline-block w-[2px] h-[1em] align-text-bottom bg-accent/80 ml-0.5 rounded-full"
+      animate={reduced ? undefined : { opacity: [1, 0.15, 1] }}
+      transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+    />
   );
 }
