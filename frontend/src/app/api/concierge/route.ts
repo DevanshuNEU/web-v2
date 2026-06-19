@@ -1,14 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildConciergeSystem, MAX_QUERY_LENGTH } from '@/lib/conciergeContext';
+import { buildConciergeSystem, MAX_QUERY_LENGTH, sanitizeVoice } from '@/lib/conciergeContext';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Cheapest capable model by default; cost-conscious. Override via env.
-const DEFAULT_MODEL = 'claude-haiku-4-5';
-// Bound the answer (and the cost) — concierge replies are 2-4 sentences.
-const MAX_TOKENS = 350;
+// Sonnet follows the voice + no-em-dash + anti-recitation instructions far
+// better than Haiku; cost stays bounded by max_tokens, prompt caching, and the
+// rate limit below. Override via env.
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// Bound the answer (and the cost). Concierge replies are 2-3 sentences.
+const MAX_TOKENS = 400;
 
 // Throttle: per-IP sliding window + a global daily ceiling (spend cap).
 const RATE_PER_MINUTE = 5;
@@ -120,7 +122,8 @@ export async function POST(req: NextRequest) {
       try {
         for await (const event of stream) {
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            controller.enqueue(encoder.encode(event.delta.text));
+            // Strip em/en dashes server-side too (defense in depth).
+            controller.enqueue(encoder.encode(sanitizeVoice(event.delta.text)));
           }
         }
         controller.close();
