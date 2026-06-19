@@ -29,20 +29,28 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://devanshuchicholikar.com'),
   title: {
-    default: 'Devanshu Chicholikar | Software Engineer',
+    default: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
     template: '%s | Devanshu Chicholikar'
   },
-  description: 'Software Engineer specializing in full-stack development, distributed systems, and cloud infrastructure. MS Software Engineering @ Northeastern University. Building with React, TypeScript, AWS, Node.js.',
+  description: 'AI engineer building dev tools at the MCP (Model Context Protocol) layer. Creator of OpenCodeIntel, a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval, and Saar. MS, Northeastern. Boston.',
   keywords: [
     'Devanshu Chicholikar',
-    'Software Engineer',
-    'Full Stack Developer',
-    'React Developer',
-    'AWS Developer',
-    'Northeastern University',
-    'TypeScript',
-    'Node.js',
-    'Boston Software Engineer'
+    'MCP',
+    'Model Context Protocol',
+    'RAG',
+    'Retrieval-Augmented Generation',
+    'AI Engineer',
+    'AI dev tools',
+    'MCP server',
+    'code intelligence',
+    'hybrid retrieval',
+    'OpenCodeIntel',
+    'Saar',
+    'LLM tooling',
+    'AI agents',
+    'founding engineer',
+    'Boston AI Engineer',
+    'Northeastern University'
   ],
   authors: [{ name: 'Devanshu Chicholikar' }],
   creator: 'Devanshu Chicholikar',
@@ -50,8 +58,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: 'https://devanshuchicholikar.com',
-    title: 'Devanshu Chicholikar | Software Engineer',
-    description: 'Software Engineer specializing in full-stack development, distributed systems, and cloud infrastructure.',
+    title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
+    description: 'AI engineer building dev tools at the MCP layer. Creator of OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval) and Saar.',
     siteName: 'Devanshu Chicholikar Portfolio',
     images: [{
       url: '/devanshu-photo.png',
@@ -62,8 +70,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Devanshu Chicholikar | Software Engineer',
-    description: 'Software Engineer specializing in full-stack development and cloud infrastructure',
+    title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
+    description: 'AI engineer building dev tools at the MCP layer. Creator of OpenCodeIntel (MCP server with hybrid RAG retrieval) and Saar.',
     images: ['/devanshu-photo.png'],
   },
   robots: {
@@ -79,28 +87,78 @@ export const metadata: Metadata = {
   },
 };
 
-// JSON-LD structured data for SEO
+// JSON-LD structured data for SEO. A @graph links the Person to the products
+// they built, and knowsAbout enumerates the exact topics search engines and
+// AI search should associate with Devanshu (MCP, RAG, code intelligence).
+const PERSON_ID = 'https://devanshuchicholikar.com/#devanshu';
 const jsonLd = {
   '@context': 'https://schema.org',
-  '@type': 'Person',
-  name: 'Devanshu Chicholikar',
-  jobTitle: 'Software Engineer',
-  url: 'https://devanshuchicholikar.com',
-  image: 'https://devanshuchicholikar.com/devanshu-photo.png',
-  sameAs: [
-    'https://www.linkedin.com/in/devanshuchicholikar/',
-    'https://github.com/DevanshuNEU',
-    'https://github.com/OpenCodeIntel',
-  ],
-  alumniOf: {
-    '@type': 'CollegeOrUniversity',
-    name: 'Northeastern University',
-  },
-  description:
-    'Software Engineer specializing in full-stack development, distributed systems, and cloud infrastructure',
-  knowsAbout: [
-    'JavaScript', 'TypeScript', 'React', 'Node.js', 'AWS',
-    'Cloud Computing', 'Distributed Systems', 'Python', 'Docker', 'Terraform',
+  '@graph': [
+    {
+      '@type': 'Person',
+      '@id': PERSON_ID,
+      name: 'Devanshu Chicholikar',
+      jobTitle: 'AI Engineer',
+      url: 'https://devanshuchicholikar.com',
+      image: 'https://devanshuchicholikar.com/devanshu-photo.png',
+      sameAs: [
+        'https://www.linkedin.com/in/devanshuchicholikar/',
+        'https://github.com/DevanshuNEU',
+        'https://github.com/OpenCodeIntel',
+        'https://opencodeintel.com',
+        'https://getsaar.com',
+      ],
+      alumniOf: {
+        '@type': 'CollegeOrUniversity',
+        name: 'Northeastern University',
+      },
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: 'Boston',
+        addressRegion: 'MA',
+        addressCountry: 'US',
+      },
+      description:
+        'AI engineer building dev tools at the MCP (Model Context Protocol) layer. Creator of OpenCodeIntel, a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval, and Saar.',
+      knowsAbout: [
+        'Model Context Protocol (MCP)',
+        'Retrieval-Augmented Generation (RAG)',
+        'AI dev tools',
+        'MCP servers',
+        'Code intelligence',
+        'Hybrid retrieval (AST, BM25, reranking)',
+        'AI agents',
+        'LLM tooling',
+        'Semantic search',
+        'TypeScript',
+        'Python',
+        'Node.js',
+        'AWS',
+        'Distributed systems',
+      ],
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'OpenCodeIntel',
+      url: 'https://opencodeintel.com',
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: 'Any',
+      description:
+        'A production MCP server that gives coding agents real code intelligence through hybrid retrieval over a repository: AST structure, BM25 keyword search, and Cohere reranking (RAG).',
+      author: { '@id': PERSON_ID },
+      keywords: 'MCP, Model Context Protocol, RAG, code intelligence, hybrid retrieval, AI agents',
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Saar',
+      url: 'https://getsaar.com',
+      applicationCategory: 'BrowserApplication',
+      operatingSystem: 'Chrome',
+      description:
+        'A Chrome extension on the Web Store that intercepts Claude.ai streams to coach against context rot.',
+      author: { '@id': PERSON_ID },
+      keywords: 'Claude.ai, context engineering, LLM tooling, AI dev tools',
+    },
   ],
 };
 
@@ -128,23 +186,33 @@ export default function RootLayout({
           </ThemeProvider>
         </PostHogProvider>
 
-        {/* Hidden semantic content for crawlers */}
+        {/* Server-rendered semantic content for crawlers and AI search. The
+            visible app is a client-rendered SPA, so this block is the indexable
+            source of truth — keep it accurate and on-message. */}
         <div className="sr-only">
-          <h1>Devanshu Chicholikar - Software Engineer</h1>
+          <h1>Devanshu Chicholikar — AI Engineer (MCP &amp; RAG dev tools)</h1>
           <p>
-            MS Software Engineering Systems graduate from Northeastern University
-            (May 2026), specializing in AI dev tools, MCP servers, and code
-            intelligence. Production experience across React, TypeScript, Node.js,
-            FastAPI, AWS, and pgvector.
+            I build AI dev tools at the MCP (Model Context Protocol) layer. I created
+            OpenCodeIntel, a production MCP server that gives coding agents real code
+            intelligence through hybrid retrieval (RAG) over a repository: AST structure,
+            BM25 keyword search, and Cohere reranking. I also built Saar, a Chrome
+            extension on the Web Store that intercepts Claude.ai streams to coach against
+            context rot. MS in Software Engineering Systems from Northeastern University
+            (May 2026). Based in Boston, MA. Open to founding-engineer and AI-engineer
+            roles at AI and dev-tools startups.
           </p>
           <h2>Projects</h2>
           <ul>
-            <li>devOS - Interactive desktop-style portfolio with Next.js 15</li>
-            <li>OpenCodeIntel - Code intelligence platform</li>
-            <li>Financial Copilot - AI financial intelligence platform</li>
-            <li>SecureScale - Production AWS infrastructure with Terraform</li>
-            <li>Saar - Auto-generate CLAUDE.md from static analysis</li>
+            <li>OpenCodeIntel — production MCP server with hybrid AST + BM25 + Cohere RAG retrieval for code intelligence</li>
+            <li>Saar — Chrome extension that intercepts Claude.ai streams for context-rot coaching</li>
+            <li>devOS — this interactive desktop-style portfolio, built with Next.js 15 and React 19</li>
           </ul>
+          <h2>Expertise</h2>
+          <p>
+            Model Context Protocol (MCP), Retrieval-Augmented Generation (RAG), AI agents,
+            LLM tooling, hybrid retrieval, semantic search, code intelligence, TypeScript,
+            Python, Node.js, AWS.
+          </p>
           <h2>Contact</h2>
           <p>Email: chicholikar.d@northeastern.edu</p>
           <p>Location: Boston, MA</p>
