@@ -3,7 +3,7 @@
 import '../setup/dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import ChatApp from '@/components/apps/ChatApp';
+import ChatPanel from '@/components/chat/ChatPanel';
 import { useChatStore } from '@/store/chatStore';
 
 const encoder = new TextEncoder();
@@ -47,9 +47,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('ChatApp', () => {
+describe('ChatPanel', () => {
   it('renders the empty state with starter chips and a composer', () => {
-    render(<ChatApp />);
+    render(<ChatPanel />);
     expect(screen.getByText('Ask me anything about what I build.')).toBeInTheDocument();
     expect(screen.getByText('What do you build?')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Ask Devanshu anything')).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('ChatApp', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<ChatApp />);
+    render(<ChatPanel />);
     fireEvent.click(screen.getByText('What do you build?'));
 
     // The streamed assistant reply appears in the thread.
@@ -79,7 +79,7 @@ describe('ChatApp', () => {
   it('shows an offline message when the API is unconfigured (503)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
 
-    render(<ChatApp />);
+    render(<ChatPanel />);
     fireEvent.click(screen.getByText('What are you looking for?'));
 
     await waitFor(() => expect(screen.getByText(/offline/i)).toBeInTheDocument());

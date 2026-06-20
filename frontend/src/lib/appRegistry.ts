@@ -22,7 +22,6 @@ import {
   ScrollText,
   Github,
   Compass,
-  MessageSquare,
   LifeBuoy,
 } from 'lucide-react';
 import {
@@ -76,7 +75,6 @@ const components = {
   'changelog': lazy(() => import('@/components/apps/ChangelogApp')),
   'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
   'browser': lazy(() => import('@/components/apps/BrowserApp')),
-  'chat': lazy(() => import('@/components/apps/ChatApp')),
   'help': lazy(() => import('@/components/apps/HelpApp')),
 };
 
@@ -136,7 +134,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'slate',
     defaultSize: { width: 700, height: 450 },
     defaultPosition: { x: 180, y: 200 },
-    pinnedToDock: true,
+    pinnedToDock: false,
     launchpad: true,
   },
   'games': {
@@ -154,7 +152,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'red',
     defaultSize: { width: 650, height: 550 },
     defaultPosition: { x: 350, y: 150 },
-    pinnedToDock: false,
+    pinnedToDock: true,
     launchpad: true,
   },
   'file-explorer': {
@@ -199,16 +197,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'sky',
     defaultSize: { width: 1040, height: 720 },
     defaultPosition: { x: 160, y: 90 },
-    pinnedToDock: true,
-    launchpad: true,
-  },
-  'chat': {
-    component: components['chat'],
-    icon: MessageSquare,
-    iconColor: 'slate',
-    defaultSize: { width: 480, height: 660 },
-    defaultPosition: { x: 220, y: 90 },
-    pinnedToDock: true,
+    pinnedToDock: false,
     launchpad: true,
   },
   'help': {
@@ -217,7 +206,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'amber',
     defaultSize: { width: 760, height: 580 },
     defaultPosition: { x: 200, y: 100 },
-    pinnedToDock: true,
+    pinnedToDock: false,
     launchpad: true,
   },
 };

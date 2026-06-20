@@ -22,6 +22,7 @@ import { useIsMono } from '@/hooks/usePalette';
 import LockScreen from './LockScreen';
 import HomeScreen from './HomeScreen';
 import AppView from './AppView';
+import AssistantSheet from './AssistantSheet';
 import type { AppType } from '../../../../shared/types';
 
 const FIRST_VISIT_KEY = 'devos-first-visit';
@@ -79,6 +80,9 @@ export default function PhoneShell() {
       <HomeScreen onOpenApp={handleOpen} />
 
       <AppView />
+
+      {/* Floating assistant — FAB + bottom sheet (self-hides while locked) */}
+      <AssistantSheet />
 
       <AnimatePresence>{locked && <LockScreen />}</AnimatePresence>
     </div>

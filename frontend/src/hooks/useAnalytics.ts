@@ -178,7 +178,6 @@ function formatAppName(appType: AppType): string {
     'changelog': 'Changelog',
     'github-activity': 'GitHub Activity',
     'browser': 'Browser',
-    'chat': 'Chat',
     'help': 'Help',
   };
   return names[appType] || appType;

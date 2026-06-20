@@ -27,7 +27,6 @@ export type AppType =
   | 'changelog'
   | 'github-activity'
   | 'browser'
-  | 'chat'
   | 'help';
 
 // API Types

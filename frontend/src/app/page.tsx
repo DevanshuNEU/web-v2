@@ -12,6 +12,7 @@ import MobileFallback from '@/components/os/MobileFallback';
 import PhoneShell from '@/components/mobile/PhoneShell';
 import Spotlight from '@/components/os/Spotlight';
 import AppSwitcher from '@/components/os/AppSwitcher';
+import AssistantBubble from '@/components/assistant/AssistantBubble';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -87,6 +88,8 @@ export default function Home() {
           <Spotlight />
           {/* App switcher — Alt+Tab / Alt+Shift+Tab cycles open windows */}
           <AppSwitcher />
+          {/* Floating assistant — orb that expands into a chat panel */}
+          <AssistantBubble />
         </Desktop>
       )}
     </>

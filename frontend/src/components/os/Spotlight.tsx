@@ -16,14 +16,13 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
-import { useChatStore } from '@/store/chatStore';
+import { useAssistantUiStore } from '@/store/assistantUiStore';
 import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
   type SpotlightItem,
   type SpotlightCategory,
 } from '@/lib/spotlightIndex';
-import type { AppType } from '../../../../shared/types';
 
 // ---------------------------------------------------------------------------
 // Category metadata
@@ -105,7 +104,7 @@ export default function Spotlight() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const openWindow = useOSStore(state => state.openWindow);
-  const setSeed = useChatStore(state => state.setSeed);
+  const openAssistant = useAssistantUiStore(state => state.openAssistant);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
   const mono = useIsMono();
@@ -143,13 +142,12 @@ export default function Spotlight() {
     }
   }, [close, openWindow]);
 
-  // -- Hand a question off to the Chat app --
+  // -- Hand a question off to the floating assistant --
   const launchChat = useCallback((q: string) => {
     const question = q.trim();
     close();
-    if (question) setSeed(question);
-    openWindow('chat' as AppType);
-  }, [close, openWindow, setSeed]);
+    openAssistant(question);
+  }, [close, openAssistant]);
 
   // -- Keyboard --
   useEffect(() => {

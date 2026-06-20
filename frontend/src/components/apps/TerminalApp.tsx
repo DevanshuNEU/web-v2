@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useOSStore } from '@/store/osStore';
 import { useMobileStore } from '@/store/mobileStore';
+import { useAssistantUiStore } from '@/store/assistantUiStore';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { resolveCommand, type CommandResult } from '@/lib/terminalCommands';
@@ -209,6 +210,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const trackEvent = useAnalyticsStore(state => state.trackEvent);
   const openWindow = useOSStore(state => state.openWindow);
   const openApp = useMobileStore(state => state.openApp);
+  const openAssistant = useAssistantUiStore(state => state.openAssistant);
   const { mode, toggleMode } = useTheme();
   const mono = useIsMono();
 
@@ -301,6 +303,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
       setHistory(prev => [...prev, { id, command: trimmed, output: result }]);
     } else if (result.type === 'action') {
       if (result.action === 'openWindow') openWindowOrApp(result.payload as string);
+      if (result.action === 'openAssistant') openAssistant(result.payload);
       if (result.action === 'toggleTheme') toggleMode();
       setHistory(prev => [...prev, { id, command: trimmed, output: [] }]);
     } else if (result.type === 'special') {
@@ -312,7 +315,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
     }
 
     setInput('');
-  }, [trackEvent, openWindowOrApp, toggleMode, mode]);
+  }, [trackEvent, openWindowOrApp, openAssistant, toggleMode, mode]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

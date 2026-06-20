@@ -13,6 +13,7 @@ import type { AppType } from '../../../shared/types';
 export type CommandResult =
   | string[]
   | { type: 'action'; action: 'openWindow'; payload: AppType }
+  | { type: 'action'; action: 'openAssistant'; payload: string }
   | { type: 'action'; action: 'toggleTheme' }
   | { type: 'special'; id: 'matrix' | 'hire' | 'confetti' };
 
@@ -34,7 +35,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '║  skills        Things I know               ║',
     '║  contact       How to reach me             ║',
     '║  hire devanshu A very good idea            ║',
-    '║  ask <q>       Ask the AI concierge         ║',
+    '║  ask <q>       Open the assistant and ask   ║',
     '║  tour          Recruiter guided tour       ║',
     '║  open <app>    Open an app window          ║',
     '║  theme <mode>  dark | light                ║',
@@ -57,14 +58,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
         '',
       ];
     }
-    return [
-      `> ${q}`,
-      '',
-      '  Open the Chat app (in the dock) to talk to Devanshu,',
-      '  or press Cmd+K and pick "Ask Devanshu" to start a',
-      '  conversation seeded with your question.',
-      '',
-    ];
+    return { type: 'action', action: 'openAssistant', payload: q };
   },
 
   about: () => [

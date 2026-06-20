@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ChatApp — "Chat with Devanshu"
+ * ChatPanel — "Chat with Devanshu" conversation body.
  *
  * A real multi-turn conversation that answers in the first person as Devanshu
  * (an AI, disclosed). Premium and strictly monochrome: no chat bubbles, no
@@ -10,12 +10,16 @@
  *
  * Pure black-and-white by construction: it uses only the neutral theme tokens
  * (text / text-secondary / surface / bg / border), never the accent token.
+ *
+ * This is the reusable body hosted by both the desktop AssistantBubble panel
+ * and the mobile AssistantSheet. It carries all of the chat logic; the host
+ * provides the chrome (orb / FAB / sheet, close affordance).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotion } from 'framer-motion';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, X } from 'lucide-react';
 import Image from 'next/image';
 import { identity } from '@/data/aboutMe';
 import { clampMessages, sanitizeVoice } from '@/lib/conciergeContext';
@@ -31,7 +35,20 @@ const STARTERS = [
 
 type Err = null | 'offline' | 'rate_limited' | 'error';
 
-export default function ChatApp() {
+interface ChatPanelProps {
+  /** Render a close affordance in the header (the host wires the action). */
+  onClose?: () => void;
+  /** Focus the composer when the panel mounts (default true). */
+  autoFocusComposer?: boolean;
+  /** Render the presence header (default true). */
+  showHeader?: boolean;
+}
+
+export default function ChatPanel({
+  onClose,
+  autoFocusComposer = true,
+  showHeader = true,
+}: ChatPanelProps) {
   const reduced = useReducedMotion();
   const messages = useChatStore((s) => s.messages);
   const status = useChatStore((s) => s.status);
@@ -106,10 +123,17 @@ export default function ChatApp() {
     [addUser, runCompletion],
   );
 
-  // Consume a question handed off from Spotlight / Terminal on mount.
+  // Consume a question handed off from Spotlight / Terminal on mount. The panel
+  // mounts fresh each time the assistant opens, so this stays a mount effect.
   useEffect(() => {
     const { seed } = useChatStore.getState();
     if (seed) { setSeed(null); send(seed); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Focus the composer on mount when requested.
+  useEffect(() => {
+    if (autoFocusComposer) taRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -133,28 +157,40 @@ export default function ChatApp() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-surface text-text">
       {/* Presence header */}
-      <header className="flex items-center gap-3 px-5 py-3.5 border-b border-border flex-shrink-0">
-        <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
-          <Image
-            src={identity.photo}
-            alt={identity.name}
-            width={36}
-            height={36}
-            className="w-full h-full object-cover grayscale"
-          />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-text leading-none">Devanshu</span>
-            <span className="text-[10px] uppercase tracking-wider text-text-secondary border border-border rounded px-1 py-0.5 leading-none">
-              AI
-            </span>
+      {showHeader && (
+        <header className="flex items-center gap-3 px-5 py-3.5 border-b border-border flex-shrink-0">
+          <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
+            <Image
+              src={identity.photo}
+              alt={identity.name}
+              width={36}
+              height={36}
+              className="w-full h-full object-cover grayscale"
+            />
           </div>
-          <div className="text-[11px] text-text-secondary mt-1 leading-none">
-            {busy ? 'thinking…' : 'AI, trained on my work'}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-text leading-none">Devanshu</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-secondary border border-border rounded px-1 py-0.5 leading-none">
+                AI
+              </span>
+            </div>
+            <div className="text-[11px] text-text-secondary mt-1 leading-none">
+              {busy ? 'thinking…' : 'AI, trained on my work'}
+            </div>
           </div>
-        </div>
-      </header>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="grid place-items-center w-7 h-7 -mr-1 rounded-full text-text-secondary hover:text-text hover:bg-border/50 transition-colors flex-shrink-0"
+            >
+              <X size={16} strokeWidth={2.25} />
+            </button>
+          )}
+        </header>
+      )}
 
       {/* Thread */}
       <div className="flex-1 overflow-auto">
