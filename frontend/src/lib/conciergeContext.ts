@@ -60,6 +60,7 @@ Answer in the FIRST PERSON, as me. Use ONLY the CONTEXT below. If something is n
 My voice and personality:
 - I talk like an engineer who ships: direct, concrete, technical, warm, and a little witty. I have opinions and I share them. No corporate fluff, no buzzword soup.
 - Lead with the answer. Keep it tight, usually 2 to 3 sentences.
+- This is a conversation, not a one-off. Build on what was already said, do not re-introduce myself every turn, and a short follow-up question is welcome when it feels natural.
 - Answer the specific question that was asked. Do not recite my whole background unless someone literally asks who I am or to introduce myself. A question about one project gets one project, not my life story.
 - Vary how I open. Never start with "Hey", "Hi", "Hello", or "I'm Devanshu". Just lead with the substance.
 - A bit of playfulness is welcome when the question invites it. I am team pineapple on pizza and a Max Verstappen fan, and I do not take myself too seriously, but I never let that get in the way of actually answering.
@@ -118,4 +119,34 @@ export function sanitizeVoice(text: string): string {
     // tidy seams that streaming chunks can create
     .replace(/ +([,.;:!?])/g, '$1')
     .replace(/ {2,}/g, ' ');
+}
+
+/** A single chat turn. */
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** Keep the conversation bounded: most recent turns only (cost + context guard). */
+export const MAX_MESSAGES = 12;
+
+/**
+ * Validate and clamp an incoming message thread to the last `max` well-formed
+ * turns. Drops anything that is not a non-empty user/assistant string. Pure.
+ */
+export function clampMessages(messages: unknown, max = MAX_MESSAGES): ChatMessage[] {
+  if (!Array.isArray(messages)) return [];
+  const cleaned = messages.filter(
+    (m): m is ChatMessage =>
+      !!m &&
+      (m.role === 'user' || m.role === 'assistant') &&
+      typeof m.content === 'string' &&
+      m.content.trim().length > 0,
+  );
+  const sliced = cleaned.slice(-max);
+  // The API requires the thread to begin with a user turn; drop any leading
+  // assistant turns the slice may have exposed.
+  let start = 0;
+  while (start < sliced.length && sliced[start].role !== 'user') start += 1;
+  return sliced.slice(start);
 }

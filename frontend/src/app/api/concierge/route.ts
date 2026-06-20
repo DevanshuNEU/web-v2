@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildConciergeSystem, MAX_QUERY_LENGTH, sanitizeVoice } from '@/lib/conciergeContext';
+import { buildConciergeSystem, MAX_QUERY_LENGTH, sanitizeVoice, clampMessages } from '@/lib/conciergeContext';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,8 +13,9 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 400;
 
 // Throttle: per-IP sliding window + a global daily ceiling (spend cap).
-const RATE_PER_MINUTE = 5;
-const DAILY_CEILING = 300;
+// Chat is multi-turn, so a single conversation sends several requests a minute.
+const RATE_PER_MINUTE = 20;
+const DAILY_CEILING = 400;
 
 type Limiter = { limit: (ip: string) => Promise<{ tooMany: boolean } | void> };
 
@@ -77,17 +78,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'concierge_unconfigured' }, { status: 503 });
   }
 
-  let query: unknown;
+  let body: { query?: unknown; messages?: unknown };
   try {
-    ({ query } = await req.json());
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  if (typeof query !== 'string' || query.trim().length === 0) {
+  // Multi-turn: prefer a messages[] thread; fall back to a single {query}.
+  const thread = Array.isArray(body.messages)
+    ? clampMessages(body.messages)
+    : typeof body.query === 'string'
+      ? clampMessages([{ role: 'user', content: body.query }])
+      : [];
+
+  if (thread.length === 0) {
     return NextResponse.json({ error: 'empty_query' }, { status: 400 });
   }
-  if (query.length > MAX_QUERY_LENGTH) {
+  const latestUser = [...thread].reverse().find((m) => m.role === 'user');
+  if (latestUser && latestUser.content.length > MAX_QUERY_LENGTH) {
     return NextResponse.json({ error: 'query_too_long' }, { status: 413 });
   }
 
@@ -112,7 +121,7 @@ export async function POST(req: NextRequest) {
         cache_control: { type: 'ephemeral' },
       },
     ],
-    messages: [{ role: 'user', content: query }],
+    messages: thread,
   });
 
   // Stream only the text deltas as plain text — the client just appends them.

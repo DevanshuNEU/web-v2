@@ -5,6 +5,8 @@ import {
   buildConciergeSystem,
   MAX_QUERY_LENGTH,
   sanitizeVoice,
+  clampMessages,
+  MAX_MESSAGES,
 } from '@/lib/conciergeContext';
 
 describe('conciergeContext', () => {
@@ -69,6 +71,53 @@ describe('conciergeContext', () => {
     it('leaves clean text untouched', () => {
       const clean = 'I build AI dev tools at the MCP layer.';
       expect(sanitizeVoice(clean)).toBe(clean);
+    });
+  });
+
+  describe('clampMessages', () => {
+    it('returns [] for non-arrays', () => {
+      expect(clampMessages(undefined)).toEqual([]);
+      expect(clampMessages('nope')).toEqual([]);
+    });
+
+    it('drops malformed and empty turns', () => {
+      const out = clampMessages([
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: '   ' }, // empty
+        { role: 'system', content: 'x' },      // wrong role
+        { role: 'assistant', content: 'hello' },
+      ]);
+      expect(out).toEqual([
+        { role: 'user', content: 'hi' },
+        { role: 'assistant', content: 'hello' },
+      ]);
+    });
+
+    it('keeps only the last `max` turns', () => {
+      const many = Array.from({ length: 20 }, (_, i) => ({
+        role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: `m${i}`,
+      }));
+      const out = clampMessages(many, 4);
+      expect(out.length).toBeLessThanOrEqual(4);
+      expect(out[out.length - 1].content).toBe('m19');
+    });
+
+    it('always begins with a user turn (API requirement)', () => {
+      // slicing could expose a leading assistant turn; it must be dropped
+      const out = clampMessages(
+        [
+          { role: 'user', content: 'a' },
+          { role: 'assistant', content: 'b' },
+          { role: 'user', content: 'c' },
+        ],
+        2,
+      );
+      expect(out[0].role).toBe('user');
+    });
+
+    it('defaults to MAX_MESSAGES', () => {
+      expect(MAX_MESSAGES).toBeGreaterThan(0);
     });
   });
 
