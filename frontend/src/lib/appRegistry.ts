@@ -22,6 +22,7 @@ import {
   ScrollText,
   Github,
   Compass,
+  MessageSquare,
   LifeBuoy,
 } from 'lucide-react';
 import {
@@ -75,6 +76,7 @@ const components = {
   'changelog': lazy(() => import('@/components/apps/ChangelogApp')),
   'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
   'browser': lazy(() => import('@/components/apps/BrowserApp')),
+  'chat': lazy(() => import('@/components/apps/ChatApp')),
   'help': lazy(() => import('@/components/apps/HelpApp')),
 };
 
@@ -197,6 +199,15 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'sky',
     defaultSize: { width: 1040, height: 720 },
     defaultPosition: { x: 160, y: 90 },
+    pinnedToDock: true,
+    launchpad: true,
+  },
+  'chat': {
+    component: components['chat'],
+    icon: MessageSquare,
+    iconColor: 'slate',
+    defaultSize: { width: 480, height: 660 },
+    defaultPosition: { x: 220, y: 90 },
     pinnedToDock: true,
     launchpad: true,
   },

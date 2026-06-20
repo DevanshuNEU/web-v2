@@ -168,6 +168,11 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     windowTitle: 'Browser.app',
     description: 'My work, live on the open web',
   },
+  'chat': {
+    title: 'Chat',
+    windowTitle: 'Chat.app',
+    description: 'Talk to me (well, my AI)',
+  },
   'help': {
     title: 'Help',
     windowTitle: 'Help.app',
