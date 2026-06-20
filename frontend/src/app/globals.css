@@ -111,6 +111,24 @@
 }
 
 /* ============================================
+   PALETTE — mono (default) vs color ("Fun")
+   ThemeProvider drives the live accent via inline style on <html>; these
+   selectors are the pre-hydration / no-JS fallback so the mono default paints
+   graphite instead of flashing the color accent. ThemeProvider sets
+   data-palette on mount, after which its inline accent takes precedence.
+   ============================================ */
+
+[data-palette="mono"] {
+  --color-accent: 29 29 31;     /* graphite — matches --color-text (light) */
+  --wallpaper-tint: 29 29 31;
+}
+
+[data-palette="mono"].dark {
+  --color-accent: 245 245 247;  /* graphite — matches --color-text (dark) */
+  --wallpaper-tint: 245 245 247;
+}
+
+/* ============================================
    BASE STYLES
    ============================================ */
 

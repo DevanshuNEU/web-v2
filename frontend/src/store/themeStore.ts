@@ -19,9 +19,12 @@ export interface Wallpaper {
   };
 }
 
+export type Palette = "mono" | "color";
+
 interface ThemeStore {
   // State
   mode: "light" | "dark";
+  palette: Palette;
   accentColor: string;
   wallpaper: Wallpaper | null;
   wallpaperTint: string | null;
@@ -29,6 +32,7 @@ interface ThemeStore {
   // Actions
   toggleMode: () => void;
   setMode: (mode: "light" | "dark") => void;
+  setPalette: (palette: Palette) => void;
   setAccent: (color: string) => void;
   setWallpaper: (wallpaper: Wallpaper) => void;
   setWallpaperTint: (color: string) => void;
@@ -76,6 +80,8 @@ export const useThemeStore = create<ThemeStore>()(
     (set) => ({
       // Initial state
       mode: "dark",
+      // Premium black & white is the default; "Fun" (color) is opt-in.
+      palette: "mono",
       accentColor: ACCENT_COLORS.blue,
       wallpaper: {
         id: "dark-signal-grid",
@@ -132,6 +138,8 @@ export const useThemeStore = create<ThemeStore>()(
         set({ mode, wallpaper: defaultWallpaper });
       },
 
+      setPalette: (palette) => set({ palette }),
+
       setAccent: (color) => set({ accentColor: color }),
 
       setWallpaper: (wallpaper) => set({ wallpaper }),
@@ -149,11 +157,13 @@ export const useTheme = () => {
   const store = useThemeStore();
   return {
     mode: store.mode,
+    palette: store.palette,
     accentColor: store.accentColor,
     wallpaper: store.wallpaper,
     wallpaperTint: store.wallpaperTint,
     toggleMode: store.toggleMode,
     setMode: store.setMode,
+    setPalette: store.setPalette,
     setAccent: store.setAccent,
     setWallpaper: store.setWallpaper,
     setWallpaperTint: store.setWallpaperTint,

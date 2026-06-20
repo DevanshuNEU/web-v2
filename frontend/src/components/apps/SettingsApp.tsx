@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme, ACCENT_COLORS } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { getWallpapersForTheme } from '@/data/wallpapers';
 import type { Wallpaper } from '@/store/themeStore';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import {
   Palette, Info, Sun, Moon, Check,
-  Volume2, VolumeX, Sparkles,
+  Volume2, VolumeX, Sparkles, Contrast,
 } from 'lucide-react';
 import { isSoundEnabled, setSoundEnabled, playSound } from '@/hooks/useSoundEffects';
 import MobileSettings from './MobileSettings';
@@ -41,6 +42,7 @@ type SectionId = typeof SECTIONS[number]['id'];
 function WallpaperThumb({
   wp, selected, onSelect,
 }: { wp: Wallpaper; selected: boolean; onSelect: (wp: Wallpaper) => void }) {
+  const mono = useIsMono();
   return (
     <button
       onClick={() => onSelect(wp)}
@@ -50,7 +52,7 @@ function WallpaperThumb({
                     ? 'border-accent shadow-md ring-2 ring-accent/25'
                     : 'border-black/10 dark:border-white/10 hover:border-accent/50 hover:scale-[1.02]'
                   }`}
-      style={{ aspectRatio: '16/9' }}
+      style={{ aspectRatio: '16/9', filter: mono ? 'grayscale(1)' : undefined }}
     >
       {wp.imageUrl ? (
         <Image src={wp.imageUrl} alt={wp.name} fill className="object-cover" />
@@ -113,7 +115,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 /* ------------------------------------------------------------------ */
 
 function AppearanceSection() {
-  const { mode, setMode, accentColor, setAccent, wallpaper, setWallpaper } = useTheme();
+  const { mode, setMode, palette, setPalette, accentColor, setAccent, wallpaper, setWallpaper } = useTheme();
   const [soundOn, setSoundOn] = useState(false);
   useEffect(() => { setSoundOn(isSoundEnabled()); }, []);
 
@@ -161,7 +163,38 @@ function AppearanceSection() {
         </div>
       </section>
 
-      {/* ── Accent color ── */}
+      {/* ── Palette: Mono / Fun ── */}
+      <section className="space-y-3">
+        <h3 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">Palette</h3>
+        <div className="flex gap-3">
+          {([
+            { v: 'mono'  as const, icon: Contrast, label: 'Mono', msg: 'Mono. Premium black and white.' },
+            { v: 'color' as const, icon: Palette,  label: 'Fun',  msg: 'Fun mode. Color, unleashed.'    },
+          ]).map(({ v, icon: Icon, label, msg }) => (
+            <button
+              key={v}
+              onClick={() => { setPalette(v); toast.success(msg); }}
+              className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl border-2 transition-all text-sm font-medium
+                          ${palette === v
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-black/10 dark:border-white/10 text-text-secondary hover:border-accent/40 hover:text-text'
+                          }`}
+            >
+              <Icon size={16} />
+              {label}
+              {palette === v && <Check size={13} strokeWidth={2.5} />}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-text-secondary">
+          {palette === 'mono'
+            ? 'Black & white, the way it ships by default.'
+            : 'The original color theme, including your accent.'}
+        </p>
+      </section>
+
+      {/* ── Accent color (Fun mode only) ── */}
+      {palette === 'color' && (
       <section className="space-y-3">
         <h3 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">Accent Color</h3>
         <div className="flex gap-2 flex-wrap">
@@ -188,6 +221,7 @@ function AppearanceSection() {
           {Object.entries(ACCENT_COLORS).find(([, c]) => c === accentColor)?.[0] ?? 'Custom'}
         </p>
       </section>
+      )}
 
       {/* ── Wallpaper ── */}
       <section className="space-y-3">

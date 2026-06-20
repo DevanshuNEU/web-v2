@@ -40,7 +40,9 @@ import { setSoundEnabled } from '@/hooks/useSoundEffects';
 
 beforeEach(() => {
   // Reset theme to a known state before each test so order doesn't matter.
-  useThemeStore.setState({ mode: 'dark', accentColor: '#007AFF' });
+  // palette: 'color' keeps the accent picker visible for the accent-wiring
+  // tests; the palette describe block sets 'mono' explicitly where it matters.
+  useThemeStore.setState({ mode: 'dark', palette: 'color', accentColor: '#007AFF' });
   setSoundEnabled(false);
 });
 
@@ -173,6 +175,49 @@ describe('MobileSettings — Display & Brightness (REAL theme wiring)', () => {
     expect(swatches.length).toBeGreaterThan(1);
     await userEvent.click(swatches[1]);
     expect(useThemeStore.getState().accentColor).not.toBe('#007AFF');
+  });
+});
+
+describe('MobileSettings — Palette (mono/Fun)', () => {
+  it('shows the current palette highlighted in Display & Brightness', async () => {
+    useThemeStore.setState({ palette: 'mono' });
+    render(<MobileSettings />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /display & brightness/i })
+    );
+    expect(screen.getByRole('button', { name: 'Mono' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Fun' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('switching to Fun updates the global themeStore palette', async () => {
+    useThemeStore.setState({ palette: 'mono' });
+    render(<MobileSettings />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /display & brightness/i })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Fun' }));
+    expect(useThemeStore.getState().palette).toBe('color');
+  });
+
+  it('hides the accent picker in mono and shows it in Fun', async () => {
+    useThemeStore.setState({ palette: 'mono' });
+    render(<MobileSettings />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /display & brightness/i })
+    );
+    // Mono: no accent swatches.
+    expect(screen.queryAllByRole('button', { name: /set accent/i })).toHaveLength(0);
+    // Flip to Fun: accent swatches appear.
+    await userEvent.click(screen.getByRole('button', { name: 'Fun' }));
+    expect(
+      screen.getAllByRole('button', { name: /set accent/i }).length
+    ).toBeGreaterThan(1);
   });
 });
 

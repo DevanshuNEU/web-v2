@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, ACCENT_COLORS } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import type { Wallpaper } from '@/store/themeStore';
 import { getWallpapersForTheme } from '@/data/wallpapers';
 import {
@@ -183,7 +184,7 @@ function ProfileRow({ onOpen }: { onOpen: () => void }) {
  * ────────────────────────────────────────────────────────────────── */
 
 function DisplayBrightnessView() {
-  const { mode, setMode, accentColor, setAccent } = useTheme();
+  const { mode, setMode, palette, setPalette, accentColor, setAccent } = useTheme();
 
   return (
     <div className="py-4 flex flex-col gap-6">
@@ -207,6 +208,31 @@ function DisplayBrightnessView() {
         </div>
       </MobileSection>
 
+      <MobileSection
+        inset
+        header="Palette"
+        footer="Mono is premium black & white, the default. Fun restores the full color theme and accent picker."
+      >
+        <div className="px-4 py-3">
+          <MobileSegmented<'mono' | 'color'>
+            options={[
+              { value: 'mono', label: 'Mono' },
+              { value: 'color', label: 'Fun' },
+            ]}
+            value={palette}
+            onChange={(next) => {
+              setPalette(next);
+              toast.success(
+                next === 'mono'
+                  ? 'Mono. Premium black and white.'
+                  : 'Fun mode. Color, unleashed.'
+              );
+            }}
+          />
+        </div>
+      </MobileSection>
+
+      {palette === 'color' && (
       <MobileSection
         inset
         header="Accent Color"
@@ -244,6 +270,7 @@ function DisplayBrightnessView() {
           })}
         </div>
       </MobileSection>
+      )}
 
       <MobileSection
         inset
@@ -259,6 +286,7 @@ function DisplayBrightnessView() {
 
 function WallpaperView() {
   const { mode, wallpaper, setWallpaper } = useTheme();
+  const mono = useIsMono();
   const available = getWallpapersForTheme(mode);
   const animated = available.filter((w) => w.type === 'animated');
   const staticWps = available.filter((w) => w.type === 'static');
@@ -277,7 +305,7 @@ function WallpaperView() {
       >
         <div className="px-4 py-3 flex items-center gap-3">
           <div
-            className="w-16 h-16 rounded-xl overflow-hidden border border-text-secondary/15 shrink-0"
+            className={`w-16 h-16 rounded-xl overflow-hidden border border-text-secondary/15 shrink-0 ${mono ? 'grayscale' : ''}`}
             style={
               wallpaper?.imageUrl
                 ? { background: `url(${wallpaper.imageUrl}) center/cover` }
@@ -337,6 +365,7 @@ function WallpaperGrid({
   /** Discriminator for tests (and screen readers). */
   variant: 'live' | 'static';
 }) {
+  const mono = useIsMono();
   return (
     <div
       className="grid grid-cols-2 gap-3 px-3 py-3"
@@ -359,7 +388,7 @@ function WallpaperGrid({
             aria-pressed={selected}
             className={`relative aspect-[3/4] rounded-2xl overflow-hidden transition-transform active:scale-[0.97] ${
               selected ? 'ring-2 ring-accent' : 'ring-1 ring-text-secondary/15'
-            }`}
+            } ${mono ? 'grayscale' : ''}`}
             style={{ background: bg }}
           >
             {wp.type === 'animated' && (
