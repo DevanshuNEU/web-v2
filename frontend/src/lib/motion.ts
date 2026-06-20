@@ -11,7 +11,7 @@
  * has "Reduce Motion" enabled at the OS level.
  */
 
-import type { Transition } from 'framer-motion';
+import type { Transition, Variants } from 'framer-motion';
 
 /** Spring presets, reused verbatim from the original inlined values. */
 export const spring = {
@@ -27,6 +27,12 @@ export const spring = {
   genie: { type: 'spring', damping: 26, stiffness: 210, mass: 0.9 },
   /** Custom cursor follow. */
   cursor: { damping: 28, stiffness: 420, mass: 0.4 },
+  /** Magnetic hover pull + settle on flat buttons. */
+  magnetic: { type: 'spring', damping: 15, stiffness: 260, mass: 0.3 },
+  /** Shared pointer-parallax depth drift (calmer than cursor). */
+  parallax: { damping: 30, stiffness: 350, mass: 0.5 },
+  /** Assistant orb / panel entrance. */
+  bubble: { type: 'spring', damping: 18, stiffness: 240, mass: 0.7 },
 } satisfies Record<string, Transition>;
 
 /** Collapses any animation to no perceptible motion (reduced-motion path). */
@@ -36,3 +42,47 @@ export const INSTANT: Transition = { duration: 0 };
 export function withReduced(t: Transition, reduced: boolean | null): Transition {
   return reduced ? INSTANT : t;
 }
+
+// ---------------------------------------------------------------------------
+// Premium-restrained interaction tokens (Linear/Kowalski register).
+// All consumers gate on useReducedMotion() AND a fine pointer.
+// ---------------------------------------------------------------------------
+
+/** Max px a magnetic element translates toward the cursor. Deliberately small. */
+export const MAGNETIC_MAX = 6;
+/** Fraction of the cursor offset applied (mirrors the cursor ring's 0.35). */
+export const MAGNETIC_PULL = 0.3;
+
+/** Base px drift of the deepest parallax layer (wallpaper). */
+export const PARALLAX_BASE = 20;
+/**
+ * Parallax depth factors. Lower = closer to the viewer = drifts LESS, giving
+ * a subtle sense of 3D depth on pointer move. Wallpaper drifts most.
+ */
+export const PARALLAX_DEPTH = {
+  wallpaper: 1.0,
+  mid: 0.35,
+  foreground: 0.12,
+} as const;
+
+/**
+ * Shared staggered-reveal variants. The container orchestrates; each item
+ * fades/rises in. Pass the reduced-motion flag so both collapse to instant.
+ */
+export const reveal = {
+  container: (reduced: boolean | null): Variants => ({
+    hidden: {},
+    show: {
+      transition: reduced
+        ? { staggerChildren: 0 }
+        : { staggerChildren: 0.025, delayChildren: 0.04 },
+    },
+  }),
+  item: (reduced: boolean | null): Variants =>
+    reduced
+      ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+      : {
+          hidden: { opacity: 0, y: 8, scale: 0.97 },
+          show: { opacity: 1, y: 0, scale: 1, transition: spring.window },
+        },
+};

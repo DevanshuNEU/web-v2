@@ -204,7 +204,7 @@ export default function Taskbar() {
             />
           )}
           <button
-            data-magnetic
+            data-magnetic="button"
             onClick={() => {
               setLaunchpadOpen(!launchpadOpen);
               setFirstVisit(false);

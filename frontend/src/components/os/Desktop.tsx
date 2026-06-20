@@ -2,8 +2,10 @@
 
 import React from 'react';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useMagneticField } from '@/hooks/useMagnetic';
 import { AnimatedBackground } from './AnimatedBackground';
 import { DesktopContextMenu } from './DesktopContextMenu';
+import { ParallaxProvider } from './ParallaxProvider';
 import MenuBar from './MenuBar';
 import Taskbar from './Taskbar';
 import DesktopIcons from './DesktopIcons';
@@ -15,25 +17,30 @@ interface DesktopProps {
 
 export default function Desktop({ children }: DesktopProps) {
   useKeyboardShortcuts();
+  // One global driver for magnetic flat buttons (no-op under reduced/coarse).
+  useMagneticField();
 
   return (
     <DesktopContextMenu>
-      <div className="min-h-screen w-full relative overflow-hidden">
-        <Cursor />
-        <AnimatedBackground />
+      {/* ParallaxProvider owns the single shared pointer source for depth drift. */}
+      <ParallaxProvider>
+        <div className="min-h-screen w-full relative overflow-hidden">
+          <Cursor />
+          <AnimatedBackground />
 
-        {/* Menu bar at top */}
-        <MenuBar />
+          {/* Menu bar at top */}
+          <MenuBar />
 
-        {/* Content area — inset by menu bar (28px) at top and dock (~72px) at bottom */}
-        <div className="relative z-10 h-screen pt-7 pb-20">
-          {/* Desktop shortcut icons — top-left, curated for first-time visitors */}
-          <DesktopIcons />
-          {children}
+          {/* Content area — inset by menu bar (28px) at top and dock (~72px) at bottom */}
+          <div className="relative z-10 h-screen pt-7 pb-20">
+            {/* Desktop shortcut icons — top-left, curated for first-time visitors */}
+            <DesktopIcons />
+            {children}
+          </div>
+
+          <Taskbar />
         </div>
-
-        <Taskbar />
-      </div>
+      </ParallaxProvider>
     </DesktopContextMenu>
   );
 }

@@ -15,7 +15,8 @@
 import React, { useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
-import { spring } from '@/lib/motion';
+import { spring, reveal, PARALLAX_DEPTH } from '@/lib/motion';
+import { useParallaxDepth } from '@/hooks/useParallaxDepth';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import AppIcon from './AppIcon';
 import type { AppType } from '../../../../shared/types';
@@ -35,10 +36,9 @@ interface DesktopIconProps {
   icon: React.ElementType;
   label: string;
   iconColor: string;
-  delay: number;
 }
 
-function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProps) {
+function DesktopIcon({ appType, icon, label, iconColor }: DesktopIconProps) {
   const openWindow = useOSStore(state => state.openWindow);
   const ref = useRef<HTMLButtonElement>(null);
   const reduced = useReducedMotion();
@@ -77,9 +77,9 @@ function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProp
 
   return (
     <motion.div
-      initial={reduced ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={reduced ? { duration: 0 } : { delay, duration: 0.3, ease: 'easeOut' }}
+      // Entrance is orchestrated by the grid container via the shared reveal
+      // variants (tighter, premium stagger); collapses to instant when reduced.
+      variants={reveal.item(reduced)}
       // perspective container — must be on a separate div, not the motion element itself
       style={{ perspective: 600 }}
       className="flex flex-col items-center gap-1.5 w-[72px]"
@@ -123,9 +123,20 @@ function DesktopIcon({ appType, icon, label, iconColor, delay }: DesktopIconProp
 // ---------------------------------------------------------------------------
 
 export default function DesktopIcons() {
+  const reduced = useReducedMotion();
+  // Mid-depth parallax drift from the shared provider; rests at 0 under
+  // reduced motion / coarse pointer. Per-icon 3D tilt is untouched.
+  const { x, y } = useParallaxDepth(PARALLAX_DEPTH.mid);
+
   return (
-    <div className="absolute top-9 left-5 flex flex-col gap-5 z-[1]">
-      {DESKTOP_APP_TYPES.map((appType, i) => {
+    <motion.div
+      style={{ x, y }}
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="absolute top-9 left-5 flex flex-col gap-5 z-[1]"
+    >
+      {DESKTOP_APP_TYPES.map((appType) => {
         const reg = appRegistry[appType];
         if (!reg) return null;
         const label = getAppLabel(appType);
@@ -136,10 +147,9 @@ export default function DesktopIcons() {
             icon={reg.icon}
             label={label.title}
             iconColor={reg.iconColor}
-            delay={i * 0.08}
           />
         );
       })}
-    </div>
+    </motion.div>
   );
 }

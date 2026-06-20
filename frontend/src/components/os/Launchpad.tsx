@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
+import { reveal } from '@/lib/motion';
 import { getLaunchpadApps, getAppLabel, appRegistry } from '@/lib/appRegistry';
 import AppIcon from './AppIcon';
 import { Search } from 'lucide-react';
@@ -17,6 +18,7 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
   const openWindow = useOSStore(s => s.openWindow);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const reduced = useReducedMotion();
 
   const allApps = getLaunchpadApps();
   const filtered = query.trim()
@@ -92,32 +94,26 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
             </div>
           </motion.div>
 
-          {/* App grid */}
+          {/* App grid — shared reveal variants drive a tight premium stagger;
+              container fades the whole grid in and orchestrates the items. */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
+            variants={reveal.container(reduced)}
+            initial="hidden"
+            animate="show"
             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
-            transition={{ delay: 0.06, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-7
                        gap-x-10 sm:gap-x-12 gap-y-8 sm:gap-y-10
                        px-6 sm:px-8 max-w-[900px]"
             onClick={(e) => e.stopPropagation()}
           >
-            {filtered.map((app, i) => {
+            {filtered.map((app) => {
               const label = getAppLabel(app.appType);
               const reg = appRegistry[app.appType];
 
               return (
                 <motion.button
                   key={app.appType}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{
-                    delay: 0.04 + i * 0.02,
-                    type: 'spring',
-                    damping: 20,
-                    stiffness: 260,
-                  }}
+                  variants={reveal.item(reduced)}
                   onClick={() => handleSelect(app.appType)}
                   className="flex flex-col items-center gap-2.5 cursor-pointer group"
                 >

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion, useMotionValue, useSpring } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import Image from 'next/image';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
-import { spring } from '@/lib/motion';
+import { PARALLAX_DEPTH } from '@/lib/motion';
+import { useParallaxDepth } from '@/hooks/useParallaxDepth';
 import { tintForHour } from '@/lib/livingDesktop';
 
 // ---------------------------------------------------------------------------
@@ -40,33 +41,14 @@ function paletteColors(colors: string[], mono: boolean): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Living desktop — cursor parallax + time-of-day ambient tint
+// Living desktop — shared pointer parallax + time-of-day ambient tint
 // ---------------------------------------------------------------------------
-
-const PARALLAX = 20; // px the wallpaper drifts toward the cursor
-
-/**
- * Cursor-reactive parallax. The wallpaper is overscanned (scale 1.06) so the
- * drift never exposes an edge. Disabled entirely under reduced motion.
- */
-function useParallax(reduced: boolean) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const sx = useSpring(x, spring.cursor);
-  const sy = useSpring(y, spring.cursor);
-
-  useEffect(() => {
-    if (reduced) return;
-    const onMove = (e: PointerEvent) => {
-      x.set((e.clientX / window.innerWidth - 0.5) * PARALLAX);
-      y.set((e.clientY / window.innerHeight - 0.5) * PARALLAX);
-    };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    return () => window.removeEventListener('pointermove', onMove);
-  }, [reduced, x, y]);
-
-  return { x: sx, y: sy, scale: reduced ? 1 : 1.06 };
-}
+//
+// Parallax drift now comes from the shared ParallaxProvider via
+// useParallaxDepth(PARALLAX_DEPTH.wallpaper); each canvas no longer owns its own
+// pointer listener. The wallpaper is still overscanned (scale 1.06) so the drift
+// never exposes an edge, and overscan collapses to 1 under reduced motion. When
+// the provider source rests at 0 (reduced / coarse pointer) the drift is 0.
 
 function TimeOfDayTint({ mono }: { mono: boolean }) {
   const [tint, setTint] = useState<string | null>(null);
@@ -98,7 +80,8 @@ function TimeOfDayTint({ mono }: { mono: boolean }) {
 
 function ParticlesCanvas({ colors, reduced, mono }: { colors: string[]; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const parallax = useParallax(reduced);
+  const parallax = useParallaxDepth(PARALLAX_DEPTH.wallpaper);
+  const overscan = reduced ? 1 : 1.06;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -173,7 +156,7 @@ function ParticlesCanvas({ colors, reduced, mono }: { colors: string[]; reduced:
     <motion.canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+      style={{ x: parallax.x, y: parallax.y, scale: overscan }}
     />
   );
 }
@@ -182,7 +165,8 @@ function ParticlesCanvas({ colors, reduced, mono }: { colors: string[]; reduced:
 
 function StarfieldCanvas({ speed, reduced, mono }: { speed: number; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const parallax = useParallax(reduced);
+  const parallax = useParallaxDepth(PARALLAX_DEPTH.wallpaper);
+  const overscan = reduced ? 1 : 1.06;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -261,7 +245,7 @@ function StarfieldCanvas({ speed, reduced, mono }: { speed: number; reduced: boo
     <motion.canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+      style={{ x: parallax.x, y: parallax.y, scale: overscan }}
     />
   );
 }
@@ -270,7 +254,8 @@ function StarfieldCanvas({ speed, reduced, mono }: { speed: number; reduced: boo
 
 function MeshCanvas({ colors, speed, reduced, mono }: { colors: string[]; speed: number; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const parallax = useParallax(reduced);
+  const parallax = useParallaxDepth(PARALLAX_DEPTH.wallpaper);
+  const overscan = reduced ? 1 : 1.06;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -330,7 +315,7 @@ function MeshCanvas({ colors, speed, reduced, mono }: { colors: string[]; speed:
     <motion.canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+      style={{ x: parallax.x, y: parallax.y, scale: overscan }}
     />
   );
 }
@@ -341,7 +326,8 @@ function MeshCanvas({ colors, speed, reduced, mono }: { colors: string[]; speed:
 
 function GridCanvas({ colors, reduced, mono }: { colors: string[]; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const parallax = useParallax(reduced);
+  const parallax = useParallaxDepth(PARALLAX_DEPTH.wallpaper);
+  const overscan = reduced ? 1 : 1.06;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -448,7 +434,7 @@ function GridCanvas({ colors, reduced, mono }: { colors: string[]; reduced: bool
     <motion.canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ x: parallax.x, y: parallax.y, scale: parallax.scale }}
+      style={{ x: parallax.x, y: parallax.y, scale: overscan }}
     />
   );
 }
