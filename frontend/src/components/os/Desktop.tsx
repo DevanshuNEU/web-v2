@@ -21,9 +21,11 @@ export default function Desktop({ children }: DesktopProps) {
   useMagneticField();
 
   return (
-    <DesktopContextMenu>
-      {/* ParallaxProvider owns the single shared pointer source for depth drift. */}
-      <ParallaxProvider>
+    // ParallaxProvider is context-only (no DOM), so it wraps OUTSIDE the menu.
+    // It must NOT sit between ContextMenuTrigger (asChild) and the desktop div,
+    // or the trigger has no DOM element to bind the right-click handler to.
+    <ParallaxProvider>
+      <DesktopContextMenu>
         <div className="min-h-screen w-full relative overflow-hidden">
           <Cursor />
           <AnimatedBackground />
@@ -40,7 +42,7 @@ export default function Desktop({ children }: DesktopProps) {
 
           <Taskbar />
         </div>
-      </ParallaxProvider>
-    </DesktopContextMenu>
+      </DesktopContextMenu>
+    </ParallaxProvider>
   );
 }

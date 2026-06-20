@@ -20,8 +20,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotion } from 'framer-motion';
 import { ArrowUp, X } from 'lucide-react';
-import Image from 'next/image';
-import { identity } from '@/data/aboutMe';
 import { clampMessages, sanitizeVoice } from '@/lib/conciergeContext';
 import { useChatStore } from '@/store/chatStore';
 import { TypingDots, StreamCaret } from '@/components/os/TypingDots';
@@ -159,15 +157,6 @@ export default function ChatPanel({
       {/* Presence header */}
       {showHeader && (
         <header className="flex items-center gap-3 px-5 py-3.5 border-b border-border flex-shrink-0">
-          <div className="relative w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
-            <Image
-              src={identity.photo}
-              alt={identity.name}
-              width={36}
-              height={36}
-              className="w-full h-full object-cover grayscale"
-            />
-          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-text leading-none">Devanshu</span>
@@ -218,13 +207,6 @@ export default function ChatPanel({
               return (
                 <div key={i} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Image
-                      src={identity.photo}
-                      alt={identity.name}
-                      width={20}
-                      height={20}
-                      className="w-5 h-5 rounded-full object-cover grayscale"
-                    />
                     <span className="text-[11px] font-medium uppercase tracking-wider text-text-secondary/70">
                       Devanshu
                     </span>
@@ -286,6 +268,7 @@ export default function ChatPanel({
             rows={1}
             placeholder="Ask Devanshu anything"
             spellCheck={false}
+            data-no-focus-ring
             className="flex-1 bg-transparent resize-none outline-none text-[15px] text-text placeholder:text-text-secondary/60 leading-relaxed py-1.5 max-h-32"
           />
           <button
@@ -312,15 +295,6 @@ function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string)
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="h-full flex flex-col items-center justify-center text-center gap-6 px-6"
     >
-      <div className="w-16 h-16 rounded-full overflow-hidden">
-        <Image
-          src={identity.photo}
-          alt={identity.name}
-          width={64}
-          height={64}
-          className="w-full h-full object-cover grayscale"
-        />
-      </div>
       <div className="space-y-1.5">
         <p className="text-[15px] text-text">Ask me anything about what I build.</p>
         <p className="text-xs text-text-secondary">An AI trained on my work, answering as me.</p>
