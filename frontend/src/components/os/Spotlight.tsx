@@ -1,23 +1,22 @@
 'use client';
 
 /**
- * Spotlight — macOS-style global search overlay, now with an AI concierge mode.
+ * Spotlight — macOS-style global search overlay + the entry point to Chat.
  *
  * Trigger:  Cmd+K  (or Ctrl+K)
- * Dismiss:  Escape (in ask mode, Escape returns to search), or click backdrop
+ * Dismiss:  Escape, or click backdrop
  *
- * Search mode searches across apps / projects / skills / commands.
- * Ask mode ("Ask devOS") streams a grounded answer from /api/concierge — the
- * portfolio answering questions about Devanshu in his own voice. It degrades
- * gracefully when the concierge is unconfigured or rate-limited.
+ * Searches across apps / projects / skills / commands. The "Ask Devanshu" row
+ * hands the query off to the Chat app (a real multi-turn conversation), rather
+ * than answering inline.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles, ArrowLeft } from 'lucide-react';
+import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
-import { sanitizeVoice } from '@/lib/conciergeContext';
+import { useChatStore } from '@/store/chatStore';
 import {
   searchSpotlight,
   type SpotlightItem,
@@ -35,8 +34,6 @@ const CATEGORY_META: Record<SpotlightCategory, { label: string; icon: React.Elem
   skill:   { label: 'Skills',   icon: Activity,    color: 'text-purple-400' },
   command: { label: 'Commands', icon: Terminal,     color: 'text-green-400'  },
 };
-
-type AskState = 'loading' | 'streaming' | 'done' | 'error' | 'offline' | 'rate_limited';
 
 // ---------------------------------------------------------------------------
 // Result rows
@@ -81,10 +78,10 @@ function AskRow({
       <Sparkles size={14} className="flex-shrink-0 text-accent" />
       <div className="flex-1 min-w-0">
         <span className={`text-sm font-medium truncate block ${isDark ? 'text-white/90' : 'text-gray-900'}`}>
-          Ask devOS: <span className="text-accent">{query}</span>
+          Ask Devanshu: <span className="text-accent">{query}</span>
         </span>
         <span className={`text-[11px] truncate block leading-snug ${isDark ? 'text-white/40' : 'text-gray-500'}`}>
-          Get a grounded answer about Devanshu
+          Opens a chat with Devanshu
         </span>
       </div>
       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-accent bg-accent/10 flex-shrink-0">AI</span>
@@ -102,86 +99,34 @@ export default function Spotlight() {
   const [results, setResults] = useState<SpotlightItem[]>([]);
   const [selIdx, setSelIdx] = useState(0);
 
-  const [view, setView] = useState<'search' | 'ask'>('search');
-  const [askQuery, setAskQuery] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [askState, setAskState] = useState<AskState>('loading');
-  const abortRef = useRef<AbortController | null>(null);
-
   const inputRef = useRef<HTMLInputElement>(null);
-  const askPanelRef = useRef<HTMLDivElement>(null);
   const openWindow = useOSStore(state => state.openWindow);
+  const setSeed = useChatStore(state => state.setSeed);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
   const reduced = useReducedMotion();
 
-  const askAvailable = view === 'search' && query.trim().length > 0;
+  const askAvailable = query.trim().length > 0;
   const selectableCount = (askAvailable ? 1 : 0) + results.length;
 
   // -- Open/close --
-
   const open = useCallback(() => {
     setIsOpen(true);
     setQuery(''); setResults([]); setSelIdx(0);
-    setView('search'); setAnswer('');
   }, []);
 
   const close = useCallback(() => {
-    abortRef.current?.abort();
     setIsOpen(false);
     setQuery(''); setResults([]); setSelIdx(0);
-    setView('search'); setAnswer('');
-  }, []);
-
-  const backToSearch = useCallback(() => {
-    abortRef.current?.abort();
-    setView('search'); setAnswer('');
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
-
-  // -- Concierge ask --
-
-  const enterAsk = useCallback(async (q: string) => {
-    const question = q.trim();
-    if (!question) return;
-    setView('ask'); setAskQuery(question); setAnswer(''); setAskState('loading');
-    // Move focus into the answer region so screen-reader users land on it.
-    setTimeout(() => askPanelRef.current?.focus(), 0);
-
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    try {
-      const res = await fetch('/api/concierge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: question }),
-        signal: ctrl.signal,
-      });
-      if (res.status === 503) { setAskState('offline'); return; }
-      if (res.status === 429) { setAskState('rate_limited'); return; }
-      if (!res.ok || !res.body) { setAskState('error'); return; }
-
-      setAskState('streaming');
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        setAnswer(a => a + decoder.decode(value, { stream: true }));
-      }
-      setAskState('done');
-    } catch (err) {
-      if ((err as Error)?.name !== 'AbortError') setAskState('error');
-    }
   }, []);
 
   // -- Focus input on open --
   useEffect(() => {
-    if (isOpen && view === 'search') {
+    if (isOpen) {
       const t = setTimeout(() => inputRef.current?.focus(), 60);
       return () => clearTimeout(t);
     }
-  }, [isOpen, view]);
+  }, [isOpen]);
 
   // -- Action dispatch --
   const handleSelect = useCallback((item: SpotlightItem) => {
@@ -193,10 +138,13 @@ export default function Spotlight() {
     }
   }, [close, openWindow]);
 
-  const openApp = useCallback((appType: AppType) => {
+  // -- Hand a question off to the Chat app --
+  const launchChat = useCallback((q: string) => {
+    const question = q.trim();
     close();
-    openWindow(appType);
-  }, [close, openWindow]);
+    if (question) setSeed(question);
+    openWindow('chat' as AppType);
+  }, [close, openWindow, setSeed]);
 
   // -- Keyboard --
   useEffect(() => {
@@ -210,11 +158,9 @@ export default function Spotlight() {
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        view === 'ask' ? backToSearch() : close();
+        close();
         return;
       }
-      if (view === 'ask') return; // no list nav while reading an answer
-
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelIdx(i => Math.min(i + 1, Math.max(selectableCount - 1, 0)));
@@ -227,7 +173,7 @@ export default function Spotlight() {
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (askAvailable && selIdx === 0) { enterAsk(query); return; }
+        if (askAvailable && selIdx === 0) { launchChat(query); return; }
         const item = results[askAvailable ? selIdx - 1 : selIdx];
         if (item) handleSelect(item);
       }
@@ -235,7 +181,7 @@ export default function Spotlight() {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, view, close, open, backToSearch, results, selIdx, askAvailable, selectableCount, query, enterAsk, handleSelect]);
+  }, [isOpen, close, open, results, selIdx, askAvailable, selectableCount, query, launchChat, handleSelect]);
 
   // -- Search --
   const handleQueryChange = (value: string) => {
@@ -245,12 +191,9 @@ export default function Spotlight() {
   };
 
   // -- Render --
-  const glass = isDark ? 'bg-[#1c1c1e]/90 border-white/12' : 'bg-white/85 border-black/10';
+  const glass = isDark ? 'bg-[#1c1c1e]/90 border-white/8' : 'bg-white/85 border-black/6';
   const inputColor = isDark ? 'text-white placeholder-white/30' : 'text-gray-900 placeholder-gray-400';
   const dividerColor = isDark ? 'border-white/8' : 'border-black/6';
-
-  // Client-side em-dash net (defense in depth) + paragraph split for spacing.
-  const answerParas = sanitizeVoice(answer).split(/\n{2,}/).filter(Boolean);
 
   return (
     <AnimatePresence>
@@ -275,20 +218,13 @@ export default function Spotlight() {
           >
             {/* Input row */}
             <div className="flex items-center gap-3 px-4 py-3.5">
-              {view === 'ask' ? (
-                <button onClick={backToSearch} aria-label="Back to search" className="flex-shrink-0">
-                  <ArrowLeft size={16} className={isDark ? 'text-white/50' : 'text-gray-500'} />
-                </button>
-              ) : (
-                <Search size={16} className={isDark ? 'text-white/35 flex-shrink-0' : 'text-gray-400 flex-shrink-0'} />
-              )}
+              <Search size={16} className={isDark ? 'text-white/35 flex-shrink-0' : 'text-gray-400 flex-shrink-0'} />
               <input
                 ref={inputRef}
                 type="text"
-                value={view === 'ask' ? askQuery : query}
+                value={query}
                 onChange={e => handleQueryChange(e.target.value)}
-                readOnly={view === 'ask'}
-                placeholder="Search, or ask devOS anything about Devanshu..."
+                placeholder="Search apps, or ask Devanshu anything..."
                 className={`flex-1 bg-transparent outline-none text-sm ${inputColor}`}
                 style={{ outline: 'none' }}
                 data-no-focus-ring
@@ -301,129 +237,45 @@ export default function Spotlight() {
               </kbd>
             </div>
 
-            {/* Ask view */}
-            {view === 'ask' && (
-              <motion.div
-                ref={askPanelRef}
-                tabIndex={-1}
-                role="region"
-                aria-label="devOS Concierge answer"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.16, ease: 'easeOut' }}
-                className={`border-t ${dividerColor} px-4 py-4 outline-none`}
-                data-no-focus-ring
-              >
-                <div className="flex items-center gap-1.5 text-[11px] text-accent mb-3">
-                  <Sparkles size={12} /> devOS Concierge
-                </div>
-
-                {askState === 'loading' && <ThinkingDots isDark={isDark} reduced={!!reduced} />}
-
-                {(askState === 'streaming' || askState === 'done') && (
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className={`text-[13.5px] leading-7 space-y-3 ${isDark ? 'text-white/85' : 'text-gray-800'}`}
-                  >
-                    {answerParas.map((para, i) => (
-                      <motion.p
-                        key={i}
-                        initial={reduced ? false : { opacity: 0, y: 3 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
-                        className="whitespace-pre-wrap"
-                      >
-                        {para}
-                        {askState === 'streaming' && i === answerParas.length - 1 && (
-                          <StreamCaret reduced={!!reduced} />
-                        )}
-                      </motion.p>
+            {/* Search results */}
+            <AnimatePresence mode="wait">
+              {(askAvailable || results.length > 0) && (
+                <motion.div
+                  key="results"
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  transition={{ duration: 0.12, ease: 'easeOut' }}
+                >
+                  <div className={`border-t ${dividerColor}`} />
+                  <div className="py-1 max-h-[360px] overflow-auto">
+                    {askAvailable && (
+                      <AskRow
+                        query={query.trim()}
+                        isSelected={selIdx === 0}
+                        isDark={isDark}
+                        onSelect={() => launchChat(query)}
+                      />
+                    )}
+                    {results.map((item, i) => (
+                      <ResultRow
+                        key={item.id}
+                        item={item}
+                        isSelected={(askAvailable ? i + 1 : i) === selIdx}
+                        isDark={isDark}
+                        onSelect={() => handleSelect(item)}
+                      />
                     ))}
                   </div>
-                )}
-
-                {(askState === 'offline' || askState === 'rate_limited' || askState === 'error') && (
-                  <p role="alert" className={`text-sm leading-relaxed ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
-                    {askState === 'offline' &&
-                      'The concierge is offline right now. You can still explore everything directly through the apps below.'}
-                    {askState === 'rate_limited' &&
-                      'A lot of questions are coming in right now. Give it a minute and try again, or browse the apps below.'}
-                    {askState === 'error' &&
-                      'Something went wrong reaching the concierge. Try again, or open the apps below.'}
-                  </p>
-                )}
-
-                {/* Actions */}
-                {askState !== 'loading' && askState !== 'streaming' && (
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {(askState === 'error' || askState === 'rate_limited') && (
-                      <button
-                        onClick={() => enterAsk(askQuery)}
-                        className="text-[12px] px-2.5 py-1.5 rounded-md border border-accent/40 text-accent
-                                   hover:bg-accent/10 active:scale-95 transition cursor-pointer"
-                      >
-                        Retry
-                      </button>
-                    )}
-                    {([['about-me', 'About Me'], ['projects', 'Projects'], ['resume', 'Resume']] as [AppType, string][]).map(
-                      ([app, label]) => (
-                        <button
-                          key={app}
-                          onClick={() => openApp(app)}
-                          className={`text-[12px] px-2.5 py-1.5 rounded-md border transition active:scale-95 cursor-pointer
-                            ${isDark ? 'border-white/12 text-white/70 hover:bg-white/8' : 'border-black/10 text-gray-600 hover:bg-black/5'}`}
-                        >
-                          Open {label}
-                        </button>
-                      )
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* Search results */}
-            {view === 'search' && (
-              <AnimatePresence mode="wait">
-                {(askAvailable || results.length > 0) && (
-                  <motion.div
-                    key="results"
-                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                    transition={{ duration: 0.12, ease: 'easeOut' }}
-                  >
-                    <div className={`border-t ${dividerColor}`} />
-                    <div className="py-1 max-h-[360px] overflow-auto">
-                      {askAvailable && (
-                        <AskRow
-                          query={query.trim()}
-                          isSelected={selIdx === 0}
-                          isDark={isDark}
-                          onSelect={() => enterAsk(query)}
-                        />
-                      )}
-                      {results.map((item, i) => (
-                        <ResultRow
-                          key={item.id}
-                          item={item}
-                          isSelected={(askAvailable ? i + 1 : i) === selIdx}
-                          isDark={isDark}
-                          onSelect={() => handleSelect(item)}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Footer hint */}
-            {view === 'search' && results.length === 0 && query.length === 0 && (
+            {results.length === 0 && query.length === 0 && (
               <div className={`border-t px-4 py-2.5 flex gap-4 flex-wrap ${dividerColor}`}>
                 <span className="flex items-center gap-1 text-[11px] text-accent opacity-70">
-                  <Sparkles size={11} /> Ask devOS
+                  <Sparkles size={11} /> Ask Devanshu
                 </span>
                 {(['app', 'project', 'skill', 'command'] as SpotlightCategory[]).map(cat => {
                   const meta = CATEGORY_META[cat];
@@ -440,31 +292,5 @@ export default function Spotlight() {
         </>
       )}
     </AnimatePresence>
-  );
-}
-
-function ThinkingDots({ isDark, reduced }: { isDark: boolean; reduced: boolean }) {
-  const color = isDark ? 'bg-white/45' : 'bg-gray-400';
-  return (
-    <div className="flex items-center gap-1.5 h-4" aria-label="Thinking">
-      {[0, 1, 2].map(i => (
-        <motion.span
-          key={i}
-          className={`w-1.5 h-1.5 rounded-full ${color}`}
-          animate={reduced ? undefined : { opacity: [0.3, 0.9, 0.3], scale: [0.85, 1, 0.85] }}
-          transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function StreamCaret({ reduced }: { reduced: boolean }) {
-  return (
-    <motion.span
-      className="inline-block w-[2px] h-[1em] align-text-bottom bg-accent/80 ml-0.5 rounded-full"
-      animate={reduced ? undefined : { opacity: [1, 0.15, 1] }}
-      transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
-    />
   );
 }

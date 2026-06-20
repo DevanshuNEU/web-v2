@@ -60,9 +60,9 @@ export const commandRegistry: Record<string, CommandHandler> = {
     return [
       `> ${q}`,
       '',
-      '  The devOS Concierge lives in Spotlight.',
-      '  Press Cmd+K, type your question, and pick "Ask devOS"',
-      '  for a streamed, grounded answer in Devanshu\'s voice.',
+      '  Open the Chat app (in the dock) to talk to Devanshu,',
+      '  or press Cmd+K and pick "Ask Devanshu" to start a',
+      '  conversation seeded with your question.',
       '',
     ];
   },
