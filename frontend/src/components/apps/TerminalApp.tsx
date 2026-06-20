@@ -6,6 +6,7 @@ import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useOSStore } from '@/store/osStore';
 import { useMobileStore } from '@/store/mobileStore';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { resolveCommand, type CommandResult } from '@/lib/terminalCommands';
 import type { AppType } from '../../../../shared/types';
 
@@ -26,6 +27,7 @@ interface HistoryEntry {
 
 function MatrixRain({ onDone }: { onDone: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mono = useIsMono();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,10 +41,13 @@ function MatrixRain({ onDone }: { onDone: () => void }) {
     const cols = Math.floor(canvas.width / 14);
     const drops = Array(cols).fill(1);
 
+    // Fun keeps the classic Matrix green; mono falls to glowing white on black.
+    const glyphColor = mono ? '#f5f5f5' : '#00ff41';
+
     const draw = () => {
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#00ff41';
+      ctx.fillStyle = glyphColor;
       ctx.font = '13px monospace';
 
       drops.forEach((y, i) => {
@@ -60,7 +65,7 @@ function MatrixRain({ onDone }: { onDone: () => void }) {
     }, 4000);
 
     return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [onDone]);
+  }, [onDone, mono]);
 
   return (
     <canvas
@@ -91,6 +96,19 @@ const HIRE_CHECKS = [
 function HireOutput() {
   const [visibleChecks, setVisibleChecks] = useState(0);
   const [showContact,   setShowContact]   = useState(false);
+  const mono = useIsMono();
+
+  // In mono the whole hire payoff is white-on-black graphite: the check glyph
+  // and "ACCESS GRANTED" still carry meaning by glyph + weight, not by green.
+  const cmd      = mono ? 'text-white/40'  : 'text-green-400/60';
+  const check    = mono ? 'text-white'     : 'text-green-500';
+  const checkLbl = mono ? 'text-white/50'  : 'text-green-400/50';
+  const checkVal = mono ? 'text-white/80'  : 'text-green-300/80';
+  const cardBox  = mono ? 'border-white/20 bg-white/[0.04]' : 'border-green-500/30 bg-green-500/5';
+  const grant    = mono ? 'text-white'     : 'text-green-400';
+  const sigil    = mono ? 'text-white/40'  : 'text-green-600/60';
+  const link     = mono ? 'text-white underline-offset-2' : 'text-blue-400';
+  const footer   = mono ? 'text-white/50'  : 'text-green-400/60';
 
   useEffect(() => {
     // Reveal each check line 150ms apart
@@ -109,7 +127,7 @@ function HireOutput() {
   return (
     <div className="my-2 font-mono text-sm space-y-0.5">
       {/* Processing header */}
-      <div className="text-green-400/60 mb-2">$ hire devanshu --evaluate</div>
+      <div className={`${cmd} mb-2`}>$ hire devanshu --evaluate</div>
 
       {/* Animated check lines */}
       {HIRE_CHECKS.slice(0, visibleChecks).map(({ label, result }, i) => (
@@ -120,9 +138,9 @@ function HireOutput() {
           transition={{ duration: 0.15 }}
           className="flex gap-2"
         >
-          <span className="text-green-500">✓</span>
-          <span className="text-green-400/50 w-40 flex-shrink-0">{label}</span>
-          <span className="text-green-300/80">{result}</span>
+          <span className={check}>✓</span>
+          <span className={`${checkLbl} w-40 flex-shrink-0`}>{label}</span>
+          <span className={checkVal}>{result}</span>
         </motion.div>
       ))}
 
@@ -133,45 +151,45 @@ function HireOutput() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="mt-4 p-4 border border-green-500/30 rounded-lg bg-green-500/5"
+            className={`mt-4 p-4 border rounded-lg ${cardBox}`}
           >
-            <div className="text-green-400 font-bold mb-3">
+            <div className={`${grant} font-bold mb-3`}>
               ACCESS GRANTED: candidate approved for hire
             </div>
             <div className="space-y-1.5 text-sm">
               <div>
-                <span className="text-green-600/60 mr-3 inline-block w-6">@</span>
+                <span className={`${sigil} mr-3 inline-block w-6`}>@</span>
                 <a
                   href="mailto:chicholikar.d@northeastern.edu"
-                  className="text-blue-400 hover:underline"
+                  className={`${link} hover:underline`}
                 >
                   chicholikar.d@northeastern.edu
                 </a>
               </div>
               <div>
-                <span className="text-green-600/60 mr-3 inline-block w-6">in</span>
+                <span className={`${sigil} mr-3 inline-block w-6`}>in</span>
                 <a
                   href="https://linkedin.com/in/devanshuchicholikar"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline"
+                  className={`${link} hover:underline`}
                 >
                   linkedin.com/in/devanshuchicholikar
                 </a>
               </div>
               <div>
-                <span className="text-green-600/60 mr-3 inline-block w-6">{'{}'}</span>
+                <span className={`${sigil} mr-3 inline-block w-6`}>{'{}'}</span>
                 <a
                   href="https://github.com/DevanshuNEU"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline"
+                  className={`${link} hover:underline`}
                 >
                   github.com/DevanshuNEU
                 </a>
               </div>
             </div>
-            <div className="mt-3 text-green-400/60 italic text-xs">
+            <div className={`mt-3 ${footer} italic text-xs`}>
               Seriously though, let&apos;s build something.
             </div>
           </motion.div>
@@ -192,6 +210,17 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const openWindow = useOSStore(state => state.openWindow);
   const openApp = useMobileStore(state => state.openApp);
   const { mode, toggleMode } = useTheme();
+  const mono = useIsMono();
+
+  // Fun keeps the colored shell prompt; mono is foreground-on-black graphite,
+  // legibility carried by weight and the existing white/40 separators.
+  const promptUser = mono ? 'text-white'    : 'text-blue-400';
+  const promptHost = mono ? 'text-white/70' : 'text-purple-400';
+  const promptCmd  = mono ? 'text-white'    : 'text-green-300';
+  const feedText   = mono ? 'text-gray-200' : 'text-green-400';
+  const inputText  = mono
+    ? 'text-white caret-white'
+    : 'text-green-300 caret-green-400';
 
   // On mobile, redirect window-open commands to the mobile app system
   const openWindowOrApp = useCallback((appId: string) => {
@@ -306,16 +335,16 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
       className={`h-full bg-black flex flex-col -m-px font-mono ${variant === 'mobile' ? 'text-base' : 'text-sm'}`}
       onClick={() => inputRef.current?.focus()}
     >
-      <div ref={scrollRef} className="flex-1 overflow-auto p-5 space-y-1 text-green-400">
+      <div ref={scrollRef} className={`flex-1 overflow-auto p-5 space-y-1 ${feedText}`}>
         {history.map((entry) => (
           <div key={entry.id}>
             {entry.command !== undefined && (
               <div className="flex gap-2 mb-1">
-                <span className="text-blue-400">devanshu</span>
+                <span className={promptUser}>devanshu</span>
                 <span className="text-white/40">@</span>
-                <span className="text-purple-400">devOS</span>
+                <span className={promptHost}>devOS</span>
                 <span className="text-white/40">~$</span>
-                <span className="text-green-300 ml-1">{entry.command}</span>
+                <span className={`${promptCmd} ml-1`}>{entry.command}</span>
               </div>
             )}
 
@@ -334,9 +363,9 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
 
         {/* Input line */}
         <div className="flex gap-2 mt-2">
-          <span className="text-blue-400">devanshu</span>
+          <span className={promptUser}>devanshu</span>
           <span className="text-white/40">@</span>
-          <span className="text-purple-400">devOS</span>
+          <span className={promptHost}>devOS</span>
           <span className="text-white/40">~$</span>
           <input
             ref={inputRef}
@@ -344,7 +373,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent outline-none text-green-300 caret-green-400 ml-1"
+            className={`flex-1 bg-transparent outline-none ml-1 ${inputText}`}
             autoFocus
             spellCheck={false}
             autoComplete="off"

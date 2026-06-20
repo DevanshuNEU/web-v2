@@ -11,14 +11,30 @@
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trophy } from 'lucide-react';
+import { useIsMono } from '@/hooks/usePalette';
 
 type GameId = 'launcher' | 'snake' | 'tetris' | 'typeracer';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MONO PALETTE — grayscale tones for the arcade.
+// Pieces/segments stay distinguishable by LIGHTNESS, not hue (color-not-only).
+// Fun mode is gated to keep today's colors byte-for-byte.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Seven graphite tones spaced by lightness — one per tetromino, all distinct
+// without relying on hue. Index aligns with TETROMINOES order (I,O,T,S,Z,L,J).
+const MONO_TETRIS = ['#f4f4f5', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#e4e4e7', '#8a8a93'];
+// Snake head brighter than body so the head reads at a glance.
+const MONO_SNAKE_HEAD = '#f4f4f5';
+const MONO_SNAKE_BODY = '#a1a1aa';
+const MONO_APPLE      = '#e4e4e7';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GAME ICONS — Apple-quality SVG illustrations
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SnakeIcon() {
+  const mono = useIsMono();
   // Pixel snake winding through a subtle grid, red apple in corner
   const seg = 8; // segment size
   // Snake body: winding S-shape segments (col, row)
@@ -29,13 +45,22 @@ function SnakeIcon() {
     [2,4],[2,5],
     [3,5],[4,5],[5,5],[6,5],[7,5],
   ];
-  const colors = [
+  const colorsFun = [
     '#4ade80','#4ade80','#4ade80','#4ade80',
     '#4ade80','#4ade80',
     '#4ade80','#4ade80','#4ade80','#22c55e',
     '#22c55e','#16a34a',
     '#16a34a','#16a34a','#16a34a','#15803d','#15803d',
   ];
+  // Mono: fade lightness head→tail so the body still reads as a snake.
+  const colorsMono = [
+    '#f4f4f5','#e8e8eb','#dcdce0','#d0d0d5',
+    '#c4c4cb','#b8b8c0',
+    '#acacb5','#a0a0aa','#9494a0','#888895',
+    '#7c7c8a','#71717a',
+    '#6a6a73','#63636c','#5c5c65','#55555e','#4e4e57',
+  ];
+  const colors = mono ? colorsMono : colorsFun;
   const w = 10, h = 8;
   return (
     <svg viewBox={`0 0 ${w * seg} ${h * seg}`} width={72} height={58} xmlns="http://www.w3.org/2000/svg">
@@ -57,39 +82,49 @@ function SnakeIcon() {
         />
       ))}
       {/* Head eyes */}
-      <circle cx={3 * seg + 3} cy={1 * seg + 3} r={1.2} fill="#052e16" />
-      <circle cx={3 * seg + 5.5} cy={1 * seg + 3} r={1.2} fill="#052e16" />
+      <circle cx={3 * seg + 3} cy={1 * seg + 3} r={1.2} fill={mono ? '#27272a' : '#052e16'} />
+      <circle cx={3 * seg + 5.5} cy={1 * seg + 3} r={1.2} fill={mono ? '#27272a' : '#052e16'} />
       {/* Apple / food */}
-      <circle cx={8 * seg + 2} cy={2 * seg + 2} r={4} fill="#ef4444" />
-      <rect x={8 * seg + 1.5} y={2 * seg - 3} width={1.5} height={4} rx={0.75} fill="#16a34a" />
+      <circle cx={8 * seg + 2} cy={2 * seg + 2} r={4} fill={mono ? MONO_APPLE : '#ef4444'} />
+      <rect x={8 * seg + 1.5} y={2 * seg - 3} width={1.5} height={4} rx={0.75} fill={mono ? '#71717a' : '#16a34a'} />
     </svg>
   );
 }
 
 function TetrisIcon() {
-  // Mini Tetris board — colorful locked pieces, I-piece falling
+  const mono = useIsMono();
+  // Mini Tetris board — locked pieces. In mono each piece type maps to a
+  // distinct grayscale tone (by lightness) so the 7 shapes stay readable.
   const cs = 7; // cell size
   const cols = 8, rows = 9;
+  // Per-piece tone: Fun hue vs mono grayscale (I,O,T,S,Z,L,J).
+  const I = mono ? MONO_TETRIS[0] : '#22d3ee';
+  const O = mono ? MONO_TETRIS[1] : '#facc15';
+  const T = mono ? MONO_TETRIS[2] : '#a78bfa';
+  const S = mono ? MONO_TETRIS[3] : '#4ade80';
+  const Z = mono ? MONO_TETRIS[4] : '#f87171';
+  const L = mono ? MONO_TETRIS[5] : '#fb923c';
+  const J = mono ? MONO_TETRIS[6] : '#60a5fa';
   // Grid: 0 = empty, color string = filled
   const grid: (string | 0)[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
   // Place pieces manually for a satisfying composition
   const pieces: [number, number, string][] = [
-    // I-piece (cyan) — bottom row, full width
-    [7,0,'#22d3ee'],[7,1,'#22d3ee'],[7,2,'#22d3ee'],[7,3,'#22d3ee'],
-    // O-piece (yellow)
-    [6,0,'#facc15'],[6,1,'#facc15'],[5,0,'#facc15'],[5,1,'#facc15'],
-    // T-piece (purple)
-    [6,2,'#a78bfa'],[6,3,'#a78bfa'],[6,4,'#a78bfa'],[5,3,'#a78bfa'],
-    // S-piece (green)
-    [5,4,'#4ade80'],[5,5,'#4ade80'],[6,5,'#4ade80'],[6,6,'#4ade80'],
-    // Z-piece (red)
-    [4,5,'#f87171'],[4,6,'#f87171'],[5,6,'#f87171'],[5,7,'#f87171'],
-    // L-piece (orange)
-    [4,2,'#fb923c'],[4,3,'#fb923c'],[4,4,'#fb923c'],[3,4,'#fb923c'],
-    // J-piece (blue)
-    [3,6,'#60a5fa'],[3,7,'#60a5fa'],[4,7,'#60a5fa'],[4,8,'#60a5fa'],
-    // Falling I (cyan, partial) — top
-    [0,4,'#22d3ee'],[1,4,'#22d3ee'],[2,4,'#22d3ee'],[3,4,'#22d3ee'],
+    // I-piece — bottom row, full width
+    [7,0,I],[7,1,I],[7,2,I],[7,3,I],
+    // O-piece
+    [6,0,O],[6,1,O],[5,0,O],[5,1,O],
+    // T-piece
+    [6,2,T],[6,3,T],[6,4,T],[5,3,T],
+    // S-piece
+    [5,4,S],[5,5,S],[6,5,S],[6,6,S],
+    // Z-piece
+    [4,5,Z],[4,6,Z],[5,6,Z],[5,7,Z],
+    // L-piece
+    [4,2,L],[4,3,L],[4,4,L],[3,4,L],
+    // J-piece
+    [3,6,J],[3,7,J],[4,7,J],[4,8,J],
+    // Falling I (partial) — top
+    [0,4,I],[1,4,I],[2,4,I],[3,4,I],
   ];
   pieces.forEach(([r, c, color]) => { if (grid[r]) grid[r][c] = color; });
 
@@ -121,24 +156,25 @@ function TetrisIcon() {
 }
 
 function TypeRacerIcon() {
+  const mono = useIsMono();
   // Terminal window: traffic lights + syntax-highlighted code lines, cursor
   return (
     <svg viewBox="0 0 80 60" width={80} height={60} xmlns="http://www.w3.org/2000/svg">
       {/* Window */}
-      <rect width={80} height={60} rx={6} fill="#1e1e2e" />
+      <rect width={80} height={60} rx={6} fill={mono ? '#18181b' : '#1e1e2e'} />
       {/* Title bar */}
-      <rect width={80} height={14} rx={6} fill="#2a2a3d" />
-      <rect y={8} width={80} height={6} fill="#2a2a3d" />
-      {/* Traffic lights */}
-      <circle cx={10} cy={7} r={3} fill="#ff5f57" />
-      <circle cx={20} cy={7} r={3} fill="#febc2e" />
-      <circle cx={30} cy={7} r={3} fill="#28c840" />
-      {/* Code line 1 — fully "typed" (green tint) */}
-      <rect x={8} y={19} width={12} height={4} rx={1} fill="#86efac" opacity={0.85} />
-      <rect x={22} y={19} width={8} height={4} rx={1} fill="#c4b5fd" opacity={0.85} />
-      <rect x={32} y={19} width={16} height={4} rx={1} fill="#7dd3fc" opacity={0.85} />
+      <rect width={80} height={14} rx={6} fill={mono ? '#27272a' : '#2a2a3d'} />
+      <rect y={8} width={80} height={6} fill={mono ? '#27272a' : '#2a2a3d'} />
+      {/* Traffic lights — neutral graphite dots in mono (distinct by lightness) */}
+      <circle cx={10} cy={7} r={3} fill={mono ? '#71717a' : '#ff5f57'} />
+      <circle cx={20} cy={7} r={3} fill={mono ? '#a1a1aa' : '#febc2e'} />
+      <circle cx={30} cy={7} r={3} fill={mono ? '#d4d4d8' : '#28c840'} />
+      {/* Code line 1 — fully "typed" */}
+      <rect x={8} y={19} width={12} height={4} rx={1} fill={mono ? '#d4d4d8' : '#86efac'} opacity={0.85} />
+      <rect x={22} y={19} width={8} height={4} rx={1} fill={mono ? '#a1a1aa' : '#c4b5fd'} opacity={0.85} />
+      <rect x={32} y={19} width={16} height={4} rx={1} fill={mono ? '#c4c4cb' : '#7dd3fc'} opacity={0.85} />
       {/* Cursor blink after typed text */}
-      <rect x={50} y={19} width={3} height={4} rx={0.5} fill="#a5f3fc" opacity={0.9} />
+      <rect x={50} y={19} width={3} height={4} rx={0.5} fill={mono ? '#f4f4f5' : '#a5f3fc'} opacity={0.9} />
       {/* Code line 2 — upcoming (dimmer) */}
       <rect x={8} y={27} width={10} height={3.5} rx={1} fill="rgba(255,255,255,0.15)" />
       <rect x={20} y={27} width={20} height={3.5} rx={1} fill="rgba(255,255,255,0.10)" />
@@ -151,7 +187,7 @@ function TypeRacerIcon() {
       <rect x={24} y={41} width={10} height={3.5} rx={1} fill="rgba(255,255,255,0.06)" />
       {/* Progress bar */}
       <rect x={8} y={51} width={64} height={3} rx={1.5} fill="rgba(255,255,255,0.08)" />
-      <rect x={8} y={51} width={26} height={3} rx={1.5} fill="#34d399" opacity={0.8} />
+      <rect x={8} y={51} width={26} height={3} rx={1.5} fill={mono ? '#d4d4d8' : '#34d399'} opacity={0.8} />
     </svg>
   );
 }
@@ -175,6 +211,10 @@ const CARDS = [
     gradient: 'linear-gradient(150deg, #166534 0%, #052e16 100%)',
     glow: '#22c55e',
     border: 'rgba(34,197,94,0.2)',
+    // Mono: neutral graphite chrome, varied lightness so the 3 cards still differ
+    gradientMono: 'linear-gradient(150deg, #3f3f46 0%, #18181b 100%)',
+    glowMono: '#a1a1aa',
+    borderMono: 'rgba(161,161,170,0.2)',
     hsKey: 'devos-snake-hs',
     hsLabel: 'pts',
   },
@@ -186,6 +226,9 @@ const CARDS = [
     gradient: 'linear-gradient(150deg, #3730a3 0%, #1e1b4b 100%)',
     glow: '#6366f1',
     border: 'rgba(99,102,241,0.2)',
+    gradientMono: 'linear-gradient(150deg, #52525b 0%, #1c1c1f 100%)',
+    glowMono: '#d4d4d8',
+    borderMono: 'rgba(212,212,216,0.2)',
     hsKey: 'devos-tetris-hs',
     hsLabel: 'pts',
   },
@@ -197,14 +240,23 @@ const CARDS = [
     gradient: 'linear-gradient(150deg, #065f46 0%, #022c22 100%)',
     glow: '#10b981',
     border: 'rgba(16,185,129,0.2)',
+    gradientMono: 'linear-gradient(150deg, #27272a 0%, #0c0c0e 100%)',
+    glowMono: '#71717a',
+    borderMono: 'rgba(113,113,122,0.2)',
     hsKey: 'devos-typeracer-hs',
     hsLabel: 'WPM',
   },
 ] as const;
 
 function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
+  const mono = useIsMono();
   const hero = CARDS[1]; // Tetris — most visually striking icon
   const shelf = [CARDS[0], CARDS[2]]; // Snake + Type Racer
+
+  // Resolve chrome per palette: Fun keeps the colored gradient/glow/border.
+  const heroGradient = mono ? hero.gradientMono : hero.gradient;
+  const heroGlow     = mono ? hero.glowMono     : hero.glow;
+  const heroBorder   = mono ? hero.borderMono   : hero.border;
 
   const hsHero  = typeof window !== 'undefined' ? (localStorage.getItem(hero.hsKey)  ?? '0') : '0';
 
@@ -228,22 +280,22 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
         className="relative overflow-hidden rounded-2xl flex-shrink-0 cursor-pointer text-left group"
         style={{
           height: 160,
-          background: hero.gradient,
-          border: `1px solid ${hero.border}`,
-          boxShadow: `0 12px 40px ${hero.glow}20, 0 2px 8px rgba(0,0,0,0.4)`,
+          background: heroGradient,
+          border: `1px solid ${heroBorder}`,
+          boxShadow: `0 12px 40px ${heroGlow}20, 0 2px 8px rgba(0,0,0,0.4)`,
         }}
       >
         {/* Hover glow */}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: `radial-gradient(ellipse at 70% 50%, ${hero.glow}28, transparent 65%)` }} />
+          style={{ background: `radial-gradient(ellipse at 70% 50%, ${heroGlow}28, transparent 65%)` }} />
 
         {/* Large ambient blob behind icon */}
         <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ filter: `blur(24px)`, width: 120, height: 120, background: `${hero.glow}30`, borderRadius: '50%' }} />
+          style={{ filter: `blur(24px)`, width: 120, height: 120, background: `${heroGlow}30`, borderRadius: '50%' }} />
 
         {/* Icon — right side */}
         <div className="absolute right-8 top-1/2 -translate-y-1/2 z-10"
-          style={{ filter: `drop-shadow(0 10px 28px ${hero.glow}80)`, transform: 'translateY(-50%) scale(1.35)' }}>
+          style={{ filter: `drop-shadow(0 10px 28px ${heroGlow}80)`, transform: 'translateY(-50%) scale(1.35)' }}>
           {GAME_ICONS[hero.id]}
         </div>
 
@@ -251,15 +303,15 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
         <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-center px-6 z-10" style={{ maxWidth: '55%' }}>
           {/* Featured label */}
           <span className="text-[9px] font-semibold tracking-widest uppercase mb-2"
-            style={{ color: hero.glow, opacity: 0.85 }}>Featured</span>
+            style={{ color: heroGlow, opacity: 0.85 }}>Featured</span>
           <h2 className="text-2xl font-bold text-white leading-tight">{hero.title}</h2>
           <p className="text-white/50 text-[11px] mt-1 leading-snug">{hero.subtitle}</p>
 
           {/* High score */}
           {parseInt(hsHero) > 0 && (
             <div className="flex items-center gap-1 mt-2">
-              <Trophy size={9} style={{ color: hero.glow }} />
-              <span className="text-[9px] font-mono font-medium" style={{ color: hero.glow }}>
+              <Trophy size={9} style={{ color: heroGlow }} />
+              <span className="text-[9px] font-mono font-medium" style={{ color: heroGlow }}>
                 Best: {hsHero} {hero.hsLabel}
               </span>
             </div>
@@ -279,6 +331,9 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
       <div className="flex-1 grid grid-cols-2 gap-3 min-h-0">
         {shelf.map((card, idx) => {
           const hs = typeof window !== 'undefined' ? (localStorage.getItem(card.hsKey) ?? '0') : '0';
+          const cardGradient = mono ? card.gradientMono : card.gradient;
+          const cardGlow     = mono ? card.glowMono     : card.glow;
+          const cardBorder   = mono ? card.borderMono   : card.border;
           return (
             <motion.button
               key={card.id}
@@ -290,32 +345,32 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
               onClick={() => onSelect(card.id)}
               className="relative overflow-hidden rounded-2xl flex flex-col cursor-pointer text-left group"
               style={{
-                background: card.gradient,
-                border: `1px solid ${card.border}`,
-                boxShadow: `0 8px 28px ${card.glow}18, 0 2px 8px rgba(0,0,0,0.4)`,
+                background: cardGradient,
+                border: `1px solid ${cardBorder}`,
+                boxShadow: `0 8px 28px ${cardGlow}18, 0 2px 8px rgba(0,0,0,0.4)`,
               }}
             >
               {/* Hover glow */}
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                style={{ background: `radial-gradient(ellipse at 50% 35%, ${card.glow}28, transparent 65%)` }} />
+                style={{ background: `radial-gradient(ellipse at 50% 35%, ${cardGlow}28, transparent 65%)` }} />
 
               {/* Ambient blob */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none"
-                style={{ filter: 'blur(20px)', width: 80, height: 80, background: `${card.glow}22`, borderRadius: '50%' }} />
+                style={{ filter: 'blur(20px)', width: 80, height: 80, background: `${cardGlow}22`, borderRadius: '50%' }} />
 
               {/* Icon — centered, constrained */}
               <div className="flex items-center justify-center pt-5 pb-3 relative z-10"
-                style={{ filter: `drop-shadow(0 6px 18px ${card.glow}70)` }}>
+                style={{ filter: `drop-shadow(0 6px 18px ${cardGlow}70)` }}>
                 {GAME_ICONS[card.id]}
               </div>
 
               {/* Info */}
               <div className="relative z-10 px-3.5 pb-3.5 mt-auto">
-                <div className="border-t mb-2.5" style={{ borderColor: card.border }} />
+                <div className="border-t mb-2.5" style={{ borderColor: cardBorder }} />
                 {parseInt(hs) > 0 && (
                   <div className="flex items-center gap-1 mb-1.5">
-                    <Trophy size={8} style={{ color: card.glow }} />
-                    <span className="text-[9px] font-mono font-medium" style={{ color: card.glow }}>
+                    <Trophy size={8} style={{ color: cardGlow }} />
+                    <span className="text-[9px] font-mono font-medium" style={{ color: cardGlow }}>
                       {hs} {card.hsLabel}
                     </span>
                   </div>
@@ -383,6 +438,7 @@ function GameHeader({
 const SNAKE_GRID = 20;
 
 function SnakeGameView({ onBack }: { onBack: () => void }) {
+  const mono = useIsMono();
   const [cellSize, setCellSize] = useState(18);
   const [status, setStatus] = useState<'idle' | 'playing' | 'paused' | 'over'>('idle');
   const [score, setScore] = useState(0);
@@ -419,12 +475,15 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
       for (let y = 0; y < SNAKE_GRID; y++)
         if ((x + y) % 2 === 0) ctx.fillRect(x * cs, y * cs, cs, cs);
     snake.forEach((seg, i) => {
-      ctx.fillStyle = i === 0 ? '#4ade80' : '#22c55e';
+      // Mono: head brighter than body so the head reads without hue.
+      ctx.fillStyle = mono
+        ? (i === 0 ? MONO_SNAKE_HEAD : MONO_SNAKE_BODY)
+        : (i === 0 ? '#4ade80' : '#22c55e');
       ctx.beginPath(); ctx.roundRect(seg.x * cs + 1, seg.y * cs + 1, cs - 2, cs - 2, 3); ctx.fill();
     });
-    ctx.fillStyle = '#f87171';
+    ctx.fillStyle = mono ? MONO_APPLE : '#f87171';
     ctx.beginPath(); ctx.roundRect(food.x * cs + 2, food.y * cs + 2, cs - 4, cs - 4, cs / 2); ctx.fill();
-  }, [cellSize]);
+  }, [cellSize, mono]);
 
   const loop = useCallback(() => {
     if (statusRef.current !== 'playing') return;
@@ -488,14 +547,14 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
           <canvas ref={canvasRef} width={canvasSize} height={canvasSize} className="rounded-xl shadow-2xl border border-white/10" />
           {status !== 'playing' && (
             <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm">
-              {status === 'idle' && <button onClick={startGame} className="px-8 py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-400 transition-all shadow-lg">Start</button>}
-              {status === 'paused' && <button onClick={() => setStatus('playing')} className="px-8 py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-400 transition-all">Resume</button>}
+              {status === 'idle' && <button onClick={startGame} className={`px-8 py-3 text-white font-bold rounded-xl transition-all shadow-lg ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Start</button>}
+              {status === 'paused' && <button onClick={() => setStatus('playing')} className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Resume</button>}
               {status === 'over' && (
                 <div className="text-center space-y-3">
                   <p className="text-white font-bold text-xl">Game Over</p>
                   <p className="text-white/70 text-sm">Score: {score}</p>
-                  {score > 0 && score === best && <p className="text-green-400 text-sm font-medium">New Best!</p>}
-                  <button onClick={startGame} className="px-8 py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-400 transition-all">Play Again</button>
+                  {score > 0 && score === best && <p className={`text-sm font-semibold ${mono ? 'text-white' : 'text-green-400'}`}>{mono ? '★ ' : ''}New Best!</p>}
+                  <button onClick={startGame} className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Play Again</button>
                 </div>
               )}
             </div>
@@ -647,6 +706,15 @@ function tetrisReducer(state: TetrisState, action: TetrisAction): TetrisState {
 
 function gravityDelay(level: number) { return Math.max(80, 800 - (level - 1) * 80); }
 
+// Map a stored piece color (the Fun hue) to its grayscale tone in mono.
+// Built from TETROMINOES order so each of the 7 pieces keeps a distinct lightness.
+const TETRIS_MONO_BY_HUE: Record<string, string> = Object.fromEntries(
+  TETROMINOES.map((p, i) => [p.color, MONO_TETRIS[i]])
+);
+function tetrisCellColor(stored: string, mono: boolean): string {
+  return mono ? (TETRIS_MONO_BY_HUE[stored] ?? '#a1a1aa') : stored;
+}
+
 function drawTetCell(ctx: CanvasRenderingContext2D, c: number, r: number, color: string, cs: number, alpha: number) {
   const x = c * cs, y = r * cs, pad = 1, rad = 3;
   ctx.globalAlpha = alpha;
@@ -667,6 +735,7 @@ function drawTetCell(ctx: CanvasRenderingContext2D, c: number, r: number, color:
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TetrisGame({ onBack }: { onBack: () => void }) {
+  const mono = useIsMono();
   const [state, dispatch] = useReducer(
     tetrisReducer,
     freshTetris(typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-tetris-hs') ?? '0') : 0)
@@ -736,16 +805,16 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
     ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 0.5;
     for (let c = 0; c <= T_COLS; c++) { ctx.beginPath(); ctx.moveTo(c * cs, 0); ctx.lineTo(c * cs, H); ctx.stroke(); }
     for (let r = 0; r <= T_ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * cs); ctx.lineTo(W, r * cs); ctx.stroke(); }
-    state.board.forEach((row, r) => row.forEach((cell, c) => { if (cell) drawTetCell(ctx, c, r, cell as string, cs, 1); }));
+    state.board.forEach((row, r) => row.forEach((cell, c) => { if (cell) drawTetCell(ctx, c, r, tetrisCellColor(cell as string, mono), cs, 1); }));
     if (state.active && state.status === 'playing') {
       const ghost = ghostOf(state.board, state.active);
       if (ghost.y !== state.active.y) {
-        const col = TETROMINOES[state.active.pieceIdx].color;
+        const col = tetrisCellColor(TETROMINOES[state.active.pieceIdx].color, mono);
         for (const [r, c] of getOccupied(ghost)) if (r >= 0) drawTetCell(ctx, c, r, col, cs, 0.18);
       }
     }
     if (state.active) {
-      const col = TETROMINOES[state.active.pieceIdx].color;
+      const col = tetrisCellColor(TETROMINOES[state.active.pieceIdx].color, mono);
       for (const [r, c] of getOccupied(state.active)) if (r >= 0) drawTetCell(ctx, c, r, col, cs, 1);
     }
     if (state.status === 'paused') {
@@ -755,7 +824,7 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
       ctx.font = `${Math.round(cs * 0.55)}px system-ui`; ctx.fillStyle = 'rgba(255,255,255,0.45)';
       ctx.fillText('P or Space to resume', W / 2, H / 2 + cs);
     }
-  }, [state, cs]);
+  }, [state, cs, mono]);
 
   // Draw next piece preview
   useEffect(() => {
@@ -768,8 +837,8 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
     const shape = piece.shapes[0];
     const ox = Math.floor((4 - shape[0].length) / 2);
     const oy = Math.floor((4 - shape.length) / 2);
-    shape.forEach((row, r) => row.forEach((v, c) => { if (v) drawTetCell(ctx, c + ox, r + oy, piece.color, PC, 1); }));
-  }, [state.nextIdx, cs]);
+    shape.forEach((row, r) => row.forEach((v, c) => { if (v) drawTetCell(ctx, c + ox, r + oy, tetrisCellColor(piece.color, mono), PC, 1); }));
+  }, [state.nextIdx, cs, mono]);
 
   const previewSize = Math.max(40, Math.round(cs * 0.75) * 4);
 
@@ -802,7 +871,7 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
               {state.status === 'idle' ? (
                 <div className="text-center space-y-3">
                   <p className="text-white/60 text-sm">Click Start or press Space</p>
-                  <button onClick={() => dispatch({ type: 'START' })} className="px-8 py-2.5 bg-indigo-500 text-white font-bold rounded-xl hover:bg-indigo-400 transition-all shadow-lg">
+                  <button onClick={() => dispatch({ type: 'START' })} className={`px-8 py-2.5 text-white font-bold rounded-xl transition-all shadow-lg ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-indigo-500 hover:bg-indigo-400'}`}>
                     Start
                   </button>
                 </div>
@@ -810,8 +879,8 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
                 <div className="text-center space-y-3">
                   <p className="text-white font-bold text-xl">Game Over</p>
                   <p className="text-white/70 text-sm">Score: {state.score.toLocaleString()}</p>
-                  {state.score >= state.best && state.score > 0 && <p className="text-yellow-400 text-sm">🏆 New Best!</p>}
-                  <button onClick={() => dispatch({ type: 'START' })} className="px-8 py-2.5 bg-indigo-500 text-white font-bold rounded-xl hover:bg-indigo-400 transition-all">
+                  {state.score >= state.best && state.score > 0 && <p className={`text-sm ${mono ? 'text-white font-semibold' : 'text-yellow-400'}`}>🏆 New Best!</p>}
+                  <button onClick={() => dispatch({ type: 'START' })} className={`px-8 py-2.5 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-indigo-500 hover:bg-indigo-400'}`}>
                     Play Again
                   </button>
                 </div>
@@ -849,7 +918,11 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
 
         {/* Action buttons */}
         <button
-          className="h-9 px-3 rounded-xl text-xs font-bold text-white bg-indigo-500/80 hover:bg-indigo-500 active:bg-indigo-600 transition-all border border-indigo-400/30 cursor-pointer select-none"
+          className={`h-9 px-3 rounded-xl text-xs font-bold text-white transition-all border cursor-pointer select-none ${
+            mono
+              ? 'bg-zinc-600/80 hover:bg-zinc-600 active:bg-zinc-700 border-zinc-400/30'
+              : 'bg-indigo-500/80 hover:bg-indigo-500 active:bg-indigo-600 border-indigo-400/30'
+          }`}
           onClick={() => {
             if (state.status === 'idle' || state.status === 'over') dispatch({ type: 'START' });
             else dispatch({ type: 'HARD_DROP' });
@@ -898,6 +971,7 @@ const CODE_SNIPPETS = [
 ];
 
 function TypeRacerGame({ onBack }: { onBack: () => void }) {
+  const mono = useIsMono();
   const [snippetIdx, setSnippetIdx] = useState(0);
   const [typed,      setTyped]      = useState('');
   const [status,     setStatus]     = useState<'idle' | 'typing' | 'done'>('idle');
@@ -960,7 +1034,12 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
       >
         <div className="text-center mr-2">
           <div className="text-xs text-text-secondary">Accuracy</div>
-          <div className={`text-sm font-bold ${accuracy >= 95 ? 'text-green-400' : accuracy >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>{accuracy}%</div>
+          {/* Mono: the % value + opacity tier signal quality, not hue. */}
+          <div className={`text-sm font-bold ${
+            mono
+              ? (accuracy >= 95 ? 'text-text' : accuracy >= 80 ? 'text-text/80' : 'text-text/55')
+              : (accuracy >= 95 ? 'text-green-400' : accuracy >= 80 ? 'text-yellow-400' : 'text-red-400')
+          }`}>{accuracy}%</div>
         </div>
         <div className="text-center mr-2">
           <div className="text-xs text-text-secondary">Time</div>
@@ -972,7 +1051,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
         {/* Snippet selector */}
         <div className="flex items-center gap-2 flex-wrap">
           {CODE_SNIPPETS.map((s, i) => (
-            <button key={i} onClick={() => setSnippetIdx(i)} className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${snippetIdx === i ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-text-secondary hover:bg-white/10 border border-white/10'}`}>
+            <button key={i} onClick={() => setSnippetIdx(i)} className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${snippetIdx === i ? (mono ? 'bg-white/15 text-text font-semibold border border-text/20' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30') : 'bg-white/5 text-text-secondary hover:bg-white/10 border border-white/10'}`}>
               {s.label}
             </button>
           ))}
@@ -980,7 +1059,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
 
         {/* Progress bar */}
         <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 rounded-full transition-all duration-100" style={{ width: `${Math.min(progress, 100)}%` }} />
+          <div className={`h-full rounded-full transition-all duration-100 ${mono ? 'bg-zinc-300' : 'bg-emerald-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
         </div>
 
         {/* Snippet display */}
@@ -989,7 +1068,18 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
             const typedChar = typed[i];
             const isCursor = i === typed.length;
             let cls = 'text-text-secondary/40';
-            if (typedChar !== undefined) cls = typedChar === char ? 'text-emerald-400' : 'text-red-400 bg-red-500/25 rounded-sm';
+            if (typedChar !== undefined) {
+              if (typedChar === char) {
+                // Correct: bright foreground in mono, emerald in Fun.
+                cls = mono ? 'text-text' : 'text-emerald-400';
+              } else {
+                // Wrong: in mono the underline + box + dim tone flag the error
+                // without hue (color-not-only); Fun keeps the red box.
+                cls = mono
+                  ? 'text-text/60 bg-white/15 rounded-sm underline decoration-2 underline-offset-2'
+                  : 'text-red-400 bg-red-500/25 rounded-sm';
+              }
+            }
             if (isCursor && status !== 'done') cls += ' border-l-2 border-accent';
             if (char === '\n') return <span key={i}><span className={cls}>↵</span>{'\n'}</span>;
             return <span key={i} className={cls}>{char === ' ' ? '\u00A0' : char}</span>;
@@ -1010,18 +1100,18 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
         {/* Completion */}
         <AnimatePresence>
           {status === 'done' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-subtle rounded-xl p-4 border border-emerald-500/30 bg-emerald-500/5">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`glass-subtle rounded-xl p-4 ${mono ? 'border border-text/20 bg-white/[0.04]' : 'border border-emerald-500/30 bg-emerald-500/5'}`}>
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 size={22} className="text-emerald-400 flex-shrink-0" />
+                  <CheckCircle2 size={22} className={`flex-shrink-0 ${mono ? 'text-text' : 'text-emerald-400'}`} />
                   <div>
                     <p className="font-bold text-text text-sm">{finalWpm >= best && finalWpm > 0 ? '🏆 New Personal Best!' : '✓ Snippet complete!'}</p>
-                    <p className="text-xs text-text-secondary">{elapsed.toFixed(1)}s · {accuracy}% accuracy · <span className="text-emerald-400 font-bold">{finalWpm} WPM</span></p>
+                    <p className="text-xs text-text-secondary">{elapsed.toFixed(1)}s · {accuracy}% accuracy · <span className={`font-bold ${mono ? 'text-text' : 'text-emerald-400'}`}>{finalWpm} WPM</span></p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={reset} className="px-4 py-2 rounded-lg bg-white/10 text-text text-xs font-medium hover:bg-white/20 transition-all">Retry</button>
-                  <button onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-400 transition-all">Next snippet →</button>
+                  <button onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} className={`px-4 py-2 rounded-lg text-white text-xs font-medium transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-emerald-500 hover:bg-emerald-400'}`}>Next snippet →</button>
                 </div>
               </div>
             </motion.div>

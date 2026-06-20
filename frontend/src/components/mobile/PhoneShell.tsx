@@ -18,6 +18,7 @@ import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useMobileStore } from '@/store/mobileStore';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import LockScreen from './LockScreen';
 import HomeScreen from './HomeScreen';
 import AppView from './AppView';
@@ -29,6 +30,7 @@ export default function PhoneShell() {
   const locked = useMobileStore((s) => s.locked);
   const openApp = useMobileStore((s) => s.openApp);
   const { wallpaper, mode } = useTheme();
+  const mono = useIsMono();
 
   // First-visit auto-open About Me, mirroring src/app/page.tsx
   useEffect(() => {
@@ -59,11 +61,18 @@ export default function PhoneShell() {
   return (
     <div
       className={`fixed inset-0 overflow-hidden ${mode === 'dark' ? 'dark' : ''}`}
-      style={{
-        background: wallpaperBackground(wallpaper),
-        height: '100dvh',
-      }}
+      style={{ height: '100dvh' }}
     >
+      {/* Wallpaper layer — its own element so mono can grayscale it without
+          touching the foreground UI. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: wallpaperBackground(wallpaper),
+          filter: mono ? 'grayscale(1)' : undefined,
+        }}
+      />
+
       {/* Subtle darkening overlay so icons/labels remain legible across wallpapers */}
       <div className="absolute inset-0 bg-black/15 pointer-events-none" />
 

@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAnalyticsStore } from '@/store/analyticsStore';
+import { useIsMono } from '@/hooks/usePalette';
 import {
   Activity,
   Clock,
@@ -80,6 +81,7 @@ function DeviceIcon({ type }: { type: string }) {
 // ---------------------------------------------------------------------------
 
 export default function AnalyticsApp() {
+  const mono = useIsMono();
   // Poll via getState() — no reactive subscriptions to avoid React 19
   // useSyncExternalStore tearing issues during commit phase.
   const [data, setData] = useState(() => {
@@ -152,7 +154,9 @@ export default function AnalyticsApp() {
                 onClick={handleOptToggle}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                   isOptedOut
-                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                    ? (mono
+                        ? 'bg-white/[0.08] text-text hover:bg-white/[0.14] font-semibold'
+                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30')
                     : 'bg-accent/20 text-accent hover:bg-accent/30'
                 }`}
               >
@@ -167,10 +171,14 @@ export default function AnalyticsApp() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
-          className="glass-subtle rounded-xl p-5 border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent"
+          className={`glass-subtle rounded-xl p-5 ${
+            mono
+              ? 'border border-text/15 bg-gradient-to-br from-white/[0.04] to-transparent'
+              : 'border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent'
+          }`}
         >
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            <div className={`w-2 h-2 rounded-full animate-pulse ${mono ? 'bg-text' : 'bg-green-400'}`} />
             <h3 className="font-semibold text-text text-sm">Your Session</h3>
             <span className="text-xs text-text-secondary ml-auto font-mono">
               {sessionId.slice(0, 8)}...

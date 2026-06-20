@@ -32,6 +32,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import type {
   ActivityEvent,
   ContributionCalendar,
@@ -285,10 +286,18 @@ function StatCard({
   sub: string;
   accent: string;
 }) {
+  const mono = useIsMono();
   return (
     <div className="rounded-2xl p-3 bg-surface dark:bg-white/[0.04] flex flex-col gap-1">
       <div className="flex items-center gap-1.5 text-label text-text-secondary font-medium uppercase tracking-wide">
-        <span style={{ color: accent }} className="flex">{icon}</span>
+        {/* In mono, the category icon drops its hue and rides text-text so the
+            stat reads by its label + value, not by color. */}
+        <span
+          style={mono ? undefined : { color: accent }}
+          className={`flex ${mono ? 'text-text' : ''}`}
+        >
+          {icon}
+        </span>
         <span className="truncate">{label}</span>
       </div>
       <div className="text-hero font-semibold text-text leading-none">
@@ -311,6 +320,7 @@ function ContributionHeatmap({
   compact: boolean;
 }) {
   const { mode } = useTheme();
+  const mono = useIsMono();
   const cellSize = compact ? 9 : 12;
   const gap = 2;
 
@@ -345,7 +355,7 @@ function ContributionHeatmap({
             style={{
               width: cellSize,
               height: cellSize,
-              background: d ? cellColor(d.level, mode) : 'transparent',
+              background: d ? cellColor(d.level, mode, mono) : 'transparent',
             }}
             title={d ? `${d.date} · ${d.count} contributions` : undefined}
             data-level={d?.level}
@@ -356,16 +366,39 @@ function ContributionHeatmap({
   );
 }
 
-function cellColor(level: number, mode: 'light' | 'dark'): string {
-  // GitHub's official palette (dark = darker base, brighter greens).
+function cellColor(level: number, mode: 'light' | 'dark', mono: boolean): string {
+  const idx = Math.max(0, Math.min(4, level));
+  if (mono) {
+    // Graphite intensity ramp: empty cell barely above the background, hottest
+    // cell near the foreground, so contribution density stays readable in pure
+    // black & white. Direction follows the surface — light ink on a dark
+    // canvas, dark ink on a light canvas — so the hottest cell always reads as
+    // the most "present."
+    const monoDark = [
+      'rgba(255,255,255,0.05)',
+      'rgba(255,255,255,0.20)',
+      'rgba(255,255,255,0.38)',
+      'rgba(255,255,255,0.62)',
+      'rgba(255,255,255,0.90)',
+    ];
+    const monoLight = [
+      'rgba(17,17,17,0.06)',
+      'rgba(17,17,17,0.22)',
+      'rgba(17,17,17,0.42)',
+      'rgba(17,17,17,0.66)',
+      'rgba(17,17,17,0.92)',
+    ];
+    return (mode === 'dark' ? monoDark : monoLight)[idx];
+  }
+  // Fun palette: GitHub's official greens, unchanged (dark = darker base).
   const dark = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
   const light = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
-  const scale = mode === 'dark' ? dark : light;
-  return scale[Math.max(0, Math.min(4, level))];
+  return (mode === 'dark' ? dark : light)[idx];
 }
 
 function CalendarLegend() {
   const { mode } = useTheme();
+  const mono = useIsMono();
   return (
     <div className="flex items-center gap-1.5 mt-2 px-1 text-[10px] text-text-secondary">
       <span>Less</span>
@@ -373,7 +406,7 @@ function CalendarLegend() {
         <span
           key={lvl}
           className="w-2 h-2 rounded-[2px] inline-block"
-          style={{ background: cellColor(lvl, mode) }}
+          style={{ background: cellColor(lvl, mode, mono) }}
         />
       ))}
       <span>More</span>
@@ -469,6 +502,7 @@ function RepoRow({
 }: {
   repo: ActivePayload['activeRepos'][number];
 }) {
+  const mono = useIsMono();
   return (
     <a
       href={repo.htmlUrl}
@@ -489,9 +523,13 @@ function RepoRow({
         <div className="text-[11px] text-text-secondary mt-1.5 flex items-center gap-2 flex-wrap">
           {repo.language && (
             <span className="flex items-center gap-1">
+              {/* In mono the dot loses its language hue and the language name
+                  to its right does the distinguishing. */}
               <span
-                className="w-2 h-2 rounded-full inline-block"
-                style={{ background: languageColor(repo.language) }}
+                className={`w-2 h-2 rounded-full inline-block ${
+                  mono ? 'bg-text-secondary' : ''
+                }`}
+                style={mono ? undefined : { background: languageColor(repo.language) }}
               />
               {repo.language}
             </span>

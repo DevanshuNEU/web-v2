@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { getWallpapersForTheme } from '@/data/wallpapers';
 import type { Wallpaper } from '@/store/themeStore';
 import { Check, Sparkles } from 'lucide-react';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 
 function WallpaperThumb({ wp, selected }: { wp: Wallpaper; selected: boolean }) {
   const isAnimated = wp.type === 'animated';
+  const mono = useIsMono();
 
   return (
     <button
@@ -18,6 +20,7 @@ function WallpaperThumb({ wp, selected }: { wp: Wallpaper; selected: boolean }) 
                   ? 'border-accent ring-2 ring-accent/30'
                   : 'border-border hover:border-accent/50'
                 }`}
+      style={{ filter: mono ? 'grayscale(1)' : undefined }}
     >
       {/* Preview */}
       {wp.imageUrl ? (

@@ -6,9 +6,17 @@ import {
   SKILLS, CAT_COLOR, CAT_LABEL, LEVEL_LABEL, SKILL_CATEGORIES,
   type Skill, type FilterCategory,
 } from '@/data/skills';
+import { useIsMono } from '@/hooks/usePalette';
 
 type FilterCat = FilterCategory;
 const CATEGORIES = SKILL_CATEGORIES;
+
+// In mono every category collapses to one graphite tone; categories are told
+// apart by their label + section, never by hue. Fun keeps the per-category hue.
+const MONO_CAT = '#9ca3af';
+function catColor(cat: Skill['category'], mono: boolean): string {
+  return mono ? MONO_CAT : CAT_COLOR[cat];
+}
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* Arc progress ring                                                   */
@@ -72,7 +80,8 @@ function SkillCard({
   onHover: (s: Skill) => void;
   onLeave: () => void;
 }) {
-  const color = CAT_COLOR[skill.category];
+  const mono = useIsMono();
+  const color = catColor(skill.category, mono);
   const { mode } = cardState;
 
   const opacity   = mode === 'dim' ? 0.28 : 1;
@@ -195,6 +204,7 @@ function SkillCard({
 /* ─────────────────────────────────────────────────────────────────── */
 
 export default function SkillsDashboardApp() {
+  const mono = useIsMono();
   const [filter, setFilter]   = useState<FilterCat>('all');
   const [hovered, setHovered] = useState<Skill | null>(null);
 
@@ -238,7 +248,7 @@ export default function SkillsDashboardApp() {
           <div className="flex items-center gap-3 flex-wrap justify-end">
             {(['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as Skill['category'][]).map(cat => (
               <div key={cat} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: CAT_COLOR[cat] }} />
+                <div className="w-2 h-2 rounded-full" style={{ background: catColor(cat, mono) }} />
                 <span className="text-[10px] text-text-secondary hidden sm:block">{CAT_LABEL[cat]}</span>
               </div>
             ))}
@@ -249,7 +259,11 @@ export default function SkillsDashboardApp() {
         <div className="flex gap-1.5 flex-wrap">
           {CATEGORIES.map(cat => {
             const isActive = filter === cat;
-            const color = cat === 'all' ? 'rgb(var(--color-accent))' : CAT_COLOR[cat as Skill['category']];
+            // In mono, the selected pill uses the (graphite) accent so the
+            // active state stays obvious; categories are not hue-coded.
+            const color = (mono || cat === 'all')
+              ? 'rgb(var(--color-accent))'
+              : CAT_COLOR[cat as Skill['category']];
             return (
               <button
                 key={cat}
@@ -294,7 +308,7 @@ export default function SkillsDashboardApp() {
       {/* ── Footer stat bar ── */}
       <div className="flex-shrink-0 px-5 py-3 border-t border-white/8 dark:border-white/6 flex gap-5 flex-wrap">
         {catStats.map(({ cat, count, avg }) => {
-          const color = CAT_COLOR[cat];
+          const color = catColor(cat, mono);
           return (
             <div key={cat} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />

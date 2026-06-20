@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ExternalLink, Mail, Linkedin, Github, MapPin, GraduationCap } from "lucide-react";
 import { useAnalyticsStore } from "@/store/analyticsStore";
+import { useIsMono } from "@/hooks/usePalette";
 import { identity, contactLinks } from "@/data/aboutMe";
 import { JourneySection } from "./about/JourneySection";
 import { ExcitesSection } from "./about/ExcitesSection";
@@ -145,6 +146,7 @@ interface AboutMeAppProps {
 export default function AboutMeApp({ variant = 'desktop' }: AboutMeAppProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const trackEvent = useAnalyticsStore(state => state.trackEvent);
+  const mono = useIsMono();
 
   const handleTab = (id: TabId) => {
     setActiveTab(id);
@@ -181,10 +183,14 @@ export default function AboutMeApp({ variant = 'desktop' }: AboutMeAppProps) {
               {identity.name}
             </h1>
             {/* Availability badge — inline with name */}
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full
-                             bg-green-500/10 border border-green-500/20
-                             text-green-600 dark:text-green-400 text-[10px] font-medium flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ${
+              mono
+                ? 'bg-black/8 border border-black/15 text-text-secondary dark:bg-white/10 dark:border-white/20'
+                : 'bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                mono ? 'bg-text-secondary dark:bg-white/80' : 'bg-green-500'
+              }`} />
               Available
             </span>
           </div>
@@ -258,6 +264,7 @@ function AboutMeMobile({
   activeTab: TabId;
   onTab: (id: TabId) => void;
 }) {
+  const mono = useIsMono();
   return (
     <div className="h-full overflow-y-auto bg-bg">
       {/* Hero */}
@@ -277,8 +284,14 @@ function AboutMeMobile({
         </div>
         <h1 className="mt-4 text-hero font-semibold text-text">{identity.name}</h1>
         <p className="mt-1 text-sm text-text-secondary">{identity.title}</p>
-        <span className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-label font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+        <span className={`mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label font-medium ${
+          mono
+            ? 'bg-black/8 border border-black/15 text-text-secondary dark:bg-white/10 dark:border-white/20'
+            : 'bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+            mono ? 'bg-text-secondary dark:bg-white/80' : 'bg-green-500'
+          }`} />
           Available
         </span>
         <div className="mt-3 flex items-center gap-4 text-meta text-text-secondary">

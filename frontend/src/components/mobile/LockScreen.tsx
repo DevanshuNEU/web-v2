@@ -14,12 +14,14 @@ import { ChevronUp, MapPin } from 'lucide-react';
 import { useMobileStore } from '@/store/mobileStore';
 import { useSwipe } from '@/hooks/useSwipe';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useIsMono } from '@/hooks/usePalette';
 import { identity } from '@/data/aboutMe';
 import StatusBar from './StatusBar';
 
 export default function LockScreen() {
   const unlock = useMobileStore((s) => s.unlock);
   const haptics = useHaptics();
+  const mono = useIsMono();
 
   const [now, setNow] = useState(() => new Date());
 
@@ -54,8 +56,9 @@ export default function LockScreen() {
       {...handlers}
       className="absolute inset-0 z-40 flex flex-col text-white touch-none"
       style={{
-        background:
-          'radial-gradient(120% 80% at 50% 0%, #1a0f2e 0%, #0f1923 55%, #050813 100%)',
+        background: mono
+          ? 'radial-gradient(120% 80% at 50% 0%, #2a2a2c 0%, #161618 55%, #050505 100%)'
+          : 'radial-gradient(120% 80% at 50% 0%, #1a0f2e 0%, #0f1923 55%, #050813 100%)',
       }}
     >
       <div className="pt-safe">
@@ -80,8 +83,18 @@ export default function LockScreen() {
             <span className="flex items-center gap-1 text-[12px] text-white/40">
               <MapPin size={11} />{identity.location}
             </span>
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-[11px] font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                mono
+                  ? 'bg-white/12 border border-white/25 text-white/85'
+                  : 'bg-green-500/15 border border-green-500/25 text-green-400'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  mono ? 'bg-white/90' : 'bg-green-400'
+                }`}
+              />
               Available
             </span>
           </div>

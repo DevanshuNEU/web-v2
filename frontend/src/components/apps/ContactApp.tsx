@@ -7,6 +7,7 @@ import {
   Mail, User, MessageSquare, Send, CheckCircle,
   Building, Loader2, Github, Linkedin, MapPin,
 } from 'lucide-react';
+import { useIsMono } from '@/hooks/usePalette';
 
 interface FormData {
   name: string;
@@ -27,17 +28,22 @@ function Field({
 }: {
   id: string; label: string; required?: boolean; error?: string; children: React.ReactNode;
 }) {
+  const mono = useIsMono();
+  // In mono the asterisk + error copy carry the meaning, not hue. Keep them
+  // legible with foreground tone + weight; in Fun keep the original red.
+  const markerCls = mono ? 'text-text font-semibold' : 'text-red-400';
+  const errorCls = mono ? 'text-text font-medium' : 'text-red-400';
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+        {label}{required && <span className={`${markerCls} ml-0.5`}>*</span>}
       </label>
       {children}
       <AnimatePresence>
         {error && (
           <motion.p
             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="text-[11px] text-red-400"
+            className={`text-[11px] ${errorCls}`}
           >{error}</motion.p>
         )}
       </AnimatePresence>
@@ -45,14 +51,14 @@ function Field({
   );
 }
 
-const inputCls = (hasError?: boolean) =>
+const inputCls = (hasError?: boolean, mono?: boolean) =>
   `w-full px-3 py-2 rounded-lg text-sm text-text
    bg-black/[0.04] dark:bg-white/[0.06]
    border transition-all duration-150 outline-none
    placeholder:text-text-secondary/40
    focus:ring-2 focus:ring-accent/30 focus:border-accent/50
    ${hasError
-     ? 'border-red-400/60'
+     ? (mono ? 'border-text/50' : 'border-red-400/60')
      : 'border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20'}`;
 
 /* ------------------------------------------------------------------ */
@@ -60,6 +66,7 @@ const inputCls = (hasError?: boolean) =>
 /* ------------------------------------------------------------------ */
 
 function SuccessView({ onReset }: { onReset: () => void }) {
+  const mono = useIsMono();
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92 }}
@@ -70,9 +77,11 @@ function SuccessView({ onReset }: { onReset: () => void }) {
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', damping: 14, stiffness: 200, delay: 0.1 }}
-        className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center"
+        className={`w-16 h-16 rounded-full border flex items-center justify-center ${
+          mono ? 'bg-white/[0.06] border-text/20' : 'bg-green-500/10 border-green-500/20'
+        }`}
       >
-        <CheckCircle className="w-8 h-8 text-green-500" />
+        <CheckCircle className={`w-8 h-8 ${mono ? 'text-text' : 'text-green-500'}`} />
       </motion.div>
       <div className="text-center">
         <h3 className="text-lg font-bold text-text mb-1">Message sent!</h3>
@@ -95,6 +104,7 @@ function SuccessView({ onReset }: { onReset: () => void }) {
 /* ------------------------------------------------------------------ */
 
 export default function ContactApp() {
+  const mono = useIsMono();
   const [formData, setFormData] = useState<FormData>({
     name: '', email: '', company: '', subject: '', message: '',
   });
@@ -159,9 +169,13 @@ export default function ContactApp() {
             <p className="text-sm font-semibold text-text leading-tight">Devanshu</p>
             <p className="text-[11px] text-text-secondary mt-0.5">Software Engineer</p>
           </div>
-          {/* Availability */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+          {/* Availability — in mono the pulsing dot + label carry the "available" state, not hue */}
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
+            mono
+              ? 'bg-white/[0.06] text-text border-text/15'
+              : 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 ${mono ? 'bg-text' : 'bg-green-500'}`} />
             Open to opportunities
           </div>
         </div>
@@ -220,7 +234,11 @@ export default function ContactApp() {
               {status === 'error' && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 p-3 rounded-lg bg-red-500/8 border border-red-500/20 text-sm text-red-500 flex items-center justify-between"
+                  className={`mb-4 p-3 rounded-lg text-sm flex items-center justify-between ${
+                    mono
+                      ? 'bg-white/[0.06] border border-text/20 text-text font-medium'
+                      : 'bg-red-500/8 border border-red-500/20 text-red-500'
+                  }`}
                 >
                   <span>Something broke on my end.{' '}</span>
                   <button className="text-xs underline ml-2 flex-shrink-0" onClick={() => setStatus('idle')}>
@@ -238,7 +256,7 @@ export default function ContactApp() {
                         id="name" placeholder="Your name"
                         value={formData.name}
                         onChange={e => handleChange('name', e.target.value)}
-                        className={`${inputCls(!!errors.name)} pl-8`}
+                        className={`${inputCls(!!errors.name, mono)} pl-8`}
                       />
                     </div>
                   </Field>
@@ -250,7 +268,7 @@ export default function ContactApp() {
                         id="email" type="email" placeholder="you@company.com"
                         value={formData.email}
                         onChange={e => handleChange('email', e.target.value)}
-                        className={`${inputCls(!!errors.email)} pl-8`}
+                        className={`${inputCls(!!errors.email, mono)} pl-8`}
                       />
                     </div>
                   </Field>
@@ -264,7 +282,7 @@ export default function ContactApp() {
                         id="company" placeholder="Optional"
                         value={formData.company}
                         onChange={e => handleChange('company', e.target.value)}
-                        className={`${inputCls()} pl-8`}
+                        className={`${inputCls(false, mono)} pl-8`}
                       />
                     </div>
                   </Field>
@@ -276,7 +294,7 @@ export default function ContactApp() {
                         id="subject" placeholder="What's on your mind?"
                         value={formData.subject}
                         onChange={e => handleChange('subject', e.target.value)}
-                        className={`${inputCls(!!errors.subject)} pl-8`}
+                        className={`${inputCls(!!errors.subject, mono)} pl-8`}
                       />
                     </div>
                   </Field>
@@ -289,7 +307,7 @@ export default function ContactApp() {
                     value={formData.message}
                     onChange={e => handleChange('message', e.target.value)}
                     rows={6}
-                    className={`${inputCls(!!errors.message)} resize-none`}
+                    className={`${inputCls(!!errors.message, mono)} resize-none`}
                   />
                 </Field>
 

@@ -20,20 +20,29 @@ import { projectMeta } from '@/data/projectMeta';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
 import IconTile from '@/components/mobile/ui/IconTile';
 import MobileSection from '@/components/mobile/ui/MobileSection';
+import { useIsMono } from '@/hooks/usePalette';
+
+// Neutral graphite used for language dots / hero tint in mono. The language
+// NAME label and status text carry meaning, so hue is decorative here.
+const MONO_LANG = '#8b8b8b';
 
 // ---------------------------------------------------------------------------
 // Status badge
 // ---------------------------------------------------------------------------
 
 function StatusBadge({ status }: { status: string }) {
+  const mono = useIsMono();
   const config = {
     active: { label: 'Active', className: 'bg-green-500/10 text-green-600 dark:text-green-400' },
     completed: { label: 'Completed', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
     experimental: { label: 'Experimental', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
   }[status] ?? { label: status, className: 'bg-surface/50 text-text-secondary' };
 
+  // In mono the status WORD carries the state; neutral chip, no hue.
+  const className = mono ? 'bg-white/[0.06] text-text font-semibold border border-text/10' : config.className;
+
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${config.className}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${className}`}>
       {config.label}
     </span>
   );
@@ -55,7 +64,8 @@ const LANG_COLORS: Record<string, string> = {
 };
 
 function LangDot({ lang }: { lang: string }) {
-  const color = LANG_COLORS[lang] ?? '#8b8b8b';
+  const mono = useIsMono();
+  const color = mono ? MONO_LANG : (LANG_COLORS[lang] ?? '#8b8b8b');
   return (
     <span className="flex items-center gap-1.5 text-xs text-text-secondary">
       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
@@ -163,8 +173,9 @@ function Sidebar({
 // ---------------------------------------------------------------------------
 
 function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
+  const mono = useIsMono();
   const allTech = Array.from(new Set([...repo.extraTech, ...repo.topics]));
-  const langColor = repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1';
+  const langColor = mono ? MONO_LANG : (repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1');
 
   return (
     <motion.div
@@ -201,7 +212,7 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
           {repo.language && <LangDot lang={repo.language} />}
           {repo.stars > 0 && (
             <span className="flex items-center gap-1 font-medium">
-              <Star size={12} className="text-amber-400" /> {repo.stars}
+              <Star size={12} className={mono ? 'text-text-secondary' : 'text-amber-400'} /> {repo.stars}
             </span>
           )}
           {repo.forks > 0 && (
@@ -360,8 +371,9 @@ function buildStaticRepos(): EnrichedRepo[] {
 // ---------------------------------------------------------------------------
 
 function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
+  const mono = useIsMono();
   const allTech = Array.from(new Set([...repo.extraTech, ...repo.topics]));
-  const langColor = repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1';
+  const langColor = mono ? MONO_LANG : (repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1');
 
   return (
     <div className="overflow-y-auto pb-6">
@@ -382,7 +394,7 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
           {repo.language && <LangDot lang={repo.language} />}
           {repo.stars > 0 && (
             <span className="flex items-center gap-1 font-medium">
-              <Star size={12} className="text-amber-400" /> {repo.stars}
+              <Star size={12} className={mono ? 'text-text-secondary' : 'text-amber-400'} /> {repo.stars}
             </span>
           )}
           {repo.forks > 0 && <span className="flex items-center gap-1"><GitFork size={11} /> {repo.forks}</span>}
@@ -463,6 +475,7 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
 
 function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
   const nav = useMobileNavigation();
+  const mono = useIsMono();
   const [filter, setFilter] = useState<Filter>('featured');
 
   const filters: { key: Filter; label: string }[] = [
@@ -515,7 +528,7 @@ function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
       ) : (
         <MobileSection inset>
           {filtered.map(repo => {
-            const langColor = repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1';
+            const langColor = mono ? MONO_LANG : (repo.language ? (LANG_COLORS[repo.language] ?? '#6366f1') : '#6366f1');
             return (
               <button
                 key={repo.name}
@@ -529,7 +542,7 @@ function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
                 </span>
                 {repo.stars > 0 && (
                   <span className="flex items-center gap-0.5 text-[12px] text-text-secondary/60 flex-shrink-0">
-                    <Star size={11} className="text-amber-400/70" /> {repo.stars}
+                    <Star size={11} className={mono ? 'text-text-secondary/70' : 'text-amber-400/70'} /> {repo.stars}
                   </span>
                 )}
                 <ChevronRight size={18} strokeWidth={2.2} className="text-text-secondary/40 flex-shrink-0" />

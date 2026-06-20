@@ -11,6 +11,7 @@ import {
 } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { appRegistry, getPinnedApps, getAppLabel } from '@/lib/appRegistry';
 import { spring } from '@/lib/motion';
 import { registerDockIcon } from '@/lib/dockRegistry';
@@ -137,6 +138,7 @@ export default function Taskbar() {
   const openWindow = useOSStore(s => s.openWindow);
   const focusWindow = useOSStore(s => s.focusWindow);
   const { mode } = useTheme();
+  const mono = useIsMono();
 
   const [launchpadOpen, setLaunchpadOpen] = useState(false);
   const [firstVisit, setFirstVisit] = useState(false);
@@ -193,7 +195,12 @@ export default function Taskbar() {
           {firstVisit && !launchpadOpen && (
             <span
               className="absolute inset-0 rounded-[11px] pointer-events-none animate-ping"
-              style={{ background: 'rgba(59,130,246,0.35)', animationDuration: '1.6s' }}
+              style={{
+                background: mono
+                  ? (mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.22)')
+                  : 'rgba(59,130,246,0.35)',
+                animationDuration: '1.6s',
+              }}
             />
           )}
           <button

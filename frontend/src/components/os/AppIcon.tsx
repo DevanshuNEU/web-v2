@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { getIconColors } from '@/lib/iconColors';
+import { getIconColors, MONO_ICON_SCHEME } from '@/lib/iconColors';
+import { useIsMono } from '@/hooks/usePalette';
 
 interface AppIconProps {
   icon: React.ElementType;
@@ -20,7 +21,8 @@ interface AppIconProps {
  *  5. White Lucide icon with drop-shadow
  */
 export default function AppIcon({ icon: Icon, colorKey, size }: AppIconProps) {
-  const colors = getIconColors(colorKey);
+  const mono = useIsMono();
+  const colors = mono ? MONO_ICON_SCHEME : getIconColors(colorKey);
   const radius = Math.round(size * 0.22);
   const iconSize = Math.round(size * 0.46);
 
@@ -32,23 +34,30 @@ export default function AppIcon({ icon: Icon, colorKey, size }: AppIconProps) {
         height: size,
         borderRadius: radius,
         background: colors.gradient,
-        boxShadow: [
-          `0 4px 14px ${colors.shadow}`,
-          `0 1px 3px rgba(0,0,0,0.12)`,
-          `inset 0 1px 1px rgba(255,255,255,0.3)`,
-          `inset 0 -1px 2px rgba(0,0,0,0.1)`,
-        ].join(', '),
+        // Mono: flat graphite face with hairline border + soft restrained shadow,
+        // no gloss. Color (Fun): today's raised-glass gradient + insets.
+        border: mono ? `1px solid ${colors.glow}` : undefined,
+        boxShadow: mono
+          ? `0 2px 8px ${colors.shadow}, 0 1px 2px rgba(0,0,0,0.18)`
+          : [
+              `0 4px 14px ${colors.shadow}`,
+              `0 1px 3px rgba(0,0,0,0.12)`,
+              `inset 0 1px 1px rgba(255,255,255,0.3)`,
+              `inset 0 -1px 2px rgba(0,0,0,0.1)`,
+            ].join(', '),
       }}
     >
-      {/* Top highlight — light reflecting off the surface */}
-      <div
-        className="absolute inset-x-0 top-0 pointer-events-none"
-        style={{
-          height: '50%',
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-          borderRadius: `${radius}px ${radius}px 0 0`,
-        }}
-      />
+      {/* Top highlight — light reflecting off the surface (gloss only in Fun mode) */}
+      {!mono && (
+        <div
+          className="absolute inset-x-0 top-0 pointer-events-none"
+          style={{
+            height: '50%',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+            borderRadius: `${radius}px ${radius}px 0 0`,
+          }}
+        />
+      )}
 
       {/* Icon */}
       <div className="relative z-10 flex items-center justify-center w-full h-full">

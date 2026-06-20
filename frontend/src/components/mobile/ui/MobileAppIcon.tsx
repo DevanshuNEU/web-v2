@@ -21,6 +21,7 @@
  */
 
 import React from 'react';
+import { useIsMono } from '@/hooks/usePalette';
 
 export interface MobileAppIconProps {
   /** Icon content shown inside the squircle (Lucide icon, <img>, emoji, …). */
@@ -55,6 +56,7 @@ export default function MobileAppIcon({
   size = 60,
   className = '',
 }: MobileAppIconProps) {
+  const mono = useIsMono();
   const radius = Math.round(size * 0.225);
   const showBadge = badge !== undefined && badge !== false && badge !== 0;
   const badgeText =
@@ -90,7 +92,11 @@ export default function MobileAppIcon({
                 ? `${badge} unread`
                 : 'has notifications'
             }
-            className="absolute -top-1 -right-1.5 min-w-[20px] h-5 px-[5px] flex items-center justify-center rounded-full bg-[#ff3b30] text-white text-[11px] font-semibold leading-none ring-2 ring-bg pointer-events-none"
+            className={`absolute -top-1 -right-1.5 min-w-[20px] h-5 px-[5px] flex items-center justify-center rounded-full text-[11px] font-semibold leading-none ring-2 ring-bg pointer-events-none ${
+              mono
+                ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900'
+                : 'bg-[#ff3b30] text-white'
+            }`}
           >
             {badgeText}
           </span>

@@ -4,8 +4,40 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion, useMotionValue, useSpring } from 'framer-motion';
 import Image from 'next/image';
 import { useTheme } from '@/store/themeStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { spring } from '@/lib/motion';
 import { tintForHour } from '@/lib/livingDesktop';
+
+// ---------------------------------------------------------------------------
+// Palette helper — luminance-preserving grayscale for the mono palette
+// ---------------------------------------------------------------------------
+
+/**
+ * toGrayscale — convert a hex color to its perceptual-luma gray.
+ *
+ * Pure: hex (#rgb or #rrggbb) → '#gggggg' where g is the Rec. 601 luma
+ * 0.299r + 0.587g + 0.114b. Used at render time to make any wallpaper render
+ * in premium black & white when the palette is 'mono'; the source wallpaper
+ * data is never mutated, so the 'color' (Fun) path reads the originals.
+ * Returns the input unchanged if it is not a parseable hex string.
+ */
+export function toGrayscale(hex: string): string {
+  if (typeof hex !== 'string') return hex;
+  let h = hex.trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return hex;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luma = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+  const hexLuma = Math.max(0, Math.min(255, luma)).toString(16).padStart(2, '0');
+  return `#${hexLuma}${hexLuma}${hexLuma}`;
+}
+
+/** Map an array of hex colors through toGrayscale only when mono is active. */
+function paletteColors(colors: string[], mono: boolean): string[] {
+  return mono ? colors.map(toGrayscale) : colors;
+}
 
 // ---------------------------------------------------------------------------
 // Living desktop — cursor parallax + time-of-day ambient tint
@@ -36,7 +68,7 @@ function useParallax(reduced: boolean) {
   return { x: sx, y: sy, scale: reduced ? 1 : 1.06 };
 }
 
-function TimeOfDayTint() {
+function TimeOfDayTint({ mono }: { mono: boolean }) {
   const [tint, setTint] = useState<string | null>(null);
   useEffect(() => {
     const update = () => setTint(tintForHour(new Date().getHours()));
@@ -45,11 +77,17 @@ function TimeOfDayTint() {
     return () => clearInterval(t);
   }, []);
   if (!tint) return null;
+  // The ambient tint is a colored rgba(...) string; mono renders it as a neutral
+  // wash via a grayscale filter so it keeps the time-of-day brightness cue
+  // without introducing hue.
   return (
     <div
       aria-hidden
       className="fixed inset-0 -z-10 pointer-events-none transition-[background] duration-1000"
-      style={{ background: `radial-gradient(120% 90% at 50% 0%, ${tint}, transparent 70%)` }}
+      style={{
+        background: `radial-gradient(120% 90% at 50% 0%, ${tint}, transparent 70%)`,
+        filter: mono ? 'grayscale(1)' : undefined,
+      }}
     />
   );
 }
@@ -58,7 +96,7 @@ function TimeOfDayTint() {
 // Canvas Animations
 // ---------------------------------------------------------------------------
 
-function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boolean }) {
+function ParticlesCanvas({ colors, reduced, mono }: { colors: string[]; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const parallax = useParallax(reduced);
 
@@ -75,7 +113,10 @@ function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boole
     resize();
     window.addEventListener('resize', resize);
 
-    const color = colors[0] ?? '#4facfe';
+    const palette = paletteColors(colors, mono);
+    const fallback = mono ? toGrayscale('#4facfe') : '#4facfe';
+    const color = palette[0] ?? fallback;
+    const bg = mono ? toGrayscale('#080818') : '#080818';
     const N = 75;
     const MAX_DIST = 130;
 
@@ -89,7 +130,7 @@ function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boole
 
     let raf: number;
     const draw = () => {
-      ctx.fillStyle = '#080818';
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (let i = 0; i < N; i++) {
@@ -126,7 +167,7 @@ function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boole
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors, reduced]);
+  }, [colors, reduced, mono]);
 
   return (
     <motion.canvas
@@ -139,7 +180,7 @@ function ParticlesCanvas({ colors, reduced }: { colors: string[]; reduced: boole
 
 // ---------------------------------------------------------------------------
 
-function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }) {
+function StarfieldCanvas({ speed, reduced, mono }: { speed: number; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const parallax = useParallax(reduced);
 
@@ -172,7 +213,8 @@ function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
 
-      ctx.fillStyle = 'rgba(4,4,16,0.25)';
+      // Trail fade. The colorful path keeps its faint navy cast; mono neutralizes it.
+      ctx.fillStyle = mono ? 'rgba(8,8,8,0.25)' : 'rgba(4,4,16,0.25)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       stars.forEach(s => {
@@ -193,7 +235,9 @@ function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }
 
         const size = Math.max(0.1, (1 - s.z / canvas.width) * 3);
         const brightness = Math.floor((1 - s.z / canvas.width) * 255);
-        const col = `rgb(${brightness},${brightness},${Math.min(255, brightness + 30)})`;
+        // Colorful stars carry a faint blue lift; mono stars are pure gray.
+        const blue = mono ? brightness : Math.min(255, brightness + 30);
+        const col = `rgb(${brightness},${brightness},${blue})`;
 
         ctx.beginPath();
         ctx.moveTo(px, py);
@@ -211,7 +255,7 @@ function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [speed, reduced]);
+  }, [speed, reduced, mono]);
 
   return (
     <motion.canvas
@@ -224,7 +268,7 @@ function StarfieldCanvas({ speed, reduced }: { speed: number; reduced: boolean }
 
 // ---------------------------------------------------------------------------
 
-function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: number; reduced: boolean }) {
+function MeshCanvas({ colors, speed, reduced, mono }: { colors: string[]; speed: number; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const parallax = useParallax(reduced);
 
@@ -241,7 +285,9 @@ function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: numbe
     resize();
     window.addEventListener('resize', resize);
 
-    const blobs = colors.map((color, i) => ({
+    const palette = paletteColors(colors, mono);
+    const bg = mono ? toGrayscale('#07071a') : '#07071a';
+    const blobs = palette.map((color, i) => ({
       x: canvas.width * (0.15 + i * 0.28),
       y: canvas.height * (0.3 + (i % 2) * 0.35),
       vx: ((Math.random() - 0.5) * speed) / 20,
@@ -252,7 +298,7 @@ function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: numbe
 
     let raf: number;
     const draw = () => {
-      ctx.fillStyle = '#07071a';
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (const b of blobs) {
@@ -278,7 +324,7 @@ function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: numbe
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors, speed, reduced]);
+  }, [colors, speed, reduced, mono]);
 
   return (
     <motion.canvas
@@ -293,7 +339,7 @@ function MeshCanvas({ colors, speed, reduced }: { colors: string[]; speed: numbe
 // Grid — PostHog-inspired dark navy base + drifting color glows + dot grid
 // ---------------------------------------------------------------------------
 
-function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean }) {
+function GridCanvas({ colors, reduced, mono }: { colors: string[]; reduced: boolean; mono: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const parallax = useParallax(reduced);
 
@@ -310,15 +356,17 @@ function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean })
     resize();
     window.addEventListener('resize', resize);
 
+    const palette = paletteColors(colors, mono);
+
     // Parse hex → [r, g, b] once
-    const parsed = colors.map(hex => {
+    const parsed = palette.map(hex => {
       const h = hex.replace('#', '');
       return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)] as [number,number,number];
     });
 
     // Seed blob positions differently so they spread across the canvas
     const startPositions = [[0.18, 0.28], [0.72, 0.18], [0.45, 0.78], [0.88, 0.65]];
-    const blobs = colors.map((color, i) => ({
+    const blobs = palette.map((color, i) => ({
       color,
       rgb: parsed[i],
       x: (startPositions[i % 4][0]) * window.innerWidth,
@@ -329,12 +377,14 @@ function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean })
 
     const GRID = 38;  // dot grid spacing px
 
+    const base = mono ? toGrayscale('#07091a') : '#07091a';
+
     let raf: number;
     const draw = () => {
       const W = canvas.width, H = canvas.height;
 
-      // Deep navy base
-      ctx.fillStyle = '#07091a';
+      // Deep navy base (graphite in mono)
+      ctx.fillStyle = base;
       ctx.fillRect(0, 0, W, H);
 
       // Move blobs + draw glow
@@ -392,7 +442,7 @@ function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean })
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, [colors, reduced]);
+  }, [colors, reduced, mono]);
 
   return (
     <motion.canvas
@@ -409,6 +459,9 @@ function GridCanvas({ colors, reduced }: { colors: string[]; reduced: boolean })
 
 export function AnimatedBackground() {
   const { wallpaper } = useTheme();
+  // Mono palette renders every wallpaper in luminance-preserving grayscale at
+  // render time; the Fun (color) path keeps the original hardcoded hues.
+  const mono = useIsMono();
   // When the OS requests reduced motion, canvases render a single static frame
   // instead of running their requestAnimationFrame loop.
   const reduced = !!useReducedMotion();
@@ -419,16 +472,16 @@ export function AnimatedBackground() {
     const { pattern, colors, speed } = wallpaper.animatedConfig;
 
     const canvas =
-      pattern === 'particles' ? <ParticlesCanvas colors={colors} reduced={reduced} />
-      : pattern === 'starfield' ? <StarfieldCanvas speed={speed} reduced={reduced} />
-      : pattern === 'grid' ? <GridCanvas colors={colors} reduced={reduced} />
+      pattern === 'particles' ? <ParticlesCanvas colors={colors} reduced={reduced} mono={mono} />
+      : pattern === 'starfield' ? <StarfieldCanvas speed={speed} reduced={reduced} mono={mono} />
+      : pattern === 'grid' ? <GridCanvas colors={colors} reduced={reduced} mono={mono} />
       // mesh / radial / wave → gradient blobs
-      : <MeshCanvas colors={colors} speed={speed} reduced={reduced} />;
+      : <MeshCanvas colors={colors} speed={speed} reduced={reduced} mono={mono} />;
 
     return (
       <>
         {canvas}
-        <TimeOfDayTint />
+        <TimeOfDayTint mono={mono} />
       </>
     );
   }
@@ -443,6 +496,9 @@ export function AnimatedBackground() {
           priority
           quality={100}
           className="object-cover"
+          // Mono renders photographic wallpapers in grayscale so the desktop
+          // stays premium black & white; the Fun path keeps full color.
+          style={mono ? { filter: 'grayscale(1)' } : undefined}
         />
       </div>
     );

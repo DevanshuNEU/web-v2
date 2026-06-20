@@ -4,6 +4,7 @@ import React from 'react';
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
+import { useIsMono } from '@/hooks/usePalette';
 import { spring, INSTANT } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
 import { computeSnap, type SnapBounds } from '@/lib/windowSnap';
@@ -30,6 +31,7 @@ export default function Window({ window, children }: WindowProps) {
   const reduced = useReducedMotion();
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
+  const mono = useIsMono();
 
   // Drive open / drag scale through the same controls the genie minimize uses,
   // so there is one animation owner per window.
@@ -227,14 +229,19 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               closeWindow(window.id);
             }}
-            className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600
-                       transition-colors flex items-center justify-center"
+            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
+              mono
+                ? 'bg-black/45 hover:bg-black/65 dark:bg-white/35 dark:hover:bg-white/55'
+                : 'bg-red-500 hover:bg-red-600'
+            }`}
             title="Close"
           >
             <X
               size={7}
               strokeWidth={2.5}
-              className="text-red-900 opacity-0 group-hover:opacity-100 transition-opacity"
+              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                mono ? 'text-white dark:text-black' : 'text-red-900'
+              }`}
             />
           </button>
 
@@ -244,14 +251,19 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               handleMinimize();
             }}
-            className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500
-                       transition-colors flex items-center justify-center"
+            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
+              mono
+                ? 'bg-black/30 hover:bg-black/50 dark:bg-white/25 dark:hover:bg-white/45'
+                : 'bg-yellow-400 hover:bg-yellow-500'
+            }`}
             title="Minimize"
           >
             <Minus
               size={7}
               strokeWidth={2.5}
-              className="text-yellow-900 opacity-0 group-hover:opacity-100 transition-opacity"
+              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                mono ? 'text-white dark:text-black' : 'text-yellow-900'
+              }`}
             />
           </button>
 
@@ -261,14 +273,19 @@ export default function Window({ window, children }: WindowProps) {
               e.stopPropagation();
               maximizeWindow(window.id);
             }}
-            className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600
-                       transition-colors flex items-center justify-center"
+            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
+              mono
+                ? 'bg-black/20 hover:bg-black/40 dark:bg-white/15 dark:hover:bg-white/35'
+                : 'bg-green-500 hover:bg-green-600'
+            }`}
             title="Maximize"
           >
             <Square
               size={6}
               strokeWidth={2.5}
-              className="text-green-900 opacity-0 group-hover:opacity-100 transition-opacity"
+              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                mono ? 'text-white dark:text-black' : 'text-green-900'
+              }`}
             />
           </button>
         </div>

@@ -17,6 +17,7 @@ import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles } from 'lucide-re
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
 import { useChatStore } from '@/store/chatStore';
+import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
   type SpotlightItem,
@@ -40,24 +41,27 @@ const CATEGORY_META: Record<SpotlightCategory, { label: string; icon: React.Elem
 // ---------------------------------------------------------------------------
 
 function ResultRow({
-  item, isSelected, isDark, onSelect,
+  item, isSelected, isDark, mono, onSelect,
 }: {
-  item: SpotlightItem; isSelected: boolean; isDark: boolean; onSelect: () => void;
+  item: SpotlightItem; isSelected: boolean; isDark: boolean; mono: boolean; onSelect: () => void;
 }) {
   const meta = CATEGORY_META[item.category];
   const Icon = meta.icon;
+  // In mono the category hue carries no meaning (the label text does), so render
+  // the icon and chip in a neutral graphite tone; Fun keeps the per-category color.
+  const accentClass = mono ? 'text-text-secondary' : meta.color;
   return (
     <button
       onClick={onSelect}
       className={`w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors duration-75
         ${isSelected ? (isDark ? 'bg-white/10' : 'bg-black/6') : (isDark ? 'hover:bg-white/6' : 'hover:bg-black/4')}`}
     >
-      <Icon size={14} className={`flex-shrink-0 ${meta.color}`} />
+      <Icon size={14} className={`flex-shrink-0 ${accentClass}`} />
       <div className="flex-1 min-w-0">
         <span className={`text-sm font-medium truncate block ${isDark ? 'text-white/90' : 'text-gray-900'}`}>{item.title}</span>
         <span className={`text-[11px] truncate block leading-snug ${isDark ? 'text-white/40' : 'text-gray-500'}`}>{item.subtitle}</span>
       </div>
-      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.color} ${isDark ? 'bg-white/5' : 'bg-black/5'} flex-shrink-0`}>
+      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${accentClass} ${isDark ? 'bg-white/5' : 'bg-black/5'} flex-shrink-0`}>
         {meta.label}
       </span>
     </button>
@@ -104,6 +108,7 @@ export default function Spotlight() {
   const setSeed = useChatStore(state => state.setSeed);
   const { mode } = useTheme();
   const isDark = mode === 'dark';
+  const mono = useIsMono();
   const reduced = useReducedMotion();
 
   const askAvailable = query.trim().length > 0;
@@ -263,6 +268,7 @@ export default function Spotlight() {
                         item={item}
                         isSelected={(askAvailable ? i + 1 : i) === selIdx}
                         isDark={isDark}
+                        mono={mono}
                         onSelect={() => handleSelect(item)}
                       />
                     ))}
@@ -281,7 +287,7 @@ export default function Spotlight() {
                   const meta = CATEGORY_META[cat];
                   const Icon = meta.icon;
                   return (
-                    <span key={cat} className={`flex items-center gap-1 text-[11px] ${meta.color} opacity-60`}>
+                    <span key={cat} className={`flex items-center gap-1 text-[11px] ${mono ? 'text-text-secondary' : meta.color} opacity-60`}>
                       <Icon size={11} /> {meta.label}
                     </span>
                   );

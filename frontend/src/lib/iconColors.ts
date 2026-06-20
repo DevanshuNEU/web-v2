@@ -74,3 +74,21 @@ export const ICON_COLORS: Record<string, IconColorScheme> = {
 export function getIconColors(colorKey: string): IconColorScheme {
   return ICON_COLORS[colorKey] ?? ICON_COLORS.blue;
 }
+
+/**
+ * Mono palette — one unified graphite tile for every app icon.
+ *
+ * Premium Linear/Arc register: a near-flat dark graphite face with the
+ * faintest top-to-bottom gradient for depth, a hairline border, and a
+ * soft restrained shadow. No per-app hue, no heavy gloss. Used in both
+ * light and dark mode (dark tile + white glyph, mirroring iOS/macOS dark
+ * app tiles), so contrast holds either way.
+ */
+export const MONO_ICON_SCHEME: IconColorScheme = {
+  // Subtle near-black graphite gradient (top slightly lighter for depth).
+  gradient: 'linear-gradient(135deg, #2a2a2e 0%, #1c1c1f 100%)',
+  // Soft restrained shadow — neutral, low-spread.
+  shadow: 'rgba(0, 0, 0, 0.32)',
+  // Hairline border color (used as a crisp 1px stroke, not a glow).
+  glow: 'rgba(255, 255, 255, 0.10)',
+};

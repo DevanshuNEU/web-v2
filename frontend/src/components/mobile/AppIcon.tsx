@@ -3,7 +3,8 @@
 import React from 'react';
 import type { AppType } from '../../../../shared/types';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
-import { getIconColors } from '@/lib/iconColors';
+import { getIconColors, MONO_ICON_SCHEME } from '@/lib/iconColors';
+import { useIsMono } from '@/hooks/usePalette';
 import { useLongPress } from '@/hooks/useLongPress';
 import { useMobileStore } from '@/store/mobileStore';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -29,9 +30,10 @@ export default function AppIcon({
   size = 60,
   label: labelOverride,
 }: AppIconProps) {
+  const mono = useIsMono();
   const reg = appRegistry[appType];
   const label = labelOverride ?? getAppLabel(appType).title;
-  const colors = getIconColors(reg.iconColor);
+  const colors = mono ? MONO_ICON_SCHEME : getIconColors(reg.iconColor);
   const Icon = reg.icon;
 
   const wiggleMode = useMobileStore((s) => s.wiggleMode);
@@ -70,7 +72,12 @@ export default function AppIcon({
           width: size,
           height: size,
           background: colors.gradient,
-          boxShadow: `0 8px 16px ${colors.shadow}, inset 0 1px 0 rgba(255,255,255,0.3)`,
+          // Mono: flat graphite face with hairline border + soft shadow, no gloss.
+          // Color (Fun): today's gradient with raised inset highlight.
+          border: mono ? `1px solid ${colors.glow}` : undefined,
+          boxShadow: mono
+            ? `0 4px 12px ${colors.shadow}, 0 1px 2px rgba(0,0,0,0.18)`
+            : `0 8px 16px ${colors.shadow}, inset 0 1px 0 rgba(255,255,255,0.3)`,
         }}
       >
         <Icon size={Math.round(size * 0.55)} className="text-white" strokeWidth={2} />
