@@ -13,7 +13,7 @@ export function ContactSection() {
 
       {/* Hero — matches Journey / What Excites Me / Currently */}
       <div className="space-y-4">
-        <h1 className="text-4xl font-semibold text-text leading-tight">
+        <h1 className="font-display text-4xl text-text leading-tight">
           Let&apos;s <span className="text-accent">connect</span>
         </h1>
         <p className="text-xl text-text-secondary max-w-3xl leading-relaxed">

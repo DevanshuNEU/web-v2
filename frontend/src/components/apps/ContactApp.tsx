@@ -225,7 +225,7 @@ export default function ContactApp() {
             >
               {/* Header */}
               <div className="mb-5">
-                <h1 className="text-xl font-bold text-text mb-1">Drop me a line</h1>
+                <h1 className="font-display text-xl text-text mb-1">Drop me a line</h1>
                 <p className="text-sm text-text-secondary">
                   Have a role? A project? Just want to say hi? Send it over.
                 </p>

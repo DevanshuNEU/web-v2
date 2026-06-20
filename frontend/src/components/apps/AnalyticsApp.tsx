@@ -129,7 +129,7 @@ export default function AnalyticsApp() {
 
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-text">
+          <h1 className="font-display text-2xl text-text">
             Live <span className="text-accent">Analytics</span>
           </h1>
           <p className="text-text-secondary text-sm">

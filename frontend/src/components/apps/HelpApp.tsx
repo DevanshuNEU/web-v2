@@ -165,7 +165,7 @@ function TourView({ onExit }: { onExit: () => void }) {
             >
               <Icon size={40} className="text-white" strokeWidth={2} />
             </div>
-            <h2 className="text-2xl font-semibold text-text leading-tight">
+            <h2 className="font-display text-2xl text-text leading-tight">
               {current.title}
             </h2>
             <p className="text-text-secondary leading-relaxed">
@@ -290,7 +290,7 @@ function WelcomePane({ onStartTour }: { onStartTour: () => void }) {
           <LifeBuoy size={28} className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-text leading-tight">
+          <h1 className="font-display text-2xl text-text leading-tight">
             New here?
           </h1>
           <p className="text-text-secondary text-sm mt-0.5">

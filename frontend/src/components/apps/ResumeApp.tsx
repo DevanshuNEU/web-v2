@@ -62,7 +62,7 @@ function ResumeMobile({
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 px-5 pt-5 pb-3 border-b border-black/6 dark:border-white/6">
-        <h1 className="text-2xl font-bold text-text leading-tight tracking-tight">{RESUME.name}</h1>
+        <h1 className="font-display text-2xl text-text leading-tight tracking-tight">{RESUME.name}</h1>
         <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20">
           {RESUME.title}
         </span>
@@ -242,7 +242,7 @@ export default function ResumeApp({ variant }: { variant?: 'desktop' | 'mobile' 
           {/* Identity */}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-text leading-tight tracking-tight">{RESUME.name}</h1>
+              <h1 className="font-display text-xl text-text leading-tight tracking-tight">{RESUME.name}</h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
                 {RESUME.title}
               </span>

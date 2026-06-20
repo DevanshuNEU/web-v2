@@ -11,7 +11,7 @@ export function ExcitesSection() {
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero */}
       <div className="space-y-6">
-        <h1 className="text-4xl font-semibold text-text leading-tight">
+        <h1 className="font-display text-4xl text-text leading-tight">
           What gets me
           <br />
           <span className="text-accent">genuinely excited</span>
@@ -50,7 +50,7 @@ export function ExcitesSection() {
       {/* Retrieval / RAG */}
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-5">
-          <h2 className="text-3xl font-semibold text-text">Retrieval that actually works</h2>
+          <h2 className="font-display text-3xl text-text">Retrieval that actually works</h2>
           <p className="text-text-secondary text-lg leading-relaxed">
             Most RAG is one embedding model and a prayer. I care about the version
             that holds up: hybrid retrieval that combines AST structure, BM25 keyword
@@ -91,7 +91,7 @@ export function ExcitesSection() {
 
       {/* The Learning Addiction */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-semibold text-text">
+        <h2 className="font-display text-3xl text-text">
           The learning never stops
         </h2>
 
@@ -149,7 +149,7 @@ export function ExcitesSection() {
         <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
         <div className="relative glass-subtle p-8 border border-accent/20">
           <div className="space-y-5">
-            <h2 className="text-3xl font-semibold text-text">
+            <h2 className="font-display text-3xl text-text">
               Technology that actually matters
             </h2>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">

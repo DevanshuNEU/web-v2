@@ -462,7 +462,7 @@ function AboutView() {
   return (
     <div className="py-4 flex flex-col gap-6 pb-12">
       <div className="px-5 pt-2">
-        <h2 className="text-[28px] font-bold text-text">devOS</h2>
+        <h2 className="font-display text-[28px] text-text">devOS</h2>
         <p className="text-[15px] text-text-secondary mt-0.5">
           Version 2.2.0 · Sprint 4
         </p>

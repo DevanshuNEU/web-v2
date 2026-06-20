@@ -197,6 +197,16 @@ body {
     -webkit-backdrop-filter: blur(var(--glass-blur-extreme)) saturate(180%);
   }
   
+  /* Editorial display face — opt-in, headings/hero only. Instrument Serif is
+     single-weight (400); apply font-weight 400 and strip any font-bold at the
+     call site (faux-bold smears this face). Tracking/leading tuned for display. */
+  .font-display {
+    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+
   /* Text utilities */
   .text-primary {
     color: rgb(var(--color-text));
@@ -439,4 +449,17 @@ body {
 .app-content .text-3xl { font-size: clamp(1.35rem, 3.8cqi, 1.875rem); }
 .app-content .text-2xl { font-size: clamp(1.15rem, 3cqi, 1.5rem); }
 .app-content .text-xl  { font-size: clamp(1.05rem, 2.4cqi, 1.25rem); }
+
+/* ============================================
+   MAGNETIC FLAT BUTTONS
+   useMagneticField() writes --mag-x / --mag-y on hovered [data-magnetic="button"]
+   elements; this rule applies the translate and a spring-like settle. Scoped to
+   the ="button" value only, so dock app icons (bare [data-magnetic], which run
+   their own magnification scale transform) are never translated. Vars default to
+   0px, so the rule rests at no offset under reduced motion / coarse pointer.
+   ============================================ */
+[data-magnetic='button'] {
+  transform: translate(var(--mag-x, 0px), var(--mag-y, 0px));
+  transition: transform 200ms cubic-bezier(0.18, 0.9, 0.32, 1.2);
+}
 .app-content .text-lg  { font-size: clamp(0.95rem, 2cqi, 1.125rem); }

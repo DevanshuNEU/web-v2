@@ -19,7 +19,7 @@ export function CurrentlySection() {
 
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-4xl font-semibold text-text leading-tight">
+        <h1 className="font-display text-4xl text-text leading-tight">
           Right now <span className="text-accent">in my life</span>
         </h1>
         <p className="text-xl text-text-secondary max-w-3xl leading-relaxed">
@@ -32,7 +32,7 @@ export function CurrentlySection() {
         <div className="space-y-5">
           <div className="flex items-center gap-3">
             <div className="text-accent"><Target size={24} /></div>
-            <h2 className="text-2xl font-semibold text-text">The job hunt is real</h2>
+            <h2 className="font-display text-2xl text-text">The job hunt is real</h2>
           </div>
           <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
             <p>
@@ -58,7 +58,7 @@ export function CurrentlySection() {
       {/* Academic Life */}
       <div className="relative pl-8 border-l-2 border-accent/30">
         <div className="space-y-5">
-          <h2 className="text-3xl font-semibold text-text">MS at Northeastern</h2>
+          <h2 className="font-display text-3xl text-text">MS at Northeastern</h2>
           <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
             <p>Finished May 2026. TA&apos;d Network Structures & Cloud Computing (CSYE6225) through my last two semesters.</p>
             <p>
@@ -78,7 +78,7 @@ export function CurrentlySection() {
       {/* What I'm shipping — OCI + Saar */}
       <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent">
         <div className="space-y-5">
-          <h2 className="text-2xl font-semibold text-text">What I&apos;m shipping</h2>
+          <h2 className="font-display text-2xl text-text">What I&apos;m shipping</h2>
           <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
             <p>
               Most of my energy goes into building at the MCP layer right now.{" "}
@@ -103,7 +103,7 @@ export function CurrentlySection() {
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="text-accent"><Monitor size={32} /></div>
-              <h2 className="text-3xl font-semibold text-text">Building Portfolio OS</h2>
+              <h2 className="font-display text-3xl text-text">Building Portfolio OS</h2>
             </div>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
               <p>You&apos;re literally inside it right now. Started as a weekend project, turned into an ongoing experiment.</p>
@@ -156,7 +156,7 @@ export function CurrentlySection() {
 
       {/* Beyond Code */}
       <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <h2 className="text-2xl font-semibold text-text mb-5">Life beyond code</h2>
+        <h2 className="font-display text-2xl text-text mb-5">Life beyond code</h2>
         <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
           <p>
             Grad school, TAing, and an active job search is a lot to juggle. The routine I built
@@ -187,7 +187,7 @@ export function CurrentlySection() {
         <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
         <div className="relative glass-subtle p-8 border border-accent/20">
           <div className="space-y-5">
-            <h2 className="text-3xl font-semibold text-text">The honest truth</h2>
+            <h2 className="font-display text-3xl text-text">The honest truth</h2>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
               <p>
                 I&apos;m at that stage where possibilities feel endless but nothing&apos;s guaranteed.

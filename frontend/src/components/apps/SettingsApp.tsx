@@ -287,7 +287,7 @@ function AboutSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text mb-0.5">devOS</h2>
+        <h2 className="font-display text-2xl text-text mb-0.5">devOS</h2>
         <p className="text-sm text-text-secondary">Version 2.2.0 · Sprint 4</p>
         <p className="text-xs text-text-secondary mt-0.5">Built by Devanshu Chicholikar</p>
       </div>

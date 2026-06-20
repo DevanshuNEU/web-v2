@@ -238,7 +238,7 @@ export default function SkillsDashboardApp() {
         {/* Title row */}
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-text">Skills</h1>
+            <h1 className="font-display text-xl text-text">Skills</h1>
             <p className="text-[11px] text-text-secondary mt-0.5">
               {SKILLS.length} skills across 6 domains · hover to trace dependency chains
             </p>

@@ -117,7 +117,7 @@ function MobileLayout({ data }: { data: ActivePayload }) {
           <Github size={12} />
           <span>github.com/{data.username}</span>
         </div>
-        <h1 className="text-display font-bold mt-1">Activity</h1>
+        <h1 className="font-display text-display mt-1">Activity</h1>
       </header>
 
       <StatStrip data={data} />
@@ -172,7 +172,7 @@ function DesktopLayout({ data }: { data: ActivePayload }) {
           <Github size={12} />
           <span>github.com/{data.username}</span>
         </div>
-        <h1 className="text-[24px] font-bold mt-1">Activity</h1>
+        <h1 className="font-display text-[24px] mt-1">Activity</h1>
       </header>
 
       <div className="p-6 flex flex-col gap-6">

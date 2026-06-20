@@ -11,7 +11,7 @@ export function JourneySection() {
       className="p-8 space-y-12 w-full max-w-5xl mx-auto">
       {/* Hero Opening */}
       <div className="space-y-6">
-        <h1 className="text-4xl font-semibold text-text leading-tight">
+        <h1 className="font-display text-4xl text-text leading-tight">
           It started with a laptop
           <br />
           <span className="text-accent">and way too much curiosity</span>
@@ -118,7 +118,7 @@ export function JourneySection() {
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="text-accent"><Lightbulb size={32} /></div>
-              <h3 className="text-3xl font-semibold text-text">
+              <h3 className="font-display text-3xl text-text">
                 Then I discovered Microsoft Encarta
               </h3>
             </div>
@@ -166,7 +166,7 @@ export function JourneySection() {
         <div className="inline-block px-4 py-2 bg-accent/10 rounded-full text-accent font-medium">
           The moment it clicked
         </div>
-        <h2 className="text-4xl font-semibold text-text">
+        <h2 className="font-display text-4xl text-text">
           10th standard.
           <br />
           <code className="text-3xl px-3 py-1 bg-black/30 rounded font-mono text-accent">
@@ -222,7 +222,7 @@ export function JourneySection() {
 
       {/* React & Promises */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-semibold text-text">
+        <h2 className="font-display text-3xl text-text">
           React confused the hell out of me
         </h2>
 
@@ -294,7 +294,7 @@ export function JourneySection() {
           <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
             Grad school
           </div>
-          <h2 className="text-3xl font-semibold text-text">
+          <h2 className="font-display text-3xl text-text">
             Northeastern & being a TA
           </h2>
           <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
@@ -328,7 +328,7 @@ export function JourneySection() {
             <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
               Now
             </div>
-            <h2 className="text-3xl font-semibold text-text">
+            <h2 className="font-display text-3xl text-text">
               Building at the MCP layer
             </h2>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">

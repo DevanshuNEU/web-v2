@@ -282,7 +282,7 @@ function AboutMeMobile({
         >
           <Image src={identity.photo} alt={identity.name} width={96} height={96} className="w-full h-full object-cover" />
         </div>
-        <h1 className="mt-4 text-hero font-semibold text-text">{identity.name}</h1>
+        <h1 className="mt-4 font-display text-hero text-text">{identity.name}</h1>
         <p className="mt-1 text-sm text-text-secondary">{identity.title}</p>
         <span className={`mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label font-medium ${
           mono

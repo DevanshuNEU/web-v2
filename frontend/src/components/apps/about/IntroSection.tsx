@@ -44,7 +44,7 @@ export function IntroSection() {
           </div>
         </motion.div>
 
-        <h1 className="text-4xl font-bold text-text mb-2">{identity.name}</h1>
+        <h1 className="font-display text-4xl text-text mb-2">{identity.name}</h1>
         <p className="text-xl text-text-secondary mb-4">{identity.title}</p>
 
         <div className="flex items-center justify-center gap-6 text-sm text-text-secondary mb-6">
@@ -72,7 +72,7 @@ export function IntroSection() {
 
       {/* Origin Story */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-bold text-text">How it started</h2>
+        <h2 className="font-display text-3xl text-text">How it started</h2>
         <div className="grid md:grid-cols-2 gap-6">
           {originStory.map((card) => {
             const Icon = ORIGIN_ICONS[card.iconName];
@@ -92,7 +92,7 @@ export function IntroSection() {
         <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
         <div className="relative glass-subtle p-8 border border-accent/20">
           <div className="space-y-5">
-            <h2 className="text-3xl font-bold text-text">What I&apos;m about</h2>
+            <h2 className="font-display text-3xl text-text">What I&apos;m about</h2>
             <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
               {whatImAbout.map((para, i) => (
                 <p key={i} className={i === whatImAbout.length - 1 ? "text-text text-xl font-medium" : undefined}>

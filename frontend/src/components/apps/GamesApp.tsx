@@ -265,7 +265,7 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
 
       {/* ── Header ── */}
       <div className="flex-shrink-0 text-center">
-        <h1 className="text-lg font-bold text-text tracking-tight">Arcade</h1>
+        <h1 className="font-display text-lg text-text tracking-tight">Arcade</h1>
         <p className="text-[10px] text-text-secondary mt-0.5">Three classics · one window · zero productivity</p>
       </div>
 

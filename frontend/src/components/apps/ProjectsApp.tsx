@@ -202,7 +202,7 @@ function ProjectDetail({ repo }: { repo: EnrichedRepo }) {
         </div>
 
         {/* Project name */}
-        <h2 className="text-3xl font-bold text-text tracking-tight leading-tight mb-1">
+        <h2 className="font-display text-3xl text-text tracking-tight leading-tight mb-1">
           {repo.displayName}
         </h2>
         <p className="text-base text-text-secondary mb-4 leading-snug">{repo.tagline}</p>
@@ -388,7 +388,7 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
             {repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel org' : '@DevanshuNEU'}
           </span>
         </div>
-        <h2 className="text-2xl font-bold text-text tracking-tight leading-tight mb-1">{repo.displayName}</h2>
+        <h2 className="font-display text-2xl text-text tracking-tight leading-tight mb-1">{repo.displayName}</h2>
         <p className="text-sm text-text-secondary mb-3 leading-snug">{repo.tagline}</p>
         <div className="flex items-center gap-3 text-xs text-text-secondary mb-4 flex-wrap">
           {repo.language && <LangDot lang={repo.language} />}
