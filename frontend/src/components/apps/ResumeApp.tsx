@@ -104,7 +104,7 @@ function Masthead() {
                   rel="noopener noreferrer"
                   className="group inline-flex"
                 >
-                  <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+                  <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
                     {c.label}
                   </MetaLabel>
                 </a>
@@ -182,7 +182,7 @@ function ProjectsBody() {
           href={`https://${proj.link}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="group flex flex-col gap-2 py-5 transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.04]"
+          className="group flex flex-col gap-2 py-5 transition-colors [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025] dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]"
         >
           <div className="flex items-baseline gap-4">
             <MetaLabel className="w-8 shrink-0 justify-start text-text-secondary">
@@ -228,7 +228,10 @@ function SkillsBody() {
                       &middot;
                     </span>
                   )}
-                  <span className="font-mono text-[13px] leading-snug text-text">
+                  <span
+                    className="font-mono leading-snug text-text"
+                    style={{ fontSize: 'clamp(0.7rem, 1.6cqi, 0.8125rem)' }}
+                  >
                     {skill}
                   </span>
                 </React.Fragment>
@@ -311,7 +314,7 @@ function ModeToggle({
             type="button"
             onClick={() => onMode(id)}
             aria-current={active ? 'true' : undefined}
-            className="group relative focus-visible:outline-none"
+            className="group relative origin-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
           >
             <MetaLabel
               className={
@@ -342,14 +345,14 @@ function DownloadControl() {
     <a
       href={PDF_HREF}
       download={PDF_DOWNLOAD}
-      className="group inline-flex items-center focus-visible:outline-none"
+      className="group inline-flex origin-center items-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
     >
-      <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+      <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
         Download PDF
       </MetaLabel>
       <span
         aria-hidden
-        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 group-hover:scale-x-150"
+        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
       />
     </a>
   );
@@ -364,8 +367,11 @@ function PdfSurface() {
     <motion.div
       key="pdf"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{
+        opacity: 1,
+        transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
+      }}
+      exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
       className="flex-1 overflow-hidden bg-bg"
     >
       <iframe
@@ -402,7 +408,7 @@ function RailRow({
       onClick={onClick}
       data-testid="rail-row"
       aria-current={active ? 'true' : undefined}
-      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+      className="group relative flex w-full origin-left items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
     >
       {active && (
         <motion.span
@@ -416,16 +422,20 @@ function RailRow({
         />
       )}
       <span
-        className={`font-mono-meta shrink-0 transition-opacity ${
-          active ? 'opacity-100' : 'opacity-50 group-hover:opacity-80'
+        className={`font-mono-meta shrink-0 transition-opacity duration-150 ${
+          active
+            ? 'opacity-100'
+            : 'opacity-50 [@media(hover:hover)and(pointer:fine)]:group-hover:opacity-80'
         }`}
       >
         {number}
       </span>
       <span
-        className={`font-display min-w-0 flex-1 truncate transition-transform ${
-          active ? 'text-text' : 'text-text-secondary group-hover:text-text'
-        } ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+        className={`font-display min-w-0 flex-1 truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+          active
+            ? 'text-text'
+            : 'text-text-secondary [@media(hover:hover)and(pointer:fine)]:group-hover:text-text'
+        } ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
       >
         {label}
       </span>
@@ -570,8 +580,11 @@ function ResumeMobile() {
           <motion.div
             key="read"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
+            }}
+            exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
             className="flex flex-1 flex-col overflow-hidden"
           >
             <ReadDocument
@@ -644,8 +657,11 @@ export default function ResumeApp({
           <motion.div
             key="read"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            animate={{
+              opacity: 1,
+              transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
+            }}
+            exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
             className="flex flex-1 overflow-hidden"
           >
             {/* Index rail. */}
