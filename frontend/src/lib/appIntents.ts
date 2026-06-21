@@ -78,4 +78,17 @@ export const appIntents: Partial<Record<AppType, AppIntent[]>> = {
     { appType: 'changelog', kind: 'open', id: 'changelog.open', label: 'Open Changelog' },
     { appType: 'changelog', kind: 'ask-about', id: 'changelog.ask-about', label: 'Ask what changed' },
   ],
+  'display-options': [
+    { appType: 'display-options', kind: 'open', id: 'display-options.open', label: 'Open Preferences' },
+    { appType: 'display-options', kind: 'ask-about', id: 'display-options.ask-about', label: 'Ask about settings' },
+  ],
+  'terminal': [
+    { appType: 'terminal', kind: 'open', id: 'terminal.open', label: 'Open Terminal' },
+    { appType: 'terminal', kind: 'ask-about', id: 'terminal.ask-about', label: 'Ask about the terminal' },
+  ],
+  'file-explorer': [
+    { appType: 'file-explorer', kind: 'open', id: 'file-explorer.open', label: 'Open Finder' },
+    { appType: 'file-explorer', kind: 'ask-about', id: 'file-explorer.ask-about', label: 'Ask about the projects' },
+    { appType: 'file-explorer', kind: 'filter', id: 'file-explorer.filter.category', label: 'Filter by category', params: ['category'] },
+  ],
 };
