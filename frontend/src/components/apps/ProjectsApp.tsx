@@ -581,11 +581,11 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
               <dl className="flex flex-col">
                 {repo.achievements.map((a, i) => (
                   <div key={i}>
-                    <div className="flex items-baseline gap-5 py-4">
-                      <dd className="shrink-0 w-28 font-display text-text leading-none tabular-nums text-[clamp(1.6rem,4.5cqi,2.5rem)]">
+                    <div className="flex items-start gap-x-6 py-4">
+                      <dd className="shrink-0 w-[clamp(4.5rem,15cqi,8.5rem)] font-display text-text leading-[1.05] tabular-nums break-words [hyphens:none] text-[clamp(1.35rem,3.4cqi,2rem)]">
                         {a.metric}
                       </dd>
-                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <div className="flex-1 min-w-0 flex flex-col gap-1 pt-0.5">
                         <dt className="text-text font-medium text-sm leading-snug text-balance">{a.label}</dt>
                         <p className="text-text-secondary text-pretty text-[clamp(0.74rem,1.5cqi,0.85rem)] leading-snug">{a.detail}</p>
                       </div>
