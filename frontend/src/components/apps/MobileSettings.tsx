@@ -1,48 +1,52 @@
 'use client';
 
 /**
- * MobileSettings — iOS-style Settings app, mounted as the mobile variant of
- * SettingsApp. Wires real controls (light/dark mode, accent color, wallpaper,
- * sound effects) to themeStore + the existing sound preference helpers, so
- * tapping a setting here is functionally equivalent to using the desktop
- * Preferences sidebar.
+ * MobileSettings - iOS-style Settings app in the Instrument monochrome
+ * register, mounted as the mobile variant of SettingsApp. Keeps the iOS
+ * grouped-list / push-navigation feel but drops the colored iOS chrome:
+ * in Mono the icon tiles, switches, selection markers, and accent checks are
+ * graphite; the original color is opt-in via the Fun palette (useIsMono()).
+ *
+ * Wires real controls (light/dark mode, palette, accent, wallpaper, sound
+ * effects, usage analytics) to themeStore + the sound + analytics stores, so
+ * tapping a setting here is functionally equivalent to the desktop Preferences
+ * document.
  *
  * View tree:
  *   Root
- *   ├── About            (Profile row at top → version, stack, build info)
- *   ├── Wi-Fi            (decorative — toy networks list)
+ *   ├── About            (Profile row at top -> version, stack, build info)
+ *   ├── Wi-Fi            (decorative)
  *   ├── Bluetooth        (decorative)
  *   ├── Notifications    (placeholder)
- *   ├── Sounds & Haptics (REAL — sound effects toggle)
- *   ├── Display & Bright (REAL — light/dark + accent picker)
- *   ├── Wallpaper        (REAL — wallpaper picker, mobile-sized grid)
+ *   ├── Sounds & Haptics (REAL - sound effects toggle)
+ *   ├── Display & Bright (REAL - light/dark + palette + accent picker)
+ *   ├── Wallpaper        (REAL - wallpaper picker, mobile-sized grid)
+ *   ├── Privacy          (REAL - usage analytics opt-out)
  *   └── Accessibility    (placeholder)
  *
- * "Real" sub-views are the only ones with side effects; the rest are pure
- * portfolio dressing so the app feels populated without lying about
- * functionality.
+ * Switches are the monochrome MonoSwitch (no green "on"): the track fills
+ * graphite when on, hairline-bordered when off. Mono-safe by construction.
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   Plane,
   Wifi,
   Bluetooth,
   Bell,
   Volume2,
-  Moon,
   Sun,
-  Palette,
   Image as ImageIcon,
   Accessibility,
   ShieldCheck,
   ChevronRight,
-  Check,
   Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, ACCENT_COLORS } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 import type { Wallpaper } from '@/store/themeStore';
 import { getWallpapersForTheme } from '@/data/wallpapers';
 import {
@@ -50,6 +54,7 @@ import {
   setSoundEnabled,
   playSound,
 } from '@/hooks/useSoundEffects';
+import { withReduced } from '@/lib/motion';
 import MobilePushView, {
   useMobileNavigation,
   type PushViewEntry,
@@ -58,6 +63,88 @@ import MobileSection from '@/components/mobile/ui/MobileSection';
 import MobileListRow from '@/components/mobile/ui/MobileListRow';
 import MobileSegmented from '@/components/mobile/ui/MobileSegmented';
 import IconTile from '@/components/mobile/ui/IconTile';
+
+/* ────────────────────────────────────────────────────────────────────
+ * Monochrome primitives - palette-gated chrome reused across the views.
+ * ────────────────────────────────────────────────────────────────── */
+
+/**
+ * MonoSwitch - the restrained switch used everywhere in mobile Settings.
+ *
+ * No colored "on": filled graphite track (bg-text) when on, hairline border
+ * when off; knob springs across. role="switch" + aria-checked so the existing
+ * tests (and screen readers) read it exactly like the iOS switch it replaces.
+ */
+function MonoSwitch({
+  on,
+  onChange,
+  label,
+}: {
+  on: boolean;
+  onChange?: (on: boolean) => void;
+  label?: string;
+}) {
+  const reduced = useReducedMotion();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange?.(!on)}
+      className={`relative h-[31px] w-[51px] shrink-0 rounded-full border transition-colors duration-200
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-text/30
+                  ${on ? 'border-text bg-text' : 'border-border bg-transparent'}`}
+    >
+      <motion.span
+        aria-hidden
+        layout
+        transition={withReduced(
+          { type: 'spring', damping: 22, stiffness: 420, mass: 0.6 },
+          reduced,
+        )}
+        className={`absolute top-1/2 h-[25px] w-[25px] -translate-y-1/2 rounded-full shadow-sm
+                    ${on ? 'bg-bg' : 'bg-text'}`}
+        style={{ left: on ? 'calc(100% - 28px)' : '3px' }}
+      />
+    </button>
+  );
+}
+
+/** Convenience: a MonoSwitch wrapped as a MobileListRow custom accessory. */
+function switchAccessory(
+  on: boolean,
+  onChange: (on: boolean) => void,
+  label: string,
+) {
+  return <MonoSwitch on={on} onChange={onChange} label={label} />;
+}
+
+/**
+ * MonoIconTile - the leading squircle. In Mono it is graphite-on-bg with a
+ * hairline; in Fun it keeps the original iOS color. The `color` prop stays the
+ * source of truth for the Fun palette so nothing about that path changes.
+ */
+function MonoIconTile({
+  color,
+  icon,
+}: {
+  color: string;
+  icon: React.ReactNode;
+}) {
+  const mono = useIsMono();
+  if (mono) {
+    return (
+      <span
+        data-testid="icon-tile"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border border-border bg-surface text-text dark:bg-white/[0.06]"
+      >
+        {icon}
+      </span>
+    );
+  }
+  return <IconTile color={color} icon={icon} />;
+}
 
 /* ────────────────────────────────────────────────────────────────────
  * Public entry
@@ -85,20 +172,18 @@ function SettingsRoot() {
 
       <MobileSection inset>
         <MobileListRow
-          icon={<IconTile color="#ff9500" icon={<Plane size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#ff9500" icon={<Plane size={16} strokeWidth={2.2} />} />}
           title="Airplane Mode"
-          accessory="switch"
-          switchOn={airplane}
-          onSwitchToggle={setAirplane}
+          accessory={switchAccessory(airplane, setAirplane, 'Airplane Mode')}
         />
         <MobileListRow
-          icon={<IconTile color="#007AFF" icon={<Wifi size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#007AFF" icon={<Wifi size={16} strokeWidth={2.2} />} />}
           title="Wi-Fi"
           value={airplane ? 'Off' : 'Devanshu-5G'}
           onClick={() => nav.push(WIFI_VIEW)}
         />
         <MobileListRow
-          icon={<IconTile color="#5856D6" icon={<Bluetooth size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#5856D6" icon={<Bluetooth size={16} strokeWidth={2.2} />} />}
           title="Bluetooth"
           value={airplane ? 'Off' : 'On'}
           onClick={() => nav.push(BLUETOOTH_VIEW)}
@@ -107,12 +192,12 @@ function SettingsRoot() {
 
       <MobileSection inset>
         <MobileListRow
-          icon={<IconTile color="#ff3b30" icon={<Bell size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#ff3b30" icon={<Bell size={16} strokeWidth={2.2} />} />}
           title="Notifications"
           onClick={() => nav.push(placeholderView('Notifications'))}
         />
         <MobileListRow
-          icon={<IconTile color="#ff2d55" icon={<Volume2 size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#ff2d55" icon={<Volume2 size={16} strokeWidth={2.2} />} />}
           title="Sounds & Haptics"
           onClick={() => nav.push(SOUNDS_VIEW)}
         />
@@ -120,17 +205,17 @@ function SettingsRoot() {
 
       <MobileSection inset>
         <MobileListRow
-          icon={<IconTile color="#007AFF" icon={<Sun size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#007AFF" icon={<Sun size={16} strokeWidth={2.2} />} />}
           title="Display & Brightness"
           onClick={() => nav.push(DISPLAY_VIEW)}
         />
         <MobileListRow
-          icon={<IconTile color="#34c759" icon={<ImageIcon size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#34c759" icon={<ImageIcon size={16} strokeWidth={2.2} />} />}
           title="Wallpaper"
           onClick={() => nav.push(WALLPAPER_VIEW)}
         />
         <MobileListRow
-          icon={<IconTile color="#007AFF" icon={<Accessibility size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#007AFF" icon={<Accessibility size={16} strokeWidth={2.2} />} />}
           title="Accessibility"
           onClick={() => nav.push(placeholderView('Accessibility'))}
         />
@@ -138,12 +223,12 @@ function SettingsRoot() {
 
       <MobileSection
         inset
-        footer="Settings outside Display & Brightness, Wallpaper, and Sounds are demo-only — this is a portfolio surface, not your real phone."
+        footer="Settings outside Display & Brightness, Wallpaper, Sounds, and Privacy are demo-only - this is a portfolio surface, not your real phone."
       >
         <MobileListRow
-          icon={<IconTile color="#007AFF" icon={<ShieldCheck size={16} strokeWidth={2.4} />} />}
+          icon={<MonoIconTile color="#007AFF" icon={<ShieldCheck size={16} strokeWidth={2.2} />} />}
           title="Privacy & Security"
-          onClick={() => nav.push(placeholderView('Privacy & Security'))}
+          onClick={() => nav.push(PRIVACY_VIEW)}
         />
       </MobileSection>
     </div>
@@ -154,27 +239,23 @@ function ProfileRow({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="mx-3 flex items-center gap-4 px-4 py-3 rounded-2xl bg-surface dark:bg-white/[0.04] active:opacity-70 transition-opacity"
+      className="mx-3 flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3 transition-opacity active:opacity-70 dark:bg-white/[0.04]"
     >
-      <div
-        className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-white text-[24px] font-semibold shrink-0"
-        style={{
-          background: 'linear-gradient(135deg, #007AFF 0%, #5856D6 100%)',
-          boxShadow: '0 4px 10px -2px rgba(0,0,0,0.2)',
-        }}
+      <span
+        className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-text font-display text-[24px] text-bg"
         aria-hidden
       >
         DC
-      </div>
-      <div className="flex-1 text-left min-w-0">
-        <div className="text-[17px] font-semibold text-text truncate">
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block truncate font-display text-[19px] leading-tight text-text">
           Devanshu Chicholikar
-        </div>
-        <div className="text-[13px] text-text-secondary mt-0.5 truncate">
+        </span>
+        <span className="mt-0.5 block truncate font-mono-meta text-text-secondary">
           Software Engineer · Portfolio Build
-        </div>
-      </div>
-      <ChevronRight size={20} className="text-text-secondary/60 shrink-0" />
+        </span>
+      </span>
+      <ChevronRight size={20} className="shrink-0 text-text-secondary/60" />
     </button>
   );
 }
@@ -184,7 +265,8 @@ function ProfileRow({ onOpen }: { onOpen: () => void }) {
  * ────────────────────────────────────────────────────────────────── */
 
 function DisplayBrightnessView() {
-  const { mode, setMode, palette, setPalette, accentColor, setAccent } = useTheme();
+  const { mode, setMode, palette, setPalette, accentColor, setAccent } =
+    useTheme();
 
   return (
     <div className="py-4 flex flex-col gap-6">
@@ -201,7 +283,7 @@ function DisplayBrightnessView() {
               toast.success(
                 next === 'dark'
                   ? 'Dark mode. Very mysterious.'
-                  : 'Light mode. Welcome to the bright side.'
+                  : 'Light mode. Welcome to the bright side.',
               );
             }}
           />
@@ -225,60 +307,66 @@ function DisplayBrightnessView() {
               toast.success(
                 next === 'mono'
                   ? 'Mono. Premium black and white.'
-                  : 'Fun mode. Color, unleashed.'
+                  : 'Fun mode. Color, unleashed.',
               );
             }}
           />
         </div>
       </MobileSection>
 
+      {/* Accent picker - inherently colorful, gated to the Fun palette. */}
       {palette === 'color' && (
-      <MobileSection
-        inset
-        header="Accent Color"
-        footer="Used for buttons, switches, and highlights across devOS."
-      >
-        <div className="px-4 py-4 flex gap-3 flex-wrap" data-testid="accent-swatches">
-          {Object.entries(ACCENT_COLORS).map(([name, color]) => {
-            const isActive = accentColor === color;
-            return (
-              <button
-                key={name}
-                onClick={() => {
-                  setAccent(color);
-                  toast.success('New accent. Same great developer.');
-                }}
-                aria-label={`Set accent ${name}`}
-                aria-pressed={isActive}
-                className="relative w-9 h-9 rounded-full transition-transform active:scale-90"
-                style={{
-                  background: color,
-                  boxShadow: isActive
-                    ? `0 0 0 3px var(--bg, #fff), 0 0 0 5px ${color}`
-                    : '0 1px 4px rgba(0,0,0,0.18)',
-                }}
-              >
-                {isActive && (
-                  <Check
-                    size={16}
-                    className="absolute inset-0 m-auto text-white"
-                    strokeWidth={2.6}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </MobileSection>
+        <MobileSection
+          inset
+          header="Accent Color"
+          footer="Used for buttons, switches, and highlights across devOS."
+        >
+          <div className="px-4 py-4 flex gap-3 flex-wrap" data-testid="accent-swatches">
+            {Object.entries(ACCENT_COLORS).map(([name, color]) => {
+              const isActive = accentColor === color;
+              return (
+                <button
+                  key={name}
+                  onClick={() => {
+                    setAccent(color);
+                    toast.success('New accent. Same great developer.');
+                  }}
+                  aria-label={`Set accent ${name}`}
+                  aria-pressed={isActive}
+                  className="relative h-9 w-9 rounded-full transition-transform active:scale-90"
+                  style={{
+                    background: color,
+                    boxShadow: isActive
+                      ? `0 0 0 3px var(--bg, #fff), 0 0 0 5px ${color}`
+                      : '0 1px 4px rgba(0,0,0,0.18)',
+                  }}
+                >
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 m-auto h-3 w-3 rounded-full bg-white/90"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </MobileSection>
       )}
 
       <MobileSection
         inset
-        footer="True Tone and Auto-Lock are decorative — devOS doesn't drive your real display."
+        footer="True Tone and Auto-Lock are decorative - devOS doesn't drive your real display."
       >
-        <MobileListRow title="True Tone" accessory="switch" switchOn={true} onSwitchToggle={() => {}} />
+        <MobileListRow
+          title="True Tone"
+          accessory={switchAccessory(true, () => {}, 'True Tone')}
+        />
         <MobileListRow title="Auto-Lock" value="2 Minutes" />
-        <MobileListRow title="Raise to Wake" accessory="switch" switchOn={true} onSwitchToggle={() => {}} />
+        <MobileListRow
+          title="Raise to Wake"
+          accessory={switchAccessory(true, () => {}, 'Raise to Wake')}
+        />
       </MobileSection>
     </div>
   );
@@ -304,8 +392,8 @@ function WallpaperView() {
         footer="Live wallpapers animate behind the home screen and lock screen."
       >
         <div className="px-4 py-3 flex items-center gap-3">
-          <div
-            className={`w-16 h-16 rounded-xl overflow-hidden border border-text-secondary/15 shrink-0 ${mono ? 'grayscale' : ''}`}
+          <span
+            className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border ${mono ? 'grayscale' : ''}`}
             style={
               wallpaper?.imageUrl
                 ? { background: `url(${wallpaper.imageUrl}) center/cover` }
@@ -319,14 +407,14 @@ function WallpaperView() {
             }
             aria-hidden
           />
-          <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-medium text-text truncate">
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-medium text-text">
               {wallpaper?.name ?? 'None'}
-            </div>
-            <div className="text-[12px] text-text-secondary mt-0.5">
+            </span>
+            <span className="mt-0.5 block font-mono-meta text-text-secondary">
               {wallpaper?.type === 'animated' ? 'Live wallpaper' : 'Static wallpaper'}
-            </div>
-          </div>
+            </span>
+          </span>
         </div>
       </MobileSection>
 
@@ -386,25 +474,23 @@ function WallpaperGrid({
             onClick={() => onSelect(wp)}
             aria-label={`Use ${wp.name} wallpaper`}
             aria-pressed={selected}
-            className={`relative aspect-[3/4] rounded-2xl overflow-hidden transition-transform active:scale-[0.97] ${
-              selected ? 'ring-2 ring-accent' : 'ring-1 ring-text-secondary/15'
+            className={`relative aspect-[3/4] overflow-hidden rounded-2xl border transition-transform active:scale-[0.97] ${
+              selected ? 'border-text' : 'border-border'
             } ${mono ? 'grayscale' : ''}`}
             style={{ background: bg }}
           >
             {wp.type === 'animated' && (
-              <span className="absolute top-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/55 backdrop-blur text-white text-[9px] font-semibold tracking-wide">
-                <Sparkles size={8} />
-                LIVE
+              <span className="absolute left-1.5 top-1.5 border border-text/70 bg-bg/70 px-1.5 py-0.5 font-mono-meta text-text backdrop-blur">
+                Live
               </span>
             )}
             {selected && (
-              <span className="absolute inset-0 bg-accent/20 flex items-end justify-end p-2 pointer-events-none">
-                <span className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                  <Check size={14} className="text-white" strokeWidth={2.6} />
-                </span>
-              </span>
+              <span
+                aria-hidden
+                className="absolute bottom-2 right-2 h-3.5 w-3.5 bg-text shadow-sm ring-1 ring-bg"
+              />
             )}
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[11px] font-medium px-2.5 py-1.5 truncate">
+            <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2.5 py-1.5 font-mono-meta text-white">
               {wp.name}
             </span>
           </button>
@@ -440,19 +526,58 @@ function SoundsView() {
       >
         <MobileListRow
           title="UI Sound Effects"
-          accessory="switch"
-          switchOn={soundOn}
-          onSwitchToggle={toggle}
+          accessory={switchAccessory(soundOn, toggle, 'UI Sound Effects')}
         />
       </MobileSection>
 
       <MobileSection
         inset
         header="Ringtone (demo)"
-        footer="Decorative — devOS doesn't actually ring."
+        footer="Decorative - devOS doesn't actually ring."
       >
         <MobileListRow title="Ringtone" value="Reflection" />
         <MobileListRow title="Text Tone" value="Note" />
+      </MobileSection>
+    </div>
+  );
+}
+
+function PrivacyView() {
+  const isOptedOut = useAnalyticsStore((s) => s.isOptedOut);
+  const setOptOut = useAnalyticsStore((s) => s.setOptOut);
+  const analyticsOn = !isOptedOut;
+
+  const toggle = (next: boolean) => {
+    setOptOut(!next);
+    toast.success(
+      next
+        ? 'Analytics on. Anonymous usage only.'
+        : 'Analytics off. Nothing leaves this tab.',
+    );
+  };
+
+  return (
+    <div className="py-4 flex flex-col gap-6 pb-12">
+      <MobileSection
+        inset
+        header="Usage Analytics"
+        footer="Anonymous, session-only. No accounts, no personal data, no cross-site tracking. Turn it off to keep everything in this tab."
+      >
+        <MobileListRow
+          title="Usage Analytics"
+          accessory={switchAccessory(analyticsOn, toggle, 'Usage Analytics')}
+        />
+      </MobileSection>
+
+      <MobileSection
+        inset
+        header="Tracking (demo)"
+        footer="Decorative - this portfolio never tracks you across sites."
+      >
+        <MobileListRow
+          title="Allow Apps to Request to Track"
+          accessory={switchAccessory(false, () => {}, 'Allow Apps to Request to Track')}
+        />
       </MobileSection>
     </div>
   );
@@ -463,10 +588,10 @@ function AboutView() {
     <div className="py-4 flex flex-col gap-6 pb-12">
       <div className="px-5 pt-2">
         <h2 className="font-display text-[28px] text-text">devOS</h2>
-        <p className="text-[15px] text-text-secondary mt-0.5">
+        <p className="mt-0.5 font-mono-meta text-text-secondary">
           Version 2.2.0 · Sprint 4
         </p>
-        <p className="text-[12px] text-text-secondary mt-1">
+        <p className="mt-1 font-mono-meta text-text-secondary">
           Built by Devanshu Chicholikar
         </p>
       </div>
@@ -479,23 +604,31 @@ function AboutView() {
       </MobileSection>
 
       <MobileSection inset header="Stack">
-        <div className="px-4 py-3 flex flex-wrap gap-1.5" data-testid="stack-chips">
-          {STACK.map((tech) => (
-            <span
-              key={tech}
-              className="px-2.5 py-0.5 rounded-full bg-accent/10 text-accent text-[12px] font-medium border border-accent/20"
-            >
-              {tech}
-            </span>
+        <div className="px-4 py-3 flex flex-wrap items-baseline gap-x-1 gap-y-1" data-testid="stack-chips">
+          {STACK.map((tech, i) => (
+            <React.Fragment key={tech}>
+              {i > 0 && (
+                <span aria-hidden className="font-mono-meta opacity-40">
+                  &middot;
+                </span>
+              )}
+              <span className="font-mono text-[13px] leading-snug text-text">
+                {tech}
+              </span>
+            </React.Fragment>
           ))}
         </div>
       </MobileSection>
 
-      <MobileSection inset header="What's in v2.2" footer="An interactive portfolio built as a desktop OS — and now a phone. Every app is a window into who I am, what I've built, and how I think about software.">
+      <MobileSection
+        inset
+        header="What's in v2.2"
+        footer="An interactive portfolio built as a desktop OS, and now a phone. Every app is a window into who I am, what I've built, and how I think about software."
+      >
         <ul className="px-4 py-3 space-y-2 text-[13px] text-text-secondary">
           {V22_HIGHLIGHTS.map((item) => (
             <li key={item} className="flex items-start gap-2">
-              <span className="text-accent mt-0.5 shrink-0">·</span>
+              <span aria-hidden className="mt-[0.6em] h-px w-2.5 shrink-0 bg-text/40" />
               <span>{item}</span>
             </li>
           ))}
@@ -516,12 +649,12 @@ const STACK = [
 ];
 
 const V22_HIGHLIGHTS = [
-  'iOS-style phone shell — squircle home screen, paged dock, lock screen',
+  'iOS-style phone shell: squircle home screen, paged dock, lock screen',
   'iOS-style push navigation with edge-swipe back across mobile apps',
   'Visible Done button in open apps + system back closes the app',
-  'Live GitHub Activity — contribution heatmap, events, active repos',
+  'Live GitHub Activity: contribution heatmap, events, active repos',
   'Fluid type so heroes scale smoothly from 360px Android to desktop',
-  'File Explorer star counts live from /api/github/repos — no stale snapshots',
+  'File Explorer star counts live from /api/github/repos, no stale snapshots',
   'Native mobile variants for Projects, Resume, Contact, Terminal, Games',
   'Safe-area handling across notches and home indicators',
 ];
@@ -536,7 +669,10 @@ function WiFiView() {
   return (
     <div className="py-4 flex flex-col gap-6">
       <MobileSection inset>
-        <MobileListRow title="Wi-Fi" accessory="switch" switchOn={on} onSwitchToggle={setOn} />
+        <MobileListRow
+          title="Wi-Fi"
+          accessory={switchAccessory(on, setOn, 'Wi-Fi')}
+        />
       </MobileSection>
 
       {on && (
@@ -552,17 +688,17 @@ function WiFiView() {
           <MobileSection
             inset
             header="Other Networks"
-            footer="Tap a network to join. These are decorative — they don't actually do anything."
+            footer="Tap a network to join. These are decorative - they don't actually do anything."
           >
             {['Devanshu-Guest', 'Starbucks WiFi', 'Library Public', 'CityNet 2.4'].map(
               (ssid) => (
                 <MobileListRow
                   key={ssid}
                   title={ssid}
-                  icon={<Wifi size={16} strokeWidth={2.4} className="text-text-secondary/70" />}
+                  icon={<Wifi size={16} strokeWidth={2.2} className="text-text-secondary/70" />}
                   onClick={() => nav.push(placeholderView(ssid))}
                 />
-              )
+              ),
             )}
           </MobileSection>
 
@@ -584,14 +720,17 @@ function BluetoothView() {
   return (
     <div className="py-4 flex flex-col gap-6">
       <MobileSection inset>
-        <MobileListRow title="Bluetooth" accessory="switch" switchOn={on} onSwitchToggle={setOn} />
+        <MobileListRow
+          title="Bluetooth"
+          accessory={switchAccessory(on, setOn, 'Bluetooth')}
+        />
       </MobileSection>
 
       {on && (
         <MobileSection
           inset
           header="My Devices"
-          footer="Decorative — devOS doesn't pair with real Bluetooth devices."
+          footer="Decorative - devOS doesn't pair with real Bluetooth devices."
         >
           <MobileListRow title="AirPods Pro" value="Connected" />
           <MobileListRow title="MacBook Pro" value="Not Connected" />
@@ -605,20 +744,21 @@ function BluetoothView() {
 function PlaceholderView({ title }: { title: string }) {
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 text-center gap-2 pb-20">
-      <div className="w-12 h-12 rounded-2xl bg-text-secondary/10 flex items-center justify-center mb-2">
-        <Sparkles size={20} className="text-text-secondary/70" />
-      </div>
+      <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-surface text-text-secondary dark:bg-white/[0.06]">
+        <Sparkles size={20} />
+      </span>
       <h3 className="text-[17px] font-semibold text-text">{title}</h3>
-      <p className="text-[14px] text-text-secondary max-w-[260px]">
-        This screen isn't part of the portfolio demo — only Display & Brightness,
-        Wallpaper, Sounds & Haptics, and About do real work.
+      <p className="max-w-[260px] text-[14px] text-text-secondary">
+        This screen isn&apos;t part of the portfolio demo - only Display &amp;
+        Brightness, Wallpaper, Sounds &amp; Haptics, Privacy, and About do real
+        work.
       </p>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * View registry — defined at the bottom so all view bodies above are in
+ * View registry - defined at the bottom so all view bodies above are in
  * scope (function declarations are hoisted, so JSX references are safe).
  * ────────────────────────────────────────────────────────────────── */
 
@@ -656,6 +796,12 @@ const WALLPAPER_VIEW: PushViewEntry = {
   id: 'wallpaper',
   title: 'Wallpaper',
   element: <WallpaperView />,
+};
+
+const PRIVACY_VIEW: PushViewEntry = {
+  id: 'privacy',
+  title: 'Privacy & Security',
+  element: <PrivacyView />,
 };
 
 const ABOUT_VIEW: PushViewEntry = {
