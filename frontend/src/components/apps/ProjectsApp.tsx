@@ -254,7 +254,7 @@ function IndexEntry({
       )}
 
       <MetaLabel
-        className={`shrink-0 w-7 justify-start transition-opacity
+        className={`shrink-0 w-7 justify-start tabular-nums transition-opacity
                     ${active ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'}`}
       >
         {number}
@@ -268,13 +268,15 @@ function IndexEntry({
         >
           {repo.displayName}
         </span>
-        <span className="mt-1 block truncate text-text-secondary text-[clamp(0.66rem,1.3cqi,0.78rem)] leading-tight">
-          {repo.tagline}
-        </span>
+        {repo.tagline && (
+          <span className="mt-1 block truncate text-text-secondary text-[clamp(0.66rem,1.3cqi,0.78rem)] leading-tight">
+            {repo.tagline}
+          </span>
+        )}
       </span>
 
       {repo.stars > 0 && (
-        <span className="shrink-0 inline-flex items-center gap-1 font-mono-meta text-text-secondary">
+        <span className="shrink-0 self-center inline-flex items-center gap-1 font-mono-meta text-text-secondary tabular-nums">
           <Star size={9} className="opacity-70" /> {repo.stars}
         </span>
       )}
@@ -313,7 +315,7 @@ function IndexColumn({
       <div className="px-3 pt-4 pb-3 flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
           <MetaLabel as="p">Index</MetaLabel>
-          <MetaLabel className="text-text-secondary/60">
+          <MetaLabel className="text-text-secondary/60 tabular-nums">
             {String(filtered.length).padStart(2, '0')}
           </MetaLabel>
         </div>
@@ -443,18 +445,20 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
           {/* Left: kicker + oversized serif name + tagline */}
           <div className="flex flex-col gap-4 min-w-0">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <MetaLabel className="text-text-secondary/60">{number}</MetaLabel>
+              <MetaLabel className="text-text-secondary/60 tabular-nums">{number}</MetaLabel>
               <StatusLabel status={repo.status} />
               <MetaLabel className="text-text-secondary/70">{orgLabel}</MetaLabel>
             </div>
 
-            <h2 className="editorial-hero text-text break-words">
+            <h2 className="editorial-hero text-text break-words text-balance">
               {repo.displayName}
             </h2>
 
-            <p className="text-text-secondary leading-snug text-[clamp(1rem,2.4cqi,1.35rem)] max-w-[42ch]">
-              {repo.tagline}
-            </p>
+            {repo.tagline && (
+              <p className="text-text-secondary leading-snug text-pretty text-[clamp(1rem,2.4cqi,1.35rem)] max-w-[42ch]">
+                {repo.tagline}
+              </p>
+            )}
           </div>
 
           {/* Right: fingerprint (wide only) + mono spec stack */}
@@ -490,7 +494,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
                 <>
                   <div className="flex items-center justify-between gap-3 py-2">
                     <MetaLabel className="text-text-secondary/55">Stars</MetaLabel>
-                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text">
+                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
                       <Star size={11} className="opacity-70" /> {repo.stars}
                     </span>
                   </div>
@@ -501,7 +505,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
                 <>
                   <div className="flex items-center justify-between gap-3 py-2">
                     <MetaLabel className="text-text-secondary/55">Forks</MetaLabel>
-                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text">
+                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
                       <GitFork size={11} className="opacity-70" /> {repo.forks}
                     </span>
                   </div>
@@ -510,7 +514,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
               )}
               <div className="flex items-center justify-between gap-3 py-2">
                 <MetaLabel className="text-text-secondary/55">Updated</MetaLabel>
-                <MetaLabel className="text-text">{updated}</MetaLabel>
+                <MetaLabel className="text-text tabular-nums">{updated}</MetaLabel>
               </div>
               <Hairline />
             </dl>
@@ -528,7 +532,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
             <section className="flex flex-col gap-4">
               <MetaLabel as="p" className="text-text-secondary/55">Overview</MetaLabel>
               <Hairline />
-              <p className="text-text-secondary leading-relaxed text-base">
+              <p className="text-text-secondary leading-relaxed text-pretty text-base">
                 {repo.description}
               </p>
             </section>
@@ -538,7 +542,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
             <section className="flex flex-col gap-4">
               <MetaLabel as="p" className="text-text-secondary/55">The Story</MetaLabel>
               <Hairline />
-              <div className="flex flex-col gap-4 text-text-secondary leading-relaxed text-base">
+              <div className="flex flex-col gap-4 text-text-secondary leading-relaxed text-pretty text-base">
                 {repo.story.map((para, i) => <p key={i}>{para}</p>)}
               </div>
             </section>
@@ -566,12 +570,12 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
                 {repo.achievements.map((a, i) => (
                   <div key={i}>
                     <div className="flex items-baseline gap-5 py-4">
-                      <dd className="shrink-0 w-28 font-display text-text leading-none text-[clamp(1.6rem,4.5cqi,2.5rem)]">
+                      <dd className="shrink-0 w-28 font-display text-text leading-none tabular-nums text-[clamp(1.6rem,4.5cqi,2.5rem)]">
                         {a.metric}
                       </dd>
                       <div className="flex-1 min-w-0 flex flex-col gap-1">
-                        <dt className="text-text font-medium text-sm leading-snug">{a.label}</dt>
-                        <p className="text-text-secondary text-[clamp(0.74rem,1.5cqi,0.85rem)] leading-snug">{a.detail}</p>
+                        <dt className="text-text font-medium text-sm leading-snug text-balance">{a.label}</dt>
+                        <p className="text-text-secondary text-pretty text-[clamp(0.74rem,1.5cqi,0.85rem)] leading-snug">{a.detail}</p>
                       </div>
                     </div>
                     {i < repo.achievements.length - 1 && <Hairline />}
@@ -651,21 +655,21 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
             {repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel' : '@DevanshuNEU'}
           </MetaLabel>
         </div>
-        <h2 className="editorial-head text-text text-[2rem] leading-tight break-words">{repo.displayName}</h2>
-        <p className="text-text-secondary text-sm leading-snug">{repo.tagline}</p>
+        <h2 className="editorial-head text-text text-[2rem] leading-tight break-words text-balance">{repo.displayName}</h2>
+        {repo.tagline && <p className="text-text-secondary text-sm leading-snug text-pretty">{repo.tagline}</p>}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
           {repo.language && <LangLabel lang={repo.language} />}
           {repo.stars > 0 && (
-            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text">
+            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
               <Star size={11} className="opacity-70" /> {repo.stars}
             </span>
           )}
           {repo.forks > 0 && (
-            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text">
+            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
               <GitFork size={11} className="opacity-70" /> {repo.forks}
             </span>
           )}
-          <MetaLabel className="text-text-secondary/70">{updated}</MetaLabel>
+          <MetaLabel className="text-text-secondary/70 tabular-nums">{updated}</MetaLabel>
         </div>
         <div className="mt-2">
           <ProjectLinks repo={repo} size="mobile" />
@@ -678,14 +682,14 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
           <section className="flex flex-col gap-3">
             <MetaLabel as="p" className="text-text-secondary/55">Overview</MetaLabel>
             <Hairline />
-            <p className="text-text-secondary text-sm leading-relaxed">{repo.description}</p>
+            <p className="text-text-secondary text-sm leading-relaxed text-pretty">{repo.description}</p>
           </section>
         )}
         {repo.story.length > 0 && (
           <section className="flex flex-col gap-3">
             <MetaLabel as="p" className="text-text-secondary/55">The Story</MetaLabel>
             <Hairline />
-            <div className="flex flex-col gap-3 text-text-secondary text-sm leading-relaxed">
+            <div className="flex flex-col gap-3 text-text-secondary text-sm leading-relaxed text-pretty">
               {repo.story.map((para, i) => <p key={i}>{para}</p>)}
             </div>
           </section>
@@ -709,10 +713,10 @@ function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
               {repo.achievements.map((a, i) => (
                 <div key={i}>
                   <div className="flex items-baseline gap-4 py-3">
-                    <dd className="shrink-0 w-20 font-display text-text leading-none text-2xl">{a.metric}</dd>
+                    <dd className="shrink-0 w-20 font-display text-text leading-none tabular-nums text-2xl">{a.metric}</dd>
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <dt className="text-text font-medium text-[13px] leading-snug">{a.label}</dt>
-                      <p className="text-text-secondary text-[11px] leading-snug">{a.detail}</p>
+                      <dt className="text-text font-medium text-[13px] leading-snug text-balance">{a.label}</dt>
+                      <p className="text-text-secondary text-[11px] leading-snug text-pretty">{a.detail}</p>
                     </div>
                   </div>
                   {i < repo.achievements.length - 1 && <Hairline />}
@@ -782,7 +786,7 @@ function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
                 onClick={() => openDetail(repo)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-black/5 dark:active:bg-white/5 transition-colors"
               >
-                <span className="font-mono-meta text-text-secondary/50 w-6 shrink-0">
+                <span className="font-mono-meta text-text-secondary/50 w-6 shrink-0 tabular-nums">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <IconTile color={langColor} icon={<Code size={14} />} />
@@ -791,7 +795,7 @@ function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
                   <span className="block text-text-secondary text-[13px] leading-tight truncate mt-0.5">{repo.tagline}</span>
                 </span>
                 {repo.stars > 0 && (
-                  <span className="inline-flex items-center gap-0.5 font-mono-meta text-text-secondary shrink-0">
+                  <span className="inline-flex items-center gap-0.5 font-mono-meta text-text-secondary shrink-0 tabular-nums">
                     <Star size={11} className="opacity-70" /> {repo.stars}
                   </span>
                 )}
@@ -863,11 +867,17 @@ export default function ProjectsApp({ variant }: { variant?: 'desktop' | 'mobile
   // Desktop - editorial index + poster stage
   const selectedRepo = repos.find(r => r.name === selected) ?? null;
   // The detail kicker number reflects the project's position within the active
-  // filter view (matches the index numbering the recruiter just scanned).
+  // filter view (matches the index numbering the recruiter just scanned). If the
+  // selection is no longer in the active filter (e.g. the filter changed while a
+  // detail was open), fall back to its position in the full list rather than
+  // mislabeling it with another row's ordinal.
   const filteredView = applyFilter(repos, filter);
-  const selectedNumber = selectedRepo
-    ? String(Math.max(0, filteredView.findIndex(r => r.name === selectedRepo.name)) + 1).padStart(2, '0')
-    : '00';
+  const selectedNumber = (() => {
+    if (!selectedRepo) return '00';
+    const inFilter = filteredView.findIndex(r => r.name === selectedRepo.name);
+    const idx = inFilter !== -1 ? inFilter : repos.findIndex(r => r.name === selectedRepo.name);
+    return String((idx === -1 ? 0 : idx) + 1).padStart(2, '0');
+  })();
 
   return (
     <div data-projects-root className="h-full flex overflow-hidden bg-surface/20">
