@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useOSStore } from '@/store/osStore';
 import { useMobileStore } from '@/store/mobileStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
+import { MetaLabel, Hairline } from '@/components/editorial';
 import { resolveCommand, type CommandResult } from '@/lib/terminalCommands';
 import type { AppType } from '../../../../shared/types';
 
@@ -201,6 +202,49 @@ function HireOutput() {
 }
 
 // ---------------------------------------------------------------------------
+// Boot greeting (typewriter)
+//
+// A warm, one-time typed greeting that runs on first open. Mount-based only
+// (no scroll/in-view trigger): a timer reveals one more character every ~22ms.
+// Under reduced motion the full string is rendered instantly with no timer,
+// so the terminal is fully usable without waiting on any animation. The text
+// is purely chrome; it lives above the command feed and never touches history
+// or the parser.
+// ---------------------------------------------------------------------------
+
+const BOOT_GREETING = "Welcome. You've reached a real terminal with a little soul.";
+
+function BootGreeting({ reduced }: { reduced: boolean | null }) {
+  const [count, setCount] = useState(reduced ? BOOT_GREETING.length : 0);
+
+  useEffect(() => {
+    if (reduced) {
+      setCount(BOOT_GREETING.length);
+      return;
+    }
+    let i = 0;
+    const tick = setInterval(() => {
+      i += 1;
+      setCount(i);
+      if (i >= BOOT_GREETING.length) clearInterval(tick);
+    }, 22);
+    return () => clearInterval(tick);
+  }, [reduced]);
+
+  const typing = !reduced && count < BOOT_GREETING.length;
+
+  return (
+    <p className="text-gray-300 leading-snug">
+      <span aria-hidden className="text-white/40 mr-2">&#9656;</span>
+      {BOOT_GREETING.slice(0, count)}
+      {typing && (
+        <span aria-hidden className="terminal-caret inline-block">&#9608;</span>
+      )}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -213,6 +257,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const openAssistant = useAssistantUiStore(state => state.openAssistant);
   const { mode, toggleMode } = useTheme();
   const mono = useIsMono();
+  const reduced = useReducedMotion();
 
   // Fun keeps the colored shell prompt; mono is foreground-on-black graphite,
   // legibility carried by weight and the existing white/40 separators.
@@ -220,9 +265,11 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const promptHost = mono ? 'text-white/70' : 'text-purple-400';
   const promptCmd  = mono ? 'text-white'    : 'text-green-300';
   const feedText   = mono ? 'text-gray-200' : 'text-green-400';
+  // Hide the native caret: a steady editorial block caret is rendered at the
+  // prompt instead (see the input line). Color still tracks the palette.
   const inputText  = mono
-    ? 'text-white caret-white'
-    : 'text-green-300 caret-green-400';
+    ? 'text-white caret-transparent'
+    : 'text-green-300 caret-transparent';
 
   // On mobile, redirect window-open commands to the mobile app system
   const openWindowOrApp = useCallback((appId: string) => {
@@ -247,6 +294,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [matrixDone, setMatrixDone] = useState(true);
+  const [focused, setFocused] = useState(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -333,16 +381,52 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
     }
   };
 
+  // Steady block caret. Blinks via a scoped keyframe; under reduced motion it
+  // holds a solid block (animation suppressed) so nothing depends on motion.
+  // It only blinks while the input is focused, matching native terminal feel.
+  const caretAnimated = !reduced && focused;
+
   return (
     <div
+      data-testid="terminal-app"
       className={`h-full bg-black flex flex-col -m-px font-mono ${variant === 'mobile' ? 'text-base' : 'text-sm'}`}
       onClick={() => inputRef.current?.focus()}
     >
+      {/* Scoped caret blink. Kept local to honor the file-only scope; no global
+          CSS is touched. The animation is gated by the .is-steady class below. */}
+      <style>{`
+        @keyframes terminal-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        .terminal-caret { animation: terminal-caret-blink 1.05s steps(1) infinite; }
+        .terminal-caret.is-steady { animation: none; opacity: 1; }
+        @media (prefers-reduced-motion: reduce) {
+          .terminal-caret { animation: none; opacity: 1; }
+        }
+      `}</style>
+
+      {/* ── Window chrome (editorial register) ──────────────────────────────
+          Reskinned-only header: a MetaLabel title + a hairline-separated meta
+          status. The body below stays a true monospace terminal. */}
+      <div className="flex items-center gap-3 px-5 pt-3.5 pb-3 shrink-0">
+        <MetaLabel
+          className="text-white"
+          glyph={<span aria-hidden className="block h-2 w-2 bg-white" />}
+        >
+          Terminal
+        </MetaLabel>
+        <span aria-hidden className="font-mono-meta text-white/30">&middot;</span>
+        <MetaLabel className="text-white/45">type help</MetaLabel>
+      </div>
+      <Hairline className="border-white/15 shrink-0" />
+
       <div ref={scrollRef} className={`flex-1 overflow-auto p-5 space-y-1 ${feedText}`}>
+        {/* Warm typed boot greeting (chrome, mount-based, reduced-motion safe). */}
+        <BootGreeting reduced={reduced} />
+
         {history.map((entry) => (
           <div key={entry.id}>
             {entry.command !== undefined && (
               <div className="flex gap-2 mb-1">
+                <span aria-hidden className={mono ? 'text-white/45' : 'text-green-500/60'}>&#9656;</span>
                 <span className={promptUser}>devanshu</span>
                 <span className="text-white/40">@</span>
                 <span className={promptHost}>devOS</span>
@@ -365,22 +449,46 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
         ))}
 
         {/* Input line */}
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-2 mt-2 items-center">
+          <span aria-hidden className={mono ? 'text-white/45' : 'text-green-500/60'}>&#9656;</span>
           <span className={promptUser}>devanshu</span>
           <span className="text-white/40">@</span>
           <span className={promptHost}>devOS</span>
           <span className="text-white/40">~$</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className={`flex-1 bg-transparent outline-none ml-1 ${inputText}`}
-            autoFocus
-            spellCheck={false}
-            autoComplete="off"
-          />
+          {/* Mirror wrapper: an invisible sizing span pins width to the typed
+              text so the block caret lands right after the last character. The
+              real <input> overlays the whole area and stays the focus target. */}
+          <span className="relative ml-1 flex-1 min-w-0">
+            <span aria-hidden className="invisible whitespace-pre">
+              {input || ''}
+            </span>
+            {!input && (
+              <span aria-hidden className="pointer-events-none absolute left-0 top-0 text-white/25">
+                try: projects
+              </span>
+            )}
+            <span
+              aria-hidden
+              className={`terminal-caret pointer-events-none absolute top-0 inline-block ${caretAnimated ? '' : 'is-steady'} ${mono ? 'text-white' : 'text-green-400'}`}
+              style={{ left: `${input.length}ch` }}
+            >
+              &#9608;
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              className={`absolute inset-0 w-full bg-transparent outline-none ${inputText}`}
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="Terminal command input"
+            />
+          </span>
         </div>
       </div>
     </div>
