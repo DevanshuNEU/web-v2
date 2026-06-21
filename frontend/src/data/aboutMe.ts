@@ -2,7 +2,7 @@
  * About Me data — single source of truth for all About Me section content.
  *
  * Consumed by:
- *   - IntroSection.tsx
+ *   - AboutMeApp.tsx (masthead, spec sheet)
  *   - JourneySection.tsx
  *   - ExcitesSection.tsx
  *   - CurrentlySection.tsx
@@ -28,10 +28,41 @@ export const identity = {
   name:         personalInfo.name,
   title:        personalInfo.title,
   location:     personalInfo.location,
-  school:       `MS at ${personalInfo.university}`,
   availability: 'Open to founding-engineer + AI-engineer roles',
   photo:        '/devanshu-photo.png',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Masthead spec-line - identity-from-specifics, rendered as mono MetaLabel
+// cells separated by middots. No role-label padding, no student/visa framing.
+// ---------------------------------------------------------------------------
+
+export const mastheadSpecLine = [
+  'AI ENGINEER',
+  'MCP-LAYER DEV TOOLS',
+  'BOSTON',
+  'OCI / SAAR / CALLBUDGET',
+] as const;
+
+// ---------------------------------------------------------------------------
+// Overview spec sheet - "About This Machine" definition list. Mono values,
+// MetaLabel keys. Identity leaks from the work (MCP / OCI / Saar), never from
+// a degree, a graduation date, or an availability label.
+// ---------------------------------------------------------------------------
+
+export interface SpecItem {
+  key:   string;
+  value: string;
+}
+
+export const specs: SpecItem[] = [
+  { key: 'Discipline',  value: 'AI engineering · dev tools' },
+  { key: 'Layer',       value: 'MCP / agent workflow' },
+  { key: 'Stack',       value: 'TypeScript · Python · Go · AWS' },
+  { key: 'Retrieval',   value: 'Hybrid AST + BM25 + Cohere rerank' },
+  { key: 'Shipping',    value: 'OpenCodeIntel · Saar · CallBudget' },
+  { key: 'Based in',    value: 'Boston, MA' },
+];
 
 // ---------------------------------------------------------------------------
 // Intro section
@@ -43,7 +74,7 @@ export const quickIntro = [
 ] as const;
 
 export interface OriginCard {
-  iconName: string;   // lucide icon name — IntroSection maps this to the component
+  iconName: string;   // lucide icon name (kept for non-visitor surfaces)
   title: string;
   text: string;
 }

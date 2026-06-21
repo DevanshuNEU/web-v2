@@ -11,16 +11,82 @@ import {
   lifeItems,
   portfolioTechStack,
   contactLinks,
+  mastheadSpecLine,
+  specs,
 } from '../../data/aboutMe';
 
 describe('identity', () => {
   it('has non-empty name', () => expect(identity.name.trim()).not.toBe(''));
   it('has non-empty title', () => expect(identity.title.trim()).not.toBe(''));
   it('has non-empty location', () => expect(identity.location.trim()).not.toBe(''));
-  it('has non-empty school', () => expect(identity.school.trim()).not.toBe(''));
   it('has non-empty availability', () => expect(identity.availability.trim()).not.toBe(''));
   it('has non-empty photo path', () => expect(identity.photo.trim()).not.toBe(''));
   it('photo path starts with /', () => expect(identity.photo).toMatch(/^\//));
+});
+
+describe('mastheadSpecLine', () => {
+  it('has at least one cell', () => {
+    expect(mastheadSpecLine.length).toBeGreaterThan(0);
+  });
+
+  it('all cells are non-empty', () => {
+    for (const cell of mastheadSpecLine) {
+      expect(cell.trim()).not.toBe('');
+    }
+  });
+
+  it('all cells are unique', () => {
+    expect(new Set(mastheadSpecLine).size).toBe(mastheadSpecLine.length);
+  });
+
+  it('signals identity from specifics (OCI / Saar / MCP)', () => {
+    const joined = mastheadSpecLine.join(' ');
+    expect(joined).toMatch(/OCI|Saar|MCP/i);
+  });
+});
+
+describe('specs', () => {
+  it('has at least one item', () => {
+    expect(specs.length).toBeGreaterThan(0);
+  });
+
+  it('every item has non-empty key and value', () => {
+    for (const item of specs) {
+      expect(item.key.trim(),   `key empty`).not.toBe('');
+      expect(item.value.trim(), `value empty for "${item.key}"`).not.toBe('');
+    }
+  });
+
+  it('all spec keys are unique', () => {
+    const keys = specs.map(s => s.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe('persona guard: no student / seeking / visa framing in visitor copy', () => {
+  // Every source string that renders into the masthead, availability chip, or
+  // the spec sheet. Identity must leak from specifics, never role labels.
+  const FORBIDDEN = /student|pursuing|seeking|graduat|visa|sponsor|F-?1\b|\bOPT\b/i;
+
+  const visitorStrings: string[] = [
+    identity.name,
+    identity.title,
+    identity.location,
+    identity.availability,
+    ...mastheadSpecLine,
+    ...specs.flatMap(s => [s.key, s.value]),
+  ];
+
+  it.each(visitorStrings)('"%s" is persona-clean', (s) => {
+    expect(s).not.toMatch(FORBIDDEN);
+  });
+
+  it('identity does not expose graduation / degree / university fields', () => {
+    expect(Object.keys(identity)).not.toContain('graduation');
+    expect(Object.keys(identity)).not.toContain('degree');
+    expect(Object.keys(identity)).not.toContain('university');
+    expect(Object.keys(identity)).not.toContain('school');
+  });
 });
 
 describe('quickIntro', () => {

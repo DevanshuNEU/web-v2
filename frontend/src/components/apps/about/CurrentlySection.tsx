@@ -1,211 +1,184 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { Target, Monitor, Coffee, Gauge, Star, Dumbbell } from "lucide-react";
+import { Hairline } from "@/components/editorial";
 import {
   lookingFor, currentlyMastering, readingList, lifeItems, portfolioTechStack,
 } from "@/data/aboutMe";
 
-const LIFE_ICONS: Record<string, React.ElementType> = {
-  Coffee, Gauge, Star, Dumbbell,
-};
+/**
+ * CurrentlySection - list-shaped editorial column.
+ *
+ * Lists render as mono bullets / hairline-divided rows. Tech stack becomes an
+ * inline mono run separated by middots. No glass cards, no colored pills, no
+ * icon medallions, no graduation/student framing. lifeItems iconNames are
+ * intentionally not rendered as medallions (kept in data for other surfaces).
+ */
+
+function Bulleted({ items }: { items: readonly string[] }) {
+  return (
+    <ul className="flex flex-col gap-2 text-lg text-text-secondary leading-relaxed">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-3">
+          <span aria-hidden className="text-text-secondary">&middot;</span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function CurrentlySection() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="p-8 space-y-12 w-full max-w-5xl mx-auto">
+    <div className="flex flex-col gap-10 max-w-[68ch]">
+      <p className="text-lg text-text-secondary leading-relaxed">
+        What I&apos;m working on, learning, and dealing with day-to-day.
+      </p>
 
-      {/* Hero */}
-      <div className="space-y-4">
-        <h1 className="font-display text-4xl text-text leading-tight">
-          Right now <span className="text-accent">in my life</span>
-        </h1>
-        <p className="text-xl text-text-secondary max-w-3xl leading-relaxed">
-          What I&apos;m working on, learning, and dealing with day-to-day.
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          The work I want next
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Founding-engineer and AI-engineer roles at AI and dev-tools startups. Not
+          just sending resumes everywhere. I want teams where I can actually
+          contribute, where my input matters, where I can take charge of meaningful
+          work and make an impact.
         </p>
-      </div>
+        <p className="font-mono-meta">What I&apos;m looking for</p>
+        <Bulleted items={lookingFor} />
+      </section>
 
-      {/* Job Hunt */}
-      <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent">
-        <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            <div className="text-accent"><Target size={24} /></div>
-            <h2 className="font-display text-2xl text-text">The job hunt is real</h2>
-          </div>
-          <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-            <p>
-              Open to founding-engineer + AI-engineer roles at AI and dev-tools startups.
-              But I&apos;m not just sending out resumes everywhere.
-            </p>
-            <p>
-              I want teams where I can actually contribute. Where my input matters.
-              Where I can take charge of meaningful work and make an impact.
-            </p>
-          </div>
-          <div className="glass-subtle rounded-xl p-5 border border-accent/20 backdrop-blur-xl bg-gradient-to-br from-accent/5 to-transparent">
-            <p className="text-accent font-medium mb-3">What I&apos;m looking for:</p>
-            <div className="space-y-2 text-text-secondary">
-              {lookingFor.map((item, i) => (
-                <p key={i}>→ {item}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Teaching
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          TA&apos;d Network Structures &amp; Cloud Computing (CSYE6225). Graded
+          assignments, held office hours, helped 60+ grad students debug their AWS
+          infrastructure at 11 PM, explained why their database queries were slow,
+          reviewed code, answered endless questions.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          It was exhausting and energizing at the same time. Their questions forced me
+          to rethink things I thought I understood. Teaching really does make you learn
+          things at a deeper level.
+        </p>
+      </section>
 
-      {/* Academic Life */}
-      <div className="relative pl-8 border-l-2 border-accent/30">
-        <div className="space-y-5">
-          <h2 className="font-display text-3xl text-text">MS at Northeastern</h2>
-          <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-            <p>Finished May 2026. TA&apos;d Network Structures & Cloud Computing (CSYE6225) through my last two semesters.</p>
-            <p>
-              Graded assignments. Held office hours. Helped 60+ grad students debug their AWS
-              infrastructure at 11 PM. Explained why their database queries were slow.
-              Reviewed code. Answered endless questions.
-            </p>
-            <p>
-              It was exhausting and energizing at the same time. Their questions forced me to
-              rethink things I thought I understood. Teaching really does make you learn things
-              at a deeper level.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          What I&apos;m shipping
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Most of my energy goes into building at the MCP layer right now.{" "}
+          <span className="text-text">OpenCodeIntel</span> is a production MCP server
+          that gives coding agents real code intelligence through hybrid AST + BM25 +
+          Cohere retrieval.{" "}
+          <span className="text-text">Saar</span> is a Chrome extension on the Web
+          Store that reads Claude.ai streams to catch context rot.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Both come from the same itch: making LLMs genuinely useful for the work
+          developers actually do, not just demos.
+        </p>
+      </section>
 
-      {/* What I'm shipping — OCI + Saar */}
-      <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent">
-        <div className="space-y-5">
-          <h2 className="font-display text-2xl text-text">What I&apos;m shipping</h2>
-          <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-            <p>
-              Most of my energy goes into building at the MCP layer right now.{" "}
-              <strong className="text-text">OpenCodeIntel</strong> is a production MCP
-              server that gives coding agents real code intelligence through hybrid
-              AST + BM25 + Cohere retrieval.{" "}
-              <strong className="text-text">Saar</strong> is a Chrome extension on the
-              Web Store that reads Claude.ai streams to catch context rot.
-            </p>
-            <p>
-              Both come from the same itch: making LLMs genuinely useful for the work
-              developers actually do, not just demos.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Building Portfolio OS
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          You&apos;re literally inside it right now. Started as a weekend project,
+          turned into an ongoing experiment.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Before this, I had a Three.js portfolio that felt childish. I wanted
+          something different. Something uniquely mine. A space where I could express
+          myself without worrying about what people think.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Saw PostHog&apos;s OS-style website on Hacker News. That&apos;s it. Their
+          whole vibe, the transparency, the writing, the culture, has been incredibly
+          inspiring.
+        </p>
+        <p className="font-mono-meta">Built with</p>
+        <p className="leading-relaxed">
+          {portfolioTechStack.map((tech, i) => (
+            <React.Fragment key={tech}>
+              {i > 0 && <span aria-hidden className="mx-2 text-text-secondary">&middot;</span>}
+              <span className="font-mono text-sm text-text">{tech}</span>
+            </React.Fragment>
+          ))}
+        </p>
+      </section>
 
-      {/* Portfolio OS */}
-      <div className="relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
-        <div className="relative glass-subtle p-8 border border-accent/20">
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="text-accent"><Monitor size={32} /></div>
-              <h2 className="font-display text-3xl text-text">Building Portfolio OS</h2>
-            </div>
-            <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-              <p>You&apos;re literally inside it right now. Started as a weekend project, turned into an ongoing experiment.</p>
-              <p>
-                Before this, I had a Three.js portfolio that felt... childish. I wanted something
-                different. Something uniquely mine. A space where I could express myself without
-                worrying about what people think.
-              </p>
-              <p>
-                Saw PostHog&apos;s OS-style website on Hacker News. BAM. That&apos;s it. Their whole vibe — the
-                transparency, the writing, the culture — it&apos;s been incredibly inspiring. Would genuinely
-                love to work with them someday.
-              </p>
-            </div>
-            <div className="glass-subtle rounded-xl p-6 space-y-3 border border-accent/20 backdrop-blur-xl bg-gradient-to-br from-accent/10 to-purple-500/5">
-              <div className="text-accent font-medium">Built with:</div>
-              <div className="flex flex-wrap gap-2">
-                {portfolioTechStack.map(tech => (
-                  <span key={tech} className="px-3 py-1 bg-white/10 rounded-full text-sm">{tech}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Hairline />
 
-      {/* Learning Stack */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="glass-subtle rounded-xl p-6 border border-white/10">
-          <h3 className="text-xl font-semibold text-text mb-4">Currently mastering</h3>
-          <div className="space-y-4">
-            {currentlyMastering.map(item => (
-              <div key={item.name}>
-                <div className="font-medium text-text mb-1">{item.name}</div>
-                <div className="text-sm text-text-secondary">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="glass-subtle rounded-xl p-6 border border-white/10">
-          <h3 className="text-xl font-semibold text-text mb-4">On the reading list</h3>
-          <div className="space-y-3 text-text-secondary">
-            {readingList.map((item, i) => (
-              <p key={i}>→ {item}</p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Beyond Code */}
-      <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <h2 className="font-display text-2xl text-text mb-5">Life beyond code</h2>
-        <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-          <p>
-            Grad school, TAing, and an active job search is a lot to juggle. The routine I built
-            around it keeps me sane. I still make time for:
-          </p>
-          <div className="grid md:grid-cols-2 gap-4 mt-4">
-            {lifeItems.map(item => {
-              const Icon = LIFE_ICONS[item.iconName];
-              return (
-                <div key={item.title} className="flex items-start gap-3">
-                  <div className="text-accent mt-1">{Icon && <Icon size={18} />}</div>
-                  <div>
-                    <div className="font-medium text-text">{item.title}</div>
-                    <div className="text-sm">{item.detail}</div>
-                  </div>
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <p className="font-mono-meta">Currently mastering</p>
+          <div className="flex flex-col">
+            {currentlyMastering.map((item, i) => (
+              <div key={item.name} className="flex flex-col">
+                <div className="flex flex-col gap-1 py-3">
+                  <span className="font-display text-text text-xl">{item.name}</span>
+                  <span className="text-text-secondary leading-relaxed">{item.detail}</span>
                 </div>
-              );
-            })}
+                {i < currentlyMastering.length - 1 && <Hairline />}
+              </div>
+            ))}
           </div>
-          <p className="mt-6 text-text-secondary">
-            Oh, and I&apos;m team pineapple on pizza. Don&apos;t @ me.
-          </p>
         </div>
-      </div>
 
-      {/* Honest Truth */}
-      <div className="relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
-        <div className="relative glass-subtle p-8 border border-accent/20">
-          <div className="space-y-5">
-            <h2 className="font-display text-3xl text-text">The honest truth</h2>
-            <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-              <p>
-                I&apos;m at that stage where possibilities feel endless but nothing&apos;s guaranteed.
-                Building skills, shipping projects, learning constantly, looking for the right
-                opportunity to make an impact.
-              </p>
-              <p>
-                Not gonna pretend I have it all figured out. Still learning. Still growing.
-                Still making mistakes and learning from them.
-              </p>
-              <p className="text-text text-xl font-medium">
-                But that&apos;s the fun part, right? This journey of continuous learning, building,
-                breaking, and improving. That&apos;s what it&apos;s all about.
-              </p>
-            </div>
-          </div>
+        <div className="flex flex-col gap-3 mt-2">
+          <p className="font-mono-meta">On the reading list</p>
+          <Bulleted items={readingList} />
         </div>
-      </div>
-    </motion.div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Life beyond code
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          A full plate is a lot to juggle. The routine I built around it keeps me
+          sane. I still make time for:
+        </p>
+        <div className="flex flex-col">
+          {lifeItems.map((item, i) => (
+            <div key={item.title} className="flex flex-col">
+              <div className="flex flex-col gap-1 py-3">
+                <span className="font-display text-text text-xl">{item.title}</span>
+                <span className="text-text-secondary leading-relaxed">{item.detail}</span>
+              </div>
+              {i < lifeItems.length - 1 && <Hairline />}
+            </div>
+          ))}
+        </div>
+        <p className="text-text-secondary leading-relaxed mt-2">
+          Oh, and I&apos;m team pineapple on pizza. Don&apos;t @ me.
+        </p>
+      </section>
+
+      <Hairline />
+
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          The honest truth
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          I&apos;m at that stage where possibilities feel endless but nothing&apos;s
+          guaranteed. Building skills, shipping projects, learning constantly, looking
+          for the right opportunity to make an impact.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Not gonna pretend I have it all figured out. Still learning. Still growing.
+          Still making mistakes and learning from them.
+        </p>
+        <p className="text-lg text-text leading-relaxed">
+          But that&apos;s the fun part, right? This journey of continuous learning,
+          building, breaking, and improving. That&apos;s what it&apos;s all about.
+        </p>
+      </section>
+    </div>
   );
 }

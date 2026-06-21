@@ -1,359 +1,236 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { Zap, Disc, Lightbulb, Palette, Smartphone, Clock } from "lucide-react";
+import { Hairline } from "@/components/editorial";
+
+/**
+ * JourneySection - narrative, typeset as a plain editorial column.
+ *
+ * No glass cards, no colored pills, no icon medallions, no hover:scale. Pull
+ * quotes become a left Hairline + italic serif. Lists become mono bullets.
+ * Prose is preserved verbatim from the prior build (copy is a separate pass).
+ */
+
+function PullQuote({ children, cite }: { children: React.ReactNode; cite?: string }) {
+  return (
+    <div className="flex gap-5 my-2">
+      <Hairline orientation="vertical" />
+      <div className="flex flex-col gap-2">
+        <p className="font-display text-text text-[clamp(1.25rem,3.4cqi,1.75rem)] leading-snug italic">
+          {children}
+        </p>
+        {cite && <p className="font-mono-meta">{cite}</p>}
+      </div>
+    </div>
+  );
+}
 
 export function JourneySection() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="p-8 space-y-12 w-full max-w-5xl mx-auto">
-      {/* Hero Opening */}
-      <div className="space-y-6">
-        <h1 className="font-display text-4xl text-text leading-tight">
-          It started with a laptop
-          <br />
-          <span className="text-accent">and way too much curiosity</span>
-        </h1>
-        <p className="text-xl text-text-secondary max-w-3xl leading-relaxed">
-          I was 8 when dad brought home our first laptop. Obviously, I went
-          straight for the games. But something else caught my attention too...
+    <div className="flex flex-col gap-10 max-w-[68ch]">
+      <p className="text-lg text-text-secondary leading-relaxed">
+        I was 8 when dad brought home our first laptop. Obviously, I went straight
+        for the games. But something else caught my attention too.
+      </p>
+
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Google. Just... Google.
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          This thing had answers to{" "}
+          <em className="emphasis-underline not-italic text-text">literally everything</em>.
+          You could type any question and get an answer. You could download games
+          online and play them on your computer.
         </p>
-      </div>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          That&apos;s when it hit me: computers weren&apos;t just for playing games.
+          They were something way bigger.
+        </p>
+      </section>
 
-      {/* The "Mind Blown" Moment */}
-      <div className="glass-subtle rounded-2xl p-8 border-l-4 border-accent">
-        <div className="flex items-start gap-4">
-          <div className="text-accent flex-shrink-0"><Zap size={32} /></div>
-          <div className="space-y-3">
-            <h3 className="text-2xl font-semibold text-text">
-              Google. Just... Google.
-            </h3>
-            <p className="text-text-secondary text-lg leading-relaxed">
-              This thing had answers to{" "}
-              <em className="text-text">literally everything</em>. You could
-              type any question and get an answer. You could download games
-              online and play them on your computer.
-            </p>
-            <p className="text-text-secondary text-lg leading-relaxed">
-              That's when it hit me - computers weren't just for playing games.
-              They were something way bigger.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <p className="font-mono-meta">~2005</p>
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          My friend Rohan had internet
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          His mom would definitely scold us if she caught us gaming, so we&apos;d
+          wait until she wasn&apos;t around. The thrill of sneaking those sessions?
+          That made it even better.
+        </p>
+        <PullQuote>
+          &ldquo;CoolROMs, GBA emulator, Vice City, Prince of Persia, Aladdin: every
+          game was a new world to explore.&rdquo;
+        </PullQuote>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Every discovery made me want to dig deeper. What else could these machines do?
+        </p>
+      </section>
 
-      {/* The Rohan Memory */}
-      <div className="relative pl-8 border-l-2 border-accent/30">
-        <div className="space-y-4">
-          <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium mb-2">
-            ~2005
-          </div>
-          <h3 className="text-2xl font-semibold text-text">
-            My friend Rohan had internet
-          </h3>
-          <p className="text-text-secondary text-lg leading-relaxed">
-            His mom would definitely scold us if she caught us gaming, so we'd
-            wait until she wasn't around. The thrill of sneaking those sessions?
-            That made it even better.
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Every Friday: Digit magazine day
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          A new Digit magazine would show up with a CD full of software and games.
+          Weekends became my exploration time.
+        </p>
+        <p className="font-mono-meta">My weekend routine</p>
+        <ul className="flex flex-col gap-2 text-lg text-text-secondary leading-relaxed">
+          <li className="flex gap-3"><span aria-hidden className="text-text-secondary">&middot;</span><span>Install every single thing on that CD, see what works</span></li>
+          <li className="flex gap-3"><span aria-hidden className="text-text-secondary">&middot;</span><span>Share CDs with friends (before cloud storage was even a thing)</span></li>
+          <li className="flex gap-3"><span aria-hidden className="text-text-secondary">&middot;</span><span>Break things, fix them, learn something new</span></li>
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Then I discovered Microsoft Encarta
+        </h3>
+        <p className="text-lg text-text leading-relaxed">This changed everything.</p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Hours would just disappear. Science, history, world wars, mythology,
+          animal facts: I&apos;d just click through topic after topic. Learning became
+          addictive in the best way possible.
+        </p>
+        <div className="flex flex-col gap-1 mt-2">
+          <p className="font-display text-text text-xl">Delux Paint</p>
+          <p className="text-text-secondary leading-relaxed">
+            I&apos;d make these digital paintings and show them to my grandfather. The
+            way his face would light up? That made every creation worth it.
           </p>
-          <blockquote className="pl-6 border-l-4 border-accent/50 italic text-text text-lg my-6">
-            "CoolROMs, GBA emulator, Vice City, Prince of Persia, Aladdin -
-            every game was a new world to explore."
-          </blockquote>
-          <p className="text-text-secondary text-lg leading-relaxed">
-            Every discovery made me want to dig deeper. What else could these
-            machines do?
+        </div>
+        <div className="flex flex-col gap-1 mt-2">
+          <p className="font-display text-text text-xl">Android Ice Cream Sandwich</p>
+          <p className="text-text-secondary leading-relaxed">
+            Dad&apos;s Garmin touchscreen phone. First time using Android. That
+            touchscreen interface? I was hooked from day one.
           </p>
         </div>
-      </div>
+      </section>
 
-      {/* The Weekend Ritual */}
-      <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <div className="flex items-start gap-6">
-          <div className="text-accent flex-shrink-0"><Disc size={40} /></div>
-          <div className="flex-1 space-y-5">
-            <h3 className="text-2xl font-semibold text-text">
-              Every Friday: Digit magazine day
-            </h3>
-            <p className="text-text-secondary text-lg leading-relaxed">
-              A new Digit magazine would show up with a CD full of software and
-              games. Weekends became my exploration time.
-            </p>
-            <div className="glass-subtle rounded-xl p-5 space-y-3 border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent backdrop-blur-xl">
-              <div className="text-sm font-mono text-accent font-semibold">
-                My weekend routine:
-              </div>
-              <ul className="space-y-3 text-text-secondary">
-                <li className="flex items-start gap-3">
-                  <span className="text-accent mt-1 text-lg">→</span>
-                  <span className="text-base">
-                    Install every single thing on that CD, see what works
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-accent mt-1 text-lg">→</span>
-                  <span className="text-base">
-                    Share CDs with friends (before cloud storage was even a
-                    thing)
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-accent mt-1 text-lg">→</span>
-                  <span className="text-base">
-                    Break things, fix them, learn something new
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <p className="font-mono-meta">The moment it clicked</p>
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          10th standard.{" "}
+          <code className="font-mono text-[0.7em] text-text-secondary">printf(&quot;Hello World&quot;)</code>
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          My first C program. I remember thinking it was the coolest thing ever.
+          Then I discovered for loops and started making all these different
+          patterns. The possibilities felt endless.
+        </p>
+        <PullQuote>That&apos;s when I knew: I wanted to be a software engineer.</PullQuote>
+      </section>
 
-      {/* Microsoft Encarta Breakthrough */}
-      <div className="relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
-        <div className="relative glass-subtle p-8 border border-accent/20">
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="text-accent"><Lightbulb size={32} /></div>
-              <h3 className="font-display text-3xl text-text">
-                Then I discovered Microsoft Encarta
-              </h3>
-            </div>
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          My first &quot;real&quot; project took 2 months
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Database management system for a library. Simple concept, right? Wrong. So
+          many errors. OOP concepts I didn&apos;t really understand yet. Failed
+          attempts everywhere.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Honestly, I was disappointed at first. But I kept at it.{" "}
+          <span className="text-text">Slowly, slowly</span>, things started working.
+          Bugs got fixed. Logic made sense.
+        </p>
+        <p className="text-text-secondary leading-relaxed">
+          <span className="text-text">Biggest lesson?</span> Stay calm. Most errors
+          are just silly mistakes. Patience wins over frustration every single time.
+        </p>
+      </section>
 
-            <div className="glass-subtle rounded-xl p-6 space-y-4 border border-accent/30 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent backdrop-blur-xl shadow-lg">
-              <div className="text-accent font-semibold text-xl">
-                This changed everything.
-              </div>
-              <p className="text-text-secondary text-lg leading-relaxed">
-                Hours would just disappear. Science, history, world wars,
-                mythology, animal facts - I'd just click through topic after
-                topic. Learning became addictive in the best way possible.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4 mt-6">
-              <div className="glass-subtle rounded-xl p-5 border border-white/10 hover:border-accent/30 transition-colors">
-                <div className="mb-3 text-accent"><Palette size={24} /></div>
-                <h4 className="font-semibold text-text text-lg mb-2">
-                  Delux Paint
-                </h4>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  I'd make these digital paintings and show them to my
-                  grandfather. The way his face would light up? That made every
-                  creation worth it.
-                </p>
-              </div>
-              <div className="glass-subtle rounded-xl p-5 border border-white/10 hover:border-accent/30 transition-colors">
-                <div className="mb-3 text-accent"><Smartphone size={24} /></div>
-                <h4 className="font-semibold text-text text-lg mb-2">
-                  Android Ice Cream Sandwich
-                </h4>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  Dad's Garmin touchscreen phone. First time using Android. That
-                  touchscreen interface? I was hooked from day one.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* The Coding Click */}
-      <div className="space-y-6">
-        <div className="inline-block px-4 py-2 bg-accent/10 rounded-full text-accent font-medium">
-          The moment it clicked
-        </div>
-        <h2 className="font-display text-4xl text-text">
-          10th standard.
-          <br />
-          <code className="text-3xl px-3 py-1 bg-black/30 rounded font-mono text-accent">
-            printf("Hello World")
-          </code>
-        </h2>
-
-        <div className="space-y-5 text-text-secondary text-lg leading-relaxed max-w-3xl">
-          <p>
-            My first C program. I remember thinking it was the coolest thing
-            ever. Then I discovered for loops and started making all these
-            different patterns. The possibilities felt endless.
-          </p>
-          <div className="pl-6 border-l-4 border-accent/50 text-text text-xl font-medium italic">
-            That's when I knew - I wanted to be a software engineer.
-          </div>
-        </div>
-      </div>
-
-      {/* The 2-Month Struggle */}
-      <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <div className="space-y-5">
-          <div className="flex items-start gap-4">
-            <div className="text-accent flex-shrink-0"><Clock size={32} /></div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-semibold text-text mb-3">
-                My first "real" project took 2 months
-              </h3>
-              <p className="text-text-secondary text-lg leading-relaxed">
-                Database management system for a library. Simple concept, right?
-                Wrong. So many errors. OOP concepts I didn't really understand
-                yet. Failed attempts everywhere.
-              </p>
-            </div>
-          </div>
-
-          <div className="glass-subtle rounded-xl p-5 border border-accent/20 backdrop-blur-xl bg-gradient-to-br from-accent/5 to-transparent">
-            <p className="text-text-secondary leading-relaxed">
-              Honestly, I was disappointed at first. But I kept at it.{" "}
-              <strong className="text-text">Slowly, slowly</strong>, things
-              started working. Bugs got fixed. Logic made sense.
-            </p>
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <p className="text-accent font-medium">Biggest lesson?</p>
-              <p className="text-text-secondary mt-2">
-                Stay calm. Most errors are just silly mistakes. Patience wins
-                over frustration every single time.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* React & Promises */}
-      <div className="space-y-6">
-        <h2 className="font-display text-3xl text-text">
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
           React confused the hell out of me
-        </h2>
+        </h3>
+        <PullQuote cite="Me, for like 3 months straight">
+          &ldquo;Why React when we literally have HTML, CSS, and JavaScript?&rdquo;
+        </PullQuote>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Getting comfortable with promises, understanding why React even existed,
+          figuring out the difference between all these frameworks: steep learning
+          curve doesn&apos;t even cover it.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          But when it finally clicked?{" "}
+          <span className="text-text">Everything changed</span>. Building complex UIs
+          suddenly made sense. Components made sense. The whole ecosystem clicked
+          into place.
+        </p>
+        <p className="text-text-secondary leading-relaxed">
+          <span className="text-text">I started noticing a pattern:</span> the
+          confusion is always part of learning. You push through it, things click,
+          and suddenly you&apos;ve unlocked a whole new set of capabilities.
+        </p>
+      </section>
 
-        <div className="glass-subtle rounded-xl p-6 border-l-4 border-accent bg-accent/5">
-          <p className="text-text text-lg italic leading-relaxed">
-            "Why React when we literally have HTML, CSS, and JavaScript?"
-          </p>
-          <p className="text-text-secondary mt-3">
-            Me, for like 3 months straight
-          </p>
-        </div>
-
-        <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-          <p>
-            Getting comfortable with promises, understanding why React even
-            existed, figuring out the difference between all these frameworks -
-            steep learning curve doesn't even cover it.
-          </p>
-          <p>
-            But when it finally clicked?{" "}
-            <strong className="text-text font-semibold">
-              Everything changed
-            </strong>
-            . Building complex UIs suddenly made sense. Components made sense.
-            The whole ecosystem clicked into place.
-          </p>
-        </div>
-
-        <div className="glass-subtle rounded-xl p-5 border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent backdrop-blur-xl">
-          <p className="text-accent font-medium mb-2">
-            I started noticing a pattern:
-          </p>
-          <p className="text-text-secondary">
-            The confusion is always part of learning. You push through it,
-            things click, and suddenly you've unlocked a whole new set of
-            capabilities.
-          </p>
-        </div>
-      </div>
-
-      {/* Industry Reality */}
-      <div className="glass-subtle rounded-2xl p-8 border border-white/10">
-        <h2 className="text-2xl font-semibold text-text mb-5">
+      <section className="flex flex-col gap-3">
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
           Then came internships
-        </h2>
-        <div className="space-y-5 text-text-secondary text-lg leading-relaxed">
-          <p>
-            Turns out software engineering isn't just writing code. It's
-            understanding what problem you're actually solving. Communicating
-            with teams. Making trade-offs. Sometimes choosing{" "}
-            <span className="text-text font-medium">"good enough"</span> over{" "}
-            <span className="text-text font-medium">"perfect"</span> because
-            shipping matters.
-          </p>
-          <p>
-            Working on real systems - optimizing APIs for actual users, building
-            infrastructure that needs to stay up, solving problems that impact
-            real people's work.
-          </p>
-          <p className="text-text text-xl font-medium">
-            That's what I'm here for. That's what gets me excited.
-          </p>
-        </div>
-      </div>
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Turns out software engineering isn&apos;t just writing code. It&apos;s
+          understanding what problem you&apos;re actually solving. Communicating with
+          teams. Making trade-offs. Sometimes choosing{" "}
+          <span className="text-text">&quot;good enough&quot;</span> over{" "}
+          <span className="text-text">&quot;perfect&quot;</span> because shipping matters.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Working on real systems: optimizing APIs for actual users, building
+          infrastructure that needs to stay up, solving problems that impact real
+          people&apos;s work.
+        </p>
+        <p className="text-lg text-text leading-relaxed">
+          That&apos;s what I&apos;m here for. That&apos;s what gets me excited.
+        </p>
+      </section>
 
-      {/* Northeastern */}
-      <div className="relative pl-8 border-l-2 border-accent/30">
-        <div className="space-y-5">
-          <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
-            Grad school
-          </div>
-          <h2 className="font-display text-3xl text-text">
-            Northeastern & being a TA
-          </h2>
-          <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-            <p>
-              Came to Northeastern for my MS because I wanted to fill knowledge
-              gaps and learn from people way smarter than me. Finished May 2026.
-            </p>
-            <p>
-              TA&apos;d Network Structures & Cloud Computing and databases. It was
-              humbling. Try explaining why someone&apos;s AWS infrastructure isn&apos;t
-              working at 11 PM. Nothing tests whether you actually understand
-              something like teaching it.
-            </p>
-          </div>
-          <div className="glass-subtle rounded-xl p-5 bg-accent/5 border border-accent/20">
-            <p className="text-text-secondary">
-              Exhausting sometimes. Grading assignments, holding office hours,
-              debugging students&apos; code. But when someone was stuck for hours
-              and I helped them figure it out, when they actually got it and
-              their code finally worked? That feeling was different. Worth it.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section className="flex flex-col gap-3">
+        <p className="font-mono-meta">Teaching</p>
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Being a TA
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          TA&apos;d Network Structures &amp; Cloud Computing and databases. It was
+          humbling. Try explaining why someone&apos;s AWS infrastructure isn&apos;t
+          working at 11 PM. Nothing tests whether you actually understand something
+          like teaching it.
+        </p>
+        <p className="text-text-secondary leading-relaxed">
+          Exhausting sometimes. Grading assignments, holding office hours, debugging
+          students&apos; code. But when someone was stuck for hours and I helped them
+          figure it out, when they actually got it and their code finally worked?
+          That feeling was different. Worth it.
+        </p>
+      </section>
 
-      {/* Now — building at the MCP layer */}
-      <div className="relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
-        <div className="relative glass-subtle p-8 border border-accent/20">
-          <div className="space-y-5">
-            <div className="inline-block px-3 py-1 bg-accent/10 rounded-full text-sm text-accent font-medium">
-              Now
-            </div>
-            <h2 className="font-display text-3xl text-text">
-              Building at the MCP layer
-            </h2>
-            <div className="space-y-4 text-text-secondary text-lg leading-relaxed">
-              <p>
-                Somewhere along the way, the thing that grabbed me as an 8-year-old
-                came back around. These days I build the workflow layer between LLMs
-                and the real work developers do.
-              </p>
-              <p>
-                <strong className="text-text">OpenCodeIntel</strong> is a production
-                MCP server that gives coding agents real code intelligence: hybrid
-                retrieval over your repo with AST structure, BM25 keywords, and Cohere
-                reranking, so the agent stops guessing about your codebase.{" "}
-                <strong className="text-text">Saar</strong> is a Chrome extension on
-                the Web Store that reads Claude.ai streams to catch context rot before
-                it wrecks an answer.
-              </p>
-              <p className="text-text text-xl font-medium">
-                Same kid, same curiosity. Just pointed at the most interesting layer
-                I&apos;ve found yet.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
+      <section className="flex flex-col gap-3">
+        <p className="font-mono-meta">Now</p>
+        <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
+          Building at the MCP layer
+        </h3>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          Somewhere along the way, the thing that grabbed me as an 8-year-old came
+          back around. These days I build the workflow layer between LLMs and the
+          real work developers do.
+        </p>
+        <p className="text-lg text-text-secondary leading-relaxed">
+          <span className="text-text">OpenCodeIntel</span> is a production MCP server
+          that gives coding agents real code intelligence: hybrid retrieval over your
+          repo with AST structure, BM25 keywords, and Cohere reranking, so the agent
+          stops guessing about your codebase.{" "}
+          <span className="text-text">Saar</span> is a Chrome extension on the Web
+          Store that reads Claude.ai streams to catch context rot before it wrecks an
+          answer.
+        </p>
+        <p className="text-lg text-text leading-relaxed">
+          Same kid, same curiosity. Just pointed at the most interesting layer
+          I&apos;ve found yet.
+        </p>
+      </section>
+    </div>
   );
 }
