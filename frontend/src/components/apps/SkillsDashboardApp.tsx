@@ -129,14 +129,20 @@ function ArcRing({ level, mono, reduced }: { level: number; mono: boolean; reduc
   const weight = levelWeight(level);
   const dash = CIRC * (level / 5);
 
+  // Window-dynamic box: the arc re-proportions with the WINDOW via cqi while the
+  // internal geometry stays intact. The SVG scales through its viewBox (stroke,
+  // circumference, dash are all viewBox user units), and Halftone samples its
+  // luminance field in normalized 0..1 space against a ResizeObserver, so the
+  // dot grid refills the resized box cleanly. Max = the original 56px so a
+  // maximized window is unchanged; small windows shrink the arc gracefully.
+  const box = 'clamp(2.5rem, 9cqi, 3.5rem)';
+
   return (
-    <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative shrink-0" style={{ width: box, height: box }}>
       {/* Faint full-circle guide track (both palettes). */}
       <svg
-        width={SIZE}
-        height={SIZE}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="absolute inset-0"
+        className="absolute inset-0 h-full w-full"
         aria-hidden
       >
         <circle
@@ -147,7 +153,11 @@ function ArcRing({ level, mono, reduced }: { level: number; mono: boolean; reduc
           stroke="rgb(var(--color-border))"
           strokeWidth="1"
         />
-        {/* Color path only: solid weighted sweep (mono uses the dot field). */}
+        {/* Color path only: solid weighted sweep (mono uses the dot field).
+            The arc's final extent is rendered statically via the dash array
+            (no animated stroke-dashoffset, which is a non-GPU paint property);
+            the value reveals once on mount via opacity only (GPU). Under
+            reduced motion the final state shows immediately with no fade. */}
         {!mono && (
           <motion.circle
             cx={CX}
@@ -157,11 +167,11 @@ function ArcRing({ level, mono, reduced }: { level: number; mono: boolean; reduc
             stroke="rgb(var(--color-text))"
             strokeWidth={weight}
             strokeLinecap="round"
-            strokeDasharray={CIRC}
-            strokeOpacity={levelOpacity(level)}
-            initial={reduced ? { strokeDashoffset: CIRC - dash } : { strokeDashoffset: CIRC }}
-            animate={{ strokeDashoffset: CIRC - dash }}
-            transition={reduced ? { duration: 0 } : { duration: 0.9, ease: EASE_OUT }}
+            strokeDasharray={`${dash} ${CIRC}`}
+            strokeDashoffset={0}
+            initial={reduced ? { opacity: levelOpacity(level) } : { opacity: 0 }}
+            animate={{ opacity: levelOpacity(level) }}
+            transition={reduced ? { duration: 0 } : { duration: 0.28, ease: EASE_OUT }}
             style={{ transformOrigin: `${CX}px ${CY}px`, transform: 'rotate(-90deg)' }}
           />
         )}
@@ -177,7 +187,12 @@ function ArcRing({ level, mono, reduced }: { level: number; mono: boolean; reduc
 
       {/* Center: the level as a quiet serif numeral (legible without hue). */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-display text-text leading-none" style={{ fontSize: 15 }}>
+        <span
+          className="font-display text-text leading-none"
+          // Tracks the arc box: cqi-based so the numeral re-proportions with the
+          // window; max = the original 15px. Lower clamp kept legible.
+          style={{ fontSize: 'clamp(0.7rem, 2.4cqi, 0.9375rem)' }}
+        >
           {level}
         </span>
       </div>
@@ -283,7 +298,9 @@ function SkillCard({
             className={`font-display text-text leading-tight truncate ${
               mode === 'active' ? 'font-medium' : ''
             }`}
-            style={{ fontSize: 16 }}
+            // Window-dynamic: re-proportions with the WINDOW width; max = the
+            // original 16px so a maximized window matches, small windows shrink.
+            style={{ fontSize: 'clamp(0.85rem, 2.6cqi, 1rem)' }}
           >
             {skill.name}
           </h3>
@@ -305,7 +322,12 @@ function SkillCard({
         </MetaLabel>
       </div>
 
-      <p className="text-[12.5px] leading-relaxed text-text-secondary line-clamp-2">
+      <p
+        className="leading-relaxed text-text-secondary line-clamp-2"
+        // Window-dynamic body: scales off the WINDOW; max = the original
+        // 12.5px, lower clamp kept legible.
+        style={{ fontSize: 'clamp(0.72rem, 1.6cqi, 0.78rem)' }}
+      >
         {skill.description}
       </p>
 
@@ -357,7 +379,9 @@ function FilterPill({
     >
       <MetaLabel
         className={
-          active ? 'text-text' : 'text-text-secondary transition-colors group-hover:text-text'
+          active
+            ? 'text-text'
+            : 'text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text'
         }
       >
         {label}
@@ -424,7 +448,13 @@ export default function SkillsDashboardApp() {
       {/* ── Header ── serif title, mono sub-line, hairline-anchored filter row. */}
       <div className="shrink-0 px-6 pt-6 pb-4 flex flex-col gap-4 border-b border-border">
         <div className="flex flex-col gap-1.5">
-          <h1 className="font-display text-text leading-none" style={{ fontSize: 28 }}>
+          <h1
+            className="font-display text-text leading-none"
+            // Window-dynamic: scales off the WINDOW width via cqi (the
+            // .app-content query container), max = the original 28px so a
+            // maximized window is unchanged; small windows scale the serif down.
+            style={{ fontSize: 'clamp(1.25rem, 5cqi, 1.75rem)' }}
+          >
             Skills
           </h1>
           <MetaLabel className="text-text-secondary">
