@@ -462,7 +462,7 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
               <MetaLabel className="text-text-secondary/70">{orgLabel}</MetaLabel>
             </div>
 
-            <h2 className="editorial-hero text-text break-words text-balance">
+            <h2 className="editorial-hero project-hero text-text break-words text-balance">
               {repo.displayName}
             </h2>
 

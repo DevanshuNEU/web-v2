@@ -525,6 +525,10 @@ body {
    global token ceiling (128px / 72px), so a maximized window matches the
    viewport-fluid version; small windows scale the serif down gracefully. */
 .app-content .editorial-hero { font-size: clamp(2.25rem, 14cqi, 8rem); }
+/* Projects poster name: a project name is multi-word and shares the stage with
+   a subtitle + metadata, so it gets a tamer ceiling than the page-title hero.
+   Still window-dynamic via cqi; specificity (0-3-0) beats the base ramp. */
+.app-content .editorial-hero.project-hero { font-size: clamp(1.9rem, 8cqi, 4.5rem); }
 .app-content .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
 
 /* Body, small text, and mono metadata scale off the WINDOW too, so a small
