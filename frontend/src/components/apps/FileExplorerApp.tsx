@@ -1,18 +1,39 @@
 'use client';
 
 /**
- * FileExplorerApp — macOS Finder-style project browser
+ * FileExplorerApp - "Finder", reskinned into the Instrument editorial register.
  *
- * Projects as "files", categories as folders. Click a project to see
- * a full detail panel with tech stack, links, and description.
+ * A Finder-style project browser, monochrome and restraint-first. Categories
+ * are folders (a left index rail on desktop, scrollable chips on mobile);
+ * projects are "files" laid out as hairline-divided index rows. Selecting a
+ * file opens a detail pane: serif title, a mono spec line (language / stars /
+ * status), hairline-divided sections, and quiet editorial links (text +
+ * hairline, never filled buttons).
+ *
+ * Live data: GitHub stars AND primary language come from /api/github/repos
+ * (the same source the app already used). Stars are never hardcoded; the mono
+ * spec line just omits a cell when the live value is absent.
+ *
+ * Animation contract (shared with AboutMeApp / ResumeApp): content reveals
+ * ONCE on mount via a staggered container, never on scroll - a windowed inner
+ * scroll container makes in-view triggers unreliable. Micro-interactions:
+ *   - a sliding selection marker (layoutId) glides between folder rows and
+ *     between file rows, like the resume rail;
+ *   - the detail pane re-runs a quiet staggered "opening" reveal, keyed on the
+ *     selected file, so loading a file feels alive;
+ *   - each folder shows a live mono item count.
+ * All of it collapses to instant under reduced motion; browsing stays fully
+ * usable with motion off.
+ *
+ * Strictly three-tone (text / text-secondary / bg + border). Status is a mono
+ * uppercase label (ACTIVE / COMPLETED / EXPERIMENTAL), never a colored badge.
+ * No language hue dots, no glass cards, no accent pills.
  */
 
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Folder, FolderOpen, FileCode2, ExternalLink, Github,
-  ChevronRight, Star, ArrowLeft,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Hairline, MetaLabel } from '@/components/editorial';
+import { reveal, withReduced, spring } from '@/lib/motion';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
 
@@ -131,7 +152,7 @@ const PROJECTS: Project[] = [
     id: 'tool-crowding',
     name: 'Tool Crowding',
     description: 'Pre-registered benchmark measuring MCP discrimination interference on code retrieval',
-    longDescription: 'Open-methodology benchmark that measures whether adding more MCP servers degrades code retrieval (pass@1). Uses padded-N=1 controls to isolate interference from prompt-length effects. Pre-registered before data collection with 10 binding design docs. Exploratory probes found a task-framing x agent-persona interaction not reported by prior art. Currently paused — frontier API costs add up fast. Harness is ready; sweep resumes when the budget does.',
+    longDescription: 'Open-methodology benchmark that measures whether adding more MCP servers degrades code retrieval (pass@1). Uses padded-N=1 controls to isolate interference from prompt-length effects. Pre-registered before data collection with 10 binding design docs. Exploratory probes found a task-framing x agent-persona interaction not reported by prior art. Currently paused - frontier API costs add up fast. Harness is ready; sweep resumes when the budget does.',
     category: 'Data / ML',
     tech: ['Python', 'pytest', 'Anthropic API', 'Claude Sonnet/Opus'],
     github: 'https://github.com/DevanshuNEU/tool-crowding',
@@ -141,7 +162,7 @@ const PROJECTS: Project[] = [
     id: 'parsewave-terminal-bench',
     name: 'Terminal-Bench',
     description: 'Contract work: calibrated LLM debugging benchmarks for ParseWave',
-    longDescription: 'Freelance work for ParseWave. Authored a benchmark suite of systems debugging tasks calibrated to 0-2/5 agent pass rate — hard enough to measure real reliability, not just catch obvious bugs. Harbor format throughout: oracle/nop baselines, anti-cheat measures, preflight checks. Three tasks shipped: nginx-502, fd-leak-emfile, concurrent-ledger.',
+    longDescription: 'Freelance work for ParseWave. Authored a benchmark suite of systems debugging tasks calibrated to 0-2/5 agent pass rate - hard enough to measure real reliability, not just catch obvious bugs. Harbor format throughout: oracle/nop baselines, anti-cheat measures, preflight checks. Three tasks shipped: nginx-502, fd-leak-emfile, concurrent-ledger.',
     category: 'Tools / CLI',
     tech: ['Python', 'pytest', 'Go', 'Nginx', 'PostgreSQL'],
     status: 'archived',
@@ -169,331 +190,381 @@ const PROJECTS: Project[] = [
 
 const CATEGORIES = ['All', 'Frontend', 'Full Stack', 'Cloud / DevOps', 'Tools / CLI', 'Systems', 'Data / ML'];
 
-const STATUS_COLORS: Record<Project['status'], string> = {
-  production: '#10b981',
-  active:     '#06b6d4',
-  wip:        '#f59e0b',
-  archived:   '#6b7280',
-};
-
+// The local status enum maps to the three editorial labels. No color anywhere;
+// the label IS the signal.
 const STATUS_LABELS: Record<Project['status'], string> = {
-  production: 'Production',
-  active:     'Active',
-  wip:        'In Progress',
-  archived:   'Archived',
-};
-
-const CATEGORY_ICON_COLORS: Record<string, { bg: string; icon: string }> = {
-  'Frontend':      { bg: '#06b6d4', icon: '#ffffff' },
-  'Full Stack':    { bg: '#6366f1', icon: '#ffffff' },
-  'Cloud / DevOps':{ bg: '#f59e0b', icon: '#ffffff' },
-  'Tools / CLI':   { bg: '#10b981', icon: '#ffffff' },
-  'Systems':       { bg: '#ef4444', icon: '#ffffff' },
-  'Data / ML':     { bg: '#ec4899', icon: '#ffffff' },
-  'Other':         { bg: '#8b5cf6', icon: '#ffffff' },
+  production: 'COMPLETED',
+  active: 'ACTIVE',
+  wip: 'EXPERIMENTAL',
+  archived: 'COMPLETED',
 };
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// Live data shape - stars + primary language keyed by lowercased repo name.
+// Both come from /api/github/repos. Absent values just drop their spec cell.
 // ---------------------------------------------------------------------------
 
-function FileIcon({ project, selected }: { project: Project; selected: boolean }) {
-  const palette = CATEGORY_ICON_COLORS[project.category] ?? CATEGORY_ICON_COLORS['Other'];
-  const statusColor = STATUS_COLORS[project.status];
+interface RepoMeta {
+  stars: number;
+  language: string | null;
+}
 
+type RepoMetaMap = Record<string, RepoMeta>;
+
+function repoMetaFor(project: Project, metaByName: RepoMetaMap): RepoMeta | undefined {
+  const byId = metaByName[project.id.toLowerCase()];
+  if (byId) return byId;
+  const gh = ghName(project.github);
+  return gh ? metaByName[gh] : undefined;
+}
+
+/** Build the mono spec cells for a project from local + live data. */
+function specCells(project: Project, metaByName: RepoMetaMap): string[] {
+  const meta = repoMetaFor(project, metaByName);
+  // Primary language: live language if present, else the project's lead tech.
+  const language = meta?.language ?? project.tech[0];
+  const cells: string[] = [];
+  if (language) cells.push(language);
+  if (meta && meta.stars > 0) {
+    cells.push(`${meta.stars} ${meta.stars === 1 ? 'STAR' : 'STARS'}`);
+  }
+  cells.push(STATUS_LABELS[project.status]);
+  return cells;
+}
+
+/** Mono run of spec cells separated by middots. */
+function SpecLine({ cells, className }: { cells: string[]; className?: string }) {
   return (
-    <div className={`
-      flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer select-none
-      transition-all duration-150
-      ${selected
-        ? 'bg-accent/15 ring-1 ring-accent/40'
-        : 'hover:bg-black/5 dark:hover:bg-white/5 active:scale-95'}
-    `}>
-      {/* Colored icon block — macOS app icon style */}
-      <div className="relative">
-        <div
-          className="w-12 h-12 rounded-[11px] flex items-center justify-center shadow-sm"
-          style={{
-            background: `linear-gradient(145deg, ${palette.bg}dd, ${palette.bg}99)`,
-            boxShadow: `0 2px 8px ${palette.bg}50, inset 0 1px 1px rgba(255,255,255,0.3)`,
-          }}
-        >
-          <FileCode2 size={22} strokeWidth={1.5} style={{ color: palette.icon }} />
-        </div>
-        {/* Status dot */}
-        <div
-          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface"
-          style={{ background: statusColor }}
-          title={STATUS_LABELS[project.status]}
-        />
-        {/* Highlight star */}
-        {project.highlight && (
-          <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-surface flex items-center justify-center">
-            <span style={{ fontSize: 6, color: 'white', lineHeight: 1 }}>★</span>
-          </div>
+    <p className={`flex flex-wrap items-center gap-x-1 gap-y-1 ${className ?? ''}`}>
+      {cells.map((cell, i) => (
+        <React.Fragment key={cell}>
+          {i > 0 && (
+            <span aria-hidden className="font-mono-meta opacity-40">
+              &middot;
+            </span>
+          )}
+          <MetaLabel className="text-text-secondary">{cell}</MetaLabel>
+        </React.Fragment>
+      ))}
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quiet editorial link - text + a hairline that grows on hover. Never a button.
+// ---------------------------------------------------------------------------
+
+function EditorialLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group inline-flex items-center focus-visible:outline-none"
+    >
+      <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+        {label}
+      </MetaLabel>
+      <span
+        aria-hidden
+        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 group-hover:scale-x-150"
+      />
+    </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// File row - a hairline-divided index row: serif name + description over a mono
+// spec line, with a sliding active marker shared via layoutId.
+// ---------------------------------------------------------------------------
+
+const FILE_MARKER_ID = 'finder-file-active';
+
+function FileRow({
+  project,
+  metaByName,
+  active,
+  reduced,
+  onClick,
+}: {
+  project: Project;
+  metaByName: RepoMetaMap;
+  active: boolean;
+  reduced: boolean | null;
+  onClick: () => void;
+}) {
+  const cells = specCells(project, metaByName);
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={onClick}
+        data-testid="finder-file-row"
+        aria-current={active ? 'true' : undefined}
+        className="group relative flex w-full flex-col gap-1.5 px-3 py-4 text-left
+                   transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.04]
+                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+      >
+        {/* Sliding selection marker: a thin graphite bar pinned to the row's
+            left edge. layoutId makes it glide between rows. */}
+        {active && (
+          <motion.span
+            layoutId={FILE_MARKER_ID}
+            aria-hidden
+            className="absolute left-0 top-3 bottom-3 w-[2px] bg-text"
+            transition={withReduced(
+              { type: 'spring', stiffness: 520, damping: 40, mass: 0.6 },
+              reduced,
+            )}
+          />
         )}
-      </div>
-      <span className={`text-[11px] text-center leading-tight max-w-[68px] break-words ${
-        selected ? 'text-accent font-semibold' : 'text-text-secondary'
-      }`}>
-        {project.name}
-      </span>
+
+        <div className="flex items-baseline justify-between gap-4">
+          <h3
+            className={`font-display text-lg leading-tight truncate transition-transform
+                        ${active ? 'text-text' : 'text-text group-hover:text-text'}
+                        ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+          >
+            {project.name}
+          </h3>
+        </div>
+
+        <p className="max-w-[60ch] text-sm leading-snug text-text-secondary">
+          {project.description}
+        </p>
+
+        <SpecLine cells={cells} className="mt-1" />
+      </button>
+      <Hairline />
     </div>
   );
 }
 
-function DetailPanel({
+// ---------------------------------------------------------------------------
+// Detail pane - serif title, mono spec line, hairline-divided sections, quiet
+// links. The whole body re-runs a quiet staggered reveal keyed on the selected
+// file id, so opening a file feels alive (collapses to instant under reduced).
+// ---------------------------------------------------------------------------
+
+function DetailBody({
   project,
-  onBack,
-  starsByName,
+  metaByName,
+  reduced,
 }: {
   project: Project;
-  onBack: () => void;
-  starsByName: Record<string, number>;
+  metaByName: RepoMetaMap;
+  reduced: boolean | null;
 }) {
-  const statusColor = STATUS_COLORS[project.status];
-  const stars =
-    starsByName[project.id.toLowerCase()] ??
-    (ghName(project.github) ? starsByName[ghName(project.github)!] : undefined);
+  const cells = specCells(project, metaByName);
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-      className="h-full flex flex-col overflow-auto"
+      key={project.id}
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-7"
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 p-5 border-b border-white/10">
-        <button
-          onClick={onBack}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-text-secondary hover:text-text"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <FileCode2 size={22} className="text-accent" strokeWidth={1.5} />
-        <div className="flex-1 min-w-0">
-          <h2 className="font-bold text-text text-base truncate">{project.name}</h2>
-          <p className="text-xs text-text-secondary truncate">{project.category}</p>
-        </div>
-        <div
-          className="px-2 py-0.5 rounded-full text-xs font-medium"
-          style={{ background: `${statusColor}20`, color: statusColor }}
-        >
-          {STATUS_LABELS[project.status]}
-        </div>
-      </div>
+      {/* Title block. */}
+      <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
+        <MetaLabel as="p" className="text-text-secondary">
+          {project.category}
+        </MetaLabel>
+        <h2 className="font-display text-text editorial-head leading-[0.95]">
+          {project.name}
+        </h2>
+        <Hairline />
+        <SpecLine cells={cells} />
+      </motion.div>
 
-      {/* Body */}
-      <div className="flex-1 p-5 space-y-5 overflow-auto">
-        <p className="text-sm text-text-secondary leading-relaxed">
+      {/* Overview. */}
+      <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
+        <MetaLabel as="p">Overview</MetaLabel>
+        <Hairline />
+        <p className="max-w-[64ch] text-sm leading-relaxed text-text-secondary">
           {project.longDescription}
         </p>
+      </motion.div>
 
-        {/* Tech stack */}
-        <div>
-          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Tech Stack</h3>
-          <div className="flex flex-wrap gap-1.5">
-            {project.tech.map(t => (
-              <span
-                key={t}
-                className="px-2 py-0.5 rounded-md text-xs font-medium bg-accent/10 text-accent border border-accent/20"
-              >
-                {t}
-              </span>
-            ))}
+      {/* Tech - a mono run, no pills. */}
+      <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
+        <MetaLabel as="p">Stack</MetaLabel>
+        <Hairline />
+        <p className="flex flex-wrap items-baseline gap-x-1 gap-y-1">
+          {project.tech.map((t, i) => (
+            <React.Fragment key={t}>
+              {i > 0 && (
+                <span aria-hidden className="font-mono-meta opacity-40">
+                  &middot;
+                </span>
+              )}
+              <span className="font-mono text-[13px] leading-snug text-text">{t}</span>
+            </React.Fragment>
+          ))}
+        </p>
+      </motion.div>
+
+      {/* Links - quiet editorial, hairline-separated from the body above. */}
+      {(project.github || project.live) && (
+        <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
+          <MetaLabel as="p">Links</MetaLabel>
+          <Hairline />
+          <div className="flex flex-wrap gap-x-8 gap-y-3">
+            {project.github && <EditorialLink href={project.github} label="GitHub" />}
+            {project.live && <EditorialLink href={project.live} label="Live Site" />}
           </div>
-        </div>
-
-        {/* Stats */}
-        {stars && stars > 0 && (
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-              <Star size={14} className="text-amber-400" />
-              <span>{stars} stars</span>
-            </div>
-          </div>
-        )}
-
-        {/* Links */}
-        <div className="flex gap-2 pt-1">
-          {project.github && (
-            <a
-              href={project.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors text-xs font-medium text-text"
-            >
-              <Github size={13} />
-              GitHub
-            </a>
-          )}
-          {project.live && (
-            <a
-              href={project.live}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors text-xs font-medium text-accent"
-            >
-              <ExternalLink size={13} />
-              Live Site
-            </a>
-          )}
-        </div>
-      </div>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Mobile — category + file grid root, push to detail
+// Desktop detail pane - quiet header (back control + breadcrumb) + body.
 // ---------------------------------------------------------------------------
 
-function FileGridMobile({ starsByName }: { starsByName: Record<string, number> }) {
-  const nav = useMobileNavigation();
-  const [activeCategory, setActiveCategory] = useState('All');
-
-  const filtered = activeCategory === 'All'
-    ? PROJECTS
-    : PROJECTS.filter(p => p.category === activeCategory);
-
-  const openDetail = (project: Project) => {
-    nav.push({
-      id: project.id,
-      title: project.name,
-      element: <DetailPanelMobile project={project} starsByName={starsByName} />,
-    });
-  };
-
-  return (
-    <div className="h-full overflow-y-auto">
-      {/* Category chips */}
-      <div className="px-4 pt-3 pb-2 flex gap-2 overflow-x-auto hide-scrollbar">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
-              activeCategory === cat
-                ? 'bg-accent text-white'
-                : 'bg-black/5 dark:bg-white/8 text-text-secondary'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* File grid */}
-      <div className="px-3 pb-4 grid grid-cols-4 gap-1">
-        {filtered.map(project => (
-          <button key={project.id} onClick={() => openDetail(project)} className="text-left">
-            <FileIcon project={project} selected={false} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DetailPanelMobile({
+function DetailPanel({
   project,
-  starsByName,
+  metaByName,
+  reduced,
+  onBack,
 }: {
   project: Project;
-  starsByName: Record<string, number>;
+  metaByName: RepoMetaMap;
+  reduced: boolean | null;
+  onBack: () => void;
 }) {
-  const statusColor = STATUS_COLORS[project.status];
-  const stars =
-    starsByName[project.id.toLowerCase()] ??
-    (ghName(project.github) ? starsByName[ghName(project.github)!] : undefined);
-
   return (
-    <div className="overflow-y-auto pb-6">
-      {/* Hero */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/10">
-        <div className="flex items-start gap-4 mb-3">
-          <div
-            className="w-14 h-14 rounded-[13px] flex-shrink-0 flex items-center justify-center shadow-sm"
-            style={{
-              background: `linear-gradient(145deg, ${CATEGORY_ICON_COLORS[project.category]?.bg ?? '#6366f1'}dd, ${CATEGORY_ICON_COLORS[project.category]?.bg ?? '#6366f1'}99)`,
-            }}
-          >
-            <FileCode2 size={24} strokeWidth={1.5} style={{ color: CATEGORY_ICON_COLORS[project.category]?.icon ?? '#fff' }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-text leading-tight">{project.name}</h2>
-            <p className="text-xs text-text-secondary mt-0.5">{project.category}</p>
-            <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: `${statusColor}20`, color: statusColor }}>
-              {STATUS_LABELS[project.status]}
-            </span>
-          </div>
-        </div>
-        <p className="text-sm text-text-secondary leading-relaxed">{project.longDescription}</p>
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="app-toolbar flex shrink-0 items-center gap-3 border-b px-5 py-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="group inline-flex items-center focus-visible:outline-none"
+          aria-label="Close detail"
+        >
+          <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+            Close
+          </MetaLabel>
+        </button>
+        <span aria-hidden className="font-mono-meta opacity-40">
+          /
+        </span>
+        <MetaLabel className="min-w-0 truncate text-text">{project.name}</MetaLabel>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Tech */}
-        <div>
-          <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-2">Tech Stack</p>
-          <div className="flex flex-wrap gap-1.5">
-            {project.tech.map(t => (
-              <span key={t} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent/10 text-accent border border-accent/20">{t}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Stars */}
-        {stars && stars > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-text-secondary">
-            <Star size={14} className="text-amber-400" />
-            <span>{stars} stars on GitHub</span>
-          </div>
-        )}
-
-        {/* Links */}
-        <div className="flex gap-2">
-          {project.github && (
-            <a href={project.github} target="_blank" rel="noopener noreferrer"
-               className="flex items-center gap-1.5 px-4 py-2 rounded-xl glass-subtle border border-white/20 text-text text-sm font-medium active:opacity-70 transition-opacity">
-              <Github size={14} /> GitHub
-            </a>
-          )}
-          {project.live && (
-            <a href={project.live} target="_blank" rel="noopener noreferrer"
-               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium active:opacity-70 transition-opacity">
-              <ExternalLink size={14} /> Live
-            </a>
-          )}
-        </div>
+      <div className="flex-1 overflow-y-auto px-6 py-7">
+        <DetailBody project={project} metaByName={metaByName} reduced={reduced} />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Folder rail row (desktop sidebar) - mono label + live count + sliding marker.
 // ---------------------------------------------------------------------------
 
-export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [selected, setSelected] = useState<Project | null>(null);
-  const [starsByName, setStarsByName] = useState<Record<string, number>>({});
+const FOLDER_MARKER_ID = 'finder-folder-active';
+
+function FolderRow({
+  label,
+  count,
+  active,
+  reduced,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  reduced: boolean | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid="finder-folder-row"
+      aria-current={active ? 'true' : undefined}
+      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+    >
+      {active && (
+        <motion.span
+          layoutId={FOLDER_MARKER_ID}
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[1.1em] w-[2px] -translate-y-1/2 bg-text"
+          transition={withReduced(
+            { type: 'spring', stiffness: 520, damping: 40, mass: 0.6 },
+            reduced,
+          )}
+        />
+      )}
+      <span
+        className={`font-mono-meta min-w-0 flex-1 truncate transition-transform
+                    ${active ? 'text-text' : 'text-text-secondary group-hover:text-text'}
+                    ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+      >
+        {label}
+      </span>
+      <span
+        className={`font-mono-meta shrink-0 tabular-nums transition-opacity
+                    ${active ? 'opacity-100' : 'opacity-40 group-hover:opacity-70'}`}
+      >
+        {String(count).padStart(2, '0')}
+      </span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live data hook - stars + language map from the GitHub repos API.
+// ---------------------------------------------------------------------------
+
+function useRepoMeta(): RepoMetaMap {
+  const [metaByName, setMetaByName] = useState<RepoMetaMap>({});
 
   useEffect(() => {
     let cancelled = false;
     fetch('/api/github/repos')
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: EnrichedRepo[]) => {
         if (cancelled || !Array.isArray(data)) return;
-        const map: Record<string, number> = {};
-        for (const r of data) map[r.name.toLowerCase()] = r.stars;
-        setStarsByName(map);
+        const map: RepoMetaMap = {};
+        for (const r of data) {
+          map[r.name.toLowerCase()] = { stars: r.stars, language: r.language };
+        }
+        setMetaByName(map);
       })
-      .catch(() => { /* leave map empty — UI just hides star block */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* leave the map empty - the spec line just drops the live cells. */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  return metaByName;
+}
+
+// ---------------------------------------------------------------------------
+// Main app - desktop default, mobile branch.
+// ---------------------------------------------------------------------------
+
+export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
+  const reduced = useReducedMotion();
+  const metaByName = useRepoMeta();
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [selected, setSelected] = useState<Project | null>(null);
+
+  const filtered = useMemo(
+    () =>
+      activeCategory === 'All'
+        ? PROJECTS
+        : PROJECTS.filter((p) => p.category === activeCategory),
+    [activeCategory],
+  );
+
+  const countFor = (cat: string) =>
+    cat === 'All' ? PROJECTS.length : PROJECTS.filter((p) => p.category === cat).length;
 
   if (variant === 'mobile') {
     return (
@@ -501,119 +572,212 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
         rootView={{
           id: 'finder-root',
           title: 'Finder',
-          element: <FileGridMobile starsByName={starsByName} />,
+          element: <FinderMobileRoot metaByName={metaByName} reduced={reduced} />,
         }}
       />
     );
   }
 
-  const filtered = activeCategory === 'All'
-    ? PROJECTS
-    : PROJECTS.filter(p => p.category === activeCategory);
+  const handleSelect = (project: Project) =>
+    setSelected((prev) => (prev?.id === project.id ? null : project));
 
-  const handleSelect = (project: Project) => {
-    setSelected(prev => prev?.id === project.id ? null : project);
+  const handleCategory = (cat: string) => {
+    setActiveCategory(cat);
+    setSelected(null);
   };
 
   return (
-    <div className="h-full flex bg-surface/20 overflow-hidden">
-
-      {/* Sidebar */}
-      <div className="w-44 flex-shrink-0 app-sidebar flex flex-col overflow-hidden">
-        <div className="px-3 pt-4 pb-2 border-b border-black/6 dark:border-white/6">
-          <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest px-1">
-            Favorites
-          </p>
+    <div className="flex h-full overflow-hidden bg-bg">
+      {/* Folder rail. */}
+      <nav
+        aria-label="Project categories"
+        className="hidden w-48 shrink-0 flex-col overflow-y-auto border-r border-border md:flex"
+      >
+        <div className="px-4 py-5">
+          <MetaLabel as="p">Folders</MetaLabel>
         </div>
-        <div className="flex-1 p-2 pt-2 space-y-0.5 overflow-auto">
-          {CATEGORIES.map(cat => {
-            const isActive = activeCategory === cat;
-            const count = cat === 'All'
-              ? PROJECTS.length
-              : PROJECTS.filter(p => p.category === cat).length;
-            const palette = cat === 'All' ? null : CATEGORY_ICON_COLORS[cat];
-            return (
-              <button
-                key={cat}
-                onClick={() => { setActiveCategory(cat); setSelected(null); }}
-                className={`app-nav-item ${isActive ? 'active' : ''}`}
-                style={isActive && palette ? { background: `${palette.bg}18`, color: palette.bg } : undefined}
-              >
-                {isActive
-                  ? <FolderOpen size={13} style={{ flexShrink: 0, color: palette?.bg }} />
-                  : <Folder size={13} style={{ flexShrink: 0 }} />
-                }
-                <span className="flex-1 truncate text-[12px]">{cat}</span>
-                <span className="text-[10px] tabular-nums opacity-50">{count}</span>
-              </button>
-            );
-          })}
+        <Hairline />
+        <div className="flex flex-col py-2">
+          {CATEGORIES.map((cat) => (
+            <FolderRow
+              key={cat}
+              label={cat}
+              count={countFor(cat)}
+              active={activeCategory === cat}
+              reduced={reduced}
+              onClick={() => handleCategory(cat)}
+            />
+          ))}
         </div>
-      </div>
+      </nav>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 glass-subtle flex-shrink-0">
-          <span className="text-text-secondary text-xs">Finder</span>
-          <ChevronRight size={12} className="text-text-secondary/40" />
-          <span className="text-text text-xs font-medium">{activeCategory}</span>
-          <div className="ml-auto text-xs text-text-secondary">
-            {filtered.length} item{filtered.length !== 1 ? 's' : ''}
-          </div>
+      {/* Main column. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Breadcrumb toolbar reflecting the current folder. */}
+        <div className="app-toolbar flex shrink-0 items-center gap-3 border-b px-5 py-3">
+          <MetaLabel className="text-text-secondary">Finder</MetaLabel>
+          <span aria-hidden className="font-mono-meta opacity-40">
+            /
+          </span>
+          <MetaLabel className="text-text">{activeCategory}</MetaLabel>
+          <span className="ml-auto">
+            <MetaLabel className="text-text-secondary tabular-nums">
+              {filtered.length} {filtered.length === 1 ? 'Item' : 'Items'}
+            </MetaLabel>
+          </span>
         </div>
 
-        {/* File grid + Detail panel */}
-        <div className="flex-1 flex overflow-hidden">
-
-          {/* File grid */}
-          <div className={`flex-1 overflow-auto p-4 transition-all ${selected ? 'max-w-[55%]' : 'w-full'}`}>
+        {/* File list + detail pane. */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* File list - reveals once on mount, re-staggers on category change. */}
+          <div
+            className={`min-w-0 overflow-y-auto px-3 py-2 transition-[flex-basis] duration-300
+                        ${selected ? 'hidden basis-1/2 lg:block' : 'basis-full'}`}
+          >
             <motion.div
               key={activeCategory}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-wrap gap-1 content-start"
+              variants={reveal.container(reduced)}
+              initial="hidden"
+              animate="show"
+              className="flex flex-col"
             >
-              {filtered.map((project, idx) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: idx * 0.04, type: 'spring', damping: 18, stiffness: 250 }}
-                  onClick={() => handleSelect(project)}
-                >
-                  <FileIcon project={project} selected={selected?.id === project.id} />
+              <Hairline />
+              {filtered.map((project) => (
+                <motion.div key={project.id} variants={reveal.item(reduced)}>
+                  <FileRow
+                    project={project}
+                    metaByName={metaByName}
+                    active={selected?.id === project.id}
+                    reduced={reduced}
+                    onClick={() => handleSelect(project)}
+                  />
                 </motion.div>
               ))}
             </motion.div>
           </div>
 
-          {/* Detail panel */}
+          {/* Detail pane. */}
           <AnimatePresence>
             {selected && (
               <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: '45%', opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-                className="border-l border-white/10 overflow-hidden flex-shrink-0 bg-surface/30"
+                key="detail"
+                initial={reduced ? false : { opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, x: 16 }}
+                transition={withReduced(spring.window, reduced)}
+                className="flex min-w-0 basis-full flex-col overflow-hidden border-l border-border lg:basis-1/2"
               >
-                <DetailPanel project={selected} onBack={() => setSelected(null)} starsByName={starsByName} />
+                <DetailPanel
+                  project={selected}
+                  metaByName={metaByName}
+                  reduced={reduced}
+                  onBack={() => setSelected(null)}
+                />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Status bar */}
-        <div className="flex-shrink-0 px-4 py-2 border-t border-white/10 glass-subtle">
-          <p className="text-xs text-text-secondary text-center">
+        {/* Status bar. */}
+        <div className="app-toolbar flex shrink-0 items-center justify-center border-t px-5 py-2">
+          <MetaLabel className="text-text-secondary">
             {selected
-              ? `${selected.name} · ${selected.tech.length} technologies`
-              : `${filtered.length} projects · Double-click to open, single-click to preview`
-            }
-          </p>
+              ? `${selected.name} / ${selected.tech.length} Technologies`
+              : `${filtered.length} ${filtered.length === 1 ? 'Project' : 'Projects'} / Select To Preview`}
+          </MetaLabel>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile - category chips + hairline file rows, push to an editorial detail.
+// ---------------------------------------------------------------------------
+
+const MOBILE_CHIP_MARKER_ID = 'finder-mobile-chip-active';
+
+function FinderMobileRoot({
+  metaByName,
+  reduced,
+}: {
+  metaByName: RepoMetaMap;
+  reduced: boolean | null;
+}) {
+  const nav = useMobileNavigation();
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const filtered =
+    activeCategory === 'All'
+      ? PROJECTS
+      : PROJECTS.filter((p) => p.category === activeCategory);
+
+  const openDetail = (project: Project) => {
+    nav.push({
+      id: project.id,
+      title: project.name,
+      element: (
+        <div className="overflow-y-auto px-5 py-6">
+          <DetailBody project={project} metaByName={metaByName} reduced={reduced} />
+        </div>
+      ),
+    });
+  };
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      {/* Folder chips - mono, with a sliding underline marker. */}
+      <div className="hide-scrollbar flex gap-5 overflow-x-auto border-b border-border px-5 py-3">
+        {CATEGORIES.map((cat) => {
+          const active = activeCategory === cat;
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setActiveCategory(cat)}
+              aria-current={active ? 'true' : undefined}
+              className="group relative shrink-0 py-1 focus-visible:outline-none"
+            >
+              <MetaLabel
+                className={active ? 'text-text' : 'text-text-secondary'}
+              >
+                {cat}
+              </MetaLabel>
+              {active && (
+                <motion.span
+                  layoutId={MOBILE_CHIP_MARKER_ID}
+                  aria-hidden
+                  className="absolute -bottom-0.5 left-0 right-0 h-px bg-text"
+                  transition={withReduced(spring.window, reduced)}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* File rows - reveal once on mount, re-stagger on category change. */}
+      <div className="flex-1 overflow-y-auto px-3 py-2">
+        <motion.div
+          key={activeCategory}
+          variants={reveal.container(reduced)}
+          initial="hidden"
+          animate="show"
+          className="flex flex-col"
+        >
+          <Hairline />
+          {filtered.map((project) => (
+            <motion.div key={project.id} variants={reveal.item(reduced)}>
+              <FileRow
+                project={project}
+                metaByName={metaByName}
+                active={false}
+                reduced={reduced}
+                onClick={() => openDetail(project)}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
   );
