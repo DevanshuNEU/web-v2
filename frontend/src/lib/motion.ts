@@ -75,14 +75,21 @@ export const reveal = {
     show: {
       transition: reduced
         ? { staggerChildren: 0 }
-        : { staggerChildren: 0.025, delayChildren: 0.04 },
+        : { staggerChildren: 0.04, delayChildren: 0.04 },
     },
   }),
   item: (reduced: boolean | null): Variants =>
     reduced
       ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
       : {
-          hidden: { opacity: 0, y: 8, scale: 0.97 },
-          show: { opacity: 1, y: 0, scale: 1, transition: spring.window },
+          // Full `transform` strings (not framer's y/scale shorthands) so the
+          // shell-wide mount reveal composites on the GPU and stays smooth even
+          // when the window is mid-mount and the main thread is busy.
+          hidden: { opacity: 0, transform: 'translateY(8px) scale(0.97)' },
+          show: {
+            opacity: 1,
+            transform: 'translateY(0px) scale(1)',
+            transition: spring.window,
+          },
         },
 };

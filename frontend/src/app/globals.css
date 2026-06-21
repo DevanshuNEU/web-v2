@@ -55,6 +55,14 @@
   --ring: 0 122 255;
   --radius: 0.75rem;
 
+  /* Motion easing — single source of truth for the interaction curves the apps
+     use. Strong custom curves (built-in CSS easings are too weak); ease-out for
+     enter/exit so the first frame moves immediately, ease-in-out for on-screen
+     movement. Apps reference these instead of re-inlining the literal bezier. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
   /* Fluid type — clamp upper bounds match existing Tailwind sizes so desktop ≥768px is byte-identical */
   --fs-display: clamp(28px, 4vw + 14px, 48px);
   --fs-hero:    clamp(20px, 2.5vw + 12px, 30px);
