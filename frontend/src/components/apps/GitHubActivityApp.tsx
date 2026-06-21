@@ -169,6 +169,27 @@ const SCOPED_CSS = `
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Heatmap dot: a restrained press-toward-foreground on hover. GPU-only
+   (transform + opacity), centered cell so it scales from its own position, and
+   gated on a fine pointer so a tap on touch never fires a stuck hover state.
+   The dot is sized in CSS already; this only adds the interaction layer. */
+[data-gh-cell] > span {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
+              opacity 140ms cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+}
+@media (hover: hover) and (pointer: fine) {
+  [data-gh-cell]:hover > span {
+    transform: scale(1.6);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Freeze the live/interaction motion; the dots stay legible, just static. */
+  [data-gh-cell] > span { transition: none; }
+  [data-gh-cell]:hover > span { transform: none; }
+}
 `;
 
 function ActivityLayout({ data, variant }: { data: ActivePayload; variant: 'desktop' | 'mobile' }) {
@@ -357,6 +378,7 @@ function ContributionField({ calendar }: { calendar: ContributionCalendar }) {
               style={{ width: 'var(--cell)', height: 'var(--cell)' }}
               title={d ? `${d.date} / ${d.count} contributions` : undefined}
               data-level={d?.level}
+              data-gh-cell={d ? '' : undefined}
             >
               {d && (
                 <span
@@ -563,7 +585,8 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
           <AsciiField
             source={tape}
             paletteKey={`tape-${items.length}`}
-            className="text-[12px] text-text-secondary leading-[1.6]"
+            className="text-text-secondary leading-[1.6]
+                       text-[clamp(10px,1.55cqi,12px)]"
           />
         </div>
         <ul className="sr-only">
@@ -603,9 +626,10 @@ function FeedRow({ item, reduced }: { item: FeedItem; reduced: boolean | null })
       href={item.link}
       target="_blank"
       rel="noopener noreferrer"
-      whileTap={reduced ? undefined : { scale: 0.99, transition: { duration: 0.12, ease: EASE_OUT } }}
-      className="group flex items-baseline gap-3 py-3
-                 hover:bg-black/[0.02] dark:hover:bg-white/[0.04] transition-colors
+      whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
+      className="group flex items-baseline gap-3 py-3 transition-colors duration-150
+                 [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.02]
+                 dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]
                  focus-visible:outline-none focus-visible:bg-black/[0.04] dark:focus-visible:bg-white/[0.06]"
     >
       <span
@@ -647,16 +671,17 @@ function RepoRow({
         href={repo.htmlUrl}
         target="_blank"
         rel="noopener noreferrer"
-        whileTap={reduced ? undefined : { scale: 0.99, transition: { duration: 0.12, ease: EASE_OUT } }}
-        className="group flex items-baseline gap-4 py-4
-                   hover:bg-black/[0.025] dark:hover:bg-white/[0.05] transition-colors
+        whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
+        className="group flex items-baseline gap-4 py-4 transition-colors duration-150
+                   [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025]
+                   dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.05]
                    focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
       >
         <MetaLabel className="shrink-0 w-8 justify-start text-text-secondary">
           {String(index).padStart(2, '0')}
         </MetaLabel>
         <span className="min-w-0 flex-1">
-          <span className="block editorial-head font-display text-text text-[clamp(1.15rem,3vw,1.6rem)] leading-tight truncate">
+          <span className="block editorial-head font-display text-text text-[clamp(1.15rem,4.5cqi,1.6rem)] leading-tight truncate">
             {repo.name}
           </span>
           {repo.description && (
