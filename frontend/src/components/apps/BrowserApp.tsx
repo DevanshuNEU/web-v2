@@ -156,7 +156,9 @@ export default function BrowserApp() {
               spellCheck={false}
               autoComplete="off"
               aria-label="Address"
-              className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-text
+              // Window-dynamic: re-proportions with window width (cqi), max = original 12.5px.
+              style={{ fontSize: 'clamp(0.68rem, 1.5cqi, 0.78rem)' }}
+              className="min-w-0 flex-1 bg-transparent font-mono text-text
                          outline-none placeholder:text-text-secondary/70"
             />
           </div>
@@ -284,7 +286,8 @@ function StartPage({
             <motion.h2
               variants={reveal.item(reduced)}
               className="font-display leading-none text-text"
-              style={{ fontSize: 30 }}
+              // Window-dynamic masthead: scales with window width (cqi), max = original 30px.
+              style={{ fontSize: 'clamp(1.35rem, 4.6cqi, 1.875rem)' }}
             >
               Browser
             </motion.h2>
@@ -355,7 +358,11 @@ function StartTile({
 
       <span className="min-w-0 flex-1">
         <span className="relative inline-block max-w-full">
-          <span className="block truncate font-display leading-tight text-text" style={{ fontSize: 18 }}>
+          <span
+            className="block truncate font-display leading-tight text-text"
+            // Window-dynamic site name: scales with window width (cqi), max = original 18px.
+            style={{ fontSize: 'clamp(0.95rem, 2.8cqi, 1.125rem)' }}
+          >
             {label}
           </span>
           {/* Hairline underline grows on hover (scaleX, transform-only). */}
@@ -369,7 +376,11 @@ function StartTile({
             )}
           />
         </span>
-        <span className="mt-1 block truncate font-mono text-[11.5px] text-text-secondary">
+        <span
+          className="mt-1 block truncate font-mono text-text-secondary"
+          // Window-dynamic host line: scales with window width (cqi), max = original 11.5px.
+          style={{ fontSize: 'clamp(0.62rem, 1.4cqi, 0.72rem)' }}
+        >
           {host}
         </span>
       </span>
@@ -407,8 +418,12 @@ function BlockedCard({ url, mono, reduced }: { url: string; mono: boolean; reduc
       )}
 
       <motion.div
-        initial={reduced ? false : { opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
+        // This card mounts right when a cross-origin page is loading (main thread
+        // busy), so animate the full transform string instead of the `y` shorthand
+        // -> stays on the GPU and won't drop frames under load (Emil perf rule).
+        // Start from a visible offset + opacity, never from nothing. ease-out enter.
+        initial={reduced ? false : { opacity: 0, transform: 'translateY(8px)' }}
+        animate={{ opacity: 1, transform: 'translateY(0px)' }}
         transition={{ duration: 0.25, ease: EASE_OUT }}
         className="relative w-full max-w-sm border border-border bg-bg/80 p-7 text-center backdrop-blur-sm"
       >
@@ -416,11 +431,19 @@ function BlockedCard({ url, mono, reduced }: { url: string; mono: boolean; reduc
           <Globe size={20} className="text-text-secondary" aria-hidden />
         </div>
 
-        <div className="font-display text-text" style={{ fontSize: 17 }}>
+        <div
+          className="font-display text-text"
+          // Window-dynamic: scales with window width (cqi), max = original 17px.
+          style={{ fontSize: 'clamp(0.95rem, 2.6cqi, 1.0625rem)' }}
+        >
           {host} can&apos;t be embedded
         </div>
 
-        <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+        <p
+          className="mt-2 leading-relaxed text-text-secondary"
+          // Window-dynamic body: scales with window width (cqi), max = original 13px.
+          style={{ fontSize: 'clamp(0.72rem, 1.7cqi, 0.8125rem)' }}
+        >
           Most sites block being shown inside another page. Open it in a real tab instead.
         </p>
 
@@ -428,9 +451,12 @@ function BlockedCard({ url, mono, reduced }: { url: string; mono: boolean; reduc
           href={url}
           target="_blank"
           rel="noopener noreferrer"
+          // Window-dynamic label: scales with window width (cqi), max = original 12px.
+          style={{ fontSize: 'clamp(0.68rem, 1.5cqi, 0.75rem)' }}
           className="mt-5 inline-flex items-center gap-1.5 border border-text px-3.5 py-2 font-mono
-                     text-[12px] uppercase tracking-wider text-text transition-colors
-                     hover:bg-text hover:text-bg motion-safe:active:scale-[0.98]"
+                     uppercase tracking-wider text-text transition-[transform,background-color,color]
+                     duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                     hover:bg-text hover:text-bg motion-safe:active:scale-[0.97]"
         >
           Open in new tab <ExternalLink size={13} aria-hidden />
         </a>
