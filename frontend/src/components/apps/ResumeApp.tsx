@@ -1,484 +1,660 @@
 'use client';
 
 /**
- * ResumeApp — Interactive Resume + PDF Viewer
+ * ResumeApp - Editorial resume in the Instrument house language.
  *
- * Two modes: polished interactive view with section nav,
- * and a raw PDF viewer showing the actual file.
+ * Two modes, both reskinned into the monochrome editorial register:
+ *   (a) "Read" - the interactive document: serif section heads, mono metadata,
+ *       a hairline-divided experience timeline, an inline mono skills run, and
+ *       IndexRow-style project rows. Every section is always rendered as one
+ *       scrolled document with a numbered index rail (desktop) / numbered
+ *       eyebrows (mobile). Random-access without hiding content.
+ *   (b) "PDF" - the raw file in an iframe, with quiet editorial chrome.
+ *
+ * The mode toggle and the Download control are quiet editorial controls
+ * (mono labels + hairlines), never filled accent buttons.
+ *
+ * Animation contract (shared with AboutMeApp): sections reveal ONCE on mount
+ * via a staggered container; never on scroll. A windowed inner scroll container
+ * makes in-view triggers unreliable, so content must never depend on one. The
+ * desktop index rail uses an IntersectionObserver purely for scroll-spy
+ * highlighting (guarded for SSR / test env), never to reveal content.
+ *
+ * Persona: the resume's own education facts (school / degree / period) render
+ * as normal resume content. The constructed `tagline` field carries graduation
+ * + seeking framing, so it is intentionally NOT rendered; the clean `title`
+ * stands in as the role line.
  */
 
-import { useState } from 'react';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  Download, Mail, MapPin, Github, Linkedin,
-  Briefcase, GraduationCap, Code2, FolderGit2, ExternalLink,
-  FileText, LayoutList,
-} from 'lucide-react';
+  EditorialSection,
+  Hairline,
+  MetaLabel,
+} from '@/components/editorial';
+import { reveal, withReduced, spring } from '@/lib/motion';
 import { RESUME } from '@/data/resume';
 
-const SECTIONS = ['Experience', 'Education', 'Skills', 'Projects', 'Summary'] as const;
-type Section = typeof SECTIONS[number];
-type ViewMode = 'interactive' | 'pdf';
-
 // ---------------------------------------------------------------------------
-// Sub-components
+// Section registry - single source for the rail and the document.
 // ---------------------------------------------------------------------------
 
-function SectionHeading({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
+const SECTIONS = [
+  { id: 'summary',    number: '01', label: 'Summary'    },
+  { id: 'experience', number: '02', label: 'Experience' },
+  { id: 'projects',   number: '03', label: 'Projects'   },
+  { id: 'skills',     number: '04', label: 'Skills'     },
+  { id: 'education',  number: '05', label: 'Education'   },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]['id'];
+type ViewMode = 'read' | 'pdf';
+
+const SECTION_DOM_ID = (id: SectionId) => `resume-section-${id}`;
+
+const PDF_HREF = '/resume.pdf';
+const PDF_DOWNLOAD = 'Devanshu_Chicholikar_Resume.pdf';
+
+// ---------------------------------------------------------------------------
+// Masthead - serif name + mono role line + hairline-divided contact run.
+// ---------------------------------------------------------------------------
+
+function Masthead() {
+  const reduced = useReducedMotion();
+  const { email, github, linkedin, location } = RESUME.contact;
+
+  // Contact cells as a mono run; first cell carries the role line above it.
+  const contacts: { label: string; href?: string }[] = [
+    { label: email, href: `mailto:${email}` },
+    { label: github, href: `https://${github}` },
+    { label: 'LinkedIn', href: `https://${linkedin}` },
+    { label: location },
+  ];
+
   return (
-    <div className="flex items-center gap-2 mb-4">
-      <Icon size={15} className="text-accent flex-shrink-0" />
-      <h2 className="text-sm font-bold text-text uppercase tracking-wider">{title}</h2>
-      <div className="flex-1 h-px bg-white/10" />
+    <div className="flex flex-col gap-4">
+      <motion.h1
+        variants={reveal.item(reduced)}
+        className="editorial-hero font-display text-text leading-[0.95]"
+      >
+        {RESUME.name}
+      </motion.h1>
+
+      {/* Role line - the clean `title`, not the persona-laden tagline. */}
+      <motion.p variants={reveal.item(reduced)}>
+        <MetaLabel>{RESUME.title}</MetaLabel>
+      </motion.p>
+
+      {/* Contact run - mono cells separated by middots, hairline above. */}
+      <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
+        <Hairline />
+        <p className="flex flex-wrap items-center gap-x-1 gap-y-2">
+          {contacts.map((c, i) => (
+            <React.Fragment key={c.label}>
+              {i > 0 && (
+                <span aria-hidden className="font-mono-meta opacity-40">
+                  &middot;
+                </span>
+              )}
+              {c.href ? (
+                <a
+                  href={c.href}
+                  target={c.href.startsWith('http') ? '_blank' : undefined}
+                  rel="noopener noreferrer"
+                  className="group inline-flex"
+                >
+                  <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+                    {c.label}
+                  </MetaLabel>
+                </a>
+              ) : (
+                <MetaLabel className="text-text-secondary">{c.label}</MetaLabel>
+              )}
+            </React.Fragment>
+          ))}
+        </p>
+      </motion.div>
     </div>
   );
 }
 
-function Bullet({ text }: { text: string }) {
+// ---------------------------------------------------------------------------
+// Section bodies - pure editorial typesetting, monochrome only.
+// ---------------------------------------------------------------------------
+
+function SummaryBody() {
   return (
-    <li className="flex items-start gap-2 text-xs text-text-secondary leading-relaxed">
-      <span className="text-accent mt-1 flex-shrink-0">·</span>
-      {text}
-    </li>
+    <p className="max-w-[68ch] text-lg leading-relaxed text-text-secondary">
+      {RESUME.summary}
+    </p>
+  );
+}
+
+function ExperienceBody() {
+  return (
+    <ol className="flex flex-col">
+      <Hairline />
+      {RESUME.experience.map((job) => (
+        <React.Fragment key={`${job.company}-${job.role}`}>
+          <li className="flex flex-col gap-3 py-6">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-display text-xl leading-tight text-text">
+                  {job.role}
+                </h3>
+                <MetaLabel className="text-text-secondary">{job.company}</MetaLabel>
+              </div>
+              <div className="shrink-0 sm:text-right">
+                <MetaLabel as="p">{job.period}</MetaLabel>
+                <MetaLabel as="p" className="text-text-secondary">
+                  {job.location}
+                </MetaLabel>
+              </div>
+            </div>
+
+            <ul className="mt-1 flex flex-col gap-2">
+              {job.bullets.map((b, i) => (
+                <li
+                  key={i}
+                  className="flex gap-3 text-sm leading-relaxed text-text-secondary"
+                >
+                  <span aria-hidden className="mt-[0.5em] h-px w-3 shrink-0 bg-text/40" />
+                  <span className="min-w-0">{b}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+          <Hairline />
+        </React.Fragment>
+      ))}
+    </ol>
+  );
+}
+
+function ProjectsBody() {
+  return (
+    <div className="flex flex-col">
+      <Hairline />
+      {RESUME.projects.map((proj, idx) => (
+        <a
+          key={proj.name}
+          href={`https://${proj.link}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group flex flex-col gap-2 py-5 transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.04]"
+        >
+          <div className="flex items-baseline gap-4">
+            <MetaLabel className="w-8 shrink-0 justify-start text-text-secondary">
+              {String(idx + 1).padStart(2, '0')}
+            </MetaLabel>
+            <div className="flex flex-1 items-baseline justify-between gap-4 min-w-0">
+              <h3 className="font-display text-xl leading-tight text-text truncate">
+                {proj.name}
+              </h3>
+              <MetaLabel className="shrink-0 justify-end text-text-secondary">
+                {proj.period}
+              </MetaLabel>
+            </div>
+          </div>
+          <div className="pl-12 flex flex-col gap-1.5">
+            <MetaLabel className="text-text-secondary">{proj.tech}</MetaLabel>
+            <p className="max-w-[64ch] text-sm leading-relaxed text-text-secondary">
+              {proj.desc}
+            </p>
+          </div>
+        </a>
+      ))}
+      <Hairline />
+    </div>
+  );
+}
+
+function SkillsBody() {
+  return (
+    <dl className="flex flex-col">
+      <Hairline />
+      {RESUME.skills.map((group) => (
+        <React.Fragment key={group.category}>
+          <div className="flex flex-col gap-2 py-4 sm:flex-row sm:gap-6">
+            <dt className="shrink-0 sm:w-40">
+              <MetaLabel>{group.category}</MetaLabel>
+            </dt>
+            <dd className="flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-1">
+              {group.items.map((skill, i) => (
+                <React.Fragment key={skill}>
+                  {i > 0 && (
+                    <span aria-hidden className="font-mono-meta opacity-40">
+                      &middot;
+                    </span>
+                  )}
+                  <span className="font-mono text-[13px] leading-snug text-text">
+                    {skill}
+                  </span>
+                </React.Fragment>
+              ))}
+            </dd>
+          </div>
+          <Hairline />
+        </React.Fragment>
+      ))}
+    </dl>
+  );
+}
+
+function EducationBody() {
+  return (
+    <ol className="flex flex-col">
+      <Hairline />
+      {RESUME.education.map((edu) => (
+        <React.Fragment key={edu.institution}>
+          <li className="flex flex-col gap-2 py-6">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-display text-xl leading-tight text-text">
+                  {edu.institution}
+                </h3>
+                <MetaLabel className="text-text-secondary">{edu.degree}</MetaLabel>
+              </div>
+              <div className="shrink-0 sm:text-right">
+                <MetaLabel as="p">{edu.period}</MetaLabel>
+                <MetaLabel as="p" className="text-text-secondary">
+                  {edu.location}
+                </MetaLabel>
+              </div>
+            </div>
+            <p className="max-w-[64ch] text-sm leading-relaxed text-text-secondary">
+              {edu.detail}
+            </p>
+          </li>
+          <Hairline />
+        </React.Fragment>
+      ))}
+    </ol>
+  );
+}
+
+function SectionBody({ id }: { id: SectionId }) {
+  switch (id) {
+    case 'summary':    return <SummaryBody />;
+    case 'experience': return <ExperienceBody />;
+    case 'projects':   return <ProjectsBody />;
+    case 'skills':     return <SkillsBody />;
+    case 'education':  return <EducationBody />;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quiet editorial controls - mode toggle + download, mono + hairline only.
+// ---------------------------------------------------------------------------
+
+function ModeToggle({
+  mode,
+  onMode,
+  reduced,
+}: {
+  mode: ViewMode;
+  onMode: (m: ViewMode) => void;
+  reduced: boolean | null;
+}) {
+  const items: { id: ViewMode; label: string }[] = [
+    { id: 'read', label: 'Read' },
+    { id: 'pdf', label: 'PDF' },
+  ];
+  return (
+    <div className="flex items-center gap-5">
+      {items.map(({ id, label }) => {
+        const active = mode === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onMode(id)}
+            aria-current={active ? 'true' : undefined}
+            className="group relative focus-visible:outline-none"
+          >
+            <MetaLabel
+              className={
+                active
+                  ? 'text-text'
+                  : 'text-text-secondary transition-colors group-hover:text-text'
+              }
+            >
+              {label}
+            </MetaLabel>
+            {active && (
+              <motion.span
+                layoutId="resume-mode-active"
+                aria-hidden
+                className="absolute -bottom-1 left-0 right-0 h-px bg-text"
+                transition={withReduced(spring.window, reduced)}
+              />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DownloadControl() {
+  return (
+    <a
+      href={PDF_HREF}
+      download={PDF_DOWNLOAD}
+      className="group inline-flex items-center focus-visible:outline-none"
+    >
+      <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+        Download PDF
+      </MetaLabel>
+      <span
+        aria-hidden
+        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 group-hover:scale-x-150"
+      />
+    </a>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Mobile layout — compact header, scrollable tabs, sticky download CTA
+// PDF surface - reskinned chrome around the unchanged iframe embed.
 // ---------------------------------------------------------------------------
 
-function ResumeMobile({
-  activeSection,
-  onSection,
-  sectionVariants,
-  itemVariants,
+function PdfSurface() {
+  return (
+    <motion.div
+      key="pdf"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex-1 overflow-hidden bg-bg"
+    >
+      <iframe
+        src={PDF_HREF}
+        className="h-full w-full border-0"
+        title="Resume PDF"
+      />
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Index rail (desktop) - numbered scroll-spy navigation, monochrome.
+// ---------------------------------------------------------------------------
+
+const RAIL_MARKER_ID = 'resume-rail-active';
+
+function RailRow({
+  number,
+  label,
+  active,
+  reduced,
+  onClick,
 }: {
-  activeSection: Section;
-  onSection: (s: Section) => void;
-  sectionVariants: Variants;
-  itemVariants: Variants;
+  number: string;
+  label: string;
+  active: boolean;
+  reduced: boolean | null;
+  onClick: () => void;
 }) {
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex-shrink-0 px-5 pt-5 pb-3 border-b border-black/6 dark:border-white/6">
-        <h1 className="font-display text-2xl text-text leading-tight tracking-tight">{RESUME.name}</h1>
-        <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20">
-          {RESUME.title}
-        </span>
-        <p className="text-text-secondary text-xs mt-1.5 leading-snug">{RESUME.tagline}</p>
-        <div className="flex items-center gap-3 mt-2 flex-wrap">
-          <a href={`mailto:${RESUME.contact.email}`}
-             className="flex items-center gap-1 text-[11px] text-text-secondary active:text-accent transition-colors">
-            <Mail size={11} className="flex-shrink-0" />{RESUME.contact.email}
-          </a>
-          <a href={`https://${RESUME.contact.linkedin}`} target="_blank" rel="noopener noreferrer"
-             className="flex items-center gap-1 text-[11px] text-text-secondary active:text-accent transition-colors">
-            <Linkedin size={11} className="flex-shrink-0" />LinkedIn
-          </a>
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid="rail-row"
+      aria-current={active ? 'true' : undefined}
+      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+    >
+      {active && (
+        <motion.span
+          layoutId={RAIL_MARKER_ID}
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[1.1em] w-[2px] -translate-y-1/2 bg-text"
+          transition={withReduced(
+            { type: 'spring', stiffness: 520, damping: 40, mass: 0.6 },
+            reduced,
+          )}
+        />
+      )}
+      <span
+        className={`font-mono-meta shrink-0 transition-opacity ${
+          active ? 'opacity-100' : 'opacity-50 group-hover:opacity-80'
+        }`}
+      >
+        {number}
+      </span>
+      <span
+        className={`font-display min-w-0 flex-1 truncate transition-transform ${
+          active ? 'text-text' : 'text-text-secondary group-hover:text-text'
+        } ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scroll-spy - highlights the rail row in view (never reveals content).
+// ---------------------------------------------------------------------------
+
+function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>) {
+  const [active, setActive] = useState<SectionId>('summary');
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    // Degrade gracefully where the API is absent (SSR, test env, old browsers):
+    // the document still renders, scroll-spy simply stays inert.
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length === 0) return;
+        const id = visible[0].target.getAttribute(
+          'data-section-id',
+        ) as SectionId | null;
+        if (!id) return;
+        setActive(id);
+      },
+      { root, rootMargin: '0px 0px -65% 0px', threshold: 0 },
+    );
+
+    const nodes = root.querySelectorAll<HTMLElement>('[data-section-id]');
+    nodes.forEach((n) => observer.observe(n));
+    return () => observer.disconnect();
+  }, [scrollRef]);
+
+  return active;
+}
+
+// ---------------------------------------------------------------------------
+// Read document - the scrolled editorial body (shared by desktop + mobile).
+// ---------------------------------------------------------------------------
+
+function ReadDocument({
+  scrollRef,
+  reduced,
+  withMasthead,
+  padClass,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  reduced: boolean | null;
+  withMasthead: boolean;
+  padClass: string;
+}) {
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <motion.div
+        className={`mx-auto flex max-w-3xl flex-col gap-16 ${padClass}`}
+        variants={reveal.container(reduced)}
+        initial="hidden"
+        animate="show"
+      >
+        {withMasthead && <Masthead />}
+
+        {SECTIONS.map(({ id, number, label }) => (
+          <motion.div
+            key={id}
+            id={SECTION_DOM_ID(id)}
+            data-section-id={id}
+            variants={reveal.item(reduced)}
+          >
+            <EditorialSection number={number} eyebrow={label} title={label}>
+              <SectionBody id={id} />
+            </EditorialSection>
+          </motion.div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile layout - single scroll, numbered eyebrows, sticky quiet controls.
+// ---------------------------------------------------------------------------
+
+function ResumeMobile() {
+  const reduced = useReducedMotion();
+  const [mode, setMode] = useState<ViewMode>('read');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
+      {/* Header - name, role, quiet controls. */}
+      <div
+        className="app-toolbar flex shrink-0 flex-col gap-3 border-b pb-3 pt-5"
+        style={{
+          paddingLeft: 'var(--sp-hero-pad)',
+          paddingRight: 'var(--sp-hero-pad)',
+        }}
+      >
+        <h1 className="font-display text-2xl leading-tight text-text">
+          {RESUME.name}
+        </h1>
+        <MetaLabel className="text-text-secondary">{RESUME.title}</MetaLabel>
+        <div className="flex items-center justify-between">
+          <ModeToggle mode={mode} onMode={setMode} reduced={reduced} />
+          <DownloadControl />
         </div>
       </div>
 
-      {/* Section tabs */}
-      <div className="flex-shrink-0 px-4 py-2.5 flex gap-2 overflow-x-auto hide-scrollbar border-b border-black/6 dark:border-white/6">
-        {SECTIONS.map(s => (
-          <button
-            key={s}
-            onClick={() => onSection(s)}
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
-              activeSection === s
-                ? 'bg-accent text-white'
-                : 'bg-black/5 dark:bg-white/8 text-text-secondary'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
-        <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait">
+        {mode === 'pdf' ? (
+          <PdfSurface key="pdf" />
+        ) : (
           <motion.div
-            key={activeSection}
-            variants={sectionVariants}
-            initial="hidden"
-            animate="visible"
+            key="read"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-1 flex-col overflow-hidden"
           >
-            {activeSection === 'Experience' && (
-              <div>
-                <SectionHeading icon={Briefcase} title="Experience" />
-                <div className="relative">
-                  <div className="absolute left-[7px] top-2 bottom-2 w-px"
-                       style={{ background: 'linear-gradient(to bottom, rgb(var(--color-accent)), transparent)' }} />
-                  <div className="space-y-6">
-                    {RESUME.experience.map((job, idx) => (
-                      <motion.div key={idx} variants={itemVariants} className="relative pl-8">
-                        <div className="absolute -left-[1px] top-[5px] w-3 h-3 rounded-full bg-accent/40 ring-2 ring-accent/25 ring-offset-1 ring-offset-transparent" />
-                        <div className="mb-1">
-                          <h3 className="font-semibold text-text text-sm leading-tight">{job.role}</h3>
-                          <p className="text-accent text-xs font-semibold mt-0.5">{job.company}</p>
-                          <p className="text-[11px] text-text-secondary font-mono mt-0.5">{job.period} · {job.location}</p>
-                        </div>
-                        <ul className="space-y-1.5 mt-2">
-                          {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
-                        </ul>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {activeSection === 'Education' && (
-              <div className="space-y-4">
-                <SectionHeading icon={GraduationCap} title="Education" />
-                {RESUME.education.map((edu, idx) => (
-                  <motion.div key={idx} variants={itemVariants} className="glass-subtle rounded-xl p-4 border border-white/10">
-                    <h3 className="font-semibold text-text text-sm">{edu.institution}</h3>
-                    <p className="text-accent text-xs font-medium mt-0.5">{edu.degree}</p>
-                    <p className="text-xs text-text-secondary font-mono mt-0.5">{edu.period} · {edu.location}</p>
-                    <p className="text-xs text-text-secondary mt-2 leading-relaxed">{edu.detail}</p>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-            {activeSection === 'Skills' && (
-              <div className="space-y-3">
-                <SectionHeading icon={Code2} title="Skills" />
-                {RESUME.skills.map((group, idx) => (
-                  <motion.div key={idx} variants={itemVariants}
-                    className="glass-subtle rounded-xl p-4 border border-white/10 border-l-2 border-l-accent/50">
-                    <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3">{group.category}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.items.map(skill => (
-                        <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent/10 text-accent border border-accent/20">{skill}</span>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-            {activeSection === 'Projects' && (
-              <div className="space-y-4">
-                <SectionHeading icon={FolderGit2} title="Projects" />
-                {RESUME.projects.map((proj, idx) => (
-                  <motion.div key={idx} variants={itemVariants}
-                    className="glass-subtle rounded-xl p-4 border border-white/10">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div>
-                        <h3 className="font-semibold text-text text-sm">{proj.name}</h3>
-                        <p className="text-xs text-accent/70 font-mono mt-0.5">{proj.tech}</p>
-                      </div>
-                      <a href={`https://${proj.link}`} target="_blank" rel="noopener noreferrer"
-                         className="text-text-secondary active:text-accent transition-colors flex-shrink-0 mt-0.5">
-                        <ExternalLink size={13} />
-                      </a>
-                    </div>
-                    <p className="text-xs text-text-secondary leading-relaxed mt-2">{proj.desc}</p>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-            {activeSection === 'Summary' && (
-              <motion.div variants={itemVariants}>
-                <SectionHeading icon={Code2} title="Summary" />
-                <p className="text-sm text-text-secondary leading-relaxed">{RESUME.summary}</p>
-              </motion.div>
-            )}
+            <ReadDocument
+              scrollRef={scrollRef}
+              reduced={reduced}
+              withMasthead={false}
+              padClass="px-[var(--sp-hero-pad)] py-8"
+            />
           </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Sticky download CTA */}
-      <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-black/6 dark:border-white/6">
-        <a
-          href="/resume.pdf"
-          download="Devanshu_Chicholikar_Resume.pdf"
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-accent text-white text-sm font-semibold active:opacity-80 transition-opacity shadow-sm"
-        >
-          <Download size={15} />
-          Download PDF
-        </a>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Main app - desktop default, mobile branch.
 // ---------------------------------------------------------------------------
 
-export default function ResumeApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
-  const [activeSection, setActiveSection] = useState<Section>('Experience');
-  const [viewMode, setViewMode] = useState<ViewMode>('interactive');
+export default function ResumeApp({
+  variant,
+}: { variant?: 'desktop' | 'mobile' } = {}) {
+  const reduced = useReducedMotion();
+  const [mode, setMode] = useState<ViewMode>('read');
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const sectionVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.06 } },
-  };
-  const itemVariants = {
-    hidden: { opacity: 0, y: 8 },
-    visible: { opacity: 1, y: 0 },
-  };
+  const active = useScrollSpy(scrollRef);
+
+  const scrollTo = useCallback(
+    (id: SectionId) => {
+      const root = scrollRef.current;
+      if (!root) return;
+      const target = root.querySelector<HTMLElement>(`#${SECTION_DOM_ID(id)}`);
+      if (!target) return;
+      root.scrollTo({
+        top: target.offsetTop - 24,
+        behavior: reduced ? 'auto' : 'smooth',
+      });
+    },
+    [reduced],
+  );
 
   if (variant === 'mobile') {
-    return (
-      <ResumeMobile
-        activeSection={activeSection}
-        onSection={setActiveSection}
-        sectionVariants={sectionVariants}
-        itemVariants={itemVariants}
-      />
-    );
+    return <ResumeMobile />;
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-
-      {/* ── Top bar ── */}
-      <div className="flex-shrink-0 px-5 py-4 app-toolbar border-b">
-        <div className="flex items-center justify-between gap-4">
-
-          {/* Identity */}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-xl text-text leading-tight tracking-tight">{RESUME.name}</h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent/10 text-accent border border-accent/20">
-                {RESUME.title}
-              </span>
-            </div>
-            <p className="text-text-secondary text-[11px] mt-0.5">{RESUME.tagline}</p>
-            {/* Contact links inline */}
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              {[
-                { href: `mailto:${RESUME.contact.email}`, icon: Mail,    label: RESUME.contact.email },
-                { href: `https://${RESUME.contact.github}`, icon: Github, label: RESUME.contact.github },
-                { href: `https://${RESUME.contact.linkedin}`, icon: Linkedin, label: 'LinkedIn' },
-                { href: '#', icon: MapPin, label: RESUME.contact.location },
-              ].map(({ href, icon: Icon, label }) => (
-                <a key={label} href={href} target={href.startsWith('http') ? '_blank' : undefined}
-                   rel="noopener noreferrer"
-                   className="flex items-center gap-1 text-[11px] text-text-secondary hover:text-accent transition-colors">
-                  <Icon size={10} className="flex-shrink-0" />{label}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* View toggle */}
-            <div className="flex items-center p-0.5 rounded-lg bg-black/[0.05] dark:bg-white/[0.06] border border-black/8 dark:border-white/10">
-              {(['interactive', 'pdf'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                    viewMode === mode
-                      ? 'bg-accent text-white shadow-sm'
-                      : 'text-text-secondary hover:text-text'
-                  }`}
-                >
-                  {mode === 'interactive' ? <LayoutList size={11} /> : <FileText size={11} />}
-                  {mode === 'interactive' ? 'Interactive' : 'PDF'}
-                </button>
-              ))}
-            </div>
-            {/* Download */}
-            <a
-              href="/resume.pdf"
-              download="Devanshu_Chicholikar_Resume.pdf"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90 transition-opacity shadow-sm"
-            >
-              <Download size={12} />
-              Download
-            </a>
-          </div>
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Top bar - name + role left, quiet controls right. */}
+      <div className="app-toolbar flex shrink-0 items-end justify-between gap-6 border-b px-6 py-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="font-display text-2xl leading-tight text-text">
+            {RESUME.name}
+          </h1>
+          <MetaLabel className="text-text-secondary">{RESUME.title}</MetaLabel>
         </div>
-
-        {/* Section tabs */}
-        {viewMode === 'interactive' && (
-          <div className="flex gap-1 mt-3">
-            {SECTIONS.map(section => (
-              <button
-                key={section}
-                onClick={() => setActiveSection(section)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  activeSection === section
-                    ? 'bg-accent text-white shadow-sm'
-                    : 'text-text-secondary hover:text-text hover:bg-black/5 dark:hover:bg-white/8'
-                }`}
-              >
-                {section}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-6">
+          <ModeToggle mode={mode} onMode={setMode} reduced={reduced} />
+          <span aria-hidden className="self-stretch">
+            <Hairline orientation="vertical" />
+          </span>
+          <DownloadControl />
+        </div>
       </div>
 
-      {/* Content */}
       <AnimatePresence mode="wait">
-        {viewMode === 'pdf' ? (
-          <motion.div
-            key="pdf"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1 overflow-hidden"
-          >
-            <iframe
-              src="/resume.pdf"
-              className="w-full h-full border-0"
-              title="Resume PDF"
-            />
-          </motion.div>
+        {mode === 'pdf' ? (
+          <PdfSurface key="pdf" />
         ) : (
           <motion.div
-            key="interactive"
+            key="read"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-1 overflow-auto p-5"
+            className="flex flex-1 overflow-hidden"
           >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSection}
-                variants={sectionVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {/* Experience */}
-                {activeSection === 'Experience' && (
-                  <div>
-                    <SectionHeading icon={Briefcase} title="Experience" />
-                    <div className="relative">
-                      {/* Gradient timeline line */}
-                      <div className="absolute left-[7px] top-2 bottom-2 w-px"
-                           style={{ background: 'linear-gradient(to bottom, rgb(var(--color-accent)), transparent)' }} />
-                      <div className="space-y-7">
-                        {RESUME.experience.map((job, idx) => (
-                          <motion.div key={idx} variants={itemVariants} className="relative pl-8">
-                            {/* Dot */}
-                            <div className="absolute -left-[1px] top-[5px] w-3 h-3 rounded-full bg-accent/40 ring-2 ring-accent/25 ring-offset-1 ring-offset-transparent" />
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <div>
-                                <h3 className="font-semibold text-text text-sm leading-tight">{job.role}</h3>
-                                <p className="text-accent text-xs font-semibold mt-0.5">{job.company}</p>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-[11px] text-text-secondary font-mono">{job.period}</p>
-                                <p className="text-[11px] text-text-secondary">{job.location}</p>
-                              </div>
-                            </div>
-                            <ul className="space-y-1.5 mt-2">
-                              {job.bullets.map((b, i) => <Bullet key={i} text={b} />)}
-                            </ul>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+            {/* Index rail. */}
+            <nav
+              aria-label="Resume sections"
+              className="hidden w-44 shrink-0 flex-col overflow-y-auto border-r border-border md:flex"
+            >
+              <div className="px-4 py-5">
+                <MetaLabel as="p">Resume</MetaLabel>
+              </div>
+              <Hairline />
+              <div className="flex flex-col py-2">
+                {SECTIONS.map(({ id, number, label }) => (
+                  <RailRow
+                    key={id}
+                    number={number}
+                    label={label}
+                    active={active === id}
+                    reduced={reduced}
+                    onClick={() => scrollTo(id)}
+                  />
+                ))}
+              </div>
+            </nav>
 
-                {/* Education */}
-                {activeSection === 'Education' && (
-                  <div className="space-y-5">
-                    <SectionHeading icon={GraduationCap} title="Education" />
-                    {RESUME.education.map((edu, idx) => (
-                      <motion.div key={idx} variants={itemVariants} className="glass-subtle rounded-xl p-4 border border-white/10">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="font-semibold text-text text-sm">{edu.institution}</h3>
-                            <p className="text-accent text-xs font-medium mt-0.5">{edu.degree}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs text-text-secondary font-mono">{edu.period}</p>
-                            <p className="text-xs text-text-secondary">{edu.location}</p>
-                          </div>
-                        </div>
-                        <p className="text-xs text-text-secondary mt-2 leading-relaxed">{edu.detail}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Skills */}
-                {activeSection === 'Skills' && (
-                  <div className="space-y-3">
-                    <SectionHeading icon={Code2} title="Skills" />
-                    {RESUME.skills.map((group, idx) => (
-                      <motion.div
-                        key={idx}
-                        variants={itemVariants}
-                        className="glass-subtle rounded-xl p-4 border border-white/10 border-l-2 border-l-accent/50"
-                      >
-                        <p className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-3">
-                          {group.category}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.items.map(skill => (
-                            <span
-                              key={skill}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium
-                                         bg-accent/10 text-accent border border-accent/20
-                                         hover:bg-accent/20 transition-colors cursor-default"
-                            >
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Projects */}
-                {activeSection === 'Projects' && (
-                  <div className="space-y-4">
-                    <SectionHeading icon={FolderGit2} title="Projects" />
-                    {RESUME.projects.map((proj, idx) => (
-                      <motion.div
-                        key={idx}
-                        variants={itemVariants}
-                        className="glass-subtle rounded-xl p-4 border border-white/10 hover:border-accent/30 transition-colors group"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div>
-                            <h3 className="font-semibold text-text text-sm group-hover:text-accent transition-colors">
-                              {proj.name}
-                            </h3>
-                            <p className="text-xs text-accent/70 font-mono mt-0.5">{proj.tech}</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-xs text-text-secondary font-mono">{proj.period}</span>
-                            <a
-                              href={`https://${proj.link}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-text-secondary hover:text-accent transition-colors"
-                            >
-                              <ExternalLink size={13} />
-                            </a>
-                          </div>
-                        </div>
-                        <p className="text-xs text-text-secondary leading-relaxed mt-2">{proj.desc}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Summary */}
-                {activeSection === 'Summary' && (
-                  <motion.div variants={itemVariants}>
-                    <SectionHeading icon={Code2} title="Summary" />
-                    <p className="text-sm text-text-secondary leading-relaxed max-w-2xl">
-                      {RESUME.summary}
-                    </p>
-                  </motion.div>
-                )}
-
-              </motion.div>
-            </AnimatePresence>
+            <ReadDocument
+              scrollRef={scrollRef}
+              reduced={reduced}
+              withMasthead
+              padClass="px-8 py-10 sm:px-10 sm:py-12"
+            />
           </motion.div>
         )}
       </AnimatePresence>
