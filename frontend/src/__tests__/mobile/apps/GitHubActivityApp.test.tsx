@@ -172,7 +172,7 @@ describe('GitHubActivityApp — populated mobile render', () => {
     expect(screen.queryByTestId('contribution-heatmap')).not.toBeInTheDocument();
   });
 
-  it('stat strip shows "—" (not "0") when calendar fetch failed', async () => {
+  it('stat strip shows "--" (not "0") when calendar fetch failed', async () => {
     fetchMock.mockReset();
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -181,10 +181,10 @@ describe('GitHubActivityApp — populated mobile render', () => {
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() => screen.getByTestId('activity-stats'));
     const stats = screen.getByTestId('activity-stats');
-    // Two stat cards (contributions, streak) should show em-dash, not zero.
-    // The other two (active repos, stars) are derived from repos and stay numeric.
-    const emDashes = stats.textContent?.match(/—/g) ?? [];
-    expect(emDashes.length).toBeGreaterThanOrEqual(2);
+    // Two stat cards (contributions, streak) should show the "--" placeholder,
+    // not zero. The other two (active repos, stars) derive from repos and stay numeric.
+    const placeholders = stats.textContent?.match(/--/g) ?? [];
+    expect(placeholders.length).toBeGreaterThanOrEqual(2);
     expect(stats).toHaveTextContent(/data unavailable/);
   });
 

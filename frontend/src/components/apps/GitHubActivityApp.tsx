@@ -1,46 +1,77 @@
 'use client';
 
 /**
- * GitHubActivityApp — live activity surface backed by /api/github/activity.
+ * GitHubActivityApp - the live activity surface in the monochrome editorial
+ * register, backed by /api/github/activity.
  *
  * Why this app exists: a portfolio that *says* "I ship a lot" is unconvincing.
- * The same portfolio rendering today's contribution graph + last week's
- * commits + currently-active repos is unfakeable, and is the single
- * highest-credibility surface a recruiter or founder can see on first visit.
+ * The same portfolio rendering today's contribution graph + last week's commits
+ * + currently-active repos is unfakeable, and is the single highest-credibility
+ * surface a recruiter or founder sees on first visit. Everything here is live;
+ * nothing is hardcoded.
  *
- * Layout (mobile, top to bottom):
- *   1. Hero stat strip — commits this year, current streak, active repos, stars
- *   2. Contribution heatmap — full year, scaled to fit screen width
- *   3. Recent Activity feed — last ~10 push events with commit messages
- *   4. Active repos — anything pushed in the last 60 days
+ * Redesign contract:
+ *   - SIGNATURE (the heatmap): the year of contributions reads as a MONOCHROME
+ *     DENSITY field. Each day is one dot in a real weeks x days DOM grid; commit
+ *     intensity inks the dot through TWO reinforcing hue-free channels - dot SIZE
+ *     and ink OPACITY both climb with the day's level. A busy day is a large,
+ *     near-foreground dot; an empty day is a faint speck. This is the Halftone
+ *     density principle (dark/dense = more), but kept as DOM so the precise grid,
+ *     the per-day count tooltip, and the a11y label all survive. In the color
+ *     ("Fun") palette the dots fall back to GitHub's official green ramp - the
+ *     dual-palette contract, preserved.
+ *   - HERO STATS: an editorial spec strip. Large serif numerals (contributions,
+ *     streak, active repos, stars - all live) over tiny mono labels, hairline
+ *     divided, scaling with the window via cqi (.editorial-hero inside
+ *     .app-content is fluid on the container width).
+ *   - ACTIVITY FEED: an AsciiField "log tape" CONSISTENT with AnalyticsApp - one
+ *     selectable <pre>, fixed-width rows (clock stamp + glyph + summary + dot
+ *     leaders + relative time), zero per-row motion (Emil's frequency rule: the
+ *     feed updates, so it must not animate). The color palette gets a plain
+ *     hairline editorial list fallback. Links preserved via an sr-only +
+ *     paired anchor list.
+ *   - ACTIVE REPOS: IndexRow-style hairline rows - serif repo name, mono meta
+ *     (grayscale language dot, stars, pushed date), links preserved.
+ *   - REGISTER: serif heads via EditorialSection, hairline dividers, generous
+ *     space, no glass cards, no accent colors, no colored icons (mono).
  *
- * Desktop variant uses the same building blocks at slightly larger scale
- * with a two-column split for sections 3 + 4.
+ * Motion (Emil): the page reveals ONCE on mount via the shared staggered
+ * container (never whileInView - a windowed inner scroll makes in-view triggers
+ * unreliable). The high-frequency feed does NOT animate. Live numbers do NOT
+ * re-animate per tick - they only fade in once with their section. Pressable
+ * rows/links get a restrained :active scale, reduced-motion gated. transform +
+ * opacity only.
+ *
+ * House rules: strictly three-tone, color branched only via useIsMono(); no em
+ * dashes; no scroll listeners; no global listeners. Live /api/github/activity
+ * fetch + loading + error/empty states preserved; the event parsing/filtering,
+ * the calendar streak/count data, and the active-repos aggregation + links are
+ * untouched. No hardcoded numbers anywhere.
  */
 
-import { useEffect, useState } from 'react';
-import {
-  GitCommit,
-  GitPullRequest,
-  GitBranch,
-  Tag,
-  Star,
-  Flame,
-  Activity as ActivityIcon,
-  ExternalLink,
-  Github,
-  AlertCircle,
-} from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ExternalLink, AlertCircle } from 'lucide-react';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
+import {
+  EditorialSection,
+  MetaLabel,
+  Hairline,
+} from '@/components/editorial';
+import AsciiField from '@/components/signature/AsciiField';
+import { reveal } from '@/lib/motion';
 import type {
   ActivityEvent,
   ContributionCalendar,
   ContributionDay,
 } from '@/lib/github';
 
+/* Strong ease-out (Emil): "starts fast, feels responsive". */
+const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
+
 /* ────────────────────────────────────────────────────────────────────
- * API client types — kept in sync with /api/github/activity payload
+ * API client types - kept in sync with /api/github/activity payload
  * ────────────────────────────────────────────────────────────────── */
 
 interface ActivePayload {
@@ -58,8 +89,10 @@ interface ActivePayload {
   username: string;
 }
 
+type ActiveRepo = ActivePayload['activeRepos'][number];
+
 /* ────────────────────────────────────────────────────────────────────
- * Public entry — branches on variant
+ * Public entry - fetch + loading + error gate (preserved verbatim in shape)
  * ────────────────────────────────────────────────────────────────── */
 
 interface GitHubActivityAppProps {
@@ -92,458 +125,569 @@ export default function GitHubActivityApp({ variant = 'desktop' }: GitHubActivit
     };
   }, []);
 
-  if (error) return <ErrorState message={error} variant={variant} />;
-  if (!data) return <LoadingState variant={variant} />;
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingState />;
 
-  return variant === 'mobile' ? (
-    <MobileLayout data={data} />
-  ) : (
-    <DesktopLayout data={data} />
-  );
+  // One responsive editorial column re-proportions to the window via @container,
+  // so both variants share a tree. The variant only tags the root testid that
+  // the harness keys on (mobile shell present / absent).
+  return <ActivityLayout data={data} variant={variant} />;
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Mobile layout
+ * Layout - the single editorial column
  * ────────────────────────────────────────────────────────────────── */
 
-function MobileLayout({ data }: { data: ActivePayload }) {
+/* ────────────────────────────────────────────────────────────────────
+ * Scoped, window-dynamic layout CSS.
+ *
+ * Only this file is editable and the project is on Tailwind 3.4 with no
+ * container-query plugin, so the @container rules that re-proportion the LAYOUT
+ * off the WINDOW (not the viewport) live here, scoped under a root data
+ * attribute so they never leak. The parent `.app-content` is the query
+ * container (container-type: inline-size), the same mechanism About Me and
+ * Projects use. Type scaling rides the cqi-aware .editorial-hero /
+ * .editorial-head / .text-* / .font-mono-meta utilities; this block handles the
+ * stat-strip column count (2-up narrow, 4-up wide) and opens up the column
+ * padding/gap as the window grows.
+ * ────────────────────────────────────────────────────────────────── */
+
+const SCOPED_CSS = `
+[data-gh-root] {
+  --gh-col-gap: 2.5rem;        /* gap between sections (narrow) */
+}
+/* Hero stat strip: two columns on a narrow window. */
+[data-gh-stats] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1.5rem;
+  row-gap: 2.5rem;
+}
+@container (min-width: 544px) {
+  /* WIDE window: the four live stats sit on one hairline-divided row. */
+  [data-gh-stats] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+`;
+
+function ActivityLayout({ data, variant }: { data: ActivePayload; variant: 'desktop' | 'mobile' }) {
+  const reduced = useReducedMotion();
+
+  const events = data.events.slice(0, 10);
+  const hasCalendar = data.calendar !== null && data.calendar.days.length > 0;
+
   return (
     <div
-      className="h-full overflow-y-auto bg-bg text-text"
-      data-testid="github-activity-mobile"
+      className="h-full overflow-auto bg-transparent"
+      data-gh-root
+      data-testid={variant === 'mobile' ? 'github-activity-mobile' : 'github-activity'}
     >
-      <header className="px-5 pt-5 pb-3">
-        <div className="flex items-center gap-2 text-text-secondary text-[11px] font-medium uppercase tracking-wider">
-          <Github size={12} />
-          <span>github.com/{data.username}</span>
-        </div>
-        <h1 className="font-display text-display mt-1">Activity</h1>
-      </header>
+      <style>{SCOPED_CSS}</style>
+      <motion.div
+        variants={reveal.container(reduced)}
+        initial="hidden"
+        animate="show"
+        className="mx-auto w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-14"
+      >
+        {/* ── Masthead ── */}
+        <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-4">
+          <MetaLabel as="p" className="text-text-secondary">
+            github.com/{data.username}
+          </MetaLabel>
+          <h1 className="editorial-hero font-display text-text leading-none">
+            Activity
+          </h1>
+          <p className="max-w-[60ch] text-text-secondary leading-relaxed">
+            Pulled live from the GitHub API on load. The graph, the log, and the
+            repository list below are real and current, not a snapshot.
+          </p>
+        </motion.header>
 
-      <StatStrip data={data} />
+        {/* ── 01 Hero stats ── live serif numerals, hairline divided ── */}
+        <motion.div variants={reveal.item(reduced)}>
+          <StatStrip data={data} />
+        </motion.div>
 
-      {data.calendar && data.calendar.days.length > 0 && (
-        <section className="px-4 pt-5">
-          <SectionHeader title="Contributions" subtitle="Last 12 months" />
-          <div className="mt-3 mx-1">
-            <ContributionHeatmap calendar={data.calendar} compact />
-          </div>
-          <CalendarLegend />
-        </section>
-      )}
-
-      <section className="px-4 pt-6">
-        <SectionHeader title="Recent Activity" subtitle="Live from the public events feed" />
-        <div className="mt-3 mx-1 rounded-2xl bg-surface dark:bg-white/[0.04] overflow-hidden divide-y divide-text-secondary/10">
-          {data.events.length === 0 ? (
-            <EmptyRow text="No recent public events." />
-          ) : (
-            data.events.slice(0, 10).map((ev) => <EventRow key={ev.id} event={ev} />)
-          )}
-        </div>
-      </section>
-
-      <section className="px-4 pt-6 pb-10">
-        <SectionHeader
-          title="Active Repositories"
-          subtitle="Pushed within the last 60 days"
-        />
-        <div className="mt-3 mx-1 flex flex-col gap-2">
-          {data.activeRepos.length === 0 ? (
-            <EmptyRow text="No recently-pushed repositories." />
-          ) : (
-            data.activeRepos.map((r) => <RepoRow key={r.fullName} repo={r} />)
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────
- * Desktop layout
- * ────────────────────────────────────────────────────────────────── */
-
-function DesktopLayout({ data }: { data: ActivePayload }) {
-  return (
-    <div className="h-full overflow-y-auto bg-bg text-text">
-      <header className="px-6 pt-6 pb-4 border-b border-text-secondary/10">
-        <div className="flex items-center gap-2 text-text-secondary text-[11px] font-medium uppercase tracking-wider">
-          <Github size={12} />
-          <span>github.com/{data.username}</span>
-        </div>
-        <h1 className="font-display text-[24px] mt-1">Activity</h1>
-      </header>
-
-      <div className="p-6 flex flex-col gap-6">
-        <StatStrip data={data} />
-
-        {data.calendar && data.calendar.days.length > 0 && (
-          <section>
-            <SectionHeader title="Contributions" subtitle="Last 12 months" />
-            <div className="mt-3">
-              <ContributionHeatmap calendar={data.calendar} compact={false} />
-            </div>
-            <CalendarLegend />
-          </section>
+        {/* ── 02 Contributions ── the density-field signature ── */}
+        {hasCalendar && (
+          <motion.div variants={reveal.item(reduced)}>
+            <EditorialSection
+              number="02"
+              eyebrow="Last 12 months"
+              title="Contributions"
+            >
+              <ContributionField calendar={data.calendar!} />
+            </EditorialSection>
+          </motion.div>
         )}
 
-        <div className="grid grid-cols-2 gap-6">
-          <section>
-            <SectionHeader title="Recent Activity" subtitle="Live public events" />
-            <div className="mt-3 rounded-xl bg-surface dark:bg-white/[0.04] overflow-hidden divide-y divide-text-secondary/10">
-              {data.events.length === 0 ? (
-                <EmptyRow text="No recent public events." />
-              ) : (
-                data.events.slice(0, 10).map((ev) => <EventRow key={ev.id} event={ev} />)
-              )}
-            </div>
-          </section>
-          <section>
-            <SectionHeader title="Active Repositories" subtitle="Last 60 days" />
-            <div className="mt-3 flex flex-col gap-2">
-              {data.activeRepos.length === 0 ? (
-                <EmptyRow text="No recently-pushed repositories." />
-              ) : (
-                data.activeRepos.map((r) => <RepoRow key={r.fullName} repo={r} />)
-              )}
-            </div>
-          </section>
-        </div>
-      </div>
+        {/* ── 03 Activity ── the AsciiField log tape (mono) / list (color) ── */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="03" eyebrow="Public events" title="Recent activity">
+            <ActivityFeed events={events} />
+          </EditorialSection>
+        </motion.div>
+
+        {/* ── 04 Active repositories ── IndexRow-style hairline rows ── */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="04" eyebrow="Pushed in the last 60 days" title="Active repositories">
+            {data.activeRepos.length === 0 ? (
+              <EmptyNote
+                line="No recently-pushed repositories."
+                hint="Public pushes from the last 60 days show up here."
+              />
+            ) : (
+              <div className="flex flex-col">
+                <Hairline />
+                {data.activeRepos.map((repo, i) => (
+                  <RepoRow
+                    key={repo.fullName}
+                    repo={repo}
+                    index={i + 1}
+                    reduced={reduced}
+                  />
+                ))}
+              </div>
+            )}
+          </EditorialSection>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Stat strip — four pill cards
+ * Hero stat strip - large serif numerals + tiny mono labels, hairline grid.
+ *
+ * Every value is derived live: contributions + streak come from the calendar
+ * (rendered "--" when the calendar fetch failed so a visitor never misreads
+ * "0 day streak" as "stopped shipping"); active-repo count and total stars are
+ * aggregated from the live activeRepos list. No hardcoded numbers.
  * ────────────────────────────────────────────────────────────────── */
 
 function StatStrip({ data }: { data: ActivePayload }) {
-  // Calendar-derived stats render as "—" when the calendar fetch failed, so
-  // a visitor doesn't read "0 day streak" and assume Devanshu has stopped
-  // shipping — they correctly read it as "data unavailable."
   const hasCalendar = data.calendar !== null;
-  const contributionsLabel = hasCalendar
+  const contributions = hasCalendar
     ? data.calendar!.totalLastYear.toLocaleString()
-    : '—';
+    : '--';
   const streak = data.calendar?.currentStreak ?? 0;
   const longestStreak = data.calendar?.longestStreak ?? 0;
-  const streakLabel = hasCalendar ? streak : '—';
+  const streakLabel = hasCalendar ? String(streak) : '--';
+  const streakSub = !hasCalendar
+    ? 'data unavailable'
+    : longestStreak > streak
+      ? `longest ${longestStreak}`
+      : 'current run';
   const activeCount = data.activeRepos.length;
   const totalStars = data.activeRepos.reduce((s, r) => s + r.stars, 0);
 
   return (
-    <div className="px-4 mt-1 grid grid-cols-2 gap-2" data-testid="activity-stats">
-      <StatCard
-        icon={<GitCommit size={16} />}
-        value={contributionsLabel}
-        label="contributions"
-        sub="last 12 months"
-        accent="#34d399"
-      />
-      <StatCard
-        icon={<Flame size={16} />}
-        value={streakLabel}
-        label="day streak"
-        sub={
-          !hasCalendar
-            ? 'data unavailable'
-            : longestStreak > streak
-            ? `longest ${longestStreak}`
-            : 'current'
-        }
-        accent="#f97316"
-      />
-      <StatCard
-        icon={<ActivityIcon size={16} />}
-        value={activeCount}
-        label="active repos"
-        sub="pushed recently"
-        accent="#60a5fa"
-      />
-      <StatCard
-        icon={<Star size={16} />}
-        value={totalStars}
-        label="stars"
-        sub="across active repos"
-        accent="#facc15"
-      />
+    <div data-gh-stats data-testid="activity-stats">
+      <Stat value={contributions} label="Contributions" sub="last 12 months" />
+      <Stat value={streakLabel} label="Day streak" sub={streakSub} />
+      <Stat value={String(activeCount)} label="Active repos" sub="pushed recently" />
+      <Stat value={totalStars.toLocaleString()} label="Stars" sub="across active repos" />
     </div>
   );
 }
 
-function StatCard({
-  icon,
-  value,
-  label,
-  sub,
-  accent,
-}: {
-  icon: React.ReactNode;
-  value: number | string;
-  label: string;
-  sub: string;
-  accent: string;
-}) {
-  const mono = useIsMono();
+function Stat({ value, label, sub }: { value: string; label: string; sub: string }) {
   return (
-    <div className="rounded-2xl p-3 bg-surface dark:bg-white/[0.04] flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-label text-text-secondary font-medium uppercase tracking-wide">
-        {/* In mono, the category icon drops its hue and rides text-text so the
-            stat reads by its label + value, not by color. */}
-        <span
-          style={mono ? undefined : { color: accent }}
-          className={`flex ${mono ? 'text-text' : ''}`}
-        >
-          {icon}
-        </span>
-        <span className="truncate">{label}</span>
-      </div>
-      <div className="text-hero font-semibold text-text leading-none">
+    <div className="flex flex-col gap-2">
+      <Hairline />
+      {/* Serif numeral scales with the window via .editorial-head + cqi. */}
+      <span className="editorial-head font-display text-text leading-none pt-3 tabular-nums">
         {value}
-      </div>
-      <div className="text-label text-text-secondary">{sub}</div>
+      </span>
+      <MetaLabel as="p" className="text-text">
+        {label}
+      </MetaLabel>
+      <span className="text-sm text-text-secondary leading-snug">{sub}</span>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Contribution heatmap — 7 rows × ~53 columns
+ * Contribution density field - the signature.
+ *
+ * A real weeks x days DOM grid (7 rows, Sun..Sat top to bottom, columns are
+ * weeks). Each day's commit level (0..4) maps to a dot whose SIZE and ink
+ * OPACITY both grow with intensity - two reinforcing hue-free channels, so
+ * "more commits" reads as a bigger, denser dot without any color. The grid is
+ * horizontally scrollable when the year does not fit; the dot scale tracks the
+ * window via @container so the field re-proportions with the app size. Every
+ * day keeps its `date / count contributions` tooltip and the whole field keeps
+ * an aria-label of the yearly total. In the color palette the dots fall back to
+ * GitHub's official green ramp (dual-palette contract).
  * ────────────────────────────────────────────────────────────────── */
 
-function ContributionHeatmap({
-  calendar,
-  compact,
-}: {
-  calendar: ContributionCalendar;
-  compact: boolean;
-}) {
+function ContributionField({ calendar }: { calendar: ContributionCalendar }) {
   const { mode } = useTheme();
   const mono = useIsMono();
-  const cellSize = compact ? 9 : 12;
-  const gap = 2;
 
-  // Pad with empty cells so the first cell sits on its actual weekday row.
-  // GitHub displays Sun as the top row, so weekday 0..6 = Sun..Sat.
   const days = calendar.days;
-  if (days.length === 0) return null;
-  const firstDay = new Date(days[0].date);
-  const firstWeekday = firstDay.getUTCDay(); // 0=Sun..6=Sat
-  const padded: Array<ContributionDay | null> = [
-    ...Array(firstWeekday).fill(null),
-    ...days,
-  ];
+  // Pad the head so the first real day sits on its true weekday row (GitHub
+  // shows Sunday as the top row: weekday 0..6 = Sun..Sat).
+  const firstWeekday = new Date(days[0].date).getUTCDay();
+  const padded: Array<ContributionDay | null> = useMemo(
+    () => [...Array(firstWeekday).fill(null), ...days],
+    [firstWeekday, days],
+  );
 
   return (
-    <div
-      className="overflow-x-auto pb-1 -mx-1 px-1"
-      data-testid="contribution-heatmap"
-      aria-label={`${calendar.totalLastYear} contributions in the last year`}
-    >
+    <div className="flex flex-col gap-4">
       <div
-        className="grid grid-rows-7 grid-flow-col"
-        style={{
-          gap: `${gap}px`,
-          width: 'fit-content',
-        }}
+        className="overflow-x-auto pb-1"
+        data-testid="contribution-heatmap"
+        role="img"
+        aria-label={`${calendar.totalLastYear} contributions in the last year`}
       >
-        {padded.map((d, i) => (
-          <div
-            key={i}
-            className="rounded-[2px]"
-            style={{
-              width: cellSize,
-              height: cellSize,
-              background: d ? cellColor(d.level, mode, mono) : 'transparent',
-            }}
-            title={d ? `${d.date} · ${d.count} contributions` : undefined}
-            data-level={d?.level}
-          />
-        ))}
+        {/* Cell box scales with the window; the inked dot is centered inside it
+            and sized as a fraction of the box that climbs with the level. */}
+        <div
+          className="grid grid-rows-7 grid-flow-col w-fit
+                     gap-[clamp(1.5px,0.5cqi,3px)]
+                     [--cell:clamp(8px,2.1cqi,14px)]"
+        >
+          {padded.map((d, i) => (
+            <div
+              key={i}
+              className="grid place-items-center"
+              style={{ width: 'var(--cell)', height: 'var(--cell)' }}
+              title={d ? `${d.date} / ${d.count} contributions` : undefined}
+              data-level={d?.level}
+            >
+              {d && (
+                <span
+                  className="block rounded-full"
+                  style={dotStyle(d.level, mode, mono)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
+      <FieldLegend mode={mode} mono={mono} />
     </div>
   );
 }
 
-function cellColor(level: number, mode: 'light' | 'dark', mono: boolean): string {
+/**
+ * Dot geometry + ink for a given level.
+ *   - size:    fraction of the cell box, 0.28 (faint) up to 1.0 (full), so a
+ *              busy day reads as a large dot and an empty day as a speck.
+ *   - opacity: climbs with the level so density reinforces size (mono only).
+ * In color, the dot fills with GitHub's green ramp at full size for legibility.
+ */
+function dotStyle(
+  level: number,
+  mode: 'light' | 'dark',
+  mono: boolean,
+): React.CSSProperties {
   const idx = Math.max(0, Math.min(4, level));
+  // Size fraction of the cell box per level. Level 0 is a small flat speck so
+  // the grid still reads as a field; 1..4 grow toward filling the cell.
+  const sizeFrac = [0.3, 0.5, 0.66, 0.82, 1][idx];
+  const size = `calc(var(--cell) * ${sizeFrac})`;
+
   if (mono) {
-    // Graphite intensity ramp: empty cell barely above the background, hottest
-    // cell near the foreground, so contribution density stays readable in pure
-    // black & white. Direction follows the surface — light ink on a dark
-    // canvas, dark ink on a light canvas — so the hottest cell always reads as
-    // the most "present."
-    const monoDark = [
-      'rgba(255,255,255,0.05)',
-      'rgba(255,255,255,0.20)',
-      'rgba(255,255,255,0.38)',
-      'rgba(255,255,255,0.62)',
-      'rgba(255,255,255,0.90)',
-    ];
-    const monoLight = [
-      'rgba(17,17,17,0.06)',
-      'rgba(17,17,17,0.22)',
-      'rgba(17,17,17,0.42)',
-      'rgba(17,17,17,0.66)',
-      'rgba(17,17,17,0.92)',
-    ];
-    return (mode === 'dark' ? monoDark : monoLight)[idx];
+    // Graphite density ramp: empty barely above the background, hottest near the
+    // foreground. Direction follows the surface (light ink on dark, dark ink on
+    // light) so the busiest day always reads as the most "present".
+    const ink = mode === 'dark' ? '255,255,255' : '17,17,17';
+    const op = [0.07, 0.26, 0.46, 0.68, 0.92][idx];
+    return { width: size, height: size, background: `rgba(${ink},${op})` };
   }
-  // Fun palette: GitHub's official greens, unchanged (dark = darker base).
+  // Color (Fun) palette: GitHub's official greens, full-size dots.
   const dark = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
   const light = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
-  return (mode === 'dark' ? dark : light)[idx];
+  const color = (mode === 'dark' ? dark : light)[idx];
+  return { width: size, height: size, background: color };
 }
 
-function CalendarLegend() {
-  const { mode } = useTheme();
-  const mono = useIsMono();
+function FieldLegend({ mode, mono }: { mode: 'light' | 'dark'; mono: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 mt-2 px-1 text-[10px] text-text-secondary">
-      <span>Less</span>
-      {[0, 1, 2, 3, 4].map((lvl) => (
-        <span
-          key={lvl}
-          className="w-2 h-2 rounded-[2px] inline-block"
-          style={{ background: cellColor(lvl, mode, mono) }}
-        />
-      ))}
-      <span>More</span>
+    <div className="flex items-center gap-2">
+      <MetaLabel className="text-text-secondary">Less</MetaLabel>
+      <span className="flex items-center gap-[clamp(2px,0.6cqi,4px)] [--cell:14px]">
+        {[0, 1, 2, 3, 4].map((lvl) => (
+          <span
+            key={lvl}
+            className="grid place-items-center"
+            style={{ width: 'var(--cell)', height: 'var(--cell)' }}
+          >
+            <span className="block rounded-full" style={dotStyle(lvl, mode, mono)} />
+          </span>
+        ))}
+      </span>
+      <MetaLabel className="text-text-secondary">More</MetaLabel>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Event row — one line per push/PR/release/branch
+ * Activity feed - AsciiField log tape (mono), hairline list (color).
+ *
+ * Consistent with AnalyticsApp: every event is one fixed-width row
+ *   14:02:51  +  Pushed: refactor heatmap field ............... 3h ago
+ * built into a single string handed to AsciiField as one selectable, no-redraw
+ * <pre>. The tape is aria-hidden; a paired anchor list carries the same events
+ * for assistive tech AND preserves the per-event links (the tape itself is a
+ * read surface, the links live in the sr-list + the color fallback rows).
  * ────────────────────────────────────────────────────────────────── */
 
-function EventRow({ event }: { event: ActivityEvent }) {
-  const repoName = event.repo.split('/').pop() ?? event.repo;
-  const when = relativeTime(event.createdAt);
+const TAPE_WIDTH = 72; // monospace columns the tape is padded to
 
-  const { icon, summary, link } = describeEvent(event);
-
-  return (
-    <a
-      href={link ?? event.repoUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start gap-3 px-4 py-3 active:opacity-70 hover:bg-text-secondary/[0.03] transition-colors"
-    >
-      <span className="mt-0.5 text-text-secondary shrink-0">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[14px] text-text leading-snug">
-          <span className="font-medium">{summary}</span>
-        </div>
-        <div className="text-[12px] text-text-secondary mt-0.5 flex items-center gap-1.5 truncate">
-          <span className="truncate">{repoName}</span>
-          <span className="text-text-secondary/40">·</span>
-          <span className="shrink-0">{when}</span>
-        </div>
-      </div>
-      <ExternalLink size={13} className="text-text-secondary/40 shrink-0 mt-1" />
-    </a>
-  );
+/** Distinct ASCII glyph per event type - the shape disambiguates, not hue. */
+function eventGlyph(ev: ActivityEvent): string {
+  switch (ev.type) {
+    case 'PushEvent': return '+'; // commits pushed
+    case 'PullRequestEvent': return '>'; // a pull request
+    case 'CreateEvent': return '*'; // a branch / tag / repo created
+    case 'ReleaseEvent': return '^'; // a release shipped
+    case 'IssuesEvent': return '?'; // an issue
+    case 'WatchEvent': return '@'; // starred
+    case 'ForkEvent': return 'Y'; // forked
+    default: return '.';
+  }
 }
 
-function describeEvent(ev: ActivityEvent): {
-  icon: React.ReactNode;
+interface FeedItem {
+  id: string;
+  glyph: string;
   summary: string;
-  link?: string;
-} {
+  repo: string;
+  when: string;
+  link: string;
+}
+
+function describeEvent(ev: ActivityEvent): { summary: string; link: string } {
   switch (ev.type) {
     case 'PushEvent': {
       const commits = ev.commits ?? [];
       const last = commits[commits.length - 1];
       const summary =
         commits.length > 1
-          ? `Pushed ${commits.length} commits — ${truncate(last?.message ?? '', 64)}`
-          : `Pushed: ${truncate(last?.message ?? '', 80)}`;
-      return {
-        icon: <GitCommit size={16} />,
-        summary,
-        link: last?.url,
-      };
+          ? `Pushed ${commits.length} commits: ${truncate(last?.message ?? '', 48)}`
+          : `Pushed: ${truncate(last?.message ?? '', 60)}`;
+      return { summary, link: last?.url ?? ev.repoUrl };
     }
     case 'PullRequestEvent':
       return {
-        icon: <GitPullRequest size={16} />,
-        summary: `${capitalize(ev.prAction ?? 'updated')} PR: ${truncate(ev.prTitle ?? '', 80)}`,
-        link: ev.prUrl,
+        summary: `${capitalize(ev.prAction ?? 'updated')} PR: ${truncate(ev.prTitle ?? '', 56)}`,
+        link: ev.prUrl ?? ev.repoUrl,
       };
     case 'CreateEvent':
-      return {
-        icon: <GitBranch size={16} />,
-        summary: `Created ${ev.refType ?? 'thing'}`,
-      };
+      return { summary: `Created ${ev.refType ?? 'item'}`, link: ev.repoUrl };
     case 'ReleaseEvent':
-      return {
-        icon: <Tag size={16} />,
-        summary: `Released ${ev.releaseTag ?? ''}`,
-      };
+      return { summary: `Released ${ev.releaseTag ?? ''}`.trim(), link: ev.repoUrl };
     case 'IssuesEvent':
-      return { icon: <ActivityIcon size={16} />, summary: 'Worked on an issue' };
+      return { summary: 'Worked on an issue', link: ev.repoUrl };
     case 'WatchEvent':
-      return { icon: <Star size={16} />, summary: 'Starred a repo' };
+      return { summary: 'Starred a repository', link: ev.repoUrl };
     case 'ForkEvent':
-      return { icon: <GitBranch size={16} />, summary: 'Forked a repo' };
+      return { summary: 'Forked a repository', link: ev.repoUrl };
     default:
-      return { icon: <ActivityIcon size={16} />, summary: 'Activity' };
+      return { summary: 'Activity', link: ev.repoUrl };
   }
 }
 
+function toFeedItems(events: ActivityEvent[]): FeedItem[] {
+  return events.map((ev) => {
+    const { summary, link } = describeEvent(ev);
+    return {
+      id: ev.id,
+      glyph: eventGlyph(ev),
+      summary,
+      repo: ev.repo.split('/').pop() ?? ev.repo,
+      when: relativeTime(ev.createdAt),
+      link,
+    };
+  });
+}
+
+/**
+ * Build the fixed-width log tape string (one row per event).
+ *
+ * Each row opens with a left index rail (01, 02, ...) rather than a wall clock:
+ * the events feed carries only a relative `when`, so a fabricated HH:MM:SS would
+ * be dishonest. The index keeps the rows aligned like a printed log while the
+ * real recency lives in the right-aligned relative time.
+ */
+function buildLogTape(items: FeedItem[]): string {
+  return items
+    .map((it, i) => {
+      const rail = String(i + 1).padStart(2, '0');
+      const head = `${rail}  ${it.glyph}  `;
+      const tail = ` ${it.when}`;
+      const room = Math.max(1, TAPE_WIDTH - head.length - tail.length);
+      let label = `${it.summary}  [${it.repo}]`;
+      if (label.length > room - 2) {
+        label = label.slice(0, Math.max(1, room - 3)) + '…';
+      }
+      const leaderCount = Math.max(1, room - label.length - 1);
+      const leader = ' ' + '.'.repeat(leaderCount);
+      return `${head}${label}${leader}${tail}`;
+    })
+    .join('\n');
+}
+
+function ActivityFeed({ events }: { events: ActivityEvent[] }) {
+  const mono = useIsMono();
+  const reduced = useReducedMotion();
+
+  const items: FeedItem[] = useMemo(() => toFeedItems(events), [events]);
+
+  const tape = useMemo(() => buildLogTape(items), [items]);
+
+  if (items.length === 0) {
+    return (
+      <EmptyNote
+        line="No recent public events."
+        hint="Pushes, pull requests, and releases appear here as they happen."
+      />
+    );
+  }
+
+  if (mono) {
+    // Signature: one selectable <pre>, zero per-row motion. The visible tape is
+    // the read surface; a paired sr-only anchor list carries the same events for
+    // assistive tech and preserves the per-event links. Each anchor exposes its
+    // summary via aria-label (its accessible name) rather than visible text, so
+    // the human-readable string lives in exactly one place (the tape) while the
+    // links stay reachable by keyboard and screen reader.
+    return (
+      <div>
+        <div className="max-h-80 overflow-auto">
+          <AsciiField
+            source={tape}
+            paletteKey={`tape-${items.length}`}
+            className="text-[12px] text-text-secondary leading-[1.6]"
+          />
+        </div>
+        <ul className="sr-only">
+          {items.map((it) => (
+            <li key={it.id}>
+              <a
+                href={it.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${it.summary} in ${it.repo}, ${it.when}`}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  // Color fallback: a plain hairline editorial list (glyph + summary + mono
+  // meta), links preserved on each row.
+  return (
+    <ul className="flex flex-col">
+      <Hairline />
+      {items.map((it) => (
+        <li key={it.id}>
+          <FeedRow item={it} reduced={reduced} />
+          <Hairline />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FeedRow({ item, reduced }: { item: FeedItem; reduced: boolean | null }) {
+  return (
+    <motion.a
+      href={item.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileTap={reduced ? undefined : { scale: 0.99, transition: { duration: 0.12, ease: EASE_OUT } }}
+      className="group flex items-baseline gap-3 py-3
+                 hover:bg-black/[0.02] dark:hover:bg-white/[0.04] transition-colors
+                 focus-visible:outline-none focus-visible:bg-black/[0.04] dark:focus-visible:bg-white/[0.06]"
+    >
+      <span
+        aria-hidden
+        className="w-4 shrink-0 text-center font-[family-name:var(--font-geist-mono)] text-text-secondary"
+      >
+        {item.glyph}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-text">{item.summary}</span>
+        <span className="mt-0.5 flex items-center gap-2 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+          <span className="truncate">{item.repo}</span>
+          <span aria-hidden className="opacity-40">/</span>
+          <span className="shrink-0">{item.when}</span>
+        </span>
+      </span>
+      <ExternalLink size={13} className="shrink-0 self-center text-text-secondary opacity-40" />
+    </motion.a>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────────────
- * Repo row
+ * Repo row - IndexRow-style hairline row, serif name + mono meta, link kept.
  * ────────────────────────────────────────────────────────────────── */
 
 function RepoRow({
   repo,
+  index,
+  reduced,
 }: {
-  repo: ActivePayload['activeRepos'][number];
+  repo: ActiveRepo;
+  index: number;
+  reduced: boolean | null;
 }) {
   const mono = useIsMono();
   return (
-    <a
-      href={repo.htmlUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-surface dark:bg-white/[0.04] active:opacity-70 hover:bg-text-secondary/[0.05] transition-colors"
-    >
-      <span className="mt-0.5 text-text-secondary shrink-0">
-        <Github size={16} />
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[15px] font-medium text-text truncate">{repo.name}</div>
-        {repo.description && (
-          <div className="text-[12px] text-text-secondary mt-0.5 line-clamp-2 leading-snug">
-            {repo.description}
-          </div>
-        )}
-        <div className="text-[11px] text-text-secondary mt-1.5 flex items-center gap-2 flex-wrap">
-          {repo.language && (
-            <span className="flex items-center gap-1">
-              {/* In mono the dot loses its language hue and the language name
-                  to its right does the distinguishing. */}
-              <span
-                className={`w-2 h-2 rounded-full inline-block ${
-                  mono ? 'bg-text-secondary' : ''
-                }`}
-                style={mono ? undefined : { background: languageColor(repo.language) }}
-              />
-              {repo.language}
+    <div className="flex flex-col">
+      <motion.a
+        href={repo.htmlUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        whileTap={reduced ? undefined : { scale: 0.99, transition: { duration: 0.12, ease: EASE_OUT } }}
+        className="group flex items-baseline gap-4 py-4
+                   hover:bg-black/[0.025] dark:hover:bg-white/[0.05] transition-colors
+                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+      >
+        <MetaLabel className="shrink-0 w-8 justify-start text-text-secondary">
+          {String(index).padStart(2, '0')}
+        </MetaLabel>
+        <span className="min-w-0 flex-1">
+          <span className="block editorial-head font-display text-text text-[clamp(1.15rem,3vw,1.6rem)] leading-tight truncate">
+            {repo.name}
+          </span>
+          {repo.description && (
+            <span className="mt-1 block max-w-[60ch] text-sm text-text-secondary leading-snug line-clamp-2">
+              {repo.description}
             </span>
           )}
-          {repo.stars > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Star size={11} /> {repo.stars}
-            </span>
-          )}
-          <span>· {relativeTime(repo.pushedAt)}</span>
-        </div>
-      </div>
-      <ExternalLink size={13} className="text-text-secondary/40 shrink-0 mt-1.5" />
-    </a>
+          <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+            {repo.language && (
+              <span className="inline-flex items-center gap-1.5">
+                {/* In mono the dot drops its language hue; the name to its right
+                    carries the distinction. */}
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${mono ? 'bg-text-secondary' : ''}`}
+                  style={mono ? undefined : { background: languageColor(repo.language) }}
+                />
+                {repo.language}
+              </span>
+            )}
+            {repo.stars > 0 && (
+              <span>
+                {repo.stars} {repo.stars === 1 ? 'star' : 'stars'}
+              </span>
+            )}
+            <span>pushed {relativeTime(repo.pushedAt)}</span>
+          </span>
+        </span>
+        <ExternalLink size={13} className="shrink-0 self-center text-text-secondary opacity-40" />
+      </motion.a>
+      <Hairline />
+    </div>
   );
 }
 
@@ -570,65 +714,69 @@ function languageColor(lang: string): string {
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Small helpers + states
+ * Small presentational pieces + states
  * ────────────────────────────────────────────────────────────────── */
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+/** Empty state: hairline-bounded, editorial, no spinner, no icon theatrics. */
+function EmptyNote({ line, hint }: { line: string; hint: string }) {
   return (
-    <div className="px-1 flex items-baseline gap-2">
-      <h2 className="text-[18px] font-semibold text-text">{title}</h2>
-      {subtitle && (
-        <span className="text-[12px] text-text-secondary">{subtitle}</span>
-      )}
+    <div className="flex flex-col gap-2 py-2">
+      <Hairline />
+      <p className="pt-4 text-sm text-text">{line}</p>
+      <p className="text-sm text-text-secondary">{hint}</p>
     </div>
   );
 }
 
-function EmptyRow({ text }: { text: string }) {
+/** Loading: skeleton matching the editorial column shape (no circular spinner). */
+function LoadingState() {
   return (
-    <div className="px-4 py-6 text-center text-[13px] text-text-secondary">
-      {text}
-    </div>
-  );
-}
-
-function LoadingState({ variant }: { variant: 'desktop' | 'mobile' }) {
-  return (
-    <div
-      className={`h-full flex flex-col gap-4 bg-bg ${variant === 'mobile' ? 'p-5' : 'p-6'}`}
-      data-testid="activity-loading"
-    >
-      <div className="h-7 w-24 bg-text-secondary/10 rounded animate-pulse" />
-      <div className="grid grid-cols-2 gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-2xl bg-text-secondary/10 animate-pulse" />
-        ))}
+    <div className="h-full overflow-auto bg-transparent" data-gh-root data-testid="activity-loading">
+      <style>{SCOPED_CSS}</style>
+      <div className="mx-auto w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-14">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-16 w-48" />
+          <Skeleton className="h-4 w-full max-w-[40ch]" />
+        </div>
+        <div data-gh-stats>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col gap-3">
+              <Hairline />
+              <Skeleton className="h-10 w-20" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))}
+        </div>
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-48 w-full" />
       </div>
-      <div className="h-32 rounded-2xl bg-text-secondary/10 animate-pulse mt-2" />
-      <div className="h-48 rounded-2xl bg-text-secondary/10 animate-pulse" />
     </div>
   );
 }
 
-function ErrorState({ message, variant }: { message: string; variant: 'desktop' | 'mobile' }) {
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`rounded bg-text-secondary/10 animate-pulse ${className ?? ''}`} />;
+}
+
+/** Error: editorial, centered, honest about the likely cause. */
+function ErrorState({ message }: { message: string }) {
   return (
     <div
-      className={`h-full flex flex-col items-center justify-center gap-3 text-center px-8 bg-bg ${
-        variant === 'mobile' ? 'pt-12' : 'pt-20'
-      }`}
+      className="h-full flex flex-col items-center justify-center gap-3 text-center px-8"
       data-testid="activity-error"
     >
-      <AlertCircle size={28} className="text-text-secondary/70" />
-      <p className="text-[15px] text-text font-medium">Couldn't load activity</p>
-      <p className="text-[13px] text-text-secondary max-w-[280px]">
-        {message}. GitHub or the contributions API may be rate-limiting.
+      <AlertCircle size={26} className="text-text-secondary" />
+      <p className="font-display text-text text-xl">Couldn&apos;t load activity</p>
+      <p className="max-w-[40ch] text-sm text-text-secondary leading-relaxed">
+        {message}. GitHub or the contributions API may be rate limiting.
       </p>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Time + string helpers
+ * Time + string helpers (preserved from the prior build)
  * ────────────────────────────────────────────────────────────────── */
 
 export function relativeTime(iso: string): string {
