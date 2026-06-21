@@ -125,7 +125,7 @@ function AppliedTag({ show, reduced }: { show: boolean; reduced: boolean | null 
           initial={{ opacity: 0, x: -4 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
           className="font-mono-meta text-text-secondary"
         >
           Applied
@@ -184,7 +184,7 @@ function SettingRow({
               initial={{ scaleX: 0, opacity: 0.9 }}
               animate={{ scaleX: 1, opacity: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.9, ease: 'easeOut' }}
+              transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
               className="absolute inset-x-0 top-0 h-px origin-left bg-text"
             />
           )}
@@ -220,20 +220,22 @@ function MonoToggle({
       aria-checked={on}
       aria-label={label}
       onClick={() => onChange(!on)}
-      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-200
+      className={`relative h-6 w-11 shrink-0 rounded-full border transition-[background-color,border-color,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/30
                   ${on ? 'border-text bg-text' : 'border-border bg-transparent'}`}
     >
       <motion.span
         aria-hidden
-        layout
+        // GPU-only: animate the transform string (not framer's `x` shorthand or
+        // a `left` layout prop) so the thumb stays on the compositor. A snappy
+        // interruptible spring lets a rapid double-toggle retarget mid-travel.
+        animate={{ transform: `translate(${on ? 20 : 0}px, -50%)` }}
         transition={withReduced(
           { type: 'spring', damping: 22, stiffness: 420, mass: 0.6 },
           reduced,
         )}
-        className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full shadow-sm
+        className={`absolute left-1 top-1/2 h-4 w-4 rounded-full shadow-sm
                     ${on ? 'bg-bg' : 'bg-text'}`}
-        style={{ left: on ? 'calc(100% - 20px)' : '4px' }}
       />
     </button>
   );
@@ -348,8 +350,16 @@ function LivePreview({
         {/* A small floating "window" centered on the wallpaper. */}
         <motion.div
           key={`${mode}-${wallpaper?.id ?? 'none'}`}
-          initial={reduced ? false : { opacity: 0, y: 6, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
+          // Theme/palette swap crossfade: GPU-only (transform + opacity), with a
+          // brief blur to bridge the outgoing and incoming surface so the swap
+          // reads as one transformation rather than two overlapping windows
+          // (Kowalski blur-mask trick; blur < 20px, transitions out to 0).
+          initial={
+            reduced
+              ? false
+              : { opacity: 0, transform: 'translateY(6px) scale(0.985)', filter: 'blur(3px)' }
+          }
+          animate={{ opacity: 1, transform: 'translateY(0px) scale(1)', filter: 'blur(0px)' }}
           transition={withReduced(spring.window, reduced)}
           className="absolute inset-[14%] flex flex-col overflow-hidden rounded-md shadow-lg"
           style={{ background: surface }}
@@ -404,9 +414,9 @@ function WallpaperThumb({
       onClick={() => onSelect(wp)}
       aria-label={`Use ${wp.name} wallpaper`}
       aria-pressed={selected}
-      className={`group relative w-full overflow-hidden border transition-colors
+      className={`group relative w-full overflow-hidden border transition-[border-color,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98]
                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/30
-                  ${selected ? 'border-text' : 'border-border hover:border-text/50'}`}
+                  ${selected ? 'border-text' : 'border-border [@media(hover:hover)and(pointer:fine)]:hover:border-text/50'}`}
       style={{ aspectRatio: '16/9', filter: mono ? 'grayscale(1)' : undefined }}
     >
       {wp.imageUrl ? (
@@ -558,7 +568,7 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
               initial={reduced ? false : { opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-              transition={{ duration: reduced ? 0 : 0.2, ease: 'easeOut' }}
+              transition={{ duration: reduced ? 0 : 0.2, ease: [0.23, 1, 0.32, 1] }}
               className="overflow-hidden"
             >
               <div className="flex flex-col gap-3 py-4">
@@ -580,7 +590,7 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
                         }}
                         aria-label={`Set accent ${name}`}
                         aria-pressed={isActive}
-                        className="relative h-7 w-7 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                        className="relative h-7 w-7 rounded-full transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:hover:scale-110 active:scale-[0.97] focus:outline-none"
                         style={{
                           background: color,
                           boxShadow: isActive
@@ -807,7 +817,7 @@ function AboutBody() {
                   &middot;
                 </span>
               )}
-              <span className="font-mono text-[13px] leading-snug text-text">
+              <span className="font-mono text-sm leading-snug text-text">
                 {tech}
               </span>
             </React.Fragment>
@@ -903,7 +913,7 @@ function RailRow({
       <span
         className={`font-display min-w-0 flex-1 truncate transition-transform ${
           active ? 'text-text' : 'text-text-secondary group-hover:text-text'
-        } ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+        } ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
       >
         {label}
       </span>
