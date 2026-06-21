@@ -260,14 +260,15 @@ function EditorialLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group inline-flex items-center focus-visible:outline-none"
+      className="group inline-flex items-center focus-visible:outline-none
+                 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
     >
       <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
         {label}
       </MetaLabel>
       <span
         aria-hidden
-        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 group-hover:scale-x-150"
+        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
       />
     </a>
   );
@@ -302,8 +303,10 @@ function FileRow({
         data-testid="finder-file-row"
         aria-current={active ? 'true' : undefined}
         className="group relative flex w-full flex-col gap-1.5 px-3 py-4 text-left
-                   transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.04]
-                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+                   transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                   hover:bg-black/[0.025] dark:hover:bg-white/[0.04]
+                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]
+                   active:scale-[0.99]"
       >
         {/* Sliding selection marker: a thin graphite bar pinned to the row's
             left edge. layoutId makes it glide between rows. */}
@@ -321,9 +324,9 @@ function FileRow({
 
         <div className="flex items-baseline justify-between gap-4">
           <h3
-            className={`font-display text-lg leading-tight truncate transition-transform
+            className={`font-display text-lg leading-tight truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                         ${active ? 'text-text' : 'text-text group-hover:text-text'}
-                        ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+                        ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
           >
             {project.name}
           </h3>
@@ -398,7 +401,12 @@ function DetailBody({
                   &middot;
                 </span>
               )}
-              <span className="font-mono text-[13px] leading-snug text-text">{t}</span>
+              <span
+                className="font-mono leading-snug text-text"
+                style={{ fontSize: 'clamp(0.72rem, 1.55cqi, 0.8125rem)' }}
+              >
+                {t}
+              </span>
             </React.Fragment>
           ))}
         </p>
@@ -440,7 +448,8 @@ function DetailPanel({
         <button
           type="button"
           onClick={onBack}
-          className="group inline-flex items-center focus-visible:outline-none"
+          className="group inline-flex items-center focus-visible:outline-none
+                     transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
           aria-label="Close detail"
         >
           <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
@@ -485,7 +494,9 @@ function FolderRow({
       onClick={onClick}
       data-testid="finder-folder-row"
       aria-current={active ? 'true' : undefined}
-      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left
+                 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                 focus-visible:outline-none active:scale-[0.99]"
     >
       {active && (
         <motion.span
@@ -499,9 +510,9 @@ function FolderRow({
         />
       )}
       <span
-        className={`font-mono-meta min-w-0 flex-1 truncate transition-transform
+        className={`font-mono-meta min-w-0 flex-1 truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                     ${active ? 'text-text' : 'text-text-secondary group-hover:text-text'}
-                    ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+                    ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
       >
         {label}
       </span>
@@ -631,7 +642,7 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* File list - reveals once on mount, re-staggers on category change. */}
           <div
-            className={`min-w-0 overflow-y-auto px-3 py-2 transition-[flex-basis] duration-300
+            className={`min-w-0 overflow-y-auto px-3 py-2 transition-[flex-basis] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]
                         ${selected ? 'hidden basis-1/2 lg:block' : 'basis-full'}`}
           >
             <motion.div
@@ -661,10 +672,13 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
             {selected && (
               <motion.div
                 key="detail"
-                initial={reduced ? false : { opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={reduced ? { opacity: 0 } : { opacity: 0, x: 16 }}
-                transition={withReduced(spring.window, reduced)}
+                initial={reduced ? false : { opacity: 0, transform: 'translateX(16px)' }}
+                animate={{ opacity: 1, transform: 'translateX(0px)' }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, transform: 'translateX(16px)' }}
+                transition={withReduced(
+                  { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
+                  reduced,
+                )}
                 className="flex min-w-0 basis-full flex-col overflow-hidden border-l border-border lg:basis-1/2"
               >
                 <DetailPanel
@@ -736,7 +750,8 @@ function FinderMobileRoot({
               type="button"
               onClick={() => setActiveCategory(cat)}
               aria-current={active ? 'true' : undefined}
-              className="group relative shrink-0 py-1 focus-visible:outline-none"
+              className="group relative shrink-0 py-1 focus-visible:outline-none
+                         transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
             >
               <MetaLabel
                 className={active ? 'text-text' : 'text-text-secondary'}
