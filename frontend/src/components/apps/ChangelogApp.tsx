@@ -96,7 +96,9 @@ function ReleaseEntry({
         aria-controls={panelId}
         data-testid="release-row"
         className="group w-full text-left flex flex-col gap-2 py-5
-                   focus-visible:outline-none"
+                   focus-visible:outline-none
+                   transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                   active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100"
       >
         {/* Mono spec line: NN / vX.Y.Z / DATE / CODENAME, with tags. */}
         <span className="flex flex-wrap items-center gap-x-1 gap-y-1">
@@ -128,7 +130,7 @@ function ReleaseEntry({
         {/* Summary. */}
         <span
           className={`text-sm leading-relaxed transition-colors
-                      ${expanded ? 'text-text' : 'text-text-secondary group-hover:text-text'}`}
+                      ${expanded ? 'text-text' : 'text-text-secondary [@media(hover:hover)and(pointer:fine)]:group-hover:text-text'}`}
         >
           {release.summary}
         </span>
@@ -139,7 +141,14 @@ function ReleaseEntry({
         id={panelId}
         initial={false}
         animate={{ height: expanded ? 'auto' : 0, opacity: expanded ? 1 : 0 }}
-        transition={withReduced({ duration: 0.25, ease: [0.4, 0, 0.2, 1] }, reduced)}
+        transition={withReduced(
+          {
+            height: { duration: 0.24, ease: [0.23, 1, 0.32, 1] },
+            // Fade the body in fast on open, out faster on close (asymmetric).
+            opacity: { duration: expanded ? 0.2 : 0.12, ease: [0.23, 1, 0.32, 1] },
+          },
+          reduced,
+        )}
         style={{ overflow: 'hidden' }}
       >
         <div className="pb-5">
