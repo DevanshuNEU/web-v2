@@ -32,6 +32,27 @@ import { useIsMono } from "@/hooks/usePalette";
 import { reveal } from "@/lib/motion";
 import { identity, contactLinks } from "@/data/aboutMe";
 
+// Strong ease-out for UI enter/exit (Kowalski). Never ease-in on UI; keep <300ms.
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+
+// Pressable surface shared by every tappable editorial row (link rows, submit,
+// reset, retry). Hairline-hover bg stays, plus:
+//   - tactile :active scale(0.98) settle on a 160ms ease-out (GPU transform only)
+//   - hover motion gated behind a fine pointer so touch taps don't false-fire
+//   - transform + colors animate on their own short ease-out curves
+const PRESSABLE =
+  "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] " +
+  "active:scale-[0.98] active:duration-100 motion-reduce:active:scale-100 " +
+  "hover:bg-black/[0.035] dark:hover:bg-white/[0.05] " +
+  "focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]";
+
+// Hover-only glyph nudge, gated behind a real (fine) pointer so a touch tap
+// never strands the glyph in its hover position. Collapses under reduced motion.
+const HOVER_NUDGE =
+  "transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] " +
+  "[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5 " +
+  "motion-reduce:transform-none";
+
 interface FormData {
   name: string;
   email: string;
@@ -70,25 +91,23 @@ function LinkRow({ label, value, href, external }: ReachRow) {
     <a
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className="group flex items-center gap-4 py-3 px-1 text-left
-                 hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
-                 focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+      className={`group flex items-center gap-4 py-3 px-1 text-left ${PRESSABLE}`}
     >
       <MetaLabel className="shrink-0 w-20 justify-start">{label}</MetaLabel>
       <span className="flex-1 min-w-0 font-mono text-sm text-text truncate">
         {value}
         {/* Hairline underline grows on hover (transform-only, monochrome).
-            Collapses under the global reduced-motion safety net. */}
+            Gated behind a fine pointer so a touch tap doesn't strand it open;
+            collapses under the global reduced-motion safety net. */}
         <span
           aria-hidden
           className="block h-px origin-left scale-x-0 bg-text/40 transition-transform
-                     duration-200 group-hover:scale-x-100 motion-reduce:transition-none"
+                     duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]
+                     [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-100
+                     motion-reduce:transition-none"
         />
       </span>
-      <MetaLabel
-        className="shrink-0 justify-end transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none"
-        aria-hidden
-      >
+      <MetaLabel className={`shrink-0 justify-end ${HOVER_NUDGE}`} aria-hidden>
         ↗
       </MetaLabel>
     </a>
@@ -192,10 +211,15 @@ function Field({
       <AnimatePresence>
         {error && (
           <motion.p
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className={`font-mono-meta text-[10px] normal-case tracking-normal ${errorCls}`}
+            // Transform string (not the `y` shorthand) so the slide is
+            // GPU-composited; ease-out enter, snappier exit (Kowalski).
+            initial={{ opacity: 0, transform: "translateY(-4px)" }}
+            animate={{ opacity: 1, transform: "translateY(0px)" }}
+            exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_OUT } }}
+            transition={{ duration: 0.18, ease: EASE_OUT }}
+            // Error copy is deliberately a notch smaller than the mono-meta ramp;
+            // clamp keeps it window-dynamic instead of pinned at a fixed 10px.
+            className={`font-mono-meta text-[clamp(0.6rem,1.25cqi,0.625rem)] normal-case tracking-normal ${errorCls}`}
           >
             {error}
           </motion.p>
@@ -248,16 +272,10 @@ function SuccessView({ onReset, reduced }: { onReset: () => void; reduced: boole
         <button
           type="button"
           onClick={onReset}
-          className="group flex items-center justify-between py-3 px-1 text-left
-                     hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
-                     focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+          className={`group flex items-center justify-between py-3 px-1 text-left ${PRESSABLE}`}
         >
           <MetaLabel>Send another</MetaLabel>
-          <span
-            aria-hidden
-            className="font-mono-meta text-text-secondary transition-transform
-                       group-hover:translate-x-0.5 motion-reduce:transform-none"
-          >
+          <span aria-hidden className={`font-mono-meta text-text-secondary ${HOVER_NUDGE}`}>
             →
           </span>
         </button>
@@ -340,6 +358,7 @@ export default function ContactApp(_props: ContactAppProps = {}) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: EASE_OUT }}
             >
               <SuccessView onReset={() => setStatus("idle")} reduced={reduced} />
             </motion.div>
@@ -349,7 +368,7 @@ export default function ContactApp(_props: ContactAppProps = {}) {
               variants={reveal.container(reduced)}
               initial="hidden"
               animate="show"
-              exit={{ opacity: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE_OUT } }}
               className="flex flex-col gap-10"
             >
               <IdentityMasthead reduced={reduced} />
@@ -364,8 +383,10 @@ export default function ContactApp(_props: ContactAppProps = {}) {
 
                     {status === "error" && (
                       <motion.div
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        // GPU transform string + ease-out; <300ms (Kowalski).
+                        initial={{ opacity: 0, transform: "translateY(-6px)" }}
+                        animate={{ opacity: 1, transform: "translateY(0px)" }}
+                        transition={{ duration: 0.2, ease: EASE_OUT }}
                         className="flex flex-col"
                       >
                         <Hairline />
@@ -390,7 +411,11 @@ export default function ContactApp(_props: ContactAppProps = {}) {
                           <button
                             type="button"
                             onClick={() => setStatus("idle")}
-                            className="font-mono-meta text-text-secondary hover:text-text transition-colors"
+                            className="font-mono-meta text-text-secondary
+                                       transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                                       hover:text-text active:scale-[0.97] active:duration-100
+                                       motion-reduce:active:scale-100
+                                       focus-visible:outline-none focus-visible:text-text"
                           >
                             Retry
                           </button>
@@ -469,20 +494,27 @@ export default function ContactApp(_props: ContactAppProps = {}) {
                           type="submit"
                           disabled={submitting}
                           aria-busy={submitting}
-                          className="group flex items-center justify-between py-3 px-1 text-left
+                          className={`group flex items-center justify-between py-3 px-1 text-left
                                      disabled:cursor-not-allowed disabled:opacity-60
-                                     hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
-                                     focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+                                     disabled:active:scale-100 ${PRESSABLE}`}
                         >
-                          <MetaLabel>
+                          {/* Label crossfade is masked with a touch of blur so the
+                              two words blend into one state change instead of a
+                              hard text swap (Kowalski's blur-mask trick). */}
+                          <MetaLabel
+                            className={`transition-[filter,opacity] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                                        ${submitting ? "motion-safe:blur-[1px] opacity-80" : "blur-0 opacity-100"}`}
+                          >
                             {submitting ? "Sending" : "Send message"}
                           </MetaLabel>
                           <span
                             aria-hidden
-                            className={`font-mono-meta text-text-secondary transition-transform
+                            className={`font-mono-meta text-text-secondary
                                         ${submitting
                                           ? "motion-safe:animate-spin"
-                                          : "group-hover:translate-x-0.5 motion-reduce:transform-none"}`}
+                                          : `transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                                             [@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5
+                                             motion-reduce:transform-none`}`}
                           >
                             {submitting ? "◴" : "→"}
                           </span>
