@@ -36,6 +36,29 @@ export async function GET() {
   const errMsg = (err: unknown): string =>
     err instanceof Error ? err.message : String(err);
 
+  try {
+    return await buildActivity(warnings, errMsg);
+  } catch (err) {
+    // Never fail-stop the whole surface: degrade to a clean empty payload so the
+    // app shows its composed empty states instead of an error screen.
+    const payload: ActivityPayload = {
+      username: USER,
+      events: [],
+      calendar: null,
+      activeRepos: [],
+      fetchedAt: new Date().toISOString(),
+      warnings: [...warnings, `activity: ${errMsg(err)}`],
+    };
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' },
+    });
+  }
+}
+
+async function buildActivity(
+  warnings: string[],
+  errMsg: (err: unknown) => string
+): Promise<NextResponse> {
   const [events, calendar, personalRepos, orgRepos] = await Promise.all([
     getUserEvents(USER).catch((err: unknown) => {
       warnings.push(`events: ${errMsg(err)}`);
