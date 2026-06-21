@@ -1,264 +1,257 @@
 'use client';
 
 /**
- * ChangelogApp — devOS Version History
+ * ChangelogApp - devOS version history as a numbered editorial release index.
  *
- * Animated changelog with version badges, dates, and personality.
- * Every release tells a story.
+ * Releases render as a hairline-ruled, newest-first timeline: each entry pairs
+ * a mono metadata line ("v2.2.0 / May 2026 / POCKET") with a serif codename
+ * title and a one-line summary. Clicking a release toggles its change list,
+ * which renders as hairline-divided rows tagged with a small uppercase mono
+ * type label (FEATURE / FIX / PERF / REFACTOR / RELEASE) instead of colored
+ * icon chips. The latest release carries a restrained mono "LATEST" tag, not a
+ * pulsing colored dot.
+ *
+ * Motion: the release list reveals once on mount via a staggered container
+ * (never on scroll - this app lives in a windowed inner scroll container where
+ * scroll-triggered reveals do not fire reliably). The expand/collapse of a
+ * change list is a local height animation, collapsed to instant under reduced
+ * motion. Desktop and mobile share the same data and the same editorial shape.
+ *
+ * Strictly monochrome: three tones only (text / text-secondary / bg+border).
+ * No glass, no accent, no gradient, no colored type labels.
  */
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles, Wrench, Zap, Bug, Package } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useAnalyticsStore } from '@/store/analyticsStore';
+import { Hairline, MetaLabel } from '@/components/editorial';
+import { reveal, withReduced } from '@/lib/motion';
+import {
+  RELEASES,
+  CHANGE_TYPE_LABEL,
+  type Release,
+} from '@/data/changelog';
 
 // ---------------------------------------------------------------------------
-// Data
+// Change row - hairline-divided line with a fixed-width uppercase mono type
+// label and the change text. No icon, no color.
 // ---------------------------------------------------------------------------
 
-type ChangeType = 'feature' | 'fix' | 'perf' | 'refactor' | 'release';
-
-interface ChangeEntry {
-  type: ChangeType;
+function ChangeRow({
+  type,
+  text,
+  first,
+}: {
+  type: Release['changes'][number]['type'];
   text: string;
+  first: boolean;
+}) {
+  return (
+    <>
+      {!first && <Hairline />}
+      <div className="flex items-baseline gap-4 py-2.5">
+        <MetaLabel className="shrink-0 w-20 justify-start opacity-70">
+          {CHANGE_TYPE_LABEL[type]}
+        </MetaLabel>
+        <span className="flex-1 min-w-0 text-sm text-text-secondary leading-relaxed">
+          {text}
+        </span>
+      </div>
+    </>
+  );
 }
 
-interface Release {
-  version: string;
-  date: string;
-  codename: string;
-  summary: string;
-  changes: ChangeEntry[];
-  highlight?: boolean;
-}
-
-const RELEASES: Release[] = [
-  {
-    version: '2.2.0',
-    date: 'May 2026',
-    codename: 'Pocket',
-    summary: 'Sprint 4. devOS gets a phone. Full iOS-style mobile shell with native-feeling apps, gestures, and live GitHub data.',
-    highlight: true,
-    changes: [
-      { type: 'feature', text: 'PhoneShell + LockScreen — iOS-style mobile shell with paged home screen, dock, and swipe-up unlock' },
-      { type: 'feature', text: 'Mobile primitives: MobileBottomSheet, MobilePushView (with iOS edge-swipe-back), MobileListRow, MobileSection, MobileSegmented' },
-      { type: 'feature', text: 'Native mobile variants for Projects, Resume, Contact, File Explorer, Terminal, and Games' },
-      { type: 'feature', text: 'GitHub Activity app — live contribution heatmap, recent events, and active repos backed by /api/github/activity' },
-      { type: 'feature', text: 'Visible "Done" button in open apps + system-back gesture closes the app instead of leaving the page' },
-      { type: 'feature', text: 'Fluid type tokens (clamp-based) so heroes scale smoothly from 360px Android to desktop' },
-      { type: 'feature', text: 'File Explorer star counts now stream live from /api/github/repos — no more stale snapshots' },
-      { type: 'refactor', text: 'ErrorBoundary wraps each mobile app host so a single crash doesn\'t blank the shell' },
-    ],
-  },
-  {
-    version: '2.1.0',
-    date: 'Mar 2026',
-    codename: 'Constellation',
-    summary: 'Sprint 3 lands. New apps, skill tree, file explorer, and a changelog you\'re reading right now.',
-    highlight: true,
-    changes: [
-      { type: 'feature', text: 'RPG Skill Tree with SVG node graph, animated connections, and level indicators' },
-      { type: 'feature', text: 'File Explorer with macOS Finder layout, project detail panels, and category filtering' },
-      { type: 'feature', text: 'Resume app with section navigation, timeline experience view, and download link' },
-      { type: 'feature', text: 'Changelog app. Meta. You\'re reading v2.1.0 in v2.1.0.' },
-      { type: 'refactor', text: 'All Zustand store subscriptions migrated to granular selectors for React 19 compatibility' },
-      { type: 'fix', text: 'AnalyticsApp infinite render loop resolved with polling pattern via getState()' },
-      { type: 'perf', text: 'WindowManager defers analytics tracking out of React commit phase via setTimeout' },
-    ],
-  },
-  {
-    version: '2.0.0',
-    date: 'Feb 2026',
-    codename: 'Horizon',
-    summary: 'Complete rebuild from v1. New architecture, new design system, new everything.',
-    highlight: true,
-    changes: [
-      { type: 'release', text: 'devOS v2: full ground-up rebuild in Next.js 15 with React 19 and App Router' },
-      { type: 'feature', text: 'Desktop OS simulator with draggable, resizable windows and Cmd+W shortcuts' },
-      { type: 'feature', text: 'macOS-style dock with spring physics magnification effect' },
-      { type: 'feature', text: 'Boot sequence animation with terminal-style log lines' },
-      { type: 'feature', text: 'PostHog analytics with transparent live dashboard in Analytics.app' },
-      { type: 'feature', text: 'Snake game with responsive canvas and high score persistence' },
-      { type: 'feature', text: 'Desktop wallpapers with picker, including the posthog-clean default' },
-      { type: 'feature', text: 'Notification center with idle-triggered welcome toast' },
-      { type: 'feature', text: 'Dark/light mode with system preference detection and animated transitions' },
-      { type: 'feature', text: 'Contact form with Resend email delivery and real validation' },
-    ],
-  },
-  {
-    version: '1.3.2',
-    date: 'Nov 2025',
-    codename: 'Patchwork',
-    summary: 'Mostly fixes. The kind of release you do at 11pm on a Tuesday.',
-    changes: [
-      { type: 'fix', text: 'Resume section scroll position no longer resets when switching tabs' },
-      { type: 'fix', text: 'Project cards now show correct tech stacks (the Java one was lying)' },
-      { type: 'perf', text: 'Reduced bundle size by 18KB by tree-shaking unused Lucide icons' },
-      { type: 'fix', text: 'Mobile viewport no longer overflows on Safari 17' },
-    ],
-  },
-  {
-    version: '1.3.0',
-    date: 'Oct 2025',
-    codename: 'Velocity',
-    summary: 'Performance pass. The site got fast. Like, actually fast.',
-    changes: [
-      { type: 'perf', text: 'Migrated to Next.js 15 with React Server Components for static sections' },
-      { type: 'perf', text: 'Added route-level code splitting. First meaningful paint dropped by 40%' },
-      { type: 'feature', text: 'Added dynamic OG image generation for social sharing' },
-      { type: 'feature', text: 'Structured data (JSON-LD) for SEO and Google rich results' },
-    ],
-  },
-  {
-    version: '1.2.0',
-    date: 'Aug 2025',
-    codename: 'Reflection',
-    summary: 'About Me got a proper redesign. Less wall of text, more human.',
-    changes: [
-      { type: 'feature', text: 'About Me redesigned with sidebar navigation and section-based layout' },
-      { type: 'feature', text: 'What Excites Me section: actual opinions, not buzzwords' },
-      { type: 'feature', text: 'Currently section with real-time status from Notion' },
-      { type: 'refactor', text: 'Projects section rebuilt with filterable grid and modal details' },
-    ],
-  },
-  {
-    version: '1.0.0',
-    date: 'Jun 2025',
-    codename: 'Launch',
-    summary: 'It\'s alive. First public release. Definitely no bugs.',
-    changes: [
-      { type: 'release', text: 'Initial public release of devanshuchicholikar.com' },
-      { type: 'feature', text: 'Static portfolio with About, Projects, Skills, and Contact sections' },
-      { type: 'feature', text: 'Responsive layout with Tailwind CSS' },
-      { type: 'feature', text: 'GitHub Actions CI/CD pipeline to Vercel' },
-    ],
-  },
-];
-
 // ---------------------------------------------------------------------------
-// Helpers
+// Release entry - the numbered editorial index row + collapsible change list.
+//
+// The header is a single full-width button: a mono spec line (version / date /
+// CODENAME) with an optional "LATEST" tag, a serif codename title, and the
+// summary. Below it, the change list expands/collapses with a height tween
+// (instant under reduced motion). A trailing hairline rules between releases.
 // ---------------------------------------------------------------------------
 
-const TYPE_CONFIG: Record<ChangeType, { icon: React.ElementType; label: string; color: string }> = {
-  feature:  { icon: Sparkles, label: 'New',      color: '#6366f1' },
-  fix:      { icon: Bug,      label: 'Fix',      color: '#f59e0b' },
-  perf:     { icon: Zap,      label: 'Perf',     color: '#10b981' },
-  refactor: { icon: Wrench,   label: 'Refactor', color: '#06b6d4' },
-  release:  { icon: Package,  label: 'Release',  color: '#ec4899' },
-};
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
-export default function ChangelogApp() {
-  const [expanded, setExpanded] = useState<string>(RELEASES[0].version);
+function ReleaseEntry({
+  release,
+  number,
+  isLatest,
+  expanded,
+  onToggle,
+  reduced,
+}: {
+  release: Release;
+  number: string;
+  isLatest: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  reduced: boolean | null;
+}) {
+  const panelId = `changelog-changes-${release.version}`;
 
   return (
-    <div className="h-full flex flex-col bg-surface/20 overflow-hidden">
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        data-testid="release-row"
+        className="group w-full text-left flex flex-col gap-2 py-5
+                   focus-visible:outline-none"
+      >
+        {/* Mono spec line: NN / vX.Y.Z / DATE / CODENAME, with tags. */}
+        <span className="flex flex-wrap items-center gap-x-1 gap-y-1">
+          <MetaLabel className="opacity-50">{number}</MetaLabel>
+          <span aria-hidden className="font-mono-meta opacity-50">&middot;</span>
+          <MetaLabel>v{release.version}</MetaLabel>
+          <span aria-hidden className="font-mono-meta opacity-50">&middot;</span>
+          <MetaLabel className="opacity-70">{release.date}</MetaLabel>
+          <span aria-hidden className="font-mono-meta opacity-50">&middot;</span>
+          <MetaLabel className="opacity-70">{release.codename}</MetaLabel>
 
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 py-5 glass-subtle border-b border-white/10">
-        <h1 className="font-display text-xl text-text">Changelog</h1>
-        <p className="text-text-secondary text-xs mt-0.5">
-          {RELEASES.length} releases · devOS is always shipping
-        </p>
-      </div>
+          {isLatest && (
+            <MetaLabel className="ml-1 border border-border px-1.5 py-0.5">
+              Latest
+            </MetaLabel>
+          )}
+          {release.highlight && !isLatest && (
+            <MetaLabel className="ml-1 border border-border px-1.5 py-0.5 opacity-70">
+              Major
+            </MetaLabel>
+          )}
+        </span>
 
-      {/* Timeline */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-0">
-          {RELEASES.map((release, idx) => {
-            const isExpanded = expanded === release.version;
-            const isLatest = idx === 0;
+        {/* Serif codename title. */}
+        <span className="editorial-head text-text text-[clamp(1.5rem,5cqi,2.25rem)] leading-tight">
+          {release.codename}
+        </span>
 
-            return (
-              <div key={release.version} className="relative flex gap-4">
-                {/* Timeline line + dot */}
-                <div className="flex flex-col items-center flex-shrink-0">
-                  <motion.div
-                    className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0 z-10"
-                    style={{
-                      background: isLatest ? 'var(--color-accent)' : isExpanded ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
-                      boxShadow: isLatest ? '0 0 10px var(--color-accent)' : 'none',
-                    }}
-                    animate={isLatest ? { scale: [1, 1.3, 1] } : {}}
-                    transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                  />
-                  {idx < RELEASES.length - 1 && (
-                    <div className="w-px flex-1 bg-white/10 mt-2 mb-0 min-h-[40px]" />
-                  )}
-                </div>
+        {/* Summary. */}
+        <span
+          className={`text-sm leading-relaxed transition-colors
+                      ${expanded ? 'text-text' : 'text-text-secondary group-hover:text-text'}`}
+        >
+          {release.summary}
+        </span>
+      </button>
 
-                {/* Content */}
-                <div className="flex-1 pb-8">
-                  {/* Version header */}
-                  <button
-                    onClick={() => setExpanded(isExpanded ? '' : release.version)}
-                    className="w-full text-left group"
-                  >
-                    <div className="flex items-center gap-3 mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold font-mono text-sm ${isLatest ? 'text-accent' : 'text-text'}`}>
-                          v{release.version}
-                        </span>
-                        {isLatest && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent text-xs font-medium">
-                            Latest
-                          </span>
-                        )}
-                        {release.highlight && !isLatest && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-white/10 text-text-secondary text-xs">
-                            Major
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-text-secondary text-xs italic">"{release.codename}"</span>
-                      <span className="text-text-secondary text-xs ml-auto">{release.date}</span>
-                    </div>
-                    <p className={`text-sm leading-relaxed transition-colors ${
-                      isExpanded ? 'text-text' : 'text-text-secondary group-hover:text-text'
-                    }`}>
-                      {release.summary}
-                    </p>
-                  </button>
-
-                  {/* Expandable change list */}
-                  <motion.div
-                    initial={false}
-                    animate={{ height: isExpanded ? 'auto' : 0, opacity: isExpanded ? 1 : 0 }}
-                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="mt-3 space-y-1.5">
-                      {release.changes.map((change, i) => {
-                        const cfg = TYPE_CONFIG[change.type];
-                        const Icon = cfg.icon;
-                        return (
-                          <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -8 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.03 }}
-                            className="flex items-start gap-2.5 py-1.5 px-3 rounded-lg bg-white/4 hover:bg-white/6 transition-colors"
-                          >
-                            <span
-                              className="flex items-center gap-1 text-xs font-medium flex-shrink-0 mt-0.5 px-1.5 py-0.5 rounded"
-                              style={{ background: `${cfg.color}15`, color: cfg.color }}
-                            >
-                              <Icon size={10} />
-                              {cfg.label}
-                            </span>
-                            <span className="text-xs text-text-secondary leading-relaxed">{change.text}</span>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Collapsible change list - height tween, instant under reduced motion. */}
+      <motion.div
+        id={panelId}
+        initial={false}
+        animate={{ height: expanded ? 'auto' : 0, opacity: expanded ? 1 : 0 }}
+        transition={withReduced({ duration: 0.25, ease: [0.4, 0, 0.2, 1] }, reduced)}
+        style={{ overflow: 'hidden' }}
+      >
+        <div className="pb-5">
+          {release.changes.map((change, i) => (
+            <ChangeRow
+              key={i}
+              type={change.type}
+              text={change.text}
+              first={i === 0}
+            />
+          ))}
         </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main app
+// ---------------------------------------------------------------------------
+
+interface ChangelogAppProps {
+  variant?: 'desktop' | 'mobile';
+}
+
+export default function ChangelogApp({ variant = 'desktop' }: ChangelogAppProps) {
+  const trackEvent = useAnalyticsStore((state) => state.trackEvent);
+  const reduced = useReducedMotion();
+  // Latest release expanded by default.
+  const [expanded, setExpanded] = useState<string>(RELEASES[0].version);
+
+  const handleToggle = (version: string) => {
+    const next = expanded === version ? '' : version;
+    setExpanded(next);
+    if (next) {
+      trackEvent('section_view', `Changelog: v${version}`, { version });
+    }
+  };
+
+  const header = (
+    <motion.div
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-2"
+    >
+      <motion.div variants={reveal.item(reduced)}>
+        <MetaLabel as="p">Changelog</MetaLabel>
+      </motion.div>
+      <motion.h1
+        variants={reveal.item(reduced)}
+        className="editorial-head text-text"
+      >
+        Release History
+      </motion.h1>
+      <motion.div variants={reveal.item(reduced)}>
+        <MetaLabel as="p" className="opacity-70">
+          {RELEASES.length} releases &middot; always shipping
+        </MetaLabel>
+      </motion.div>
+    </motion.div>
+  );
+
+  // Numbered release index. Reveals once on mount with a stagger (never on
+  // scroll); shared verbatim by the desktop and mobile layouts below.
+  const index = (
+    <motion.div
+      className="flex flex-col"
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+    >
+      <Hairline />
+      {RELEASES.map((release, idx) => {
+        const isLatest = idx === 0;
+        const number = String(idx + 1).padStart(2, '0');
+        return (
+          <motion.div key={release.version} variants={reveal.item(reduced)}>
+            <ReleaseEntry
+              release={release}
+              number={number}
+              isLatest={isLatest}
+              expanded={expanded === release.version}
+              onToggle={() => handleToggle(release.version)}
+              reduced={reduced}
+            />
+            <Hairline />
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+
+  if (variant === 'mobile') {
+    return (
+      <div className="h-full overflow-y-auto bg-bg">
+        <div
+          className="flex flex-col gap-8 pb-12 pt-8"
+          style={{ paddingLeft: 'var(--sp-hero-pad)', paddingRight: 'var(--sp-hero-pad)' }}
+        >
+          {header}
+          {index}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-bg">
+      <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-12">
+        {header}
+        {index}
       </div>
     </div>
   );
