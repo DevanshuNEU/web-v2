@@ -519,6 +519,15 @@ body {
 .app-content .editorial-hero { font-size: clamp(2.25rem, 14cqi, 8rem); }
 .app-content .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
 
+/* Body, small text, and mono metadata scale off the WINDOW too, so a small
+   window reads proportionally tighter while a maximized one matches the
+   original size (upper clamp = the Tailwind/token value). Gentle ranges so
+   nothing breaks across the OS; this is what makes every app feel dynamic to
+   its window rather than fixed. */
+.app-content .text-base      { font-size: clamp(0.85rem, 1.9cqi, 1rem); }
+.app-content .text-sm        { font-size: clamp(0.78rem, 1.65cqi, 0.875rem); }
+.app-content .font-mono-meta { font-size: clamp(0.62rem, 1.45cqi, 0.75rem); }
+
 /* ============================================
    MAGNETIC FLAT BUTTONS
    useMagneticField() writes --mag-x / --mag-y on hovered [data-magnetic="button"]
