@@ -1,13 +1,36 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
-import {
-  Mail, User, MessageSquare, Send, CheckCircle,
-  Building, Loader2, Github, Linkedin, MapPin,
-} from 'lucide-react';
-import { useIsMono } from '@/hooks/usePalette';
+/**
+ * ContactApp - "Ping Me" in the Instrument editorial register.
+ *
+ * A single vertically-scrolled editorial document: an identity masthead
+ * (serif name + mono spec metadata + availability chip + hairline-divided
+ * reach-me link rows) sits above a contact form. The form keeps every piece
+ * of behaviour from the original - the five fields, per-field validation, the
+ * real POST to /api/contact, and the submitting / success / error states -
+ * but the chrome is rebuilt in the house language: hairline-underline inputs,
+ * mono uppercase MetaLabel field labels, and a restrained monochrome submit
+ * (text + glyph + hairline), never a filled accent block.
+ *
+ * Desktop and mobile share this one layout; the only difference is horizontal
+ * padding. The same registry component renders both (mobile passes
+ * variant="mobile").
+ *
+ * Animations: content reveals ONCE on mount via a staggered container, never
+ * on scroll - a windowed inner scroll container makes in-view triggers
+ * unreliable, so nothing here depends on an IntersectionObserver. Everything
+ * collapses to instant under reduced motion via the shared `reveal` variants.
+ *
+ * Persona: identity leaks from specifics (the work + location), never from
+ * student / graduation / degree / visa framing.
+ */
+
+import React, { useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Hairline, MetaLabel, EditorialSection } from "@/components/editorial";
+import { useIsMono } from "@/hooks/usePalette";
+import { reveal } from "@/lib/motion";
+import { identity, contactLinks } from "@/data/aboutMe";
 
 interface FormData {
   name: string;
@@ -17,316 +40,459 @@ interface FormData {
   message: string;
 }
 
-type Status = 'idle' | 'submitting' | 'success' | 'error';
+type Status = "idle" | "submitting" | "success" | "error";
 
-/* ------------------------------------------------------------------ */
-/*  Inline macOS-style input                                           */
-/* ------------------------------------------------------------------ */
+interface ContactAppProps {
+  variant?: "desktop" | "mobile";
+}
+
+// ---------------------------------------------------------------------------
+// Masthead spec-line + reach-me rows. Mono metadata, hairline-divided links.
+// ---------------------------------------------------------------------------
+
+const SPEC_LINE = [identity.title, identity.location] as const;
+
+interface ReachRow {
+  label: string;
+  value: string;
+  href: string;
+  external?: boolean;
+}
+
+const REACH_ROWS: ReachRow[] = [
+  { label: "Email", value: contactLinks.email, href: `mailto:${contactLinks.email}` },
+  { label: "LinkedIn", value: contactLinks.linkedin, href: contactLinks.linkedin, external: true },
+  { label: "GitHub", value: contactLinks.github, href: contactLinks.github, external: true },
+];
+
+function LinkRow({ label, value, href, external }: ReachRow) {
+  return (
+    <a
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      className="group flex items-center gap-4 py-3 px-1 text-left
+                 hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
+                 focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+    >
+      <MetaLabel className="shrink-0 w-20 justify-start">{label}</MetaLabel>
+      <span className="flex-1 min-w-0 font-mono text-sm text-text truncate">
+        {value}
+        {/* Hairline underline grows on hover (transform-only, monochrome).
+            Collapses under the global reduced-motion safety net. */}
+        <span
+          aria-hidden
+          className="block h-px origin-left scale-x-0 bg-text/40 transition-transform
+                     duration-200 group-hover:scale-x-100 motion-reduce:transition-none"
+        />
+      </span>
+      <MetaLabel
+        className="shrink-0 justify-end transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none"
+        aria-hidden
+      >
+        ↗
+      </MetaLabel>
+    </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Identity masthead - serif name, mono spec-line, editorial availability chip,
+// hairline-divided reach-me rows.
+// ---------------------------------------------------------------------------
+
+function IdentityMasthead({ reduced }: { reduced: boolean | null }) {
+  const mono = useIsMono();
+
+  return (
+    <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <h1 className="editorial-head font-display text-text leading-tight">
+          {identity.name}
+        </h1>
+
+        {/* Mono spec-line: MetaLabel cells separated by middots. */}
+        <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
+          {SPEC_LINE.map((cell, i) => (
+            <React.Fragment key={cell}>
+              {i > 0 && (
+                <span aria-hidden className="font-mono-meta opacity-50">
+                  &middot;
+                </span>
+              )}
+              <MetaLabel>{cell}</MetaLabel>
+            </React.Fragment>
+          ))}
+        </p>
+      </div>
+
+      {/* Availability - editorial chip: hairline border, filled square, no
+          pulse. In Fun the square + label may carry hue; in mono it is tone
+          and weight only. */}
+      <span
+        className={`inline-flex w-fit items-center gap-2 border px-2.5 py-1
+                    ${mono ? "border-border" : "border-green-500/30"}`}
+      >
+        <span aria-hidden className={`h-2 w-2 ${mono ? "bg-text" : "bg-green-500"}`} />
+        <MetaLabel className={mono ? undefined : "text-green-600 dark:text-green-400"}>
+          Open to opportunities
+        </MetaLabel>
+      </span>
+
+      {/* Reach-me rows - hairline-divided link list, About-Me register. */}
+      <div className="flex flex-col mt-1">
+        <Hairline />
+        {REACH_ROWS.map((row) => (
+          <React.Fragment key={row.label}>
+            <LinkRow {...row} />
+            <Hairline />
+          </React.Fragment>
+        ))}
+      </div>
+    </motion.header>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Editorial field - mono uppercase MetaLabel, hairline-underline input,
+// mono-toned error copy (no colored chips).
+// ---------------------------------------------------------------------------
 
 function Field({
-  id, label, required, error, children,
+  id,
+  label,
+  required,
+  error,
+  children,
 }: {
-  id: string; label: string; required?: boolean; error?: string; children: React.ReactNode;
+  id: string;
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
 }) {
   const mono = useIsMono();
-  // In mono the asterisk + error copy carry the meaning, not hue. Keep them
-  // legible with foreground tone + weight; in Fun keep the original red.
-  const markerCls = mono ? 'text-text font-semibold' : 'text-red-400';
-  const errorCls = mono ? 'text-text font-medium' : 'text-red-400';
+  // In mono the asterisk + error copy carry meaning via tone + weight, not
+  // hue; in Fun the original red returns.
+  const markerCls = mono ? "text-text" : "text-red-400";
+  const errorCls = mono ? "text-text font-medium" : "text-red-400";
+
   return (
-    <div className="space-y-1">
-      <label htmlFor={id} className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
-        {label}{required && <span className={`${markerCls} ml-0.5`}>*</span>}
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="block">
+        <MetaLabel>
+          {label}
+          {required && (
+            <span aria-hidden className={`${markerCls} ml-0.5`}>
+              *
+            </span>
+          )}
+        </MetaLabel>
       </label>
       {children}
       <AnimatePresence>
         {error && (
           <motion.p
-            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className={`text-[11px] ${errorCls}`}
-          >{error}</motion.p>
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={`font-mono-meta text-[10px] normal-case tracking-normal ${errorCls}`}
+          >
+            {error}
+          </motion.p>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-const inputCls = (hasError?: boolean, mono?: boolean) =>
-  `w-full px-3 py-2 rounded-lg text-sm text-text
-   bg-black/[0.04] dark:bg-white/[0.06]
-   border transition-all duration-150 outline-none
+// Hairline-underline input. No filled box, no ring; the bottom border thickens
+// to graphite on focus and on error. Strictly monochrome in mono.
+const inputCls = (hasError?: boolean) =>
+  `w-full bg-transparent px-0 py-2 text-sm text-text outline-none
    placeholder:text-text-secondary/40
-   focus:ring-2 focus:ring-accent/30 focus:border-accent/50
+   border-0 border-b transition-colors duration-150
    ${hasError
-     ? (mono ? 'border-text/50' : 'border-red-400/60')
-     : 'border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20'}`;
+     ? "border-text/60"
+     : "border-border focus:border-text/70 hover:border-text/40"}`;
 
-/* ------------------------------------------------------------------ */
-/*  Success state                                                      */
-/* ------------------------------------------------------------------ */
+// ---------------------------------------------------------------------------
+// Success state - mono glyph + serif line + restrained reset, no color, no
+// scale-pop card.
+// ---------------------------------------------------------------------------
 
-function SuccessView({ onReset }: { onReset: () => void }) {
-  const mono = useIsMono();
+function SuccessView({ onReset, reduced }: { onReset: () => void; reduced: boolean | null }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex-1 flex flex-col items-center justify-center gap-5 p-8"
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col items-start gap-5"
     >
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', damping: 14, stiffness: 200, delay: 0.1 }}
-        className={`w-16 h-16 rounded-full border flex items-center justify-center ${
-          mono ? 'bg-white/[0.06] border-text/20' : 'bg-green-500/10 border-green-500/20'
-        }`}
-      >
-        <CheckCircle className={`w-8 h-8 ${mono ? 'text-text' : 'text-green-500'}`} />
+      <motion.div variants={reveal.item(reduced)} className="flex items-center gap-3">
+        <span aria-hidden className="font-mono-meta text-text text-base leading-none">
+          ✓
+        </span>
+        <MetaLabel>Message sent</MetaLabel>
       </motion.div>
-      <div className="text-center">
-        <h3 className="text-lg font-bold text-text mb-1">Message sent!</h3>
-        <p className="text-sm text-text-secondary max-w-xs">
-          {"I'll get back to you faster than a hot reload. Promise."}
-        </p>
-      </div>
-      <button
-        onClick={onReset}
-        className="px-4 py-1.5 rounded-lg text-sm text-text-secondary border border-black/10 dark:border-white/10 hover:border-accent/40 hover:text-accent transition-colors"
-      >
-        Send another
-      </button>
+
+      <motion.h2 variants={reveal.item(reduced)} className="editorial-head font-display text-text leading-tight">
+        Thanks for reaching out.
+      </motion.h2>
+
+      <motion.p variants={reveal.item(reduced)} className="text-sm text-text-secondary max-w-[48ch] leading-relaxed">
+        {"I read every message and reply faster than a hot reload. Promise."}
+      </motion.p>
+
+      <motion.div variants={reveal.item(reduced)} className="flex flex-col w-full max-w-xs">
+        <Hairline />
+        <button
+          type="button"
+          onClick={onReset}
+          className="group flex items-center justify-between py-3 px-1 text-left
+                     hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
+                     focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+        >
+          <MetaLabel>Send another</MetaLabel>
+          <span
+            aria-hidden
+            className="font-mono-meta text-text-secondary transition-transform
+                       group-hover:translate-x-0.5 motion-reduce:transform-none"
+          >
+            →
+          </span>
+        </button>
+        <Hairline />
+      </motion.div>
     </motion.div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Main                                                               */
-/* ------------------------------------------------------------------ */
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
-export default function ContactApp() {
+// The `variant` prop is accepted for registry compatibility (mobile passes
+// variant="mobile"); desktop and mobile share this one editorial layout, so it
+// is intentionally not branched on.
+export default function ContactApp(_props: ContactAppProps = {}) {
+  void _props;
+  const reduced = useReducedMotion();
   const mono = useIsMono();
   const [formData, setFormData] = useState<FormData>({
-    name: '', email: '', company: '', subject: '', message: '',
+    name: "", email: "", company: "", subject: "", message: "",
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
-  const [status, setStatus] = useState<Status>('idle');
+  const [status, setStatus] = useState<Status>("idle");
 
   const validate = (key: keyof FormData, value: string): string | null => {
     switch (key) {
-      case 'name':    return value.length < 2 ? 'At least 2 characters' : null;
-      case 'email':   return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? 'Enter a valid email' : null;
-      case 'subject': return value.length < 5 ? 'At least 5 characters' : null;
-      case 'message': return value.length < 20 ? 'At least 20 characters' : null;
+      case "name":    return value.length < 2 ? "At least 2 characters" : null;
+      case "email":   return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? "Enter a valid email" : null;
+      case "subject": return value.length < 5 ? "At least 5 characters" : null;
+      case "message": return value.length < 20 ? "At least 20 characters" : null;
       default:        return null;
     }
   };
 
   const handleChange = (key: keyof FormData, value: string) => {
-    setFormData(p => ({ ...p, [key]: value }));
-    if (errors[key]) setErrors(p => ({ ...p, [key]: undefined }));
+    setFormData((p) => ({ ...p, [key]: value }));
+    if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Partial<FormData> = {};
-    (['name', 'email', 'subject', 'message'] as const).forEach(f => {
-      if (!formData[f].trim()) newErrors[f] = 'Required';
-      else { const err = validate(f, formData[f]); if (err) newErrors[f] = err; }
+    (["name", "email", "subject", "message"] as const).forEach((f) => {
+      if (!formData[f].trim()) newErrors[f] = "Required";
+      else {
+        const err = validate(f, formData[f]);
+        if (err) newErrors[f] = err;
+      }
     });
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
-    setStatus('submitting');
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setStatus("submitting");
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
       if (!res.ok) throw new Error();
-      setStatus('success');
-      setFormData({ name: '', email: '', company: '', subject: '', message: '' });
+      setStatus("success");
+      setFormData({ name: "", email: "", company: "", subject: "", message: "" });
     } catch {
-      setStatus('error');
+      setStatus("error");
     }
   };
 
+  const submitting = status === "submitting";
+
   return (
-    <div className="h-full flex overflow-hidden">
-
-      {/* ── Left sidebar: personal card ── */}
-      <div className="w-52 flex-shrink-0 app-sidebar flex flex-col">
-
-        {/* Identity */}
-        <div className="p-5 flex flex-col items-center gap-3 border-b border-black/6 dark:border-white/6">
-          <div className="w-[88px] h-[88px] rounded-full overflow-hidden ring-2 ring-accent/20 shadow-md flex-shrink-0">
-            <Image
-              src="/devanshu-photo.png"
-              alt="Devanshu"
-              width={88} height={88}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-text leading-tight">Devanshu</p>
-            <p className="text-[11px] text-text-secondary mt-0.5">Software Engineer</p>
-          </div>
-          {/* Availability — in mono the pulsing dot + label carry the "available" state, not hue */}
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-            mono
-              ? 'bg-white/[0.06] text-text border-text/15'
-              : 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 ${mono ? 'bg-text' : 'bg-green-500'}`} />
-            Open to opportunities
-          </div>
-        </div>
-
-        {/* Links */}
-        <div className="flex-1 p-3 overflow-auto">
-          <p className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest px-2 mb-2 mt-0.5">
-            Reach me
-          </p>
-          {[
-            { href: 'mailto:chicholikar.d@northeastern.edu', icon: Mail,     label: 'chicholikar.d' },
-            { href: 'https://github.com/DevanshuNEU',        icon: Github,   label: 'DevanshuNEU' },
-            { href: 'https://linkedin.com/in/devanshuchicholikar', icon: Linkedin, label: 'LinkedIn' },
-            { href: '#',                                      icon: MapPin,   label: 'Boston, MA' },
-          ].map(({ href, icon: Icon, label }) => (
-            <a
-              key={label}
-              href={href}
-              target={href.startsWith('http') ? '_blank' : undefined}
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-2 py-2 rounded-lg text-[12px] text-text-secondary hover:text-text hover:bg-black/5 dark:hover:bg-white/5 transition-colors mb-0.5"
-            >
-              <Icon size={12} className="text-accent flex-shrink-0" />
-              <span className="truncate">{label}</span>
-            </a>
-          ))}
-        </div>
-
-        {/* Bottom quote */}
-        <div className="p-4 text-[11px] text-text-secondary/50 italic text-center border-t border-black/6 dark:border-white/6 leading-relaxed">
-          &ldquo;My inbox is warmer than Boston winters.&rdquo;
-        </div>
-      </div>
-
-      {/* ── Right: form ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-full overflow-y-auto bg-bg">
+      <div className="mx-auto max-w-2xl px-6 py-8 sm:px-10 sm:py-10 flex flex-col gap-10">
         <AnimatePresence mode="wait">
-          {status === 'success' ? (
-            <SuccessView key="success" onReset={() => setStatus('idle')} />
-          ) : (
+          {status === "success" ? (
             <motion.div
-              key="form"
+              key="success"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 overflow-auto p-5"
             >
-              {/* Header */}
-              <div className="mb-5">
-                <h1 className="font-display text-xl text-text mb-1">Drop me a line</h1>
-                <p className="text-sm text-text-secondary">
-                  Have a role? A project? Just want to say hi? Send it over.
-                </p>
-              </div>
+              <SuccessView onReset={() => setStatus("idle")} reduced={reduced} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="document"
+              variants={reveal.container(reduced)}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0 }}
+              className="flex flex-col gap-10"
+            >
+              <IdentityMasthead reduced={reduced} />
 
-              {status === 'error' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  className={`mb-4 p-3 rounded-lg text-sm flex items-center justify-between ${
-                    mono
-                      ? 'bg-white/[0.06] border border-text/20 text-text font-medium'
-                      : 'bg-red-500/8 border border-red-500/20 text-red-500'
-                  }`}
-                >
-                  <span>Something broke on my end.{' '}</span>
-                  <button className="text-xs underline ml-2 flex-shrink-0" onClick={() => setStatus('idle')}>
-                    Try again
-                  </button>
-                </motion.div>
-              )}
+              <motion.div variants={reveal.item(reduced)}>
+                <EditorialSection number="01" eyebrow="Get in touch" title="Drop me a line">
+                  <div className="flex flex-col gap-6">
+                    <p className="text-sm text-text-secondary leading-relaxed max-w-[56ch]">
+                      Have a role, a project, or just want to say hi? Send it over and
+                      it lands straight in my inbox.
+                    </p>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field id="name" label="Name" required error={errors.name}>
-                    <div className="relative">
-                      <User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/40 pointer-events-none" />
-                      <input
-                        id="name" placeholder="Your name"
-                        value={formData.name}
-                        onChange={e => handleChange('name', e.target.value)}
-                        className={`${inputCls(!!errors.name, mono)} pl-8`}
-                      />
-                    </div>
-                  </Field>
+                    {status === "error" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col"
+                      >
+                        <Hairline />
+                        <div className="flex items-center justify-between gap-3 py-3 px-1">
+                          <span className="flex items-center gap-3">
+                            <span
+                              aria-hidden
+                              className={`font-mono-meta text-base leading-none ${
+                                mono ? "text-text" : "text-red-400"
+                              }`}
+                            >
+                              !
+                            </span>
+                            <span
+                              className={`text-sm ${
+                                mono ? "text-text font-medium" : "text-red-400"
+                              }`}
+                            >
+                              Something broke on my end.
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setStatus("idle")}
+                            className="font-mono-meta text-text-secondary hover:text-text transition-colors"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                        <Hairline />
+                      </motion.div>
+                    )}
 
-                  <Field id="email" label="Email" required error={errors.email}>
-                    <div className="relative">
-                      <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/40 pointer-events-none" />
-                      <input
-                        id="email" type="email" placeholder="you@company.com"
-                        value={formData.email}
-                        onChange={e => handleChange('email', e.target.value)}
-                        className={`${inputCls(!!errors.email, mono)} pl-8`}
-                      />
-                    </div>
-                  </Field>
-                </div>
+                    {/* noValidate: custom JS validation is the single source of
+                        truth, so type="email" keeps the mobile email keyboard
+                        without the native bubble pre-empting our editorial errors. */}
+                    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <Field id="name" label="Name" required error={errors.name}>
+                          <input
+                            id="name"
+                            placeholder="Your name"
+                            value={formData.name}
+                            onChange={(e) => handleChange("name", e.target.value)}
+                            className={inputCls(!!errors.name)}
+                          />
+                        </Field>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Field id="company" label="Company">
-                    <div className="relative">
-                      <Building className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/40 pointer-events-none" />
-                      <input
-                        id="company" placeholder="Optional"
-                        value={formData.company}
-                        onChange={e => handleChange('company', e.target.value)}
-                        className={`${inputCls(false, mono)} pl-8`}
-                      />
-                    </div>
-                  </Field>
+                        <Field id="email" label="Email" required error={errors.email}>
+                          <input
+                            id="email"
+                            type="email"
+                            placeholder="you@company.com"
+                            value={formData.email}
+                            onChange={(e) => handleChange("email", e.target.value)}
+                            className={inputCls(!!errors.email)}
+                          />
+                        </Field>
+                      </div>
 
-                  <Field id="subject" label="Subject" required error={errors.subject}>
-                    <div className="relative">
-                      <MessageSquare className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/40 pointer-events-none" />
-                      <input
-                        id="subject" placeholder="What's on your mind?"
-                        value={formData.subject}
-                        onChange={e => handleChange('subject', e.target.value)}
-                        className={`${inputCls(!!errors.subject, mono)} pl-8`}
-                      />
-                    </div>
-                  </Field>
-                </div>
+                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <Field id="company" label="Company">
+                          <input
+                            id="company"
+                            placeholder="Optional"
+                            value={formData.company}
+                            onChange={(e) => handleChange("company", e.target.value)}
+                            className={inputCls(false)}
+                          />
+                        </Field>
 
-                <Field id="message" label="Message" required error={errors.message}>
-                  <textarea
-                    id="message"
-                    placeholder="Tell me about the opportunity, project, or just say hey..."
-                    value={formData.message}
-                    onChange={e => handleChange('message', e.target.value)}
-                    rows={6}
-                    className={`${inputCls(!!errors.message, mono)} resize-none`}
-                  />
-                </Field>
+                        <Field id="subject" label="Subject" required error={errors.subject}>
+                          <input
+                            id="subject"
+                            placeholder="What's on your mind?"
+                            value={formData.subject}
+                            onChange={(e) => handleChange("subject", e.target.value)}
+                            className={inputCls(!!errors.subject)}
+                          />
+                        </Field>
+                      </div>
 
-                <button
-                  type="submit"
-                  disabled={status === 'submitting'}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg
-                             bg-accent text-white text-sm font-medium
-                             hover:opacity-90 active:opacity-80
-                             disabled:opacity-50 disabled:cursor-not-allowed
-                             transition-opacity shadow-sm"
-                >
-                  {status === 'submitting' ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
-                  ) : (
-                    <><Send className="w-4 h-4" /> Send Message</>
-                  )}
-                </button>
-              </form>
+                      <Field id="message" label="Message" required error={errors.message}>
+                        <textarea
+                          id="message"
+                          placeholder="Tell me about the opportunity, project, or just say hey..."
+                          value={formData.message}
+                          onChange={(e) => handleChange("message", e.target.value)}
+                          rows={5}
+                          className={`${inputCls(!!errors.message)} resize-none`}
+                        />
+                      </Field>
+
+                      {/* Submit - restrained monochrome row: serif-adjacent mono
+                          label + glyph above a hairline, never a filled accent
+                          block. The glyph spins under load (collapses under
+                          reduced motion). */}
+                      <div className="flex flex-col">
+                        <Hairline />
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          aria-busy={submitting}
+                          className="group flex items-center justify-between py-3 px-1 text-left
+                                     disabled:cursor-not-allowed disabled:opacity-60
+                                     hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
+                                     focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+                        >
+                          <MetaLabel>
+                            {submitting ? "Sending" : "Send message"}
+                          </MetaLabel>
+                          <span
+                            aria-hidden
+                            className={`font-mono-meta text-text-secondary transition-transform
+                                        ${submitting
+                                          ? "motion-safe:animate-spin"
+                                          : "group-hover:translate-x-0.5 motion-reduce:transform-none"}`}
+                          >
+                            {submitting ? "◴" : "→"}
+                          </span>
+                        </button>
+                        <Hairline />
+                      </div>
+                    </form>
+                  </div>
+                </EditorialSection>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
