@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "PostHog-inspired portfolio website with OS interface",
   "private": true,
+  "engines": {
+    "node": ">=20.19"
+  },
   "workspaces": [
     "frontend",
     "backend"
