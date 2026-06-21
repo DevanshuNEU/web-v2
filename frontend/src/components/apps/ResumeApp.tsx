@@ -145,7 +145,7 @@ function ExperienceBody() {
                 </h3>
                 <MetaLabel className="text-text-secondary">{job.company}</MetaLabel>
               </div>
-              <div className="shrink-0 sm:text-right">
+              <div className="flex shrink-0 flex-col gap-0.5 sm:items-end">
                 <MetaLabel as="p">{job.period}</MetaLabel>
                 <MetaLabel as="p" className="text-text-secondary">
                   {job.location}
@@ -256,7 +256,7 @@ function EducationBody() {
                 </h3>
                 <MetaLabel className="text-text-secondary">{edu.degree}</MetaLabel>
               </div>
-              <div className="shrink-0 sm:text-right">
+              <div className="flex shrink-0 flex-col gap-0.5 sm:items-end">
                 <MetaLabel as="p">{edu.period}</MetaLabel>
                 <MetaLabel as="p" className="text-text-secondary">
                   {edu.location}
@@ -443,28 +443,50 @@ function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>) {
   useEffect(() => {
     const root = scrollRef.current;
     if (!root) return;
-    // Degrade gracefully where the API is absent (SSR, test env, old browsers):
-    // the document still renders, scroll-spy simply stays inert.
-    if (typeof IntersectionObserver === 'undefined') return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length === 0) return;
-        const id = visible[0].target.getAttribute(
-          'data-section-id',
-        ) as SectionId | null;
-        if (!id) return;
-        setActive(id);
-      },
-      { root, rootMargin: '0px 0px -65% 0px', threshold: 0 },
-    );
+    let raf = 0;
+    const compute = () => {
+      raf = 0;
+      const nodes = Array.from(
+        root.querySelectorAll<HTMLElement>('[data-section-id]'),
+      );
+      if (nodes.length === 0) return;
 
-    const nodes = root.querySelectorAll<HTMLElement>('[data-section-id]');
-    nodes.forEach((n) => observer.observe(n));
-    return () => observer.disconnect();
+      // Bottom of scroll: the last section can never cross a top trigger line
+      // when it is short, so force it active once we reach the end. This is the
+      // fix for the last section (Education) never highlighting.
+      const atBottom =
+        root.scrollTop + root.clientHeight >= root.scrollHeight - 4;
+      if (atBottom) {
+        const last = nodes[nodes.length - 1].getAttribute('data-section-id');
+        if (last) setActive(last as SectionId);
+        return;
+      }
+
+      // Otherwise the active section is the last one whose top has passed a
+      // trigger line ~32% down the scroll container.
+      const line = root.getBoundingClientRect().top + root.clientHeight * 0.32;
+      let current = nodes[0].getAttribute('data-section-id');
+      for (const node of nodes) {
+        if (node.getBoundingClientRect().top <= line) {
+          current = node.getAttribute('data-section-id');
+        } else {
+          break;
+        }
+      }
+      if (current) setActive(current as SectionId);
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(compute);
+    };
+
+    compute();
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      root.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [scrollRef]);
 
   return active;

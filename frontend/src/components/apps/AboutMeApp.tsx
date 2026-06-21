@@ -260,35 +260,55 @@ function useScrollSpy(
   useEffect(() => {
     const root = scrollRef.current;
     if (!root) return;
-    // Degrade gracefully where the API is absent (SSR, test env, old browsers):
-    // the document still renders, scroll-spy simply stays inert.
-    if (typeof IntersectionObserver === "undefined") return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Pick the entry nearest the top of the viewport that is intersecting.
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length === 0) return;
-        const id = visible[0].target.getAttribute("data-section-id") as SectionId | null;
-        if (!id) return;
-        setActive((prev) => {
-          if (prev !== id) onEnterRef.current(id);
-          return id;
-        });
-      },
-      {
-        root,
-        // Trip when a section crosses the upper third of the scroll area.
-        rootMargin: "0px 0px -65% 0px",
-        threshold: 0,
-      },
-    );
+    let raf = 0;
+    const setIfChanged = (id: SectionId) =>
+      setActive((prev) => {
+        if (prev !== id) onEnterRef.current(id);
+        return id;
+      });
 
-    const nodes = root.querySelectorAll<HTMLElement>("[data-section-id]");
-    nodes.forEach((n) => observer.observe(n));
-    return () => observer.disconnect();
+    const compute = () => {
+      raf = 0;
+      const nodes = Array.from(
+        root.querySelectorAll<HTMLElement>("[data-section-id]"),
+      );
+      if (nodes.length === 0) return;
+
+      // Bottom of scroll: a short last section can never cross a top trigger
+      // line, so force it active at the end (fixes the last section, Contact,
+      // never highlighting).
+      const atBottom =
+        root.scrollTop + root.clientHeight >= root.scrollHeight - 4;
+      if (atBottom) {
+        const last = nodes[nodes.length - 1].getAttribute("data-section-id");
+        if (last) setIfChanged(last as SectionId);
+        return;
+      }
+
+      // Active = last section whose top has passed a line ~32% down the area.
+      const line = root.getBoundingClientRect().top + root.clientHeight * 0.32;
+      let current = nodes[0].getAttribute("data-section-id");
+      for (const node of nodes) {
+        if (node.getBoundingClientRect().top <= line) {
+          current = node.getAttribute("data-section-id");
+        } else {
+          break;
+        }
+      }
+      if (current) setIfChanged(current as SectionId);
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(compute);
+    };
+
+    compute();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [scrollRef]);
 
   return active;
