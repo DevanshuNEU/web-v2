@@ -18,6 +18,25 @@ import { MotionGlobalConfig } from 'framer-motion';
 // actually unmounts removed children inside a single test tick.
 MotionGlobalConfig.skipAnimations = true;
 
+// JSDom does not implement IntersectionObserver or ResizeObserver. Components
+// that use scroll-spy, whileInView reveals, or element-size measurement (and
+// Framer Motion's whileInView, which constructs an IntersectionObserver
+// internally) reference these at mount, so provide minimal no-op stubs.
+class NoopObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+  globalThis.IntersectionObserver = NoopObserver as unknown as typeof IntersectionObserver;
+}
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = NoopObserver as unknown as typeof ResizeObserver;
+}
+
 // Auto-unmount after every test to prevent state leaking between cases.
 afterEach(() => {
   cleanup();

@@ -9,7 +9,7 @@
  */
 
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
@@ -27,11 +27,14 @@ const geistMono = Geist_Mono({
 });
 
 // Editorial display face for headings/hero (opt-in via the .font-display
-// utility). Single weight (400) with italic — the signature editorial accent.
-const instrumentSerif = Instrument_Serif({
+// utility). Newsreader is a real multi-weight serif: default heads paint at
+// 400-500, with 600 reserved for restrained emphasis. Italic carries the
+// editorial accent. Bound to --font-serif so it drives every .font-display
+// / .editorial-* site across the OS.
+const newsreader = Newsreader({
   variable: "--font-serif",
   subsets: ["latin"],
-  weight: "400",
+  weight: ["400", "500", "600"],
   style: ["normal", "italic"],
   display: "swap",
 });
@@ -188,7 +191,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}>
         <PostHogProvider>
           <ThemeProvider>
             {children}

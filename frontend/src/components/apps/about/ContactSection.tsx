@@ -27,10 +27,22 @@ function LinkRow({ label, value, href, external, glyph }: LinkRowProps) {
                  focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
     >
       <MetaLabel className="shrink-0 w-24 justify-start">{label}</MetaLabel>
-      <span className="flex-1 min-w-0 font-mono text-sm text-text truncate group-hover:text-text">
+      <span className="flex-1 min-w-0 font-mono text-sm text-text truncate">
         {value}
+        {/* Hairline underline grows on hover (transform-only, monochrome).
+            Collapses to no motion under the global reduced-motion safety net. */}
+        <span
+          aria-hidden
+          className="block h-px origin-left scale-x-0 bg-text/40 transition-transform
+                     duration-200 group-hover:scale-x-100 motion-reduce:transition-none"
+        />
       </span>
-      <MetaLabel className="shrink-0 justify-end" aria-hidden>{glyph}</MetaLabel>
+      <MetaLabel
+        className="shrink-0 justify-end transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none"
+        aria-hidden
+      >
+        {glyph}
+      </MetaLabel>
     </a>
   );
 }

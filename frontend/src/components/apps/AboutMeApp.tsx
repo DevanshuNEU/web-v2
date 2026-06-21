@@ -16,24 +16,22 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAnalyticsStore } from "@/store/analyticsStore";
-import { useIsMono, usePalette } from "@/hooks/usePalette";
-import { useTheme } from "@/store/themeStore";
-import { Dither } from "@/components/signature";
+import { useIsMono } from "@/hooks/usePalette";
 import {
   Hairline,
   MetaLabel,
   EditorialSection,
-  IndexRow,
 } from "@/components/editorial";
 import MobileSection from "@/components/mobile/ui/MobileSection";
+import { reveal } from "@/lib/motion";
 import {
   identity,
-  contactLinks,
   mastheadSpecLine,
   specs,
 } from "@/data/aboutMe";
+import Portrait from "./about/Portrait";
 import { JourneySection } from "./about/JourneySection";
 import { ExcitesSection } from "./about/ExcitesSection";
 import { CurrentlySection } from "./about/CurrentlySection";
@@ -56,41 +54,47 @@ type SectionId = typeof SECTIONS[number]["id"];
 const SECTION_DOM_ID = (id: SectionId) => `about-section-${id}`;
 
 // ---------------------------------------------------------------------------
-// Masthead - Dither portrait + serif name + mono spec-line + editorial chip.
+// Masthead - clean grayscale portrait + serif name + mono spec-line + chip.
+//
+// Composition: photo and the text column sit on one editorial baseline (photo
+// left, name/spec/chip right on wide; stacked on narrow). On mount the four
+// pieces stagger in once (photo, name, spec-line, chip). Everything collapses
+// to instant under reduced motion via the shared `reveal` variants.
 // ---------------------------------------------------------------------------
 
 function Masthead({ size = 140 }: { size?: number }) {
-  const palette = usePalette();
   const mono = useIsMono();
-  const { mode } = useTheme();
-  // Re-read ink on palette AND light/dark change so the dither tracks theme.
-  const paletteKey = `${palette}-${mode}`;
+  const reduced = useReducedMotion();
 
   return (
-    <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-7">
-      <div
-        className="shrink-0 overflow-hidden"
-        style={{ width: size, height: size }}
-      >
-        <Dither
+    <motion.div
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-7"
+    >
+      <motion.div variants={reveal.item(reduced)}>
+        <Portrait
           src={identity.photo}
-          alt={identity.name}
+          alt={`Portrait of ${identity.name}`}
           size={size}
-          matrix={4}
-          levels={2}
-          paletteKey={paletteKey}
           priority
-          className="h-full w-full object-cover"
         />
-      </div>
+      </motion.div>
 
       <div className="flex flex-1 flex-col gap-3 min-w-0">
-        <h1 className="editorial-hero text-text leading-[1.02]">
+        <motion.h1
+          variants={reveal.item(reduced)}
+          className="about-masthead-name font-display text-text"
+        >
           {identity.name}
-        </h1>
+        </motion.h1>
 
         {/* Mono spec-line: MetaLabel cells separated by middots. */}
-        <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
+        <motion.p
+          variants={reveal.item(reduced)}
+          className="flex flex-wrap items-center gap-x-1 gap-y-1"
+        >
           {mastheadSpecLine.map((cell, i) => (
             <React.Fragment key={cell}>
               {i > 0 && (
@@ -99,10 +103,11 @@ function Masthead({ size = 140 }: { size?: number }) {
               <MetaLabel>{cell}</MetaLabel>
             </React.Fragment>
           ))}
-        </p>
+        </motion.p>
 
         {/* Availability - editorial chip: hairline border, filled square, no pulse. */}
-        <span
+        <motion.span
+          variants={reveal.item(reduced)}
           className={`inline-flex w-fit items-center gap-2 border px-2.5 py-1
                       ${mono
                         ? "border-border"
@@ -115,9 +120,9 @@ function Masthead({ size = 140 }: { size?: number }) {
           <MetaLabel className={mono ? undefined : "text-green-600 dark:text-green-400"}>
             Available
           </MetaLabel>
-        </span>
+        </motion.span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -165,6 +170,79 @@ function SectionBody({ id }: { id: SectionId }) {
     case "currently": return <CurrentlySection />;
     case "contact":   return <ContactSection />;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Rail row - responsive "01 / Label" index row with a sliding active marker.
+//
+// The active indicator is a single thin monochrome bar shared across rows via
+// framer-motion `layoutId`, so it GLIDES between rows on scroll/click instead
+// of a heavy box jumping. Under reduced motion the layout animation collapses
+// (layout transition duration 0) and the marker simply appears in place. Hover
+// is a hairline label-underline grow plus a tiny translate, monochrome only.
+// ---------------------------------------------------------------------------
+
+const RAIL_MARKER_ID = "about-rail-active";
+
+function RailRow({
+  number,
+  label,
+  active,
+  reduced,
+  onClick,
+}: {
+  number: string;
+  label: string;
+  active: boolean;
+  reduced: boolean | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid="index-row"
+      aria-current={active ? "true" : undefined}
+      className="about-rail-row group relative flex w-full items-center gap-3 px-3 text-left
+                 focus-visible:outline-none"
+    >
+      {/* Sliding active marker: a thin graphite bar pinned to the row's left
+          edge. layoutId makes it glide between rows. */}
+      {active && (
+        <motion.span
+          layoutId={RAIL_MARKER_ID}
+          aria-hidden
+          className="absolute left-0 top-1/2 h-[1.1em] w-[2px] -translate-y-1/2 bg-text"
+          transition={
+            reduced
+              ? { duration: 0 }
+              : { type: "spring", stiffness: 520, damping: 40, mass: 0.6 }
+          }
+        />
+      )}
+
+      <span
+        className={`about-rail-number font-mono-meta shrink-0 transition-opacity
+                    ${active ? "opacity-100" : "opacity-50 group-hover:opacity-80"}`}
+      >
+        {number}
+      </span>
+
+      <span
+        className={`about-rail-label font-display min-w-0 flex-1 truncate transition-transform
+                    ${active ? "text-text" : "text-text-secondary group-hover:text-text"}
+                    ${reduced ? "" : "group-hover:translate-x-0.5"}`}
+      >
+        {label}
+        {/* Hairline underline that grows on hover (transform-only). */}
+        <span
+          aria-hidden
+          className="block h-px origin-left scale-x-0 bg-text/40 transition-transform
+                     duration-200 group-hover:scale-x-100"
+        />
+      </span>
+    </button>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -258,42 +336,46 @@ export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
 
   return (
     <div className="h-full flex overflow-hidden">
-      {/* ── Sticky index rail ── */}
+      {/* ── Sticky index rail ── width + row sizing scale off the window via
+          @container (see .about-rail / .about-rail-row in globals.css). ── */}
       <nav
         aria-label="About sections"
-        className="hidden md:flex w-56 shrink-0 flex-col border-r border-border overflow-y-auto"
+        className="about-rail hidden md:flex shrink-0 flex-col border-r border-border overflow-y-auto"
       >
         <div className="px-4 py-5">
           <MetaLabel as="p">About</MetaLabel>
         </div>
         <Hairline />
-        <div className="px-2 py-2">
+        <div className="flex flex-col py-2">
           {SECTIONS.map(({ id, number, label }) => (
-            <IndexRow
+            <RailRow
               key={id}
               number={number}
-              title={
-                <span className="text-[clamp(0.95rem,2cqi,1.1rem)]">{label}</span>
-              }
+              label={label}
               active={active === id}
-              hairline={false}
+              reduced={reduced}
               onClick={() => scrollTo(id)}
             />
           ))}
         </div>
       </nav>
 
-      {/* ── Scrolled editorial document ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      {/* ── Scrolled editorial document ── gentle proximity snap, smooth anchor
+          scroll, GPU transform/opacity reveals. ── */}
+      <div ref={scrollRef} className="about-scroll flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-16">
           <Masthead size={140} />
 
           {SECTIONS.map(({ id, number, label }) => (
-            <div
+            <motion.div
               key={id}
               id={SECTION_DOM_ID(id)}
               data-section-id={id}
-              className="scroll-mt-6"
+              className="about-snap"
+              variants={reveal.item(reduced)}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ root: scrollRef, once: true, amount: 0.15 }}
             >
               <EditorialSection
                 number={number}
@@ -302,7 +384,7 @@ export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
               >
                 <SectionBody id={id} />
               </EditorialSection>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -316,6 +398,7 @@ export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
 
 function AboutMeMobile() {
   const trackEvent = useAnalyticsStore((state) => state.trackEvent);
+  const reduced = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleEnter = useCallback(
@@ -327,8 +410,16 @@ function AboutMeMobile() {
 
   useScrollSpy(scrollRef, handleEnter);
 
+  // Shared reveal wiring for each mobile section (transform/opacity, once).
+  const sectionMotion = {
+    variants: reveal.item(reduced),
+    initial: "hidden" as const,
+    whileInView: "show" as const,
+    viewport: { root: scrollRef, once: true, amount: 0.15 },
+  };
+
   return (
-    <div ref={scrollRef} className="h-full overflow-y-auto bg-bg">
+    <div ref={scrollRef} className="about-scroll h-full overflow-y-auto bg-bg">
       <div
         className="flex flex-col gap-12 pb-12 pt-8"
         style={{ paddingLeft: "var(--sp-hero-pad)", paddingRight: "var(--sp-hero-pad)" }}
@@ -336,7 +427,7 @@ function AboutMeMobile() {
         <Masthead size={120} />
 
         {/* Overview specs - list-shaped, MobileSection. */}
-        <section id={SECTION_DOM_ID("overview")} data-section-id="overview" className="flex flex-col gap-4">
+        <motion.section {...sectionMotion} id={SECTION_DOM_ID("overview")} data-section-id="overview" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>01</span><span aria-hidden className="mx-2 opacity-50">/</span>Overview</MetaLabel>
           <p className="text-base text-text-secondary leading-relaxed">
             I build AI dev tools at the MCP layer: production MCP servers, retrieval
@@ -354,39 +445,39 @@ function AboutMeMobile() {
               </div>
             ))}
           </MobileSection>
-        </section>
+        </motion.section>
 
         {/* Journey - narrative typeset block. */}
-        <section id={SECTION_DOM_ID("journey")} data-section-id="journey" className="flex flex-col gap-4">
+        <motion.section {...sectionMotion} id={SECTION_DOM_ID("journey")} data-section-id="journey" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>02</span><span aria-hidden className="mx-2 opacity-50">/</span>Journey</MetaLabel>
           <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Journey</h2>
           <Hairline />
           <JourneySection />
-        </section>
+        </motion.section>
 
         {/* What Excites Me - narrative typeset block. */}
-        <section id={SECTION_DOM_ID("excites")} data-section-id="excites" className="flex flex-col gap-4">
+        <motion.section {...sectionMotion} id={SECTION_DOM_ID("excites")} data-section-id="excites" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>03</span><span aria-hidden className="mx-2 opacity-50">/</span>What Excites Me</MetaLabel>
           <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">What Excites Me</h2>
           <Hairline />
           <ExcitesSection />
-        </section>
+        </motion.section>
 
         {/* Currently - list-shaped via its own component. */}
-        <section id={SECTION_DOM_ID("currently")} data-section-id="currently" className="flex flex-col gap-4">
+        <motion.section {...sectionMotion} id={SECTION_DOM_ID("currently")} data-section-id="currently" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>04</span><span aria-hidden className="mx-2 opacity-50">/</span>Currently</MetaLabel>
           <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Currently</h2>
           <Hairline />
           <CurrentlySection />
-        </section>
+        </motion.section>
 
         {/* Contact - link rows. */}
-        <section id={SECTION_DOM_ID("contact")} data-section-id="contact" className="flex flex-col gap-4">
+        <motion.section {...sectionMotion} id={SECTION_DOM_ID("contact")} data-section-id="contact" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>05</span><span aria-hidden className="mx-2 opacity-50">/</span>Contact</MetaLabel>
           <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Contact</h2>
           <Hairline />
           <ContactSection />
-        </section>
+        </motion.section>
       </div>
     </div>
   );

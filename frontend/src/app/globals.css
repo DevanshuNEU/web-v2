@@ -209,9 +209,11 @@ body {
     -webkit-backdrop-filter: blur(var(--glass-blur-extreme)) saturate(180%);
   }
   
-  /* Editorial display face — opt-in, headings/hero only. Instrument Serif is
-     single-weight (400); apply font-weight 400 and strip any font-bold at the
-     call site (faux-bold smears this face). Tracking/leading tuned for display. */
+  /* Editorial display face — opt-in, headings/hero only. Newsreader is a real
+     multi-weight serif, so faux-bold is no longer a concern: default heads sit
+     at 400, and you MAY step to font-weight 500/600 for restrained emphasis
+     (Tailwind font-medium / font-semibold). Keep it elegant — never heavy/black
+     (700+). Tracking/leading tuned for display. */
   .font-display {
     font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
     font-weight: 400;
@@ -220,10 +222,10 @@ body {
   }
 
   /* ============================================
-     EDITORIAL / INSTRUMENT FOUNDATION
+     EDITORIAL FOUNDATION
      Monochrome, restraint-first display + meta type and hairline rules.
-     Serif faces are single-weight (400); NEVER add font-bold (faux-bold
-     smears Instrument Serif, see .font-display note above).
+     The serif (Newsreader) carries real weights: heads default to 400, and
+     500/600 are available for tasteful emphasis. Never go heavy/black (700+).
      ============================================ */
 
   /* Uppercase mono eyebrow used across editorial surfaces. */
@@ -530,3 +532,70 @@ body {
   transition: transform 200ms cubic-bezier(0.18, 0.9, 0.32, 1.2);
 }
 .app-content .text-lg  { font-size: clamp(0.95rem, 2cqi, 1.125rem); }
+
+/* ============================================
+   ABOUT ME — masthead name + responsive index rail
+   The About Me app lives inside .app-content (container-type: inline-size),
+   so everything below scales off the WINDOW (container) width via cqi/@container,
+   never the viewport. Keeps the masthead from clipping and lets the rail go
+   quiet/compact in a small window while staying generous when maximized.
+   ============================================ */
+
+/* Masthead name: serif clamps off container width and is ALLOWED to wrap, so
+   the full "Devanshu Chicholikar" never clips. Pairs with min-w-0 on the flex
+   column in JSX so the serif can shrink below its intrinsic width. */
+.about-masthead-name {
+  font-size: clamp(2rem, 9cqi, 4.25rem);
+  line-height: 1.04;
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+/* Index rail: compact + quiet at small container widths, generous when wide. */
+.about-rail {
+  width: clamp(11rem, 20cqi, 14rem);
+}
+
+/* Per-row sizing tokens scale down in a narrow window. */
+.about-rail-row {
+  --about-row-py: 1rem;
+  --about-row-num: 0.72rem;
+  --about-row-label: 1.05rem;
+  padding-top: var(--about-row-py);
+  padding-bottom: var(--about-row-py);
+}
+.about-rail-row .about-rail-number { font-size: var(--about-row-num); }
+.about-rail-row .about-rail-label  { font-size: var(--about-row-label); line-height: 1.15; }
+
+/* Tighten the whole rail when the window/container is narrow. */
+@container (max-width: 720px) {
+  .about-rail-row {
+    --about-row-py: 0.5rem;
+    --about-row-num: 0.62rem;
+    --about-row-label: 0.9rem;
+  }
+}
+@container (max-width: 560px) {
+  .about-rail-row {
+    --about-row-py: 0.4rem;
+    --about-row-num: 0.58rem;
+    --about-row-label: 0.82rem;
+  }
+}
+
+/* ============================================
+   ABOUT ME — buttery scroll + gentle proximity snap
+   Proximity (NOT mandatory) so free scrolling is never fought; sections settle
+   near their start. scroll-padding keeps the snapped top clear of the masthead
+   breathing room. Disabled under reduced motion via the global safety net
+   (scroll-behavior: auto) and the JS branch for anchor scrolls.
+   ============================================ */
+.about-scroll {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 1.5rem;
+}
+.about-snap {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+  scroll-margin-top: 1.5rem;
+}
