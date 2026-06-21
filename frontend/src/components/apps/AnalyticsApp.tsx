@@ -66,6 +66,14 @@ import {
 // ---------------------------------------------------------------------------
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
+// Window-dynamic size for mono DATA values (relative times, counts, the log
+// tape). font-mono-meta would re-proportion too, but it forces uppercase +
+// tracking + a fixed ink, which is wrong for mixed-case values and the dot-leader
+// tape. So this is a bespoke size-only clamp: it tracks the window the same way
+// (cqi = 1% of the window's inline size) with the upper bound pinned to the
+// original 0.75rem, so a maximized window is unchanged and small windows shrink.
+const MONO_DATA_FS = 'clamp(0.66rem, 1.5cqi, 0.75rem)';
+
 const POSTHOG_DASHBOARD_URL = process.env.NEXT_PUBLIC_POSTHOG_DASHBOARD_URL || null;
 
 // ---------------------------------------------------------------------------
@@ -183,9 +191,13 @@ function UsageBar({
       <motion.span
         className="absolute inset-y-0 left-0 right-0 bg-text"
         style={{ opacity, transformOrigin: 'left center' }}
-        initial={reduced ? { scaleX: scale } : { scaleX: 0 }}
-        animate={{ scaleX: scale }}
-        transition={reduced ? { duration: 0 } : { duration: 0.42, delay: 0.06, ease: EASE_OUT }}
+        // Full transform string (not the scaleX shorthand) so the once-per-mount
+        // draw stays hardware-accelerated and never drops frames while the OS is
+        // mounting the window. The bar grows from the left like a fill, not a
+        // pop-in. Reduced motion lands on the resting scale with no draw.
+        initial={reduced ? { transform: `scaleX(${scale})` } : { transform: 'scaleX(0)' }}
+        animate={{ transform: `scaleX(${scale})` }}
+        transition={reduced ? { duration: 0 } : { duration: 0.3, delay: 0.06, ease: EASE_OUT }}
       />
     </span>
   );
@@ -287,7 +299,7 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
               </MetaLabel>
             </span>
           </div>
-          <p className="max-w-[60ch] text-text-secondary leading-relaxed">
+          <p className="max-w-[60ch] text-base text-text-secondary leading-relaxed">
             Everything below is real, measured from your current visit. Anonymous,
             via PostHog. No personal data, no fake numbers.
           </p>
@@ -334,7 +346,7 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
                 <AsciiField
                   source={tape}
                   paletteKey={`tape-${recentEvents.length}`}
-                  className="text-[12px] text-text-secondary leading-[1.5]"
+                  className="text-[clamp(0.66rem,1.5cqi,0.75rem)] text-text-secondary leading-[1.5]"
                 />
                 <ul className="sr-only">
                   {recentEvents.map((e) => (
@@ -361,7 +373,10 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
                       <span className="min-w-0 flex-1 truncate text-sm text-text">
                         {e.label}
                       </span>
-                      <span className="shrink-0 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+                      <span
+                        className="shrink-0 font-[family-name:var(--font-geist-mono)] text-text-secondary"
+                        style={{ fontSize: MONO_DATA_FS }}
+                      >
                         {formatRelativeTime(e.timestamp)}
                       </span>
                     </div>
@@ -389,7 +404,10 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
                       <span className="text-sm capitalize text-text">
                         {app.appType.replace(/-/g, ' ')}
                       </span>
-                      <span className="shrink-0 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+                      <span
+                        className="shrink-0 font-[family-name:var(--font-geist-mono)] text-text-secondary"
+                        style={{ fontSize: MONO_DATA_FS }}
+                      >
                         {app.openCount}x
                         {app.totalTimeMs > 0 && (
                           <>
@@ -411,7 +429,7 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
         <motion.div variants={reveal.item(reduced)}>
           <EditorialSection number="04" eyebrow="Your data" title="Privacy">
             <div className="flex flex-col gap-4 max-w-[60ch]">
-              <p className="text-text-secondary leading-relaxed">
+              <p className="text-base text-text-secondary leading-relaxed">
                 Tracking is anonymous and scoped to this session. You can turn it
                 off; the live log above clears the moment you do.
               </p>
@@ -430,7 +448,7 @@ export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
         <motion.div variants={reveal.item(reduced)}>
           <EditorialSection number="05" eyebrow="Everyone" title="Aggregate">
             <div className="flex flex-col gap-4 max-w-[60ch]">
-              <p className="text-text-secondary leading-relaxed">
+              <p className="text-base text-text-secondary leading-relaxed">
                 Cross-visitor numbers live in PostHog, in the same build-in-public
                 spirit. The dashboard opens in a new tab, nothing is embedded here.
               </p>
@@ -480,7 +498,10 @@ function SpecCell({
         {value}
       </div>
       {sub && (
-        <div className="font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary leading-snug">
+        <div
+          className="font-[family-name:var(--font-geist-mono)] text-text-secondary leading-snug"
+          style={{ fontSize: MONO_DATA_FS }}
+        >
           {sub}
         </div>
       )}
@@ -517,7 +538,7 @@ function QuietLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      whileTap={reduced ? undefined : { scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT } }}
+      whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.16, ease: EASE_OUT } }}
       className="group inline-flex w-fit items-center gap-2 text-sm text-text focus-visible:outline-none"
     >
       <span className="relative">
@@ -562,7 +583,7 @@ function QuietToggle({
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      whileTap={reduced ? undefined : { scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT } }}
+      whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.16, ease: EASE_OUT } }}
       className="group inline-flex w-fit items-center gap-2.5 border border-border px-3 py-1.5
                  transition-colors hover:border-text/40 focus-visible:outline-none"
     >
