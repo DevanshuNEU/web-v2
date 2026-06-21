@@ -55,7 +55,7 @@ import { useIsMono } from '@/hooks/usePalette';
 import { Hairline, MetaLabel } from '@/components/editorial';
 import { Plotter } from '@/components/signature';
 import { strokeSet } from '@/lib/signature/plotter';
-import { reveal, withReduced } from '@/lib/motion';
+import { reveal, withReduced, INSTANT } from '@/lib/motion';
 
 // Neutral graphite used for language dots / icon tiles in mono. The language
 // NAME and status WORD carry meaning, so hue is decorative here.
@@ -433,10 +433,22 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
   return (
     <motion.div
       key={repo.name}
-      initial={reduced ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
-      transition={withReduced({ duration: 0.32, ease: [0.23, 1, 0.32, 1] }, reduced)}
+      // Selecting a project is list-navigation frequency, so the cross-fade
+      // stays snappy and under the 300ms UI ceiling. Full transform strings keep
+      // this on the GPU so it never drops frames while the new repo's data and
+      // fingerprint paint. Per-state transitions make the exit snappier than the
+      // enter (asymmetric: fast where the system responds).
+      initial={reduced ? false : { opacity: 0, transform: 'translateY(8px)' }}
+      animate={{
+        opacity: 1,
+        transform: 'translateY(0px)',
+        transition: withReduced({ duration: 0.24, ease: [0.23, 1, 0.32, 1] }, reduced),
+      }}
+      exit={
+        reduced
+          ? { opacity: 0, transition: INSTANT }
+          : { opacity: 0, transform: 'translateY(-5px)', transition: { duration: 0.16, ease: [0.23, 1, 0.32, 1] } }
+      }
       className="flex-1 overflow-y-auto"
     >
       <div data-projects-stage>
