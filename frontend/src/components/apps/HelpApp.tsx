@@ -163,7 +163,7 @@ function TourView({ onExit }: { onExit: () => void }) {
         <button
           type="button"
           onClick={onExit}
-          className="font-mono-meta text-text-secondary hover:text-text transition-colors focus-visible:outline-none focus-visible:text-text"
+          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] focus-visible:outline-none focus-visible:text-text"
         >
           Skip
         </button>
@@ -191,7 +191,8 @@ function TourView({ onExit }: { onExit: () => void }) {
             >
               <span
                 aria-hidden
-                className="font-display text-text/70 text-[2rem] leading-none select-none"
+                className="font-display text-text/70 leading-none select-none"
+                style={{ fontSize: 'clamp(1.5rem, 5cqi, 2rem)' }}
               >
                 {current.glyph}
               </span>
@@ -219,7 +220,7 @@ function TourView({ onExit }: { onExit: () => void }) {
           type="button"
           onClick={back}
           disabled={step === 0}
-          className="font-mono-meta text-text-secondary transition-colors hover:text-text disabled:opacity-30 disabled:hover:text-text-secondary focus-visible:outline-none focus-visible:text-text"
+          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] disabled:opacity-30 disabled:active:scale-100 disabled:hover:text-text-secondary focus-visible:outline-none focus-visible:text-text"
         >
           Back
         </button>
@@ -237,7 +238,7 @@ function TourView({ onExit }: { onExit: () => void }) {
         <button
           type="button"
           onClick={next}
-          className="font-mono-meta text-text transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:opacity-70"
+          className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
         >
           {isLast ? 'Done' : 'Next'}
         </button>
@@ -266,7 +267,7 @@ function OverviewBody({ onStartTour }: { onStartTour: () => void }) {
       <button
         type="button"
         onClick={onStartTour}
-        className="w-fit font-mono-meta text-text transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:opacity-70"
+        className="w-fit font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
       >
         Take the {TOUR_STEPS.length}-step tour &rarr;
       </button>
@@ -289,7 +290,10 @@ function AppsBody() {
         return (
           <React.Fragment key={appType}>
             <div className="flex items-baseline gap-4 py-3.5">
-              <span className="min-w-0 flex-1 font-display text-text text-[1.0625rem] leading-snug">
+              <span
+                className="min-w-0 flex-1 font-display text-text leading-snug"
+                style={{ fontSize: 'clamp(0.9rem, 2.1cqi, 1.0625rem)' }}
+              >
                 {label.title}
               </span>
               <span className="flex-1 text-sm leading-snug text-text-secondary">
@@ -318,7 +322,7 @@ function ShortcutsBody() {
               {row.keys.map((k) => (
                 <kbd
                   key={k}
-                  className="border border-border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-text-secondary"
+                  className="border border-border px-2 py-0.5 font-mono-meta uppercase tracking-wide text-text-secondary"
                 >
                   {k}
                 </kbd>
@@ -499,7 +503,7 @@ function ReferenceView({
               type="button"
               onClick={() => scrollTo(id)}
               data-testid="index-row"
-              className="group flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+              className="group flex w-full items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] focus-visible:outline-none"
             >
               <span className="font-mono-meta shrink-0 opacity-50 transition-opacity group-hover:opacity-80">
                 {number}
@@ -515,7 +519,7 @@ function ReferenceView({
           <button
             type="button"
             onClick={onStartTour}
-            className="font-mono-meta text-text transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:opacity-70"
+            className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
           >
             Take the tour &rarr;
           </button>
