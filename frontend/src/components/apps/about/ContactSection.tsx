@@ -23,7 +23,9 @@ function LinkRow({ label, value, href, external, glyph }: LinkRowProps) {
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className="group flex items-center gap-4 py-4 px-1 text-left
-                 hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors
+                 transition-[background-color,transform] duration-150 ease-out
+                 hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
+                 motion-safe:active:scale-[0.99]
                  focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
     >
       <MetaLabel className="shrink-0 w-24 justify-start">{label}</MetaLabel>

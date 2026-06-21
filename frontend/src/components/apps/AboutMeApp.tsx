@@ -4,9 +4,10 @@
  * AboutMeApp - "About Devanshu"
  *
  * A single vertically-scrolled, numbered editorial document. The desktop
- * variant pins a numbered index rail on the left (scroll-spy: an
- * IntersectionObserver highlights the section in view and clicking a row
- * scrolls to it). The mobile variant drops the rail for a single scroll.
+ * variant pins a numbered index rail on the left (scroll-spy: a scroll
+ * listener tracks the section in view with a bottom-of-scroll fallback, so the
+ * short last section still highlights; clicking a row scrolls to it). The
+ * mobile variant drops the rail for a single scroll.
  *
  * Random-access without hiding content: every section is always rendered,
  * the rail is navigation, not tabs.
@@ -204,6 +205,7 @@ function RailRow({
       data-testid="index-row"
       aria-current={active ? "true" : undefined}
       className="about-rail-row group relative flex w-full items-center gap-3 px-3 text-left
+                 transition-transform duration-150 ease-out motion-safe:active:scale-[0.98]
                  focus-visible:outline-none"
     >
       {/* Sliding active marker: a thin graphite bar pinned to the row's left
@@ -467,7 +469,7 @@ function AboutMeMobile() {
                 <span className="shrink-0 w-24 text-label font-medium uppercase tracking-wider text-text-secondary">
                   {key}
                 </span>
-                <span className="flex-1 font-mono text-[13px] text-text leading-snug">
+                <span className="flex-1 font-mono text-sm text-text leading-snug">
                   {value}
                 </span>
               </div>
