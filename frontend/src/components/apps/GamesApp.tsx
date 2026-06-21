@@ -129,7 +129,7 @@ function SelectorEntry({
       <span className="flex-1 min-w-0">
         <span
           className={`block font-display leading-tight truncate text-text-secondary group-hover:text-text
-                      transition-[color,transform] text-[clamp(1.15rem,3.4cqi,1.9rem)]
+                      transition-[color,transform] duration-150 ease-out text-[clamp(1.15rem,3.4cqi,1.9rem)]
                       ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
         >
           {card.title}
@@ -971,7 +971,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
               key={i}
               onClick={() => setSnippetIdx(i)}
               aria-pressed={snippetIdx === i}
-              className="group relative font-mono-meta transition-opacity active:scale-[0.97] focus-visible:outline-none"
+              className="group relative font-mono-meta transition-[opacity,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none"
             >
               <span className={snippetIdx === i ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>
                 {s.label}
