@@ -1,27 +1,50 @@
 'use client';
 
 /**
- * GamesApp — Arcade
+ * GamesApp - Arcade
  *
- * Snake    · Nokia 3310 nostalgia
- * Tetris   · The programmer's meditation
- * Type Racer · Code faster than your linter
+ * Three working games - Snake, Tetris, Type Racer - wrapped in an editorial
+ * monochrome chrome. ONLY the chrome is art-directed; every game loop, reducer,
+ * input handler, collision/physics, scoring path and canvas draw routine below
+ * is preserved byte-for-byte from the original, including the per-game mono
+ * palettes (MONO_TETRIS / MONO_SNAKE_* / MONO_APPLE).
+ *
+ * Selector (design-taste-frontend, strictly monochrome): a numbered editorial
+ * index - serif game names (Newsreader), tiny uppercase mono metadata (genre,
+ * controls, best score), hairline dividers, generous space. A faint seeded
+ * Plotter line-mark sits on the backdrop, hard-gated on the mono palette and
+ * reduced motion by the primitive itself. The index staggers in ONCE on mount.
+ *
+ * Chrome motion (emil-design-eng): the selector rows press on :active and lift
+ * on hover (transform + opacity, ease-out). Start / game-over overlays get a
+ * single tasteful entrance (occasional surface). The in-game HUD score VALUE is
+ * high-frequency, so it is rendered live but NEVER animated per update - no
+ * score-pop during play. Everything collapses to instant under reduced motion.
+ *
+ * Window-dynamic: the app lives inside `.app-content` (container-type:
+ * inline-size); the selector + HUD re-proportion off the window via the
+ * cqi-aware editorial/text utilities. The game canvases keep their existing
+ * ResizeObserver sizing logic untouched.
  */
 
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trophy } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMono } from '@/hooks/usePalette';
+import { Hairline, MetaLabel } from '@/components/editorial';
+import { Plotter } from '@/components/signature';
+import { strokeSet } from '@/lib/signature/plotter';
+import { reveal, withReduced } from '@/lib/motion';
 
 type GameId = 'launcher' | 'snake' | 'tetris' | 'typeracer';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MONO PALETTE — grayscale tones for the arcade.
+// MONO PALETTE - grayscale tones for the arcade.
 // Pieces/segments stay distinguishable by LIGHTNESS, not hue (color-not-only).
 // Fun mode is gated to keep today's colors byte-for-byte.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Seven graphite tones spaced by lightness — one per tetromino, all distinct
+// Seven graphite tones spaced by lightness - one per tetromino, all distinct
 // without relying on hue. Index aligns with TETROMINOES order (I,O,T,S,Z,L,J).
 const MONO_TETRIS = ['#f4f4f5', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#e4e4e7', '#8a8a93'];
 // Snake head brighter than body so the head reads at a glance.
@@ -30,176 +53,12 @@ const MONO_SNAKE_BODY = '#a1a1aa';
 const MONO_APPLE      = '#e4e4e7';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GAME ICONS — Apple-quality SVG illustrations
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SnakeIcon() {
-  const mono = useIsMono();
-  // Pixel snake winding through a subtle grid, red apple in corner
-  const seg = 8; // segment size
-  // Snake body: winding S-shape segments (col, row)
-  const body = [
-    [3,1],[4,1],[5,1],[6,1],
-    [6,2],[6,3],
-    [5,3],[4,3],[3,3],[2,3],
-    [2,4],[2,5],
-    [3,5],[4,5],[5,5],[6,5],[7,5],
-  ];
-  const colorsFun = [
-    '#4ade80','#4ade80','#4ade80','#4ade80',
-    '#4ade80','#4ade80',
-    '#4ade80','#4ade80','#4ade80','#22c55e',
-    '#22c55e','#16a34a',
-    '#16a34a','#16a34a','#16a34a','#15803d','#15803d',
-  ];
-  // Mono: fade lightness head→tail so the body still reads as a snake.
-  const colorsMono = [
-    '#f4f4f5','#e8e8eb','#dcdce0','#d0d0d5',
-    '#c4c4cb','#b8b8c0',
-    '#acacb5','#a0a0aa','#9494a0','#888895',
-    '#7c7c8a','#71717a',
-    '#6a6a73','#63636c','#5c5c65','#55555e','#4e4e57',
-  ];
-  const colors = mono ? colorsMono : colorsFun;
-  const w = 10, h = 8;
-  return (
-    <svg viewBox={`0 0 ${w * seg} ${h * seg}`} width={72} height={58} xmlns="http://www.w3.org/2000/svg">
-      {/* Grid dots */}
-      {Array.from({ length: h }, (_, r) =>
-        Array.from({ length: w }, (_, c) => (
-          <circle key={`${r}-${c}`} cx={c * seg + seg / 2} cy={r * seg + seg / 2} r={0.7} fill="rgba(255,255,255,0.08)" />
-        ))
-      )}
-      {/* Snake body segments */}
-      {body.map(([c, r], i) => (
-        <rect
-          key={i}
-          x={c * seg + 1} y={r * seg + 1}
-          width={seg - 2} height={seg - 2}
-          rx={i === 0 ? 3 : 2}
-          fill={colors[i]}
-          opacity={0.95}
-        />
-      ))}
-      {/* Head eyes */}
-      <circle cx={3 * seg + 3} cy={1 * seg + 3} r={1.2} fill={mono ? '#27272a' : '#052e16'} />
-      <circle cx={3 * seg + 5.5} cy={1 * seg + 3} r={1.2} fill={mono ? '#27272a' : '#052e16'} />
-      {/* Apple / food */}
-      <circle cx={8 * seg + 2} cy={2 * seg + 2} r={4} fill={mono ? MONO_APPLE : '#ef4444'} />
-      <rect x={8 * seg + 1.5} y={2 * seg - 3} width={1.5} height={4} rx={0.75} fill={mono ? '#71717a' : '#16a34a'} />
-    </svg>
-  );
-}
-
-function TetrisIcon() {
-  const mono = useIsMono();
-  // Mini Tetris board — locked pieces. In mono each piece type maps to a
-  // distinct grayscale tone (by lightness) so the 7 shapes stay readable.
-  const cs = 7; // cell size
-  const cols = 8, rows = 9;
-  // Per-piece tone: Fun hue vs mono grayscale (I,O,T,S,Z,L,J).
-  const I = mono ? MONO_TETRIS[0] : '#22d3ee';
-  const O = mono ? MONO_TETRIS[1] : '#facc15';
-  const T = mono ? MONO_TETRIS[2] : '#a78bfa';
-  const S = mono ? MONO_TETRIS[3] : '#4ade80';
-  const Z = mono ? MONO_TETRIS[4] : '#f87171';
-  const L = mono ? MONO_TETRIS[5] : '#fb923c';
-  const J = mono ? MONO_TETRIS[6] : '#60a5fa';
-  // Grid: 0 = empty, color string = filled
-  const grid: (string | 0)[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
-  // Place pieces manually for a satisfying composition
-  const pieces: [number, number, string][] = [
-    // I-piece — bottom row, full width
-    [7,0,I],[7,1,I],[7,2,I],[7,3,I],
-    // O-piece
-    [6,0,O],[6,1,O],[5,0,O],[5,1,O],
-    // T-piece
-    [6,2,T],[6,3,T],[6,4,T],[5,3,T],
-    // S-piece
-    [5,4,S],[5,5,S],[6,5,S],[6,6,S],
-    // Z-piece
-    [4,5,Z],[4,6,Z],[5,6,Z],[5,7,Z],
-    // L-piece
-    [4,2,L],[4,3,L],[4,4,L],[3,4,L],
-    // J-piece
-    [3,6,J],[3,7,J],[4,7,J],[4,8,J],
-    // Falling I (partial) — top
-    [0,4,I],[1,4,I],[2,4,I],[3,4,I],
-  ];
-  pieces.forEach(([r, c, color]) => { if (grid[r]) grid[r][c] = color; });
-
-  return (
-    <svg viewBox={`0 0 ${cols * cs} ${rows * cs}`} width={72} height={72} xmlns="http://www.w3.org/2000/svg">
-      {/* Board background */}
-      <rect width={cols * cs} height={rows * cs} rx={3} fill="rgba(0,0,0,0.25)" />
-      {/* Grid lines */}
-      {Array.from({ length: rows }, (_, r) =>
-        Array.from({ length: cols }, (_, c) => (
-          <rect key={`${r}-${c}`} x={c*cs+0.5} y={r*cs+0.5} width={cs-1} height={cs-1} rx={1}
-            fill="rgba(255,255,255,0.04)" />
-        ))
-      )}
-      {/* Filled cells */}
-      {grid.map((row, r) =>
-        row.map((cell, c) =>
-          cell ? (
-            <g key={`${r}-${c}`}>
-              <rect x={c*cs+1} y={r*cs+1} width={cs-2} height={cs-2} rx={1.5} fill={cell} opacity={0.92} />
-              {/* Highlight */}
-              <rect x={c*cs+2} y={r*cs+2} width={cs-5} height={2} rx={0.5} fill="rgba(255,255,255,0.35)" />
-            </g>
-          ) : null
-        )
-      )}
-    </svg>
-  );
-}
-
-function TypeRacerIcon() {
-  const mono = useIsMono();
-  // Terminal window: traffic lights + syntax-highlighted code lines, cursor
-  return (
-    <svg viewBox="0 0 80 60" width={80} height={60} xmlns="http://www.w3.org/2000/svg">
-      {/* Window */}
-      <rect width={80} height={60} rx={6} fill={mono ? '#18181b' : '#1e1e2e'} />
-      {/* Title bar */}
-      <rect width={80} height={14} rx={6} fill={mono ? '#27272a' : '#2a2a3d'} />
-      <rect y={8} width={80} height={6} fill={mono ? '#27272a' : '#2a2a3d'} />
-      {/* Traffic lights — neutral graphite dots in mono (distinct by lightness) */}
-      <circle cx={10} cy={7} r={3} fill={mono ? '#71717a' : '#ff5f57'} />
-      <circle cx={20} cy={7} r={3} fill={mono ? '#a1a1aa' : '#febc2e'} />
-      <circle cx={30} cy={7} r={3} fill={mono ? '#d4d4d8' : '#28c840'} />
-      {/* Code line 1 — fully "typed" */}
-      <rect x={8} y={19} width={12} height={4} rx={1} fill={mono ? '#d4d4d8' : '#86efac'} opacity={0.85} />
-      <rect x={22} y={19} width={8} height={4} rx={1} fill={mono ? '#a1a1aa' : '#c4b5fd'} opacity={0.85} />
-      <rect x={32} y={19} width={16} height={4} rx={1} fill={mono ? '#c4c4cb' : '#7dd3fc'} opacity={0.85} />
-      {/* Cursor blink after typed text */}
-      <rect x={50} y={19} width={3} height={4} rx={0.5} fill={mono ? '#f4f4f5' : '#a5f3fc'} opacity={0.9} />
-      {/* Code line 2 — upcoming (dimmer) */}
-      <rect x={8} y={27} width={10} height={3.5} rx={1} fill="rgba(255,255,255,0.15)" />
-      <rect x={20} y={27} width={20} height={3.5} rx={1} fill="rgba(255,255,255,0.10)" />
-      <rect x={42} y={27} width={12} height={3.5} rx={1} fill="rgba(255,255,255,0.10)" />
-      {/* Code line 3 */}
-      <rect x={8} y={34} width={6} height={3.5} rx={1} fill="rgba(255,255,255,0.10)" />
-      <rect x={16} y={34} width={24} height={3.5} rx={1} fill="rgba(255,255,255,0.08)" />
-      {/* Code line 4 */}
-      <rect x={8} y={41} width={14} height={3.5} rx={1} fill="rgba(255,255,255,0.08)" />
-      <rect x={24} y={41} width={10} height={3.5} rx={1} fill="rgba(255,255,255,0.06)" />
-      {/* Progress bar */}
-      <rect x={8} y={51} width={64} height={3} rx={1.5} fill="rgba(255,255,255,0.08)" />
-      <rect x={8} y={51} width={26} height={3} rx={1.5} fill={mono ? '#d4d4d8' : '#34d399'} opacity={0.8} />
-    </svg>
-  );
-}
-
-const GAME_ICONS: Record<string, React.ReactElement> = {
-  snake: <SnakeIcon />,
-  tetris: <TetrisIcon />,
-  typeracer: <TypeRacerIcon />,
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LAUNCHER — Premium 3-column card grid
+// SELECTOR - editorial numbered index
+//
+// Three games set as a ruled, numbered list: serif name + tiny uppercase mono
+// metadata (genre · controls · best). No gradients, no glow, no colored chrome.
+// hsKey / hsLabel feed the live best-score read from localStorage (rendered,
+// not animated). controls / genre are the mono caption line.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CARDS = [
@@ -207,14 +66,8 @@ const CARDS = [
     id: 'snake' as GameId,
     title: 'Snake',
     subtitle: 'Nokia 3310 edition',
+    genre: 'Arcade',
     controls: '← → ↑ ↓ · Space pause',
-    gradient: 'linear-gradient(150deg, #166534 0%, #052e16 100%)',
-    glow: '#22c55e',
-    border: 'rgba(34,197,94,0.2)',
-    // Mono: neutral graphite chrome, varied lightness so the 3 cards still differ
-    gradientMono: 'linear-gradient(150deg, #3f3f46 0%, #18181b 100%)',
-    glowMono: '#a1a1aa',
-    borderMono: 'rgba(161,161,170,0.2)',
     hsKey: 'devos-snake-hs',
     hsLabel: 'pts',
   },
@@ -222,13 +75,8 @@ const CARDS = [
     id: 'tetris' as GameId,
     title: 'Tetris',
     subtitle: "The programmer's meditation",
+    genre: 'Puzzle',
     controls: '← → ↑ · Space drop · P pause',
-    gradient: 'linear-gradient(150deg, #3730a3 0%, #1e1b4b 100%)',
-    glow: '#6366f1',
-    border: 'rgba(99,102,241,0.2)',
-    gradientMono: 'linear-gradient(150deg, #52525b 0%, #1c1c1f 100%)',
-    glowMono: '#d4d4d8',
-    borderMono: 'rgba(212,212,216,0.2)',
     hsKey: 'devos-tetris-hs',
     hsLabel: 'pts',
   },
@@ -236,157 +84,116 @@ const CARDS = [
     id: 'typeracer' as GameId,
     title: 'Type Racer',
     subtitle: 'Code faster than your linter',
+    genre: 'Reflex',
     controls: 'Start typing to begin',
-    gradient: 'linear-gradient(150deg, #065f46 0%, #022c22 100%)',
-    glow: '#10b981',
-    border: 'rgba(16,185,129,0.2)',
-    gradientMono: 'linear-gradient(150deg, #27272a 0%, #0c0c0e 100%)',
-    glowMono: '#71717a',
-    borderMono: 'rgba(113,113,122,0.2)',
     hsKey: 'devos-typeracer-hs',
     hsLabel: 'WPM',
   },
 ] as const;
 
+function bestScore(key: string): number {
+  if (typeof window === 'undefined') return 0;
+  return parseInt(localStorage.getItem(key) ?? '0', 10) || 0;
+}
+
+// One numbered, ruled index entry. Serif name, mono caption line, mono best on
+// the right. Hover is a graphite tint + tiny translate (transform/opacity only,
+// ease-out); the row presses to 0.985 on :active. No per-frame motion.
+function SelectorEntry({
+  number,
+  card,
+  reduced,
+  onSelect,
+}: {
+  number: string;
+  card: (typeof CARDS)[number];
+  reduced: boolean | null;
+  onSelect: () => void;
+}) {
+  const best = bestScore(card.hsKey);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      data-testid="index-row"
+      className={`group relative flex w-full items-baseline gap-4 px-3 py-4 text-left
+                  transition-[transform,background-color] duration-150 ease-out
+                  hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
+                  active:scale-[0.985]
+                  focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]`}
+    >
+      <MetaLabel className="shrink-0 w-7 justify-start tabular-nums text-text-secondary/55 group-hover:text-text-secondary">
+        {number}
+      </MetaLabel>
+
+      <span className="flex-1 min-w-0">
+        <span
+          className={`block font-display leading-tight truncate text-text-secondary group-hover:text-text
+                      transition-[color,transform] text-[clamp(1.15rem,3.4cqi,1.9rem)]
+                      ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
+        >
+          {card.title}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-text-secondary/70">
+          <MetaLabel>{card.genre}</MetaLabel>
+          <span aria-hidden className="font-mono-meta opacity-40">·</span>
+          <MetaLabel className="truncate">{card.controls}</MetaLabel>
+        </span>
+      </span>
+
+      {best > 0 && (
+        <span className="shrink-0 self-center flex flex-col items-end gap-0.5">
+          <MetaLabel className="text-text tabular-nums">{best}</MetaLabel>
+          <MetaLabel className="text-text-secondary/50">{`Best ${card.hsLabel}`}</MetaLabel>
+        </span>
+      )}
+    </button>
+  );
+}
+
 function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
-  const mono = useIsMono();
-  const hero = CARDS[1]; // Tetris — most visually striking icon
-  const shelf = [CARDS[0], CARDS[2]]; // Snake + Type Racer
-
-  // Resolve chrome per palette: Fun keeps the colored gradient/glow/border.
-  const heroGradient = mono ? hero.gradientMono : hero.gradient;
-  const heroGlow     = mono ? hero.glowMono     : hero.glow;
-  const heroBorder   = mono ? hero.borderMono   : hero.border;
-
-  const hsHero  = typeof window !== 'undefined' ? (localStorage.getItem(hero.hsKey)  ?? '0') : '0';
+  const reduced = useReducedMotion();
 
   return (
-    <div className="h-full flex flex-col px-5 pt-4 pb-5 gap-3 bg-surface/20 overflow-hidden">
-
-      {/* ── Header ── */}
-      <div className="flex-shrink-0 text-center">
-        <h1 className="font-display text-lg text-text tracking-tight">Arcade</h1>
-        <p className="text-[10px] text-text-secondary mt-0.5">Three classics · one window · zero productivity</p>
+    <div className="relative h-full flex flex-col overflow-hidden bg-surface/20">
+      {/* Faint signature line-mark on the backdrop - hard-gated on the mono
+          palette + reduced motion inside Plotter. Decorative, behind content. */}
+      <div aria-hidden className="pointer-events-none absolute -right-10 -bottom-16 w-[min(60cqi,28rem)] opacity-[0.06]">
+        <Plotter generator={(s) => strokeSet(s, 6)} seed={0xA12C} strokeWidth={1} />
       </div>
 
-      {/* ── Hero card ── full width, horizontal */}
-      <motion.button
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-        whileHover={{ scale: 1.012 }}
-        whileTap={{ scale: 0.985 }}
-        onClick={() => onSelect(hero.id)}
-        className="relative overflow-hidden rounded-2xl flex-shrink-0 cursor-pointer text-left group"
-        style={{
-          height: 160,
-          background: heroGradient,
-          border: `1px solid ${heroBorder}`,
-          boxShadow: `0 12px 40px ${heroGlow}20, 0 2px 8px rgba(0,0,0,0.4)`,
-        }}
-      >
-        {/* Hover glow */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: `radial-gradient(ellipse at 70% 50%, ${heroGlow}28, transparent 65%)` }} />
-
-        {/* Large ambient blob behind icon */}
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ filter: `blur(24px)`, width: 120, height: 120, background: `${heroGlow}30`, borderRadius: '50%' }} />
-
-        {/* Icon — right side */}
-        <div className="absolute right-8 top-1/2 -translate-y-1/2 z-10"
-          style={{ filter: `drop-shadow(0 10px 28px ${heroGlow}80)`, transform: 'translateY(-50%) scale(1.35)' }}>
-          {GAME_ICONS[hero.id]}
+      {/* ── Masthead ── serif title + mono spec line ── */}
+      <div className="relative z-10 px-5 pt-6 pb-4 flex flex-col gap-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <MetaLabel as="p">Arcade</MetaLabel>
+          <MetaLabel className="text-text-secondary/60 tabular-nums">{String(CARDS.length).padStart(2, '0')}</MetaLabel>
         </div>
+        <h1 className="editorial-head text-text leading-[1.05]">Three classics, one window.</h1>
+        <MetaLabel className="text-text-secondary/70">Snake · Tetris · Type Racer</MetaLabel>
+      </div>
 
-        {/* Text — left side */}
-        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-center px-6 z-10" style={{ maxWidth: '55%' }}>
-          {/* Featured label */}
-          <span className="text-[9px] font-semibold tracking-widest uppercase mb-2"
-            style={{ color: heroGlow, opacity: 0.85 }}>Featured</span>
-          <h2 className="text-2xl font-bold text-white leading-tight">{hero.title}</h2>
-          <p className="text-white/50 text-[11px] mt-1 leading-snug">{hero.subtitle}</p>
+      <Hairline className="relative z-10 mx-5" />
 
-          {/* High score */}
-          {parseInt(hsHero) > 0 && (
-            <div className="flex items-center gap-1 mt-2">
-              <Trophy size={9} style={{ color: heroGlow }} />
-              <span className="text-[9px] font-mono font-medium" style={{ color: heroGlow }}>
-                Best: {hsHero} {hero.hsLabel}
-              </span>
-            </div>
-          )}
-
-          {/* CTA */}
-          <div className="mt-3">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/90
-              border border-white/20 bg-white/10 group-hover:bg-white/18 transition-colors">
-              Play →
-            </span>
-          </div>
-        </div>
-      </motion.button>
-
-      {/* ── Shelf — two equal cards ── */}
-      <div className="flex-1 grid grid-cols-2 gap-3 min-h-0">
-        {shelf.map((card, idx) => {
-          const hs = typeof window !== 'undefined' ? (localStorage.getItem(card.hsKey) ?? '0') : '0';
-          const cardGradient = mono ? card.gradientMono : card.gradient;
-          const cardGlow     = mono ? card.glowMono     : card.glow;
-          const cardBorder   = mono ? card.borderMono   : card.border;
-          return (
-            <motion.button
-              key={card.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 + idx * 0.06, type: 'spring', damping: 22, stiffness: 260 }}
-              whileHover={{ scale: 1.022, y: -3 }}
-              whileTap={{ scale: 0.975 }}
-              onClick={() => onSelect(card.id)}
-              className="relative overflow-hidden rounded-2xl flex flex-col cursor-pointer text-left group"
-              style={{
-                background: cardGradient,
-                border: `1px solid ${cardBorder}`,
-                boxShadow: `0 8px 28px ${cardGlow}18, 0 2px 8px rgba(0,0,0,0.4)`,
-              }}
-            >
-              {/* Hover glow */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                style={{ background: `radial-gradient(ellipse at 50% 35%, ${cardGlow}28, transparent 65%)` }} />
-
-              {/* Ambient blob */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none"
-                style={{ filter: 'blur(20px)', width: 80, height: 80, background: `${cardGlow}22`, borderRadius: '50%' }} />
-
-              {/* Icon — centered, constrained */}
-              <div className="flex items-center justify-center pt-5 pb-3 relative z-10"
-                style={{ filter: `drop-shadow(0 6px 18px ${cardGlow}70)` }}>
-                {GAME_ICONS[card.id]}
-              </div>
-
-              {/* Info */}
-              <div className="relative z-10 px-3.5 pb-3.5 mt-auto">
-                <div className="border-t mb-2.5" style={{ borderColor: cardBorder }} />
-                {parseInt(hs) > 0 && (
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <Trophy size={8} style={{ color: cardGlow }} />
-                    <span className="text-[9px] font-mono font-medium" style={{ color: cardGlow }}>
-                      {hs} {card.hsLabel}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-end justify-between gap-1">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-white text-sm leading-tight truncate">{card.title}</h3>
-                    <p className="text-white/40 text-[10px] mt-0.5 leading-tight truncate">{card.subtitle}</p>
-                  </div>
-                  <span className="text-white/30 text-xs group-hover:text-white/60 transition-colors flex-shrink-0 font-medium pb-0.5">→</span>
-                </div>
-                <p className="text-white/20 text-[9px] font-mono mt-1.5 truncate">{card.controls}</p>
-              </div>
-            </motion.button>
-          );
-        })}
+      {/* ── Numbered index ── staggers in ONCE on mount (never on scroll) ── */}
+      <div className="relative z-10 flex-1 overflow-y-auto px-2 py-1">
+        <motion.div
+          variants={reveal.container(reduced)}
+          initial="hidden"
+          animate="show"
+          className="flex flex-col"
+        >
+          {CARDS.map((card, i) => (
+            <motion.div key={card.id} variants={reveal.item(reduced)}>
+              <SelectorEntry
+                number={String(i + 1).padStart(2, '0')}
+                card={card}
+                reduced={reduced}
+                onSelect={() => onSelect(card.id)}
+              />
+              {i < CARDS.length - 1 && <Hairline className="mx-1" />}
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
   );
@@ -396,6 +203,20 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
 // Shared game header
 // ─────────────────────────────────────────────────────────────────────────────
 
+// A single HUD stat: tiny mono uppercase label over a value. The value updates
+// live during play and is rendered plainly - NO entrance/score-pop animation,
+// because the HUD is a high-frequency surface (emil frequency rule).
+function HudStat({ label, value, emphatic = false }: { label: string; value: React.ReactNode; emphatic?: boolean }) {
+  return (
+    <div className="flex flex-col items-end gap-0.5 text-right">
+      <MetaLabel className="text-text-secondary/55">{label}</MetaLabel>
+      <span className={`font-mono-meta tabular-nums leading-none text-[clamp(0.82rem,2cqi,1rem)] ${emphatic ? 'text-text' : 'text-text'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function GameHeader({
   title, score, best, scoreLabel = 'Score', bestLabel = 'Best',
   onBack, onReset, children,
@@ -404,41 +225,118 @@ function GameHeader({
   scoreLabel?: string; bestLabel?: string;
   onBack: () => void; onReset: () => void; children?: React.ReactNode;
 }) {
+  // Mono editorial HUD frame: a single hairline rule under a quiet bar.
+  const iconBtn =
+    'p-1.5 text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95 focus-visible:outline-none';
   return (
-    <div className="flex items-center gap-3 px-4 py-3 glass-subtle border-b border-white/10 flex-shrink-0">
-      <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-text-secondary hover:text-text">
-        <ArrowLeft size={15} />
-      </button>
-      <span className="font-bold text-text text-sm">{title}</span>
-      <div className="flex-1" />
-      {children}
-      {score !== undefined && (
-        <div className="text-center">
-          <div className="text-xs text-text-secondary">{scoreLabel}</div>
-          <div className="text-sm font-bold text-text">{score}</div>
+    <div className="flex-shrink-0">
+      <div className="flex items-center gap-4 px-4 py-3 bg-surface/20">
+        <button onClick={onBack} className={iconBtn} aria-label="Back to arcade">
+          <ArrowLeft size={15} />
+        </button>
+        <span className="font-display text-text leading-none text-[clamp(1rem,2.6cqi,1.3rem)]">{title}</span>
+        <div className="flex-1" />
+        <div className="flex items-center gap-4 sm:gap-5">
+          {children}
+          {score !== undefined && <HudStat label={scoreLabel} value={score} />}
+          {best !== undefined && <HudStat label={bestLabel} value={best} emphatic />}
         </div>
-      )}
-      {best !== undefined && (
-        <div className="text-center">
-          <div className="text-xs text-text-secondary">{bestLabel}</div>
-          <div className="text-sm font-bold text-accent">{best}</div>
-        </div>
-      )}
-      <button onClick={onReset} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-text-secondary hover:text-text">
-        <RotateCcw size={14} />
-      </button>
+        <button onClick={onReset} className={iconBtn} aria-label="Reset game">
+          <RotateCcw size={14} />
+        </button>
+      </div>
+      <Hairline />
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SNAKE — ref-based, window listener (no text inputs here so it's fine)
+// Shared overlay chrome - start / pause / game-over surfaces.
+//
+// These are OCCASIONAL surfaces (seen between rounds, not during play), so a
+// single tasteful entrance is allowed per emil. Enter is transform + opacity,
+// ease-out, never from scale(0); it collapses to instant under reduced motion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OVERLAY_EASE = [0.23, 1, 0.32, 1] as const;
+
+// Pressable editorial button. Default = the ink primary (filled bg-text/text-bg);
+// 'ghost' = hairline outline. Mono palette keeps it monochrome; Fun keeps the
+// per-game accent passed in via `accent`/`accentHover`.
+function OverlayButton({
+  children, onClick, variant = 'primary', mono, accent, accentHover,
+}: {
+  children: React.ReactNode; onClick: () => void;
+  variant?: 'primary' | 'ghost'; mono: boolean;
+  accent?: string; accentHover?: string;
+}) {
+  if (variant === 'ghost') {
+    return (
+      <button
+        onClick={onClick}
+        className="inline-flex items-center justify-center gap-2 border border-border px-5 py-2 text-text font-medium
+                   transition-[transform,border-color] duration-150 ease-out hover:border-text/45 active:scale-[0.97]
+                   focus-visible:outline-none font-mono-meta"
+      >
+        {children}
+      </button>
+    );
+  }
+  const colorCls = mono
+    ? 'bg-text text-bg hover:opacity-90'
+    : 'text-white';
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 font-semibold
+                  transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97]
+                  focus-visible:outline-none font-mono-meta ${colorCls}`}
+      style={mono ? undefined : { background: accent }}
+      onMouseEnter={mono || !accentHover ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accentHover; }}
+      onMouseLeave={mono || !accent ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accent; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Scrim + centered card that animates in once on (re)mount of the status.
+function GameOverlay({ reduced, children }: { reduced: boolean | null; children: React.ReactNode }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-bg/70 backdrop-blur-[2px]">
+      <motion.div
+        initial={reduced ? false : { opacity: 0, y: 8, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={withReduced({ duration: 0.24, ease: OVERLAY_EASE }, reduced)}
+        className="flex flex-col items-center gap-4 px-8 text-center"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+// Editorial controls hint strip - mono uppercase meta, single hairline above.
+function ControlsHint({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex-shrink-0">
+      <Hairline />
+      <div className="flex items-center justify-center py-2.5 bg-surface/10">
+        <MetaLabel className="text-text-secondary/60">{children}</MetaLabel>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SNAKE - ref-based, window listener (no text inputs here so it's fine)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SNAKE_GRID = 20;
 
 function SnakeGameView({ onBack }: { onBack: () => void }) {
   const mono = useIsMono();
+  const reduced = useReducedMotion();
   const [cellSize, setCellSize] = useState(18);
   const [status, setStatus] = useState<'idle' | 'playing' | 'paused' | 'over'>('idle');
   const [score, setScore] = useState(0);
@@ -544,30 +442,44 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
       <GameHeader title="Snake" score={score} best={best} onBack={onBack} onReset={startGame} />
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-4 bg-surface/20 overflow-hidden">
         <div className="relative">
-          <canvas ref={canvasRef} width={canvasSize} height={canvasSize} className="rounded-xl shadow-2xl border border-white/10" />
+          <canvas ref={canvasRef} width={canvasSize} height={canvasSize} className="border border-border" />
           {status !== 'playing' && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm">
-              {status === 'idle' && <button onClick={startGame} className={`px-8 py-3 text-white font-bold rounded-xl transition-all shadow-lg ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Start</button>}
-              {status === 'paused' && <button onClick={() => setStatus('playing')} className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Resume</button>}
-              {status === 'over' && (
-                <div className="text-center space-y-3">
-                  <p className="text-white font-bold text-xl">Game Over</p>
-                  <p className="text-white/70 text-sm">Score: {score}</p>
-                  {score > 0 && score === best && <p className={`text-sm font-semibold ${mono ? 'text-white' : 'text-green-400'}`}>{mono ? '★ ' : ''}New Best!</p>}
-                  <button onClick={startGame} className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-green-500 hover:bg-green-400'}`}>Play Again</button>
-                </div>
+            <GameOverlay reduced={reduced} key={status}>
+              {status === 'idle' && (
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Snake</h2>
+                  <MetaLabel className="text-text-secondary/65">Eat · grow · don&apos;t bite yourself</MetaLabel>
+                  <OverlayButton onClick={startGame} mono={mono} accent="#22c55e" accentHover="#4ade80">Start</OverlayButton>
+                </>
               )}
-            </div>
+              {status === 'paused' && (
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Paused</h2>
+                  <OverlayButton onClick={() => setStatus('playing')} mono={mono} accent="#22c55e" accentHover="#4ade80">Resume</OverlayButton>
+                </>
+              )}
+              {status === 'over' && (
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Game Over</h2>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-mono-meta tabular-nums text-text text-[clamp(1.1rem,3cqi,1.5rem)]">{score}</span>
+                    <MetaLabel className="text-text-secondary/55">Points</MetaLabel>
+                  </div>
+                  {score > 0 && score === best && <MetaLabel className="text-text">New best</MetaLabel>}
+                  <OverlayButton onClick={startGame} mono={mono} accent="#22c55e" accentHover="#4ade80">Play again</OverlayButton>
+                </>
+              )}
+            </GameOverlay>
           )}
         </div>
       </div>
-      <div className="text-center py-2 text-xs text-text-secondary border-t border-white/10 flex-shrink-0">Arrow keys / WASD · Space to pause</div>
+      <ControlsHint>Arrow keys / WASD · Space to pause</ControlsHint>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TETRIS — types + helpers
+// TETRIS - types + helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const T_COLS = 10;
@@ -731,17 +643,18 @@ function drawTetCell(ctx: CanvasRenderingContext2D, c: number, r: number, color:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TETRIS GAME — responsive canvas + focus-based keyboard + button controls
+// TETRIS GAME - responsive canvas + focus-based keyboard + button controls
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TetrisGame({ onBack }: { onBack: () => void }) {
   const mono = useIsMono();
+  const reduced = useReducedMotion();
   const [state, dispatch] = useReducer(
     tetrisReducer,
     freshTetris(typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-tetris-hs') ?? '0') : 0)
   );
 
-  // Responsive cell size — recalculates whenever the game area resizes
+  // Responsive cell size - recalculates whenever the game area resizes
   const [cs, setCs] = useState(20);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); // for focus
@@ -779,7 +692,7 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
     return () => clearInterval(intervalRef.current);
   }, [state.status, state.level]);
 
-  // Keyboard handler on the focused container div — fixes arrow key issue in small windows
+  // Keyboard handler on the focused container div - fixes arrow key issue in small windows
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'ArrowLeft':  case 'a': case 'A': e.preventDefault(); dispatch({ type: 'MOVE', dx: -1 }); break;
@@ -842,8 +755,8 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
 
   const previewSize = Math.max(40, Math.round(cs * 0.75) * 4);
 
-  // Shared button style for on-screen controls
-  const ctrlBtn = "w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text bg-white/6 hover:bg-white/14 active:bg-white/20 transition-all border border-white/8 hover:border-white/20 cursor-pointer select-none";
+  // Shared button style for on-screen controls - editorial mono, pressable.
+  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none focus-visible:outline-none";
 
   return (
     <div
@@ -853,8 +766,8 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
       className="h-full flex flex-col overflow-hidden outline-none"
     >
       <GameHeader title="Tetris" score={state.score} best={state.best} onBack={onBack} onReset={() => dispatch({ type: 'RESET' })}>
-        <div className="text-center mr-2"><div className="text-xs text-text-secondary">Lines</div><div className="text-sm font-bold text-text">{state.lines}</div></div>
-        <div className="text-center mr-2"><div className="text-xs text-text-secondary">Level</div><div className="text-sm font-bold text-accent">{state.level}</div></div>
+        <HudStat label="Lines" value={state.lines} />
+        <HudStat label="Level" value={state.level} />
       </GameHeader>
 
       <div ref={gameAreaRef} className="flex-1 flex items-center justify-center gap-3 p-3 bg-surface/20 overflow-hidden">
@@ -864,80 +777,83 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
             ref={canvasRef}
             width={T_COLS * cs}
             height={T_ROWS * cs}
-            className="rounded-xl shadow-2xl border border-white/10 block"
+            className="border border-border block"
           />
           {(state.status === 'idle' || state.status === 'over') && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm">
+            <GameOverlay reduced={reduced} key={state.status}>
               {state.status === 'idle' ? (
-                <div className="text-center space-y-3">
-                  <p className="text-white/60 text-sm">Click Start or press Space</p>
-                  <button onClick={() => dispatch({ type: 'START' })} className={`px-8 py-2.5 text-white font-bold rounded-xl transition-all shadow-lg ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-indigo-500 hover:bg-indigo-400'}`}>
-                    Start
-                  </button>
-                </div>
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Tetris</h2>
+                  <MetaLabel className="text-text-secondary/65">Click Start or press Space</MetaLabel>
+                  <OverlayButton onClick={() => dispatch({ type: 'START' })} mono={mono} accent="#6366f1" accentHover="#818cf8">Start</OverlayButton>
+                </>
               ) : (
-                <div className="text-center space-y-3">
-                  <p className="text-white font-bold text-xl">Game Over</p>
-                  <p className="text-white/70 text-sm">Score: {state.score.toLocaleString()}</p>
-                  {state.score >= state.best && state.score > 0 && <p className={`text-sm ${mono ? 'text-white font-semibold' : 'text-yellow-400'}`}>🏆 New Best!</p>}
-                  <button onClick={() => dispatch({ type: 'START' })} className={`px-8 py-2.5 text-white font-bold rounded-xl transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-indigo-500 hover:bg-indigo-400'}`}>
-                    Play Again
-                  </button>
-                </div>
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Game Over</h2>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-mono-meta tabular-nums text-text text-[clamp(1.1rem,3cqi,1.5rem)]">{state.score.toLocaleString()}</span>
+                    <MetaLabel className="text-text-secondary/55">Points</MetaLabel>
+                  </div>
+                  {state.score >= state.best && state.score > 0 && <MetaLabel className="text-text">New best</MetaLabel>}
+                  <OverlayButton onClick={() => dispatch({ type: 'START' })} mono={mono} accent="#6366f1" accentHover="#818cf8">Play again</OverlayButton>
+                </>
               )}
-            </div>
+            </GameOverlay>
           )}
         </div>
 
         {/* Side panel */}
         <div className="flex flex-col gap-3 flex-shrink-0">
-          <div className="glass-subtle rounded-xl p-2 border border-white/10 text-center">
-            <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1.5">Next</p>
-            <canvas ref={previewRef} width={previewSize} height={previewSize} className="rounded-lg" style={{ width: previewSize, height: previewSize }} />
+          <div className="border border-border p-2 text-center">
+            <MetaLabel as="p" className="text-text-secondary/60 justify-center mb-1.5">Next</MetaLabel>
+            <canvas ref={previewRef} width={previewSize} height={previewSize} style={{ width: previewSize, height: previewSize }} />
           </div>
         </div>
       </div>
 
-      {/* ── On-screen controls — fix for small windows & touch ── */}
-      <div className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 border-t border-white/10 bg-surface/10">
-        {/* D-pad */}
-        <button className={ctrlBtn} onClick={() => dispatch({ type: 'ROTATE' })} title="Rotate (↑)">
-          <ChevronUp size={16} />
-        </button>
-        <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: -1 })} title="Left (←)">
-          <ChevronLeft size={16} />
-        </button>
-        <button className={ctrlBtn} onClick={() => dispatch({ type: 'SOFT_DROP' })} title="Soft drop (↓)">
-          <ChevronDown size={16} />
-        </button>
-        <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: 1 })} title="Right (→)">
-          <ChevronRight size={16} />
-        </button>
+      {/* ── On-screen controls - fix for small windows & touch ── */}
+      <div className="flex-shrink-0">
+        <Hairline />
+        <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface/10">
+          {/* D-pad */}
+          <button className={ctrlBtn} onClick={() => dispatch({ type: 'ROTATE' })} title="Rotate (↑)" aria-label="Rotate">
+            <ChevronUp size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: -1 })} title="Left (←)" aria-label="Move left">
+            <ChevronLeft size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => dispatch({ type: 'SOFT_DROP' })} title="Soft drop (↓)" aria-label="Soft drop">
+            <ChevronDown size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: 1 })} title="Right (→)" aria-label="Move right">
+            <ChevronRight size={16} />
+          </button>
 
-        <div className="w-px h-5 bg-white/15 mx-1" />
+          <div className="w-px h-5 bg-border mx-1" />
 
-        {/* Action buttons */}
-        <button
-          className={`h-9 px-3 rounded-xl text-xs font-bold text-white transition-all border cursor-pointer select-none ${
-            mono
-              ? 'bg-zinc-600/80 hover:bg-zinc-600 active:bg-zinc-700 border-zinc-400/30'
-              : 'bg-indigo-500/80 hover:bg-indigo-500 active:bg-indigo-600 border-indigo-400/30'
-          }`}
-          onClick={() => {
-            if (state.status === 'idle' || state.status === 'over') dispatch({ type: 'START' });
-            else dispatch({ type: 'HARD_DROP' });
-          }}
-          title="Hard drop (Space)"
-        >
-          {state.status === 'idle' || state.status === 'over' ? 'Start' : 'Drop'}
-        </button>
-        <button
-          className={ctrlBtn}
-          onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })}
-          title="Pause (P)"
-        >
-          {state.status === 'paused' ? '▶' : '⏸'}
-        </button>
+          {/* Action buttons */}
+          <button
+            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none ${
+              mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
+            }`}
+            style={mono ? undefined : { background: '#6366f1' }}
+            onClick={() => {
+              if (state.status === 'idle' || state.status === 'over') dispatch({ type: 'START' });
+              else dispatch({ type: 'HARD_DROP' });
+            }}
+            title="Hard drop (Space)"
+          >
+            {state.status === 'idle' || state.status === 'over' ? 'Start' : 'Drop'}
+          </button>
+          <button
+            className={ctrlBtn}
+            onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })}
+            title="Pause (P)"
+            aria-label="Pause"
+          >
+            {state.status === 'paused' ? '▶' : '⏸'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -972,6 +888,7 @@ const CODE_SNIPPETS = [
 
 function TypeRacerGame({ onBack }: { onBack: () => void }) {
   const mono = useIsMono();
+  const reduced = useReducedMotion();
   const [snippetIdx, setSnippetIdx] = useState(0);
   const [typed,      setTyped]      = useState('');
   const [status,     setStatus]     = useState<'idle' | 'typing' | 'done'>('idle');
@@ -1032,38 +949,49 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
         scoreLabel="Current" bestLabel="Best"
         onBack={onBack} onReset={reset}
       >
-        <div className="text-center mr-2">
-          <div className="text-xs text-text-secondary">Accuracy</div>
-          {/* Mono: the % value + opacity tier signal quality, not hue. */}
-          <div className={`text-sm font-bold ${
-            mono
-              ? (accuracy >= 95 ? 'text-text' : accuracy >= 80 ? 'text-text/80' : 'text-text/55')
-              : (accuracy >= 95 ? 'text-green-400' : accuracy >= 80 ? 'text-yellow-400' : 'text-red-400')
-          }`}>{accuracy}%</div>
-        </div>
-        <div className="text-center mr-2">
-          <div className="text-xs text-text-secondary">Time</div>
-          <div className="text-sm font-bold text-text font-mono">{elapsed.toFixed(1)}s</div>
-        </div>
+        {/* Accuracy keeps its color-not-only quality tiering (mono: opacity). */}
+        <HudStat
+          label="Accuracy"
+          value={
+            <span className={
+              mono
+                ? (accuracy >= 95 ? 'text-text' : accuracy >= 80 ? 'text-text/80' : 'text-text/55')
+                : (accuracy >= 95 ? 'text-green-400' : accuracy >= 80 ? 'text-yellow-400' : 'text-red-400')
+            }>{accuracy}%</span>
+          }
+        />
+        <HudStat label="Time" value={`${elapsed.toFixed(1)}s`} />
       </GameHeader>
 
       <div className="flex-1 flex flex-col gap-4 p-5 bg-surface/20 overflow-auto">
-        {/* Snippet selector */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Snippet selector - mono uppercase tabs with a hairline underline marker. */}
+        <div className="flex items-center gap-5 flex-wrap">
           {CODE_SNIPPETS.map((s, i) => (
-            <button key={i} onClick={() => setSnippetIdx(i)} className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${snippetIdx === i ? (mono ? 'bg-white/15 text-text font-semibold border border-text/20' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30') : 'bg-white/5 text-text-secondary hover:bg-white/10 border border-white/10'}`}>
-              {s.label}
+            <button
+              key={i}
+              onClick={() => setSnippetIdx(i)}
+              aria-pressed={snippetIdx === i}
+              className="group relative font-mono-meta transition-opacity active:scale-[0.97] focus-visible:outline-none"
+            >
+              <span className={snippetIdx === i ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>
+                {s.label}
+              </span>
+              <span
+                aria-hidden
+                className={`absolute -bottom-1 left-0 right-0 h-px bg-text origin-left transition-transform duration-200 ease-out motion-reduce:transition-none
+                            ${snippetIdx === i ? 'scale-x-100' : reduced ? 'scale-x-0' : 'scale-x-0 group-hover:scale-x-50'}`}
+              />
             </button>
           ))}
         </div>
 
-        {/* Progress bar */}
-        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all duration-100 ${mono ? 'bg-zinc-300' : 'bg-emerald-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+        {/* Progress bar - flat hairline track + ink fill (no per-frame easing pop). */}
+        <div className="w-full h-px bg-border overflow-hidden">
+          <div className={`h-full transition-[width] duration-100 ${mono ? 'bg-text' : 'bg-emerald-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
         </div>
 
         {/* Snippet display */}
-        <div className="glass-subtle rounded-xl p-4 border border-white/10 font-mono text-sm leading-loose select-none overflow-auto max-h-48">
+        <div className="border border-border p-4 font-mono text-sm leading-loose select-none overflow-auto max-h-48 bg-bg/40">
           {snippet.split('').map((char, i) => {
             const typedChar = typed[i];
             const isCursor = i === typed.length;
@@ -1093,25 +1021,34 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
           onChange={handleChange}
           disabled={status === 'done'}
           placeholder={status === 'idle' ? 'Start typing to begin the timer...' : ''}
-          className="w-full h-24 font-mono text-sm p-3 rounded-xl bg-black/30 border border-white/15 focus:border-accent/50 focus:outline-none text-text resize-none placeholder:text-text-secondary/40 disabled:opacity-60"
+          className="w-full h-24 font-mono text-sm p-3 bg-bg/40 border border-border focus:border-text/40 focus:outline-none text-text resize-none placeholder:text-text-secondary/40 disabled:opacity-60 transition-colors"
           autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
         />
 
-        {/* Completion */}
+        {/* Completion - occasional surface: a single ease-out entrance, mono. */}
         <AnimatePresence>
           {status === 'done' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`glass-subtle rounded-xl p-4 ${mono ? 'border border-text/20 bg-white/[0.04]' : 'border border-emerald-500/30 bg-emerald-500/5'}`}>
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={withReduced({ duration: 0.24, ease: OVERLAY_EASE }, reduced)}
+              className={`border p-4 ${mono ? 'border-border bg-white/[0.03]' : 'border-emerald-500/30 bg-emerald-500/5'}`}
+            >
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 size={22} className={`flex-shrink-0 ${mono ? 'text-text' : 'text-emerald-400'}`} />
-                  <div>
-                    <p className="font-bold text-text text-sm">{finalWpm >= best && finalWpm > 0 ? '🏆 New Personal Best!' : '✓ Snippet complete!'}</p>
-                    <p className="text-xs text-text-secondary">{elapsed.toFixed(1)}s · {accuracy}% accuracy · <span className={`font-bold ${mono ? 'text-text' : 'text-emerald-400'}`}>{finalWpm} WPM</span></p>
+                  <CheckCircle2 size={20} className={`flex-shrink-0 ${mono ? 'text-text' : 'text-emerald-400'}`} />
+                  <div className="flex flex-col gap-1">
+                    <span className="font-display text-text text-base leading-none">
+                      {finalWpm >= best && finalWpm > 0 ? 'New personal best' : 'Snippet complete'}
+                    </span>
+                    <MetaLabel className="text-text-secondary/70">
+                      {elapsed.toFixed(1)}s · {accuracy}% accuracy · <span className={mono ? 'text-text' : 'text-emerald-400'}>{finalWpm} WPM</span>
+                    </MetaLabel>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={reset} className="px-4 py-2 rounded-lg bg-white/10 text-text text-xs font-medium hover:bg-white/20 transition-all">Retry</button>
-                  <button onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} className={`px-4 py-2 rounded-lg text-white text-xs font-medium transition-all ${mono ? 'bg-zinc-600 hover:bg-zinc-500' : 'bg-emerald-500 hover:bg-emerald-400'}`}>Next snippet →</button>
+                  <OverlayButton onClick={reset} variant="ghost" mono={mono}>Retry</OverlayButton>
+                  <OverlayButton onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} mono={mono} accent="#10b981" accentHover="#34d399">Next snippet</OverlayButton>
                 </div>
               </div>
             </motion.div>
@@ -1119,9 +1056,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
         </AnimatePresence>
       </div>
 
-      <div className="text-center py-2 text-xs text-text-secondary border-t border-white/10 flex-shrink-0">
-        Type exactly — capitalization and punctuation count
-      </div>
+      <ControlsHint>Type exactly · capitalization and punctuation count</ControlsHint>
     </div>
   );
 }
@@ -1132,13 +1067,23 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
 
 export default function GamesApp() {
   const [game, setGame] = useState<GameId>('launcher');
+  const reduced = useReducedMotion();
+
+  // Selector <-> game transition: an occasional surface, so a single ease-out
+  // slide (transform + opacity) is allowed; it collapses to instant under
+  // reduced motion. Coming from the selector, a game enters from the right;
+  // returning, the selector fades.
+  const slideIn  = reduced ? { opacity: 0 } : { opacity: 0, x: 20 };
+  const slideOut = reduced ? { opacity: 0 } : { opacity: 0, x: -20 };
+  const tx = withReduced({ duration: 0.26, ease: OVERLAY_EASE }, reduced);
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <AnimatePresence mode="wait">
-        {game === 'launcher'  && <motion.div key="launcher"  className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Launcher onSelect={setGame} /></motion.div>}
-        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}><SnakeGameView  onBack={() => setGame('launcher')} /></motion.div>}
-        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}><TetrisGame     onBack={() => setGame('launcher')} /></motion.div>}
-        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}><TypeRacerGame  onBack={() => setGame('launcher')} /></motion.div>}
+        {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} /></motion.div>}
+        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGameView  onBack={() => setGame('launcher')} /></motion.div>}
+        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={() => setGame('launcher')} /></motion.div>}
+        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={() => setGame('launcher')} /></motion.div>}
       </AnimatePresence>
     </div>
   );

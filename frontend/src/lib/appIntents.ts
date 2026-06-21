@@ -92,4 +92,8 @@ export const appIntents: Partial<Record<AppType, AppIntent[]>> = {
     { appType: 'file-explorer', kind: 'ask-about', id: 'file-explorer.ask-about', label: 'Ask about the projects' },
     { appType: 'file-explorer', kind: 'filter', id: 'file-explorer.filter.category', label: 'Filter by category', params: ['category'] },
   ],
+  'games': [
+    { appType: 'games', kind: 'open', id: 'games.open', label: 'Open Arcade' },
+    { appType: 'games', kind: 'ask-about', id: 'games.ask-about', label: 'Ask about the arcade' },
+  ],
 };
