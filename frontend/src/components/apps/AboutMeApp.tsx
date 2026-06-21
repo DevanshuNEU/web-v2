@@ -366,26 +366,33 @@ export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
         <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-16">
           <Masthead size={140} />
 
-          {SECTIONS.map(({ id, number, label }) => (
-            <motion.div
-              key={id}
-              id={SECTION_DOM_ID(id)}
-              data-section-id={id}
-              className="about-snap"
-              variants={reveal.item(reduced)}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ root: scrollRef, once: true, amount: 0.15 }}
-            >
-              <EditorialSection
-                number={number}
-                eyebrow={label}
-                title={label}
+          {/* Sections reveal once on mount with a stagger (not on scroll): a
+              windowed inner scroll container makes scroll-triggered reveals
+              unreliable, so content must never depend on an in-view trigger. */}
+          <motion.div
+            className="flex flex-col gap-16"
+            variants={reveal.container(reduced)}
+            initial="hidden"
+            animate="show"
+          >
+            {SECTIONS.map(({ id, number, label }) => (
+              <motion.div
+                key={id}
+                id={SECTION_DOM_ID(id)}
+                data-section-id={id}
+                className="about-snap"
+                variants={reveal.item(reduced)}
               >
-                <SectionBody id={id} />
-              </EditorialSection>
-            </motion.div>
-          ))}
+                <EditorialSection
+                  number={number}
+                  eyebrow={label}
+                  title={label}
+                >
+                  <SectionBody id={id} />
+                </EditorialSection>
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </div>
     </div>
@@ -410,12 +417,13 @@ function AboutMeMobile() {
 
   useScrollSpy(scrollRef, handleEnter);
 
-  // Shared reveal wiring for each mobile section (transform/opacity, once).
+  // Shared reveal wiring for each mobile section: reveal once on mount, never
+  // on scroll. Scroll-triggered reveals inside a windowed scroll container are
+  // unreliable, so content must never depend on an in-view trigger.
   const sectionMotion = {
     variants: reveal.item(reduced),
     initial: "hidden" as const,
-    whileInView: "show" as const,
-    viewport: { root: scrollRef, once: true, amount: 0.15 },
+    animate: "show" as const,
   };
 
   return (
