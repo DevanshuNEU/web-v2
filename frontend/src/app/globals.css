@@ -63,6 +63,18 @@
   --fs-meta:    clamp(11px, 0.4vw + 9.5px, 13px);
   --fs-label:   clamp(10px, 0.4vw + 8.5px, 12px);
 
+  /* Editorial display sizes: Instrument-foundation hero/headline scale.
+     Kept separate from --fs-display (which ~20 consumers depend on); these
+     are opt-in via the .editorial-* utilities, not the Tailwind fontSize map. */
+  --fs-editorial:  clamp(48px, 10vw + 8px, 128px);
+  --fs-display-lg: clamp(34px, 6vw + 10px, 72px);
+
+  /* Editorial tracking + rule tokens */
+  --tracking-meta:  0.14em;
+  --tracking-label: 0.18em;
+  --rule-weight:    1px;
+  --ink-mid:        var(--color-text-secondary);
+
   /* Fluid spacing for mobile shell */
   --sp-hero-pad:  clamp(16px, 3vw + 8px, 24px);
   --sp-icon-hero: clamp(72px, 18vw, 96px);
@@ -205,6 +217,55 @@ body {
     font-weight: 400;
     letter-spacing: -0.01em;
     line-height: 1.05;
+  }
+
+  /* ============================================
+     EDITORIAL / INSTRUMENT FOUNDATION
+     Monochrome, restraint-first display + meta type and hairline rules.
+     Serif faces are single-weight (400); NEVER add font-bold (faux-bold
+     smears Instrument Serif, see .font-display note above).
+     ============================================ */
+
+  /* Uppercase mono eyebrow used across editorial surfaces. */
+  .font-mono-meta {
+    font-family: var(--font-geist-mono), 'SF Mono', Monaco, Consolas, monospace;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-meta);
+    font-size: var(--fs-meta);
+    color: rgb(var(--ink-mid));
+    font-weight: 500;
+  }
+
+  /* Oversized serif hero. */
+  .editorial-hero {
+    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.02;
+    font-size: var(--fs-editorial);
+  }
+
+  /* Section-level serif headline. */
+  .editorial-head {
+    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
+    font-size: var(--fs-display-lg);
+  }
+
+  /* Inline emphasis: thin graphite underline, generous offset. */
+  .emphasis-underline {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    text-decoration-color: rgb(var(--ink-mid));
+  }
+
+  /* Hairline rule: 1px border at the theme border color. */
+  .hairline {
+    border: 0;
+    border-top: var(--rule-weight) solid rgb(var(--color-border));
   }
 
   /* Text utilities */
@@ -449,6 +510,12 @@ body {
 .app-content .text-3xl { font-size: clamp(1.35rem, 3.8cqi, 1.875rem); }
 .app-content .text-2xl { font-size: clamp(1.15rem, 3cqi, 1.5rem); }
 .app-content .text-xl  { font-size: clamp(1.05rem, 2.4cqi, 1.25rem); }
+
+/* Editorial display heads scale off the WINDOW width too. Upper clamp = the
+   global token ceiling (128px / 72px), so a maximized window matches the
+   viewport-fluid version; small windows scale the serif down gracefully. */
+.app-content .editorial-hero { font-size: clamp(2.25rem, 14cqi, 8rem); }
+.app-content .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
 
 /* ============================================
    MAGNETIC FLAT BUTTONS
