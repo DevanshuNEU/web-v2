@@ -1,44 +1,76 @@
 'use client';
 
 /**
- * AnalyticsApp
+ * AnalyticsApp - the live-session analytics surface in the monochrome editorial
+ * register.
  *
- * Transparent, real-time analytics dashboard showing:
- * - Live session data (current visitor)
- * - Activity feed (what you've done this visit)
- * - App usage stats
- * - Privacy controls
+ * Redesign contract:
+ *   - SIGNATURE (mono): the activity feed renders as an AsciiField "log tape" -
+ *     a single selectable monospace block where every event is one fixed-width
+ *     row: a mono clock stamp, a distinct ASCII glyph per event type, the label,
+ *     and a right-aligned relative time. It reads like a Unix system log. Because
+ *     AsciiField takes a verbatim string, the whole tape is ONE static <pre> with
+ *     zero per-row redraw (Emil's frequency rule: the feed updates often, so it
+ *     must not animate). Gated on useIsMono; the color palette gets a plain
+ *     editorial IndexRow-style list fallback.
+ *   - DATA-VIZ (hue-free): app-usage counts read as horizontal bars whose fill is
+ *     a GPU scaleX (never an animated width, never color) plus an opacity ramp,
+ *     so "more opens" reads as a longer, denser bar. Device breakdown is an icon
+ *     + mono label. Session stats sit in an editorial spec grid (MetaLabel keys,
+ *     mono values), no nested cards.
+ *   - REGISTER: serif section heads via EditorialSection numbered eyebrows,
+ *     hairline dividers, generous space, no glass cards. The PostHog link is a
+ *     quiet editorial link (text + hairline underline), not a filled accent
+ *     button. The live indicator is a single small filled square - no green, no
+ *     infinite pulse (Emil bans unmotivated loops).
  *
- * Philosophy: No fake data. Everything shown is either real or clearly sourced.
+ * Motion (Emil): sections reveal ONCE on mount via the shared staggered
+ * container (never on scroll - a windowed inner scroll container makes in-view
+ * triggers unreliable). The high-frequency feed does NOT animate row entries.
+ * The usage bars draw once per mount (occasional, so they earn an entrance) via
+ * scaleX + opacity on a strong ease-out, under reduced motion they snap to their
+ * resting state. Pressable controls get a restrained :active scale, gated on
+ * reduced motion. transform/opacity only.
+ *
+ * Persona / house rules: strictly three-tone, color branched only via
+ * useIsMono(); the AsciiField signature self-gates to mono; no em dashes; no
+ * scroll listeners reveal content; PostHog opens in a new tab, never embedded.
+ *
+ * Data preserved verbatim from the prior build: useAnalyticsStore polling via
+ * getState() (no reactive subscription, to dodge React 19 useSyncExternalStore
+ * tearing), the 1s session-duration tick, recent-events filtering (last 15,
+ * most-recent-first), app-usage filtering (openCount > 0) + sort (by openCount
+ * desc), device detection, and the opt-out toggle.
  */
 
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { useAnalyticsStore } from '@/store/analyticsStore';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useAnalyticsStore, type EventType } from '@/store/analyticsStore';
 import { useIsMono } from '@/hooks/usePalette';
 import {
-  Activity,
-  Clock,
+  EditorialSection,
+  MetaLabel,
+  Hairline,
+} from '@/components/editorial';
+import AsciiField from '@/components/signature/AsciiField';
+import { reveal } from '@/lib/motion';
+import {
   Monitor,
   Smartphone,
   Tablet,
-  Shield,
   ExternalLink,
-  Eye,
-  MousePointer,
-  Terminal,
-  Palette,
-  FolderOpen,
-  Info,
-  TrendingUp,
-  BarChart3,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Strong ease-out (Emil): "starts fast, feels responsive" for the bar draw.
 // ---------------------------------------------------------------------------
+const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
 const POSTHOG_DASHBOARD_URL = process.env.NEXT_PUBLIC_POSTHOG_DASHBOARD_URL || null;
+
+// ---------------------------------------------------------------------------
+// Formatting helpers (logic preserved from the prior build)
+// ---------------------------------------------------------------------------
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -52,38 +84,130 @@ function formatDuration(ms: number): string {
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 5) return 'Just now';
+  if (seconds < 5) return 'now';
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-function getEventIcon(type: string) {
+/** Wall-clock stamp HH:MM:SS for the log tape's left column. */
+function formatClock(timestamp: number): string {
+  const d = new Date(timestamp);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/**
+ * Distinct ASCII glyph per event type for the log tape. Hue-free signal: the
+ * shape itself disambiguates the event class the way a syslog facility tag does.
+ */
+function eventGlyph(type: EventType): string {
   switch (type) {
-    case 'app_open':
-    case 'app_close': return FolderOpen;
-    case 'theme_change': return Palette;
-    case 'terminal_command': return Terminal;
-    case 'section_view': return Eye;
-    default: return MousePointer;
+    case 'app_open':        return '+'; // a window opened
+    case 'app_close':       return '-'; // a window closed
+    case 'app_focus':       return '*'; // focus moved
+    case 'theme_change':    return '~'; // appearance toggled
+    case 'section_view':    return '>'; // scrolled into a section
+    case 'terminal_command':return '$'; // a shell command
+    case 'external_link':   return '^'; // left the site
+    default:                return '.'; // generic interaction
   }
 }
 
-function DeviceIcon({ type }: { type: string }) {
-  if (type === 'mobile') return <Smartphone size={18} />;
-  if (type === 'tablet') return <Tablet size={18} />;
-  return <Monitor size={18} />;
+// ---------------------------------------------------------------------------
+// Device icon (lucide, kept; rendered in current ink, never accent)
+// ---------------------------------------------------------------------------
+
+function DeviceIcon({ type, size = 16 }: { type: string; size?: number }) {
+  if (type === 'mobile') return <Smartphone size={size} />;
+  if (type === 'tablet') return <Tablet size={size} />;
+  return <Monitor size={size} />;
 }
 
 // ---------------------------------------------------------------------------
-// Main Component
+// Log tape - the AsciiField signature for the activity feed.
+//
+// Every event becomes one fixed-width line:
+//   12:04:51  +  Opened terminal ................................ 8s ago
+// Columns are space-padded to a monospace grid so the stamps, glyphs and times
+// line up into rails. The whole thing is a single string handed to AsciiField,
+// which renders it as one selectable <pre> with no per-row motion. Dot leaders
+// connect the label to the right-aligned time the way a printed index does.
 // ---------------------------------------------------------------------------
 
-export default function AnalyticsApp() {
+const TAPE_WIDTH = 64; // total monospace columns the tape is padded to
+
+function buildLogTape(events: { type: EventType; label: string; timestamp: number }[]): string {
+  return events
+    .map((e) => {
+      const stamp = formatClock(e.timestamp);
+      const glyph = eventGlyph(e.type);
+      const rel = formatRelativeTime(e.timestamp);
+      const head = `${stamp}  ${glyph}  `;
+      const tail = ` ${rel}`;
+      // Space available for the label + dot leaders between head and tail.
+      const room = Math.max(1, TAPE_WIDTH - head.length - tail.length);
+      let label = e.label;
+      if (label.length > room - 2) {
+        // Truncate over-long labels so the leader/time stay on the grid.
+        label = label.slice(0, Math.max(1, room - 3)) + '…';
+      }
+      const leaderCount = Math.max(1, room - label.length - 1);
+      const leader = ' ' + '.'.repeat(leaderCount);
+      return `${head}${label}${leader}${tail}`;
+    })
+    .join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Usage bar - count as length + density, never hue, never animated width.
+// ---------------------------------------------------------------------------
+
+function UsageBar({
+  fraction,
+  reduced,
+}: {
+  fraction: number; // 0..1 share of the max open-count
+  reduced: boolean | null;
+}) {
+  // Floor so even a single open is a visible bar; opacity ramps with the share
+  // so a busier app reads denser as well as longer (two reinforcing channels).
+  const scale = 0.12 + fraction * 0.88;
+  const opacity = 0.4 + fraction * 0.6;
+  return (
+    <span
+      aria-hidden
+      className="relative block h-1 w-full overflow-hidden bg-border/50"
+    >
+      <motion.span
+        className="absolute inset-y-0 left-0 right-0 bg-text"
+        style={{ opacity, transformOrigin: 'left center' }}
+        initial={reduced ? { scaleX: scale } : { scaleX: 0 }}
+        animate={{ scaleX: scale }}
+        transition={reduced ? { duration: 0 } : { duration: 0.42, delay: 0.06, ease: EASE_OUT }}
+      />
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+interface AnalyticsAppProps {
+  variant?: 'desktop' | 'mobile';
+}
+
+export default function AnalyticsApp(_props: AnalyticsAppProps = {}) {
+  // variant is accepted for parity with the app contract; the layout is a single
+  // responsive editorial column (grids collapse to one column on narrow), so no
+  // separate mobile tree is needed.
   const mono = useIsMono();
-  // Poll via getState() — no reactive subscriptions to avoid React 19
-  // useSyncExternalStore tearing issues during commit phase.
+  const reduced = useReducedMotion();
+
+  // Poll via getState() - no reactive subscription, to avoid React 19
+  // useSyncExternalStore tearing during the commit phase (preserved).
   const [data, setData] = useState(() => {
     const s = useAnalyticsStore.getState();
     return {
@@ -93,7 +217,7 @@ export default function AnalyticsApp() {
       device: s.device,
       recentEvents: s.events.slice(-15).reverse(),
       appUsage: Object.values(s.appUsage)
-        .filter(u => u.openCount > 0)
+        .filter((u) => u.openCount > 0)
         .sort((a, b) => b.openCount - a.openCount),
     };
   });
@@ -108,7 +232,7 @@ export default function AnalyticsApp() {
         device: s.device,
         recentEvents: s.events.slice(-15).reverse(),
         appUsage: Object.values(s.appUsage)
-          .filter(u => u.openCount > 0)
+          .filter((u) => u.openCount > 0)
           .sort((a, b) => b.openCount - a.openCount),
       });
     };
@@ -123,235 +247,330 @@ export default function AnalyticsApp() {
     store.setOptOut(!store.isOptedOut);
   };
 
+  // The log tape recomputes each tick (cheap string build); memo keyed on the
+  // event ids + the duration so relative times stay live without per-row motion.
+  const tape = useMemo(
+    () => buildLogTape(recentEvents),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recentEvents, duration],
+  );
+
+  const maxOpens = appUsage.length > 0 ? appUsage[0].openCount : 1;
+
   return (
-    <div className="h-full flex flex-col bg-surface/30 overflow-auto">
-      <div className="p-6 space-y-5 max-w-4xl mx-auto w-full">
-
-        {/* Header */}
-        <div className="space-y-1">
-          <h1 className="font-display text-2xl text-text">
-            Live <span className="text-accent">Analytics</span>
+    <div className="h-full overflow-auto bg-transparent">
+      <motion.div
+        variants={reveal.container(reduced)}
+        initial="hidden"
+        animate="show"
+        className="mx-auto w-full max-w-3xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-14"
+      >
+        {/* ── Masthead ── serif hero + mono sub-line + single live square. */}
+        <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-4">
+          <h1 className="editorial-hero font-display text-text leading-none">
+            Live Analytics
           </h1>
-          <p className="text-text-secondary text-sm">
-            Real-time insights from your visit. No fake data.
-          </p>
-        </div>
-
-        {/* Privacy Notice */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-subtle rounded-xl p-4 border-l-4 border-accent"
-        >
-          <div className="flex items-start gap-3">
-            <Shield className="text-accent flex-shrink-0 mt-0.5" size={18} />
-            <div className="flex-1 space-y-2">
-              <p className="text-text-secondary text-sm leading-relaxed">
-                Anonymous tracking via PostHog. No personal data collected.
-                All data shown here is from <strong className="text-text">your current session</strong>.
-              </p>
-              <button
-                onClick={handleOptToggle}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                  isOptedOut
-                    ? (mono
-                        ? 'bg-white/[0.08] text-text hover:bg-white/[0.14] font-semibold'
-                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30')
-                    : 'bg-accent/20 text-accent hover:bg-accent/30'
-                }`}
-              >
-                {isOptedOut ? 'Tracking Disabled · Click to Enable' : 'Disable Tracking'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Live Session Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className={`glass-subtle rounded-xl p-5 ${
-            mono
-              ? 'border border-text/15 bg-gradient-to-br from-white/[0.04] to-transparent'
-              : 'border border-green-500/20 bg-gradient-to-br from-green-500/5 to-transparent'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <div className={`w-2 h-2 rounded-full animate-pulse ${mono ? 'bg-text' : 'bg-green-400'}`} />
-            <h3 className="font-semibold text-text text-sm">Your Session</h3>
-            <span className="text-xs text-text-secondary ml-auto font-mono">
-              {sessionId.slice(0, 8)}...
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {/* Live indicator: ONE small filled square. No infinite pulse: the
+                1s tick already proves liveness; an animated dot would be an
+                unmotivated loop (Emil). Mono = ink, color = green. */}
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden
+                className={`h-2 w-2 ${mono ? 'bg-text' : 'bg-green-500'}`}
+              />
+              <MetaLabel className="text-text-secondary">
+                Live <span aria-hidden className="opacity-40 mx-1">/</span>{' '}
+                <span className="font-[family-name:var(--font-geist-mono)]">
+                  {sessionId.slice(0, 8)}
+                </span>
+              </MetaLabel>
             </span>
           </div>
+          <p className="max-w-[60ch] text-text-secondary leading-relaxed">
+            Everything below is real, measured from your current visit. Anonymous,
+            via PostHog. No personal data, no fake numbers.
+          </p>
+        </motion.header>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <div className="text-text-secondary text-xs mb-1 flex items-center gap-1">
-                <Clock size={11} /> Duration
-              </div>
-              <div className="text-xl font-bold text-text">{formatDuration(duration)}</div>
+        {/* ── 01 Session ── editorial spec grid (MetaLabel keys, mono values). */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="01" eyebrow="This visit" title="Session">
+            {/* Editorial spec grid. Grid's column count is fixed by design, so
+                the mobile collapse is handled here with a responsive wrapper
+                (2-up on narrow, 4-up from sm). */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+              <SpecCell label="Duration" value={formatDuration(duration)} />
+              <SpecCell
+                label="Device"
+                value={
+                  <span className="inline-flex items-center gap-2 capitalize">
+                    <DeviceIcon type={device.type} size={15} />
+                    {device.type}
+                  </span>
+                }
+                sub={`${device.browser} / ${device.os}`}
+              />
+              <SpecCell label="Apps opened" value={String(appUsage.length)} />
+              <SpecCell label="Events" value={String(recentEvents.length)} />
             </div>
-            <div>
-              <div className="text-text-secondary text-xs mb-1 flex items-center gap-1">
-                <DeviceIcon type={device.type} /> Device
-              </div>
-              <div className="text-sm font-medium text-text capitalize">{device.type}</div>
-              <div className="text-xs text-text-secondary">{device.browser} · {device.os}</div>
-            </div>
-            <div>
-              <div className="text-text-secondary text-xs mb-1 flex items-center gap-1">
-                <FolderOpen size={11} /> Apps Opened
-              </div>
-              <div className="text-xl font-bold text-text">{appUsage.length}</div>
-            </div>
-            <div>
-              <div className="text-text-secondary text-xs mb-1 flex items-center gap-1">
-                <Activity size={11} /> Events
-              </div>
-              <div className="text-xl font-bold text-text">{recentEvents.length}</div>
-            </div>
-          </div>
+          </EditorialSection>
         </motion.div>
 
-        {/* Two Column */}
-        <div className="grid md:grid-cols-2 gap-4">
-
-          {/* Activity Feed */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="glass-subtle rounded-xl p-5 border border-white/10"
-          >
-            <h3 className="font-semibold text-text mb-3 flex items-center gap-2 text-sm">
-              <Activity size={14} className="text-accent" />
-              Live Activity Feed
-            </h3>
+        {/* ── 02 Activity ── the AsciiField log tape (mono) / list (color). */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="02" eyebrow="Event log" title="Activity">
             {recentEvents.length === 0 ? (
-              <div className="text-center py-6 text-text-secondary text-xs">
-                <MousePointer size={20} className="mx-auto mb-2 opacity-40" />
-                <p>No activity yet</p>
-                <p className="mt-0.5 opacity-70">Open some apps to see events here</p>
+              <EmptyNote
+                line="No activity yet."
+                hint="Open an app or run a terminal command to write to the log."
+              />
+            ) : mono ? (
+              // Signature: one selectable <pre>, zero per-row motion. The tape is
+              // scrollable but never redrawn row-by-row as the feed updates.
+              // AsciiField is aria-hidden, so a screen-reader-only list carries
+              // the same events for assistive tech.
+              <div className="max-h-72 overflow-auto">
+                <AsciiField
+                  source={tape}
+                  paletteKey={`tape-${recentEvents.length}`}
+                  className="text-[12px] text-text-secondary leading-[1.5]"
+                />
+                <ul className="sr-only">
+                  {recentEvents.map((e) => (
+                    <li key={`${e.timestamp}-${e.label}`}>
+                      {e.label}, {formatRelativeTime(e.timestamp)}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                {recentEvents.map((event, index) => {
-                  const Icon = getEventIcon(event.type);
-                  return (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="flex items-center gap-2.5 py-1.5 px-2.5 rounded-lg bg-surface/30 hover:bg-surface/50 transition-colors"
-                    >
-                      <Icon size={12} className="text-accent flex-shrink-0" />
-                      <span className="text-xs text-text truncate flex-1">{event.label}</span>
-                      <span className="text-xs text-text-secondary whitespace-nowrap">
-                        {formatRelativeTime(event.timestamp)}
+              // Color fallback: a plain editorial list (no ASCII), still hue-clean
+              // in structure - glyph + label + mono time, hairline-divided.
+              <ul className="flex flex-col">
+                <Hairline />
+                {recentEvents.map((e) => (
+                  <li key={`${e.timestamp}-${e.label}`}>
+                    <div className="flex items-baseline gap-3 py-2.5">
+                      <span
+                        aria-hidden
+                        className="w-4 shrink-0 text-center font-[family-name:var(--font-geist-mono)] text-text-secondary"
+                      >
+                        {eventGlyph(e.type)}
                       </span>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </motion.div>
-
-          {/* App Usage */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.22 }}
-            className="glass-subtle rounded-xl p-5 border border-white/10"
-          >
-            <h3 className="font-semibold text-text mb-3 flex items-center gap-2 text-sm">
-              <BarChart3 size={14} className="text-accent" />
-              Apps Explored
-            </h3>
-            {appUsage.length === 0 ? (
-              <div className="text-center py-6 text-text-secondary text-xs">
-                <FolderOpen size={20} className="mx-auto mb-2 opacity-40" />
-                <p>No apps opened yet</p>
-                <p className="mt-0.5 opacity-70">Double-click icons to explore</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {appUsage.map(app => (
-                  <div
-                    key={app.appType}
-                    className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-surface/30"
-                  >
-                    <span className="text-xs text-text capitalize">
-                      {app.appType.replace(/-/g, ' ')}
-                    </span>
-                    <div className="flex items-center gap-2 text-xs text-text-secondary">
-                      <span>{app.openCount}x</span>
-                      {app.totalTimeMs > 0 && (
-                        <span className="text-accent">{formatDuration(app.totalTimeMs)}</span>
-                      )}
+                      <span className="min-w-0 flex-1 truncate text-sm text-text">
+                        {e.label}
+                      </span>
+                      <span className="shrink-0 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+                        {formatRelativeTime(e.timestamp)}
+                      </span>
                     </div>
-                  </div>
+                    <Hairline />
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-          </motion.div>
-        </div>
+          </EditorialSection>
+        </motion.div>
 
-        {/* Aggregate / PostHog link */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-subtle rounded-xl p-5 border border-accent/20"
-        >
-          <div className="flex items-start gap-3">
-            <TrendingUp className="text-accent flex-shrink-0 mt-0.5" size={18} />
-            <div className="flex-1 space-y-2">
-              <h3 className="font-semibold text-text text-sm">Aggregate Analytics</h3>
+        {/* ── 03 Apps ── usage as scaleX + opacity bars, no hue, no width anim. */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="03" eyebrow="Per app" title="Usage">
+            {appUsage.length === 0 ? (
+              <EmptyNote
+                line="No apps opened yet."
+                hint="Double-click an icon on the desktop to start exploring."
+              />
+            ) : (
+              <ul className="flex flex-col gap-5">
+                {appUsage.map((app) => (
+                  <li key={app.appType} className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <span className="text-sm capitalize text-text">
+                        {app.appType.replace(/-/g, ' ')}
+                      </span>
+                      <span className="shrink-0 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
+                        {app.openCount}x
+                        {app.totalTimeMs > 0 && (
+                          <>
+                            <span aria-hidden className="opacity-40 mx-1.5">/</span>
+                            {formatDuration(app.totalTimeMs)}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <UsageBar fraction={app.openCount / maxOpens} reduced={reduced} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </EditorialSection>
+        </motion.div>
+
+        {/* ── 04 Privacy ── opt-out as a quiet pressable, no filled accent. */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="04" eyebrow="Your data" title="Privacy">
+            <div className="flex flex-col gap-4 max-w-[60ch]">
+              <p className="text-text-secondary leading-relaxed">
+                Tracking is anonymous and scoped to this session. You can turn it
+                off; the live log above clears the moment you do.
+              </p>
+              <QuietToggle
+                on={isOptedOut}
+                reduced={reduced}
+                onClick={handleOptToggle}
+                offLabel="Disable tracking"
+                onLabel="Tracking disabled, click to re-enable"
+              />
+            </div>
+          </EditorialSection>
+        </motion.div>
+
+        {/* ── 05 Aggregate ── PostHog as a quiet editorial link, new tab. */}
+        <motion.div variants={reveal.item(reduced)}>
+          <EditorialSection number="05" eyebrow="Everyone" title="Aggregate">
+            <div className="flex flex-col gap-4 max-w-[60ch]">
+              <p className="text-text-secondary leading-relaxed">
+                Cross-visitor numbers live in PostHog, in the same build-in-public
+                spirit. The dashboard opens in a new tab, nothing is embedded here.
+              </p>
               {POSTHOG_DASHBOARD_URL ? (
-                <a
+                <QuietLink
                   href={POSTHOG_DASHBOARD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-all text-xs font-medium"
-                >
-                  View Full Dashboard <ExternalLink size={12} />
-                </a>
+                  reduced={reduced}
+                  label="View the full dashboard"
+                />
               ) : (
-                <p className="text-text-secondary text-xs leading-relaxed">
-                  Aggregate data is tracked via PostHog. Set{' '}
-                  <code className="px-1 py-0.5 bg-black/20 rounded text-accent text-xs">
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  Set{' '}
+                  <code className="font-[family-name:var(--font-geist-mono)] text-text">
                     NEXT_PUBLIC_POSTHOG_DASHBOARD_URL
                   </code>{' '}
-                  to embed a public dashboard here.
+                  to link a public dashboard here.
                 </p>
               )}
             </div>
-          </div>
+          </EditorialSection>
         </motion.div>
-
-        {/* Why transparency */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.38 }}
-          className="glass-subtle rounded-xl p-5 border border-white/10"
-        >
-          <div className="flex items-start gap-3">
-            <Info className="text-accent flex-shrink-0 mt-0.5" size={16} />
-            <div>
-              <h3 className="font-semibold text-text text-sm mb-1">Why show this publicly?</h3>
-              <p className="text-text-secondary text-xs leading-relaxed">
-                Inspired by PostHog's "build in public" philosophy. You should know exactly what
-                data I collect and how visitors interact with this portfolio. No hidden tracking,
-                no dark patterns.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-      </div>
+      </motion.div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Small presentational pieces
+// ---------------------------------------------------------------------------
+
+/** Spec cell: a MetaLabel key over a mono value, optional mono sub-line. */
+function SpecCell({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <MetaLabel as="p" className="text-text-secondary">
+        {label}
+      </MetaLabel>
+      <div className="font-[family-name:var(--font-geist-mono)] text-lg text-text leading-snug">
+        {value}
+      </div>
+      {sub && (
+        <div className="font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary leading-snug">
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Empty state: hairline-bounded, editorial, no spinner, no icon theatrics. */
+function EmptyNote({ line, hint }: { line: string; hint: string }) {
+  return (
+    <div className="flex flex-col gap-2 py-2">
+      <Hairline />
+      <p className="pt-4 text-sm text-text">{line}</p>
+      <p className="text-sm text-text-secondary">{hint}</p>
+    </div>
+  );
+}
+
+/**
+ * Quiet editorial link: text + a hairline underline that grows from the left on
+ * hover (transform-only, ease via CSS). Opens in a new tab. No filled accent.
+ */
+function QuietLink({
+  href,
+  label,
+  reduced,
+}: {
+  href: string;
+  label: string;
+  reduced: boolean | null;
+}) {
+  return (
+    <motion.a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileTap={reduced ? undefined : { scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT } }}
+      className="group inline-flex w-fit items-center gap-2 text-sm text-text focus-visible:outline-none"
+    >
+      <span className="relative">
+        {label}
+        <span
+          aria-hidden
+          className="absolute -bottom-0.5 left-0 right-0 block h-px origin-left scale-x-100 bg-text/40
+                     transition-transform duration-200 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-x-0 motion-reduce:transition-none"
+        />
+        <span
+          aria-hidden
+          className="absolute -bottom-0.5 left-0 right-0 block h-px origin-left scale-x-0 bg-text
+                     transition-transform duration-200 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-x-100 motion-reduce:transition-none"
+        />
+      </span>
+      <ExternalLink size={13} className="shrink-0" />
+    </motion.a>
+  );
+}
+
+/**
+ * Quiet toggle: a pressable text control with a hairline border. State reads
+ * from the label + a small leading square (filled when off / active tracking,
+ * hollow when disabled). Restrained :active press, reduced-motion gated. No hue,
+ * no glow, no filled-accent button.
+ */
+function QuietToggle({
+  on,
+  offLabel,
+  onLabel,
+  reduced,
+  onClick,
+}: {
+  on: boolean;
+  offLabel: string;
+  onLabel: string;
+  reduced: boolean | null;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      whileTap={reduced ? undefined : { scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT } }}
+      className="group inline-flex w-fit items-center gap-2.5 border border-border px-3 py-1.5
+                 transition-colors hover:border-text/40 focus-visible:outline-none"
+    >
+      <span
+        aria-hidden
+        className={`h-2 w-2 shrink-0 ${on ? 'border border-text' : 'bg-text'}`}
+      />
+      <MetaLabel className="text-text">{on ? onLabel : offLabel}</MetaLabel>
+    </motion.button>
   );
 }
