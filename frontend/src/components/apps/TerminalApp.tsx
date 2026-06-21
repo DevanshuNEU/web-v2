@@ -135,9 +135,9 @@ function HireOutput() {
       {HIRE_CHECKS.slice(0, visibleChecks).map(({ label, result }, i) => (
         <motion.div
           key={label}
-          initial={{ opacity: 0, x: -6 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.15 }}
+          initial={{ opacity: 0, transform: 'translateX(-6px)' }}
+          animate={{ opacity: 1, transform: 'translateX(0px)' }}
+          transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
           className="flex gap-2"
         >
           <span className={check}>✓</span>
@@ -150,9 +150,9 @@ function HireOutput() {
       <AnimatePresence>
         {showContact && (
           <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            initial={{ opacity: 0, transform: 'translateY(6px)' }}
+            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
             className={`mt-4 p-4 border rounded-lg ${cardBox}`}
           >
             <div className={`${grant} font-bold mb-3`}>
@@ -191,7 +191,7 @@ function HireOutput() {
                 </a>
               </div>
             </div>
-            <div className={`mt-3 ${footer} italic text-xs`}>
+            <div className={`mt-3 ${footer} italic font-mono-meta`}>
               Seriously though, let&apos;s build something.
             </div>
           </motion.div>
