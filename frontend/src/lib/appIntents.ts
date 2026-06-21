@@ -69,6 +69,7 @@ export const appIntents: Partial<Record<AppType, AppIntent[]>> = {
   'skills-dashboard': [
     { appType: 'skills-dashboard', kind: 'open', id: 'skills-dashboard.open', label: 'Open Skills Dashboard' },
     { appType: 'skills-dashboard', kind: 'ask-about', id: 'skills-dashboard.ask-about', label: 'Ask about the skills' },
+    { appType: 'skills-dashboard', kind: 'filter', id: 'skills-dashboard.filter.category', label: 'Filter skills by category', params: ['category'] },
   ],
   'help': [
     { appType: 'help', kind: 'open', id: 'help.open', label: 'Open Help' },

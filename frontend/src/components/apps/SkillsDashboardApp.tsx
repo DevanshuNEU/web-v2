@@ -1,65 +1,218 @@
 'use client';
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+/**
+ * SkillsDashboardApp - the proficiency dashboard in the monochrome editorial
+ * register.
+ *
+ * Redesign contract:
+ *   - SIGNATURE (mono): each card's proficiency reads as INK DENSITY, not hue.
+ *     A halftone arc field (the `Halftone` primitive fed a luminance function)
+ *     inks an annular sweep proportional to level/5: level 1 = a short, sparse
+ *     arc of small dots; level 5 = a near-full ring of dense, large dots. The
+ *     same level also drives stroke weight + opacity on the guide ring so the
+ *     value survives even where the dot field is faint.
+ *   - SIGNATURE (color / Fun): Halftone renders nothing in the color palette by
+ *     contract, so the color path keeps a graceful solid arc-ring fallback whose
+ *     stroke weight + opacity still scale with level (legible without relying on
+ *     the category hue either).
+ *   - DATA-VIZ: category is a MetaLabel + a single graphite dot, never a colored
+ *     tint. Level reads from the arc + a weighted dot meter (filled dots grow in
+ *     size/opacity with level). Footer stats are width + opacity bars, no color.
+ *   - REGISTER: serif card heads (.font-display), mono metadata, hairline
+ *     dividers, generous spacing, no nested cards (one hairline-bounded tile).
+ *
+ * Motion (Emil): cards reveal ONCE on mount via the shared staggered container
+ * (never on scroll - a windowed inner scroll container makes in-view triggers
+ * unreliable). The dependency-chain hover is the one signature interaction: it
+ * communicates STATE (active / related / dim) with opacity + weight only, on a
+ * strong ease-out, transform/opacity only, under 200ms, no infinite pulses, no
+ * hue. Cards get a restrained :active scale(0.98). The arc draws once per mount
+ * (occasional, so it earns an entrance); hover never re-animates the arc.
+ *
+ * Persona / house rules: strictly three-tone, color branched only via
+ * useIsMono(); halftone gated on mono + reduced-motion (handled inside the
+ * primitive); no em dashes; no scroll listeners reveal content.
+ */
+
+import React, { useCallback, useMemo, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  SKILLS, CAT_COLOR, CAT_LABEL, LEVEL_LABEL, SKILL_CATEGORIES,
+  SKILLS, CAT_LABEL, LEVEL_LABEL, SKILL_CATEGORIES,
   type Skill, type FilterCategory,
 } from '@/data/skills';
+import { MetaLabel, Hairline } from '@/components/editorial';
+import Halftone from '@/components/signature/Halftone';
+import { reveal, withReduced, spring } from '@/lib/motion';
 import { useIsMono } from '@/hooks/usePalette';
 
 type FilterCat = FilterCategory;
 const CATEGORIES = SKILL_CATEGORIES;
 
-// In mono every category collapses to one graphite tone; categories are told
-// apart by their label + section, never by hue. Fun keeps the per-category hue.
-const MONO_CAT = '#9ca3af';
-function catColor(cat: Skill['category'], mono: boolean): string {
-  return mono ? MONO_CAT : CAT_COLOR[cat];
+/* Strong ease-out (Emil): "starts fast, feels responsive" for state feedback. */
+const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Proficiency dimensions (read WITHOUT hue)                            */
+/* ─────────────────────────────────────────────────────────────────── */
+
+/**
+ * Level encodes into three reinforcing, hue-free channels so the value reads in
+ * either palette and at any zoom:
+ *   - sweep:   fraction of the ring that is inked (level/5)
+ *   - weight:  guide-ring stroke px (thin at 1, bold at 5)
+ *   - density: dot opacity floor in mono / stroke opacity in color
+ */
+function levelWeight(level: number): number {
+  // 1 -> 1.5px, 5 -> 4.5px. Sparse/thin reads "beginner", bold reads "expert".
+  return 1.5 + (level - 1) * 0.75;
+}
+function levelOpacity(level: number): number {
+  // 1 -> 0.42, 5 -> 1. The faintest level is still legible against the track.
+  return 0.42 + (level - 1) * 0.145;
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
-/* Arc progress ring                                                   */
+/* Arc geometry                                                         */
 /* ─────────────────────────────────────────────────────────────────── */
 
-const R = 20;
-const CX = 26;
-const CY = 26;
-const CIRC = 2 * Math.PI * R; // 125.7
+const SIZE = 56;
+const CX = SIZE / 2;
+const CY = SIZE / 2;
+const R = 21;
+const CIRC = 2 * Math.PI * R;
 
-function ArcRing({ level, color, delay }: { level: number; color: string; delay: number }) {
-  const offset = CIRC * (1 - level / 5);
+/**
+ * Halftone luminance field for a card's proficiency, as a pure (nx, ny) -> lum
+ * function in 0..1 normalized canvas space. Dark (low lum) = a large ink dot.
+ *
+ * The field is an annulus (the ring band) swept from the top (12 o'clock,
+ * clockwise) across `level/5` of the circle. Inside the swept band, darkness
+ * ramps toward the leading edge a touch so the arc reads as "filling up"; the
+ * `levelOpacity` floor keeps even low levels visible. Everything outside the
+ * band is white (no dot). The primitive itself is mono-gated, so this only ever
+ * runs in the brand register.
+ */
+function makeArcField(level: number): (nx: number, ny: number) => number {
+  const sweep = (level / 5) * Math.PI * 2; // radians of inked arc
+  const floor = levelOpacity(level);
+  // Band radius in normalized units (canvas is square, 0..1).
+  const rNorm = R / SIZE;
+  const halfBand = 0.085; // ring thickness / 2 in normalized units
+  return (nx, ny) => {
+    const dx = nx - 0.5;
+    const dy = ny - 0.5;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Outside the ring band -> white (no dot).
+    if (Math.abs(dist - rNorm) > halfBand) return 1;
+    // Angle from 12 o'clock, clockwise, in 0..2PI.
+    let ang = Math.atan2(dx, -dy);
+    if (ang < 0) ang += Math.PI * 2;
+    if (ang > sweep) return 1; // past the swept portion -> white
+    // Within the sweep: darkness tracks the density floor, with a mild ramp so
+    // the band feels denser toward its trailing (filled) start.
+    const ramp = 1 - (ang / Math.max(sweep, 0.0001)) * 0.25;
+    const darkness = floor * ramp;
+    return 1 - Math.max(0, Math.min(1, darkness));
+  };
+}
+
+/**
+ * ArcRing - proficiency as ink density (mono) or a weighted solid sweep (color).
+ *
+ * Mono: a faint full-circle guide track + the Halftone annular sweep. The dot
+ * field carries the value; the track only frames it.
+ * Color: Halftone returns null, so we draw a solid arc whose stroke weight and
+ * opacity scale with level (still readable without the category hue).
+ */
+function ArcRing({ level, mono, reduced }: { level: number; mono: boolean; reduced: boolean | null }) {
+  const field = useMemo(() => makeArcField(level), [level]);
+  const weight = levelWeight(level);
+  const dash = CIRC * (level / 5);
+
   return (
-    <svg width="52" height="52" viewBox="0 0 52 52" style={{ overflow: 'visible' }}>
-      {/* Subtle outer glow ring */}
-      <circle cx={CX} cy={CY} r={R + 3} fill="none" strokeWidth="1" stroke={color} strokeOpacity="0.08" />
-      {/* Track */}
-      <circle cx={CX} cy={CY} r={R} fill="none" strokeWidth="3.5" stroke="rgba(255,255,255,0.07)" />
-      {/* Filled arc */}
-      <motion.circle
-        cx={CX} cy={CY} r={R}
-        fill="none"
-        strokeWidth="3.5"
-        stroke={color}
-        strokeLinecap="round"
-        strokeDasharray={CIRC}
-        initial={{ strokeDashoffset: CIRC }}
-        animate={{ strokeDashoffset: offset }}
-        transition={{ duration: 1.1, delay, ease: [0.16, 1, 0.3, 1] }}
-        style={{ transformOrigin: `${CX}px ${CY}px`, transform: 'rotate(-90deg)' }}
-      />
-      {/* Center percentage */}
-      <text
-        x={CX} y={CY + 1}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize="10"
-        fontWeight="700"
-        fill={color}
+    <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+      {/* Faint full-circle guide track (both palettes). */}
+      <svg
+        width={SIZE}
+        height={SIZE}
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="absolute inset-0"
+        aria-hidden
       >
-        {level * 20}%
-      </text>
-    </svg>
+        <circle
+          cx={CX}
+          cy={CY}
+          r={R}
+          fill="none"
+          stroke="rgb(var(--color-border))"
+          strokeWidth="1"
+        />
+        {/* Color path only: solid weighted sweep (mono uses the dot field). */}
+        {!mono && (
+          <motion.circle
+            cx={CX}
+            cy={CY}
+            r={R}
+            fill="none"
+            stroke="rgb(var(--color-text))"
+            strokeWidth={weight}
+            strokeLinecap="round"
+            strokeDasharray={CIRC}
+            strokeOpacity={levelOpacity(level)}
+            initial={reduced ? { strokeDashoffset: CIRC - dash } : { strokeDashoffset: CIRC }}
+            animate={{ strokeDashoffset: CIRC - dash }}
+            transition={reduced ? { duration: 0 } : { duration: 0.9, ease: EASE_OUT }}
+            style={{ transformOrigin: `${CX}px ${CY}px`, transform: 'rotate(-90deg)' }}
+          />
+        )}
+      </svg>
+
+      {/* Mono path only: the halftone proficiency field (self-gates to null in
+          the color palette and to a single static frame under reduced motion). */}
+      {mono && (
+        <div className="absolute inset-0">
+          <Halftone source={field} cell={4} maxRadius={2} paletteKey={`lvl-${level}`} />
+        </div>
+      )}
+
+      {/* Center: the level as a quiet serif numeral (legible without hue). */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-display text-text leading-none" style={{ fontSize: 15 }}>
+          {level}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Weighted dot meter - level as size + opacity, never hue              */
+/* ─────────────────────────────────────────────────────────────────── */
+
+function DotMeter({ level }: { level: number }) {
+  return (
+    <div className="flex items-center gap-1.5" aria-hidden>
+      {[1, 2, 3, 4, 5].map((i) => {
+        const on = i <= level;
+        // Filled dots grow + gain opacity with position so the meter reads as a
+        // weighted ramp, not five identical pips.
+        const size = on ? 4 + i * 0.6 : 4;
+        const opacity = on ? 0.5 + i * 0.1 : 1;
+        return (
+          <span
+            key={i}
+            className={on ? 'bg-text' : 'border border-border'}
+            style={{
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              opacity: on ? opacity : 1,
+              display: 'inline-block',
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -67,135 +220,158 @@ function ArcRing({ level, color, delay }: { level: number; color: string; delay:
 /* Skill card                                                          */
 /* ─────────────────────────────────────────────────────────────────── */
 
-interface CardState {
-  mode: 'normal' | 'active' | 'related' | 'dim';
-}
+type CardMode = 'normal' | 'active' | 'related' | 'dim';
 
+/**
+ * Per-mode read, hue-free (Emil: state via opacity + weight, not color):
+ *   active  - full ink, head goes to medium serif weight
+ *   related - full ink, a quiet "prerequisite / unlocks" hairline note appears
+ *   dim     - lowered opacity so the eye ignores it
+ *   normal  - baseline
+ */
 function SkillCard({
-  skill, cardState, idx, onHover, onLeave,
+  skill, mode, relation, mono, reduced, onHover, onLeave,
 }: {
   skill: Skill;
-  cardState: CardState;
-  idx: number;
+  mode: CardMode;
+  relation: 'prerequisite' | 'unlocks' | null;
+  mono: boolean;
+  reduced: boolean | null;
   onHover: (s: Skill) => void;
   onLeave: () => void;
 }) {
-  const mono = useIsMono();
-  const color = catColor(skill.category, mono);
-  const { mode } = cardState;
-
-  const opacity   = mode === 'dim' ? 0.28 : 1;
-  const elevation = mode === 'active' ? -8 : mode === 'related' ? -4 : 0;
-  const scale     = mode === 'active' ? 1.04 : mode === 'related' ? 1.01 : mode === 'dim' ? 0.97 : 1;
-
-  const borderColor = mode === 'active'  ? `${color}90`
-                    : mode === 'related' ? `${color}50`
-                    : 'rgba(255,255,255,0.08)';
-
-  const shadow = mode === 'active'
-    ? `0 16px 40px ${color}30, 0 0 0 1px ${color}50`
-    : mode === 'related'
-    ? `0 8px 24px ${color}18, 0 0 0 1px ${color}30`
-    : '0 2px 8px rgba(0,0,0,0.12)';
+  const dim = mode === 'dim';
+  const emphasised = mode === 'active' || mode === 'related';
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20, scale: 0.9 }}
-      animate={{ opacity, y: elevation, scale, transition: { duration: 0.25, ease: 'easeOut' } }}
-      exit={{ opacity: 0, scale: 0.85, y: 10, transition: { duration: 0.18 } }}
-      transition={{ delay: idx * 0.035, type: 'spring', damping: 20, stiffness: 200 }}
+      variants={reveal.item(reduced)}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97, transition: { duration: 0.16, ease: EASE_OUT } }}
+      // Hover state: opacity + a hairline-weight border shift only. Transform is
+      // reserved for the :active press (handled in CSS via whileTap below).
+      animate={{
+        opacity: dim ? 0.32 : 1,
+        transition: { duration: 0.16, ease: EASE_OUT },
+      }}
+      whileTap={reduced ? undefined : { scale: 0.98, transition: { duration: 0.12, ease: EASE_OUT } }}
       onMouseEnter={() => onHover(skill)}
       onMouseLeave={onLeave}
-      className="relative rounded-2xl overflow-hidden cursor-default select-none"
-      style={{ border: `1px solid ${borderColor}`, boxShadow: shadow }}
+      onFocus={() => onHover(skill)}
+      onBlur={onLeave}
+      tabIndex={0}
+      data-testid="skill-card"
+      data-mode={mode}
+      className="group relative flex flex-col gap-3 p-4 text-left select-none cursor-default
+                 focus-visible:outline-none"
+      style={{
+        // No nested cards: a single hairline frame. Active/related thickens the
+        // top edge to the ink color; everything else stays at the border token.
+        borderTop: `${emphasised ? 2 : 1}px solid ${
+          emphasised ? 'rgb(var(--color-text))' : 'rgb(var(--color-border))'
+        }`,
+      }}
     >
-      {/* Gradient background tint from category color */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: `radial-gradient(circle at 20% 20%, ${color}12 0%, transparent 65%)` }}
-      />
+      <div className="flex items-start gap-3.5">
+        <ArcRing level={skill.level} mono={mono} reduced={reduced} />
 
-      {/* Top accent line */}
-      <div className="relative h-[3px] w-full" style={{ background: color, opacity: mode === 'dim' ? 0.4 : 1 }} />
-
-      {/* Active glow pulse */}
-      {mode === 'active' && (
-        <motion.div
-          className="absolute inset-0 pointer-events-none rounded-2xl"
-          animate={{ opacity: [0.06, 0.14, 0.06] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ background: color }}
-        />
-      )}
-
-      {/* Card body */}
-      <div className="relative p-4">
-        <div className="flex items-start gap-3 mb-3">
-          {/* Arc ring */}
-          <div className="flex-shrink-0">
-            <ArcRing level={skill.level} color={color} delay={idx * 0.04} />
-          </div>
-
-          {/* Name + meta */}
-          <div className="flex-1 min-w-0 pt-1">
-            <h3
-              className="font-bold leading-tight text-[14px] transition-colors"
-              style={{ color: mode === 'active' ? color : 'rgb(var(--color-text))' }}
-            >
-              {skill.name}
-            </h3>
-            <p className="text-[10px] text-text-secondary mt-0.5 font-medium">
-              {skill.xp}
-            </p>
-            {/* Level dots */}
-            <div className="flex gap-1 mt-2">
-              {[1, 2, 3, 4, 5].map(i => (
-                <motion.div
-                  key={i}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: idx * 0.035 + i * 0.05, type: 'spring', stiffness: 400 }}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: i <= skill.level ? color : 'rgba(255,255,255,0.1)' }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Category + level label */}
-        <div className="flex items-center justify-between mb-2.5">
-          <span
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-            style={{ background: `${color}15`, color }}
+        <div className="min-w-0 flex-1 flex flex-col gap-1.5 pt-0.5">
+          <h3
+            // Weight is a discrete state read, not an animated one: font-weight
+            // is non-GPU (reflow/repaint) and does not interpolate smoothly, so
+            // it snaps. State already animates via opacity + the top-edge weight.
+            className={`font-display text-text leading-tight truncate ${
+              mode === 'active' ? 'font-medium' : ''
+            }`}
+            style={{ fontSize: 16 }}
           >
-            {CAT_LABEL[skill.category]}
-          </span>
-          <span className="text-[10px] text-text-secondary font-medium">
-            {LEVEL_LABEL[skill.level]}
-          </span>
+            {skill.name}
+          </h3>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Category: a graphite dot + mono label. No tint, no hue. */}
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-text/55 shrink-0" />
+            <MetaLabel className="text-text-secondary truncate">
+              {CAT_LABEL[skill.category]}
+            </MetaLabel>
+          </div>
         </div>
+      </div>
 
-        {/* Description */}
-        <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
-          {skill.description}
-        </p>
+      {/* Level read-out: weighted dot meter + named tier + experience. */}
+      <div className="flex items-center justify-between gap-3">
+        <DotMeter level={skill.level} />
+        <MetaLabel className="text-text-secondary shrink-0">
+          {LEVEL_LABEL[skill.level]} <span aria-hidden className="opacity-40 mx-1">/</span> {skill.xp}
+        </MetaLabel>
+      </div>
 
-        {/* Dependency hint when related */}
-        {(mode === 'related') && skill.deps.length > 0 && (
+      <p className="text-[12.5px] leading-relaxed text-text-secondary line-clamp-2">
+        {skill.description}
+      </p>
+
+      {/* Dependency-chain note: only on related cards. Communicates the relation
+          to the hovered skill in words, hue-free. Fades in on ease-out. */}
+      <AnimatePresence>
+        {relation && (
           <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-2 pt-2 border-t flex items-center gap-1"
-            style={{ borderColor: `${color}20` }}
+            key={relation}
+            initial={reduced ? { opacity: 1 } : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.16, ease: EASE_OUT } }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, transition: { duration: 0.1 } }}
+            className="flex flex-col gap-2"
           >
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-            <span className="text-[10px]" style={{ color }}>prerequisite</span>
+            <Hairline />
+            <MetaLabel className="text-text">
+              {relation === 'prerequisite' ? 'Prerequisite' : 'Unlocks'}
+            </MetaLabel>
           </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* Filter pill - quiet editorial control, mono only                    */
+/* ─────────────────────────────────────────────────────────────────── */
+
+function FilterPill({
+  label, active, reduced, onClick,
+}: {
+  label: string;
+  active: boolean;
+  reduced: boolean | null;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      data-testid="filter-pill"
+      // Pressable element -> restrained press scale (Emil). Filtering is
+      // occasional, so a brief feedback press is appropriate; no hue, no glow.
+      // Gated on reduced motion (the prior CSS active:scale fired regardless).
+      whileTap={reduced ? undefined : { scale: 0.97, transition: { duration: 0.12, ease: EASE_OUT } }}
+      className="group relative px-3 py-1.5 focus-visible:outline-none"
+    >
+      <MetaLabel
+        className={
+          active ? 'text-text' : 'text-text-secondary transition-colors group-hover:text-text'
+        }
+      >
+        {label}
+      </MetaLabel>
+      {/* Active marker: a single ink underline that glides between pills. */}
+      {active && (
+        <motion.span
+          layoutId="skills-filter-active"
+          aria-hidden
+          className="absolute -bottom-px left-3 right-3 h-px bg-text"
+          transition={withReduced(spring.window, reduced)}
+        />
+      )}
+    </motion.button>
   );
 }
 
@@ -205,127 +381,125 @@ function SkillCard({
 
 export default function SkillsDashboardApp() {
   const mono = useIsMono();
+  const reduced = useReducedMotion();
   const [filter, setFilter]   = useState<FilterCat>('all');
   const [hovered, setHovered] = useState<Skill | null>(null);
 
-  const visible = filter === 'all'
-    ? SKILLS
-    : SKILLS.filter(s => s.category === filter);
+  const visible = useMemo(
+    () => (filter === 'all' ? SKILLS : SKILLS.filter((s) => s.category === filter)),
+    [filter],
+  );
 
-  const getCardState = (skill: Skill): CardState => {
-    if (!hovered) return { mode: 'normal' };
-    if (skill.id === hovered.id) return { mode: 'active' };
-    // Is this skill a prerequisite of the hovered skill?
-    if (hovered.deps.includes(skill.id)) return { mode: 'related' };
-    // Does the hovered skill unlock this one?
-    if (skill.deps.includes(hovered.id)) return { mode: 'related' };
-    return { mode: 'dim' };
-  };
+  // Dependency-chain resolution for the hover signature interaction.
+  const resolve = useCallback(
+    (skill: Skill): { mode: CardMode; relation: 'prerequisite' | 'unlocks' | null } => {
+      if (!hovered) return { mode: 'normal', relation: null };
+      if (skill.id === hovered.id) return { mode: 'active', relation: null };
+      // skill is a prerequisite OF the hovered skill.
+      if (hovered.deps.includes(skill.id)) return { mode: 'related', relation: 'prerequisite' };
+      // hovered skill is a prerequisite of skill -> hovered unlocks skill.
+      if (skill.deps.includes(hovered.id)) return { mode: 'related', relation: 'unlocks' };
+      return { mode: 'dim', relation: null };
+    },
+    [hovered],
+  );
 
-  /* Category stats */
-  const catStats = (['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as Skill['category'][]).map(cat => {
-    const skills = SKILLS.filter(s => s.category === cat);
-    const avg = skills.reduce((a, b) => a + b.level, 0) / skills.length;
-    return { cat, count: skills.length, avg };
-  });
+  const onHover = useCallback((s: Skill) => setHovered(s), []);
+  const onLeave = useCallback(() => setHovered(null), []);
+
+  // Footer stats: per-category count + average proficiency, as width + opacity
+  // bars (no color). Order matches the legacy footer.
+  const catStats = useMemo(() => {
+    const order: Skill['category'][] = ['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'];
+    return order.map((cat) => {
+      const skills = SKILLS.filter((s) => s.category === cat);
+      const avg = skills.reduce((a, b) => a + b.level, 0) / skills.length;
+      return { cat, count: skills.length, avg };
+    });
+  }, []);
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-transparent">
 
-      {/* ── Header ── */}
-      <div className="flex-shrink-0 px-5 pt-5 pb-4 border-b border-white/8 dark:border-white/6">
-
-        {/* Title row */}
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="font-display text-xl text-text">Skills</h1>
-            <p className="text-[11px] text-text-secondary mt-0.5">
-              {SKILLS.length} skills across 6 domains · hover to trace dependency chains
-            </p>
-          </div>
-
-          {/* Category legend */}
-          <div className="flex items-center gap-3 flex-wrap justify-end">
-            {(['ai', 'cloud', 'backend', 'frontend', 'language', 'tool'] as Skill['category'][]).map(cat => (
-              <div key={cat} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ background: catColor(cat, mono) }} />
-                <span className="text-[10px] text-text-secondary hidden sm:block">{CAT_LABEL[cat]}</span>
-              </div>
-            ))}
-          </div>
+      {/* ── Header ── serif title, mono sub-line, hairline-anchored filter row. */}
+      <div className="shrink-0 px-6 pt-6 pb-4 flex flex-col gap-4 border-b border-border">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="font-display text-text leading-none" style={{ fontSize: 28 }}>
+            Skills
+          </h1>
+          <MetaLabel className="text-text-secondary">
+            {SKILLS.length} skills <span aria-hidden className="opacity-40 mx-1">/</span> 6 domains
+            <span aria-hidden className="opacity-40 mx-1">/</span> hover to trace dependencies
+          </MetaLabel>
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-1.5 flex-wrap">
-          {CATEGORIES.map(cat => {
-            const isActive = filter === cat;
-            // In mono, the selected pill uses the (graphite) accent so the
-            // active state stays obvious; categories are not hue-coded.
-            const color = (mono || cat === 'all')
-              ? 'rgb(var(--color-accent))'
-              : CAT_COLOR[cat as Skill['category']];
-            return (
-              <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className="px-3 py-1 rounded-full text-[11px] font-semibold transition-all capitalize"
-                style={{
-                  background: isActive ? color : 'rgba(255,255,255,0.06)',
-                  color: isActive ? 'white' : 'rgb(var(--color-text-secondary))',
-                  boxShadow: isActive ? `0 2px 8px ${color}40` : 'none',
-                  border: `1px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.08)'}`,
-                }}
-              >
-                {cat === 'all' ? 'All' : CAT_LABEL[cat as Skill['category']]}
-              </button>
-            );
-          })}
+        {/* Filter pills. */}
+        <div className="flex flex-wrap gap-x-1 gap-y-2 -mx-1">
+          {CATEGORIES.map((cat) => (
+            <FilterPill
+              key={cat}
+              label={cat === 'all' ? 'All' : CAT_LABEL[cat as Skill['category']]}
+              active={filter === cat}
+              reduced={reduced}
+              onClick={() => setFilter(cat)}
+            />
+          ))}
         </div>
       </div>
 
-      {/* ── Card grid ── */}
-      <div className="flex-1 overflow-auto p-5">
+      {/* ── Card grid ── reveals ONCE on mount via the staggered container. The
+          grid is the container; cards are the items. Filter reflow uses layout. */}
+      <div className="flex-1 overflow-auto px-6 py-6">
         <motion.div
           layout
-          className="grid gap-3"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
+          variants={reveal.container(reduced)}
+          initial="hidden"
+          animate="show"
+          className="grid gap-x-5 gap-y-6"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))' }}
         >
           <AnimatePresence mode="popLayout">
-            {visible.map((skill, idx) => (
-              <SkillCard
-                key={skill.id}
-                skill={skill}
-                cardState={getCardState(skill)}
-                idx={idx}
-                onHover={setHovered}
-                onLeave={() => setHovered(null)}
-              />
-            ))}
+            {visible.map((skill) => {
+              const { mode, relation } = resolve(skill);
+              return (
+                <SkillCard
+                  key={skill.id}
+                  skill={skill}
+                  mode={mode}
+                  relation={relation}
+                  mono={mono}
+                  reduced={reduced}
+                  onHover={onHover}
+                  onLeave={onLeave}
+                />
+              );
+            })}
           </AnimatePresence>
         </motion.div>
       </div>
 
-      {/* ── Footer stat bar ── */}
-      <div className="flex-shrink-0 px-5 py-3 border-t border-white/8 dark:border-white/6 flex gap-5 flex-wrap">
-        {catStats.map(({ cat, count, avg }) => {
-          const color = catColor(cat, mono);
-          return (
-            <div key={cat} className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-              <span className="text-[11px] text-text-secondary">{count} {CAT_LABEL[cat]}</span>
-              {/* Mini avg bar */}
-              <div className="w-12 h-1 rounded-full bg-white/10 overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: color }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(avg / 5) * 100}%` }}
-                  transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
-                />
-              </div>
-            </div>
-          );
-        })}
+      {/* ── Footer stats ── width + opacity bars, no color. */}
+      <div className="shrink-0 px-6 py-3.5 border-t border-border flex flex-wrap gap-x-7 gap-y-3">
+        {catStats.map(({ cat, count, avg }) => (
+          <div key={cat} className="flex items-center gap-2.5">
+            <MetaLabel className="text-text-secondary">
+              {count} {CAT_LABEL[cat]}
+            </MetaLabel>
+            {/* Average-proficiency bar: width = level fraction, opacity = level
+                fraction. Reads as "how filled" without any hue. */}
+            <span aria-hidden className="relative block h-1 w-14 bg-border/60 rounded-full overflow-hidden">
+              {/* Fill is full-width and revealed via a GPU scaleX from the left,
+                  not an animated width (width is non-GPU: layout + paint). */}
+              <motion.span
+                className="absolute inset-y-0 left-0 right-0 rounded-full bg-text"
+                style={{ opacity: 0.4 + (avg / 5) * 0.6, transformOrigin: 'left center' }}
+                initial={reduced ? { scaleX: avg / 5 } : { scaleX: 0 }}
+                animate={{ scaleX: avg / 5 }}
+                transition={reduced ? { duration: 0 } : { duration: 0.7, delay: 0.2, ease: EASE_OUT }}
+              />
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
