@@ -25,7 +25,7 @@ import type { AppType } from '../../../../shared/types';
 // Curated desktop app list
 // ---------------------------------------------------------------------------
 
-const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'resume', 'projects'];
+const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'resume', 'projects', 'help'];
 
 // ---------------------------------------------------------------------------
 // Single icon with 3D tilt

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import {
   motion,
+  AnimatePresence,
   useMotionValue,
   useSpring,
   useTransform,
@@ -74,6 +75,7 @@ interface DockIconProps {
 function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }: DockIconProps) {
   // ref lives on the outer div so getBoundingClientRect reflects the layout box
   const ref = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
   const scale = useDockMagnification(mouseX, ref, reduced);
 
   // Publish this icon's live rect so a minimizing window knows where to genie into.
@@ -96,7 +98,27 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
       ref={ref}
       style={{ width: layoutWidth, height: BASE_SIZE }}
       className="relative flex-shrink-0 flex items-end justify-center"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* Hover name label — mono, clears the magnified icon */}
+      <AnimatePresence>
+        {hovered && (
+          <motion.span
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
+            transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+            style={{ transformOrigin: 'center bottom' }}
+            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-8 -translate-x-1/2
+                       whitespace-nowrap rounded-md border border-white/15 bg-black/75 px-2 py-1
+                       font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md"
+          >
+            {label.windowTitle}
+          </motion.span>
+        )}
+      </AnimatePresence>
+
       {/* Inner: visual scale only, grows upward */}
       <motion.button
         data-magnetic

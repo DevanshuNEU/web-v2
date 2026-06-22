@@ -68,12 +68,13 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05, duration: 0.2 }}
-            className="mt-12 sm:mt-16 mb-10 sm:mb-14 w-[200px]"
+            className="mt-12 sm:mt-16 mb-10 sm:mb-14 w-[min(86vw,300px)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative">
+            <div className="relative flex items-center">
               <Search
-                size={13}
+                size={14}
+                strokeWidth={1.75}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
               />
               <input
@@ -82,15 +83,17 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search"
-                className="w-full pl-8 pr-3 py-[7px] rounded-lg
-                           bg-white/[0.08]
-                           border border-white/[0.08]
-                           text-[13px] text-white placeholder:text-white/35
-                           outline-none
-                           focus:bg-white/[0.12] focus:border-white/[0.15]
-                           transition-all duration-150"
+                placeholder="Search apps"
+                className="w-full rounded-xl border border-white/[0.10] bg-white/[0.06]
+                           py-2 pl-9 pr-12 text-[13.5px] text-white outline-none
+                           transition-colors duration-150 placeholder:text-white/35
+                           focus:border-white/20 focus:bg-white/[0.10]"
               />
+              <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded
+                             border border-white/15 bg-white/[0.06] px-1.5 py-0.5 font-mono
+                             text-[10px] uppercase tracking-wide text-white/40">
+                esc
+              </kbd>
             </div>
           </motion.div>
 
