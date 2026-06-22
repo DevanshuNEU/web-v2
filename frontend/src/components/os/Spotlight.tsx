@@ -1,100 +1,61 @@
 'use client';
 
 /**
- * Spotlight — macOS-style global search overlay + the entry point to Chat.
+ * Spotlight — the devOS command layer.
  *
- * Trigger:  Cmd+K  (or Ctrl+K)
- * Dismiss:  Escape, or click backdrop
+ * Trigger:  Cmd/Ctrl+K        Dismiss:  Escape / backdrop click
  *
- * Searches across apps / projects / skills / commands. The "Ask Devanshu" row
- * hands the query off to the Chat app (a real multi-turn conversation), rather
- * than answering inline.
+ * A monochrome, editorial-mono command surface. Searches apps / projects /
+ * skills / commands; the "Ask Devanshu" row hands the query to the floating
+ * assistant. Three signature moves:
+ *   1. A single sliding "lozenge" (shared `layoutId` element) glides between
+ *      rows as the selection moves — the one motion moment.
+ *   2. Results group under mono section headers (the index already groups +
+ *      caps per category; we render that structure instead of a flat list).
+ *   3. The idle state offers a curated "Jump to" set so the panel is never an
+ *      empty void.
+ *
+ * Fully ink-on-paper: category identity is carried by mono meta-labels, not
+ * colour. Colours flip with the theme via the semantic tokens (text / surface /
+ * border), so no per-mode branching is needed.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Search, Zap, FolderOpen, Activity, Terminal, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
-import { useTheme } from '@/store/themeStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
-import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
+  getSpotlightIndex,
   type SpotlightItem,
   type SpotlightCategory,
 } from '@/lib/spotlightIndex';
 
-// ---------------------------------------------------------------------------
-// Category metadata
-// ---------------------------------------------------------------------------
-
-const CATEGORY_META: Record<SpotlightCategory, { label: string; icon: React.ElementType; color: string }> = {
-  app:     { label: 'Apps',     icon: Zap,        color: 'text-blue-400'   },
-  project: { label: 'Projects', icon: FolderOpen,  color: 'text-orange-400' },
-  skill:   { label: 'Skills',   icon: Activity,    color: 'text-purple-400' },
-  command: { label: 'Commands', icon: Terminal,     color: 'text-green-400'  },
+const CATEGORY_LABEL: Record<SpotlightCategory, string> = {
+  app: 'Apps', project: 'Projects', skill: 'Skills', command: 'Commands',
+};
+const CATEGORY_TAG: Record<SpotlightCategory, string> = {
+  app: 'OPEN', project: 'OPEN', skill: 'VIEW', command: 'RUN',
+};
+const GLYPH: Record<SpotlightCategory, string> = {
+  app: '▸', project: '▸', skill: '▸', command: '›',
 };
 
-// ---------------------------------------------------------------------------
-// Result rows
-// ---------------------------------------------------------------------------
+/** Curated idle suggestions, looked up from the live index by id. */
+const SUGGESTED_IDS = [
+  'app:about-me',
+  'app:projects',
+  'app:skills-dashboard',
+  'cmd:hire devanshu',
+  'app:terminal',
+];
 
-function ResultRow({
-  item, isSelected, isDark, mono, onSelect,
-}: {
-  item: SpotlightItem; isSelected: boolean; isDark: boolean; mono: boolean; onSelect: () => void;
-}) {
-  const meta = CATEGORY_META[item.category];
-  const Icon = meta.icon;
-  // In mono the category hue carries no meaning (the label text does), so render
-  // the icon and chip in a neutral graphite tone; Fun keeps the per-category color.
-  const accentClass = mono ? 'text-text-secondary' : meta.color;
-  return (
-    <button
-      onClick={onSelect}
-      className={`w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors duration-75
-        ${isSelected ? (isDark ? 'bg-white/10' : 'bg-black/6') : (isDark ? 'hover:bg-white/6' : 'hover:bg-black/4')}`}
-    >
-      <Icon size={14} className={`flex-shrink-0 ${accentClass}`} />
-      <div className="flex-1 min-w-0">
-        <span className={`text-sm font-medium truncate block ${isDark ? 'text-white/90' : 'text-gray-900'}`}>{item.title}</span>
-        <span className={`text-[11px] truncate block leading-snug ${isDark ? 'text-white/40' : 'text-gray-500'}`}>{item.subtitle}</span>
-      </div>
-      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${accentClass} ${isDark ? 'bg-white/5' : 'bg-black/5'} flex-shrink-0`}>
-        {meta.label}
-      </span>
-    </button>
-  );
-}
+type Row =
+  | { key: string; index: number; kind: 'ask'; query: string }
+  | { key: string; index: number; kind: 'item'; item: SpotlightItem };
 
-function AskRow({
-  query, isSelected, isDark, onSelect,
-}: {
-  query: string; isSelected: boolean; isDark: boolean; onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={`w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors duration-75
-        ${isSelected ? (isDark ? 'bg-white/10' : 'bg-black/6') : (isDark ? 'hover:bg-white/6' : 'hover:bg-black/4')}`}
-    >
-      <Sparkles size={14} className="flex-shrink-0 text-accent" />
-      <div className="flex-1 min-w-0">
-        <span className={`text-sm font-medium truncate block ${isDark ? 'text-white/90' : 'text-gray-900'}`}>
-          Ask Devanshu: <span className="text-accent">{query}</span>
-        </span>
-        <span className={`text-[11px] truncate block leading-snug ${isDark ? 'text-white/40' : 'text-gray-500'}`}>
-          Opens a chat with Devanshu
-        </span>
-      </div>
-      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-accent bg-accent/10 flex-shrink-0">AI</span>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
+interface Section { header: string; rows: Row[] }
 
 export default function Spotlight() {
   const [isOpen, setIsOpen] = useState(false);
@@ -105,49 +66,74 @@ export default function Spotlight() {
   const inputRef = useRef<HTMLInputElement>(null);
   const openWindow = useOSStore(state => state.openWindow);
   const openAssistant = useAssistantUiStore(state => state.openAssistant);
-  const { mode } = useTheme();
-  const isDark = mode === 'dark';
-  const mono = useIsMono();
   const reduced = useReducedMotion();
 
-  const askAvailable = query.trim().length > 0;
-  const selectableCount = (askAvailable ? 1 : 0) + results.length;
+  // -- Build sections + a flat row list (the flat list drives keyboard nav). --
+  const { sections, flatRows } = useMemo(() => {
+    const builtSections: Section[] = [];
+    const builtFlat: Row[] = [];
+    const push = (header: string, rows: Row[]) => {
+      if (!rows.length) return;
+      rows.forEach(r => { r.index = builtFlat.length; builtFlat.push(r); });
+      builtSections.push({ header, rows });
+    };
 
-  // -- Open/close --
-  const open = useCallback(() => {
-    setIsOpen(true);
-    setQuery(''); setResults([]); setSelIdx(0);
-  }, []);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
-    setQuery(''); setResults([]); setSelIdx(0);
-  }, []);
-
-  // -- Focus input on open --
-  useEffect(() => {
-    if (isOpen) {
-      const t = setTimeout(() => inputRef.current?.focus(), 60);
-      return () => clearTimeout(t);
+    const q = query.trim();
+    if (q) {
+      push('Ask', [{ key: 'ask', index: 0, kind: 'ask', query: q }]);
+      const byCat = new Map<SpotlightCategory, Row[]>();
+      for (const item of results) {
+        const arr = byCat.get(item.category) ?? [];
+        arr.push({ key: item.id, index: 0, kind: 'item', item });
+        byCat.set(item.category, arr);
+      }
+      (['app', 'project', 'skill', 'command'] as SpotlightCategory[]).forEach(cat => {
+        push(CATEGORY_LABEL[cat], byCat.get(cat) ?? []);
+      });
+    } else {
+      const idx = new Map(getSpotlightIndex().map(i => [i.id, i]));
+      const rows: Row[] = SUGGESTED_IDS
+        .map(id => idx.get(id))
+        .filter((i): i is SpotlightItem => Boolean(i))
+        .map(item => ({ key: item.id, index: 0, kind: 'item' as const, item }));
+      push('Jump to', rows);
     }
+    return { sections: builtSections, flatRows: builtFlat };
+  }, [query, results]);
+
+  const maxIdx = Math.max(flatRows.length - 1, 0);
+
+  // -- Open / close --
+  const open = useCallback(() => { setIsOpen(true); setQuery(''); setResults([]); setSelIdx(0); }, []);
+  const close = useCallback(() => { setIsOpen(false); setQuery(''); setResults([]); setSelIdx(0); }, []);
+
+  // -- Focus the input on open --
+  useEffect(() => {
+    if (!isOpen) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(t);
   }, [isOpen]);
 
   // -- Action dispatch --
   const handleSelect = useCallback((item: SpotlightItem) => {
     close();
     switch (item.action.type) {
-      case 'openApp':       openWindow(item.action.appType); break;
-      case 'openProjects':  openWindow('projects'); break;
-      case 'openTerminal':  openWindow('terminal'); break;
+      case 'openApp':      openWindow(item.action.appType); break;
+      case 'openProjects': openWindow('projects'); break;
+      case 'openTerminal': openWindow('terminal'); break;
     }
   }, [close, openWindow]);
 
-  // -- Hand a question off to the floating assistant --
   const launchChat = useCallback((q: string) => {
     const question = q.trim();
     close();
     openAssistant(question);
   }, [close, openAssistant]);
+
+  const runRow = useCallback((row: Row) => {
+    if (row.kind === 'ask') launchChat(row.query);
+    else handleSelect(row.item);
+  }, [launchChat, handleSelect]);
 
   // -- Keyboard --
   useEffect(() => {
@@ -158,143 +144,160 @@ export default function Spotlight() {
         return;
       }
       if (!isOpen) return;
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
-        return;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelIdx(i => Math.min(i + 1, Math.max(selectableCount - 1, 0)));
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelIdx(i => Math.max(i - 1, 0));
-        return;
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (askAvailable && selIdx === 0) { launchChat(query); return; }
-        const item = results[askAvailable ? selIdx - 1 : selIdx];
-        if (item) handleSelect(item);
-      }
+      if (e.key === 'Escape')    { e.preventDefault(); close(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSelIdx(i => Math.min(i + 1, maxIdx)); return; }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setSelIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Enter')     { e.preventDefault(); const row = flatRows[selIdx]; if (row) runRow(row); }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, close, open, results, selIdx, askAvailable, selectableCount, query, launchChat, handleSelect]);
+  }, [isOpen, close, open, flatRows, selIdx, maxIdx, runRow]);
 
-  // -- Search --
   const handleQueryChange = (value: string) => {
     setQuery(value);
     setResults(searchSpotlight(value));
     setSelIdx(0);
   };
 
-  // -- Render --
-  const glass = isDark ? 'bg-[#1c1c1e]/90 border-white/8' : 'bg-white/85 border-black/6';
-  const inputColor = isDark ? 'text-white placeholder-white/30' : 'text-gray-900 placeholder-gray-400';
-  const dividerColor = isDark ? 'border-white/8' : 'border-black/6';
-
   return (
     <AnimatePresence>
       {isOpen && (
         <>
           <motion.div
-            key="spotlight-backdrop"
+            key="cmd-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[9000] bg-black/40 backdrop-blur-sm"
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
             onClick={close}
+            className="fixed inset-0 z-[9000] bg-black/55 backdrop-blur-[3px]"
+            style={{ backgroundImage: 'radial-gradient(ellipse at 50% 38%, transparent 28%, rgba(0,0,0,0.4) 100%)' }}
           />
 
           <motion.div
-            key="spotlight-panel"
-            initial={{ opacity: 0, scale: 0.96, x: '-50%', y: 'calc(-50% - 12px)' }}
-            animate={{ opacity: 1, scale: 1,    x: '-50%', y: '-50%'               }}
-            exit={{ opacity: 0, scale: 0.96,    x: '-50%', y: 'calc(-50% - 12px)'  }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className={`fixed z-[9001] left-1/2 top-1/2 w-full max-w-[560px] rounded-2xl overflow-hidden
-                        border shadow-2xl backdrop-blur-2xl ${glass}`}
+            key="cmd-panel"
+            initial={reduced ? { opacity: 0, x: '-50%', y: '-50%' } : { opacity: 0, x: '-50%', y: '-50%', scale: 0.97 }}
+            animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
+            exit={reduced ? { opacity: 0, x: '-50%', y: '-50%' } : { opacity: 0, x: '-50%', y: '-50%', scale: 0.985 }}
+            transition={reduced ? { duration: 0.12 } : { type: 'spring', stiffness: 420, damping: 32, mass: 0.8 }}
+            style={{ transformOrigin: 'center top' }}
+            className="fixed left-1/2 top-[42%] z-[9001] w-[min(92vw,580px)] overflow-hidden rounded-[20px]
+                       border border-border/60 bg-surface/80 shadow-2xl backdrop-blur-2xl"
           >
-            {/* Input row */}
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <Search size={16} className={isDark ? 'text-white/35 flex-shrink-0' : 'text-gray-400 flex-shrink-0'} />
+            {/* Masthead */}
+            <div className="px-4 pt-3">
+              <span className="select-none font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary/45">
+                ⌘ devOS · command
+              </span>
+            </div>
+
+            {/* Input */}
+            <div className="flex items-center gap-3 px-4 pb-3 pt-2">
+              <Search size={17} strokeWidth={1.75} className="shrink-0 text-text-secondary/50" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={e => handleQueryChange(e.target.value)}
-                placeholder="Search apps, or ask Devanshu anything..."
-                className={`flex-1 bg-transparent outline-none text-sm ${inputColor}`}
-                style={{ outline: 'none' }}
+                placeholder="Search apps, or ask Devanshu anything…"
+                className="flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-text-secondary/40"
                 data-no-focus-ring
                 autoComplete="off"
                 spellCheck={false}
               />
-              <kbd className={`text-[10px] px-1.5 py-0.5 rounded border font-mono flex-shrink-0
-                ${isDark ? 'text-white/25 border-white/15 bg-white/5' : 'text-gray-400 border-gray-200 bg-gray-50'}`}>
+              <kbd className="shrink-0 rounded border border-border/70 bg-text/[0.04] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary/50">
                 esc
               </kbd>
             </div>
 
-            {/* Search results */}
-            <AnimatePresence mode="wait">
-              {(askAvailable || results.length > 0) && (
-                <motion.div
-                  key="results"
-                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  transition={{ duration: 0.12, ease: 'easeOut' }}
-                >
-                  <div className={`border-t ${dividerColor}`} />
-                  <div className="py-1 max-h-[360px] overflow-auto">
-                    {askAvailable && (
-                      <AskRow
-                        query={query.trim()}
-                        isSelected={selIdx === 0}
-                        isDark={isDark}
-                        onSelect={() => launchChat(query)}
-                      />
-                    )}
-                    {results.map((item, i) => (
-                      <ResultRow
-                        key={item.id}
-                        item={item}
-                        isSelected={(askAvailable ? i + 1 : i) === selIdx}
-                        isDark={isDark}
-                        mono={mono}
-                        onSelect={() => handleSelect(item)}
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div className="h-px bg-border/55" />
 
-            {/* Footer hint */}
-            {results.length === 0 && query.length === 0 && (
-              <div className={`border-t px-4 py-2.5 flex gap-4 flex-wrap ${dividerColor}`}>
-                <span className="flex items-center gap-1 text-[11px] text-accent opacity-70">
-                  <Sparkles size={11} /> Ask Devanshu
-                </span>
-                {(['app', 'project', 'skill', 'command'] as SpotlightCategory[]).map(cat => {
-                  const meta = CATEGORY_META[cat];
-                  const Icon = meta.icon;
-                  return (
-                    <span key={cat} className={`flex items-center gap-1 text-[11px] ${mono ? 'text-text-secondary' : meta.color} opacity-60`}>
-                      <Icon size={11} /> {meta.label}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+            {/* Results */}
+            <div className="max-h-[min(56vh,420px)] overflow-auto py-2">
+              {sections.map((section, si) => (
+                <div key={section.header} className={si > 0 ? 'mt-1' : ''}>
+                  <div className="select-none px-4 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-secondary/40">
+                    {section.header}
+                  </div>
+                  {section.rows.map(row => (
+                    <RowView
+                      key={row.key}
+                      row={row}
+                      selected={row.index === selIdx}
+                      reduced={!!reduced}
+                      onRun={() => runRow(row)}
+                      onHover={() => setSelIdx(row.index)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="h-px bg-border/55" />
+
+            {/* Action bar */}
+            <div className="flex items-center gap-4 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-text-secondary/55">
+              <span className="flex items-center gap-1.5"><Hint>↑↓</Hint> navigate</span>
+              <span className="flex items-center gap-1.5"><Hint>↵</Hint> open</span>
+              <span className="ml-auto flex items-center gap-1.5"><Hint>esc</Hint> dismiss</span>
+            </div>
           </motion.div>
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded border border-border/60 bg-text/[0.03] px-1 py-px font-mono text-[9px] leading-none text-text-secondary/70">
+      {children}
+    </kbd>
+  );
+}
+
+function RowView({ row, selected, reduced, onRun, onHover }: {
+  row: Row; selected: boolean; reduced: boolean; onRun: () => void; onHover: () => void;
+}) {
+  const glyph = row.kind === 'ask' ? '✦' : GLYPH[row.item.category];
+  const title = row.kind === 'ask' ? 'Ask Devanshu' : row.item.title;
+  const tag = row.kind === 'ask' ? 'ASK' : CATEGORY_TAG[row.item.category];
+  const subtitle = row.kind === 'ask' ? 'Opens a chat with Devanshu' : row.item.subtitle;
+
+  return (
+    <button
+      type="button"
+      onClick={onRun}
+      onMouseMove={() => { if (!selected) onHover(); }}
+      className="group relative flex w-full items-center gap-3 px-4 py-2.5 text-left
+                 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.992]"
+    >
+      {selected && (
+        <motion.div
+          layoutId="cmd-selection"
+          transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 560, damping: 44, mass: 0.6 }}
+          className="absolute inset-x-2 inset-y-0 z-0 rounded-xl bg-text/[0.06]"
+        >
+          <span className="absolute left-0 top-1/2 h-[56%] w-[2px] -translate-y-1/2 rounded-full bg-text/70" />
+        </motion.div>
+      )}
+
+      <span className="relative z-10 w-3 shrink-0 text-center font-mono text-[13px] text-text-secondary/70">
+        {glyph}
+      </span>
+
+      <span className="relative z-10 min-w-0 flex-1">
+        <span className="block truncate text-[13.5px] font-medium text-text">
+          {title}
+          {row.kind === 'ask' && <span className="text-text-secondary"> “{row.query}”</span>}
+        </span>
+        <span className="block truncate text-[11.5px] leading-snug text-text-secondary/65">{subtitle}</span>
+      </span>
+
+      <span className="relative z-10 shrink-0 font-mono text-[9.5px] uppercase tracking-[0.16em] text-text-secondary/45">
+        {tag}
+      </span>
+      {selected && (
+        <span className="relative z-10 shrink-0 font-mono text-[11px] text-text-secondary/70">↵</span>
+      )}
+    </button>
   );
 }

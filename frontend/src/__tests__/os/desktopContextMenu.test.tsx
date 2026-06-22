@@ -63,6 +63,6 @@ describe('desktop right-click context menu', () => {
     fireEvent.contextMenu(surface as Element);
 
     // A menu item only renders once the trigger successfully opened the menu.
-    expect(await screen.findByText('Search devOS')).toBeInTheDocument();
+    expect(await screen.findByText('search devOS')).toBeInTheDocument();
   });
 });

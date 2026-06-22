@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Desktop right-click menu — the command layer's terminal half.
+ *
+ * Shares the Spotlight language: monochrome, mono type, hairline separators, a
+ * graphite highlight. Each entry reads like a shell command behind a `›` prompt
+ * glyph. Origin-aware (Radix anchors the scale to the cursor) with the shared
+ * ease-out curve. Colours flip with the theme via semantic tokens.
+ */
+
 import React from 'react';
 import {
   ContextMenu,
@@ -9,96 +18,93 @@ import {
   ContextMenuTrigger,
   ContextMenuLabel,
 } from '@/components/ui/context-menu';
-import { Palette, RefreshCw, FolderOpen, Terminal, User, Coffee, Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
-import { useTheme } from '@/store/themeStore';
 
 interface DesktopContextMenuProps {
   children: React.ReactNode;
 }
 
+const ITEM_CLASS =
+  'group relative flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 ' +
+  'font-mono text-[12.5px] text-text-secondary outline-none transition-colors duration-100 ' +
+  'focus:bg-text/[0.07] focus:text-text data-[highlighted]:bg-text/[0.07] data-[highlighted]:text-text';
+
+/** The shell-prompt glyph that leads every command; brightens on highlight. */
+function Prompt() {
+  return (
+    <span className="font-mono text-[12px] text-text-secondary/40 transition-colors duration-100 group-data-[highlighted]:text-text/70">
+      ›
+    </span>
+  );
+}
+
 export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
   const openWindow = useOSStore(state => state.openWindow);
-  const { mode } = useTheme();
-  const isDark = mode === 'dark';
-
-  const menuBg = isDark
-    ? 'rgba(28, 28, 32, 0.88)'
-    : 'rgba(250, 250, 252, 0.90)';
-  const borderClass = isDark ? 'border-white/12' : 'border-black/6';
-  const separatorClass = isDark ? 'bg-white/8' : 'bg-black/6';
-  const itemClass = isDark
-    ? 'cursor-pointer text-white/85 focus:bg-white/8 focus:text-white/85 data-[highlighted]:bg-white/8 data-[highlighted]:text-white/85'
-    : 'cursor-pointer text-gray-800 focus:bg-black/5 focus:text-gray-800 data-[highlighted]:bg-black/5 data-[highlighted]:text-gray-800';
-  const labelClass = isDark ? 'text-white/35' : 'text-gray-400';
-  const kbdClass = isDark ? 'text-white/35 font-mono ml-2' : 'text-gray-400 font-mono ml-2';
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        {children}
-      </ContextMenuTrigger>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 
       <ContextMenuContent
-        className={`w-60 border ${borderClass} shadow-glass-xl`}
-        style={{ background: menuBg, backdropFilter: 'blur(40px) saturate(160%)', WebkitBackdropFilter: 'blur(40px) saturate(160%)' }}
+        className="w-64 rounded-xl border border-border/60 bg-surface/80 p-1.5 font-mono shadow-2xl
+                   backdrop-blur-2xl duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]"
       >
-        {/* Flavour header — not clickable */}
-        <ContextMenuLabel className={`text-[11px] font-normal px-2 py-1.5 leading-tight select-none ${labelClass}`}>
-          devOS · right-click as a service
+        {/* Flavour header — a shell comment, not clickable */}
+        <ContextMenuLabel className="select-none px-2.5 py-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.16em] text-text-secondary/40">
+          # right-click as a service
         </ContextMenuLabel>
 
-        <ContextMenuSeparator className={separatorClass} />
+        <ContextMenuSeparator className="my-1 bg-text/10" />
 
         {/* Spotlight search shortcut — triggers the Cmd+K overlay */}
         <ContextMenuItem
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
           }}
-          className={itemClass}
+          className={ITEM_CLASS}
         >
-          <Search className="mr-2 h-4 w-4 opacity-60" />
-          <span className="flex-1">Search devOS</span>
-          <kbd className={`text-[10px] ${kbdClass}`}>⌘K</kbd>
+          <Prompt />
+          <span className="flex-1">search devOS</span>
+          <kbd className="font-mono text-[10px] text-text-secondary/40">⌘K</kbd>
         </ContextMenuItem>
 
-        <ContextMenuSeparator className={separatorClass} />
+        <ContextMenuSeparator className="my-1 bg-text/10" />
 
-        <ContextMenuItem onClick={() => openWindow('about-me')} className={itemClass}>
-          <User className="mr-2 h-4 w-4 opacity-60" />
+        <ContextMenuItem onClick={() => openWindow('about-me')} className={ITEM_CLASS}>
+          <Prompt />
           <span>open ./about-me</span>
         </ContextMenuItem>
 
-        <ContextMenuItem onClick={() => openWindow('file-explorer')} className={itemClass}>
-          <FolderOpen className="mr-2 h-4 w-4 opacity-60" />
+        <ContextMenuItem onClick={() => openWindow('file-explorer')} className={ITEM_CLASS}>
+          <Prompt />
           <span>ls -la ~/projects</span>
         </ContextMenuItem>
 
-        <ContextMenuItem onClick={() => openWindow('terminal')} className={itemClass}>
-          <Terminal className="mr-2 h-4 w-4 opacity-60" />
+        <ContextMenuItem onClick={() => openWindow('terminal')} className={ITEM_CLASS}>
+          <Prompt />
           <span>open Terminal.app</span>
         </ContextMenuItem>
 
-        <ContextMenuSeparator className={separatorClass} />
+        <ContextMenuSeparator className="my-1 bg-text/10" />
 
-        <ContextMenuItem onClick={() => openWindow('display-options')} className={itemClass}>
-          <Palette className="mr-2 h-4 w-4 opacity-60" />
-          <span>Make it yours</span>
+        <ContextMenuItem onClick={() => openWindow('display-options')} className={ITEM_CLASS}>
+          <Prompt />
+          <span>theme --customize</span>
         </ContextMenuItem>
 
-        <ContextMenuSeparator className={separatorClass} />
+        <ContextMenuSeparator className="my-1 bg-text/10" />
 
-        <ContextMenuItem onClick={() => window.location.reload()} className={itemClass}>
-          <RefreshCw className="mr-2 h-4 w-4 opacity-60" />
+        <ContextMenuItem onClick={() => window.location.reload()} className={ITEM_CLASS}>
+          <Prompt />
           <span>git pull .</span>
         </ContextMenuItem>
 
         <ContextMenuItem
           disabled
-          className={`opacity-40 cursor-default focus:bg-transparent data-[highlighted]:bg-transparent ${isDark ? 'text-white/40' : 'text-gray-400'}`}
+          className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-mono text-[12px] italic text-text-secondary/35 opacity-70 focus:bg-transparent data-[highlighted]:bg-transparent"
         >
-          <Coffee className="mr-2 h-4 w-4 opacity-40" />
-          <span className="italic text-[12px]">brew install good-vibes</span>
+          <span className="font-mono text-[12px] text-text-secondary/25">$</span>
+          <span>brew install good-vibes</span>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
