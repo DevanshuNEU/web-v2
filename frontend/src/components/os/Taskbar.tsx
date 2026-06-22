@@ -114,7 +114,7 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
                        whitespace-nowrap rounded-md border border-white/15 bg-black/75 px-2 py-1
                        font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md"
           >
-            {label.windowTitle}
+            {label.title}
           </motion.span>
         )}
       </AnimatePresence>
@@ -125,7 +125,6 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
         style={{ scale, originY: 1 }}
         onClick={onClick}
         className={`relative cursor-pointer ${isMinimized ? 'opacity-40' : ''}`}
-        title={label.windowTitle}
         aria-label={`${label.windowTitle}${isRunning ? ' (open)' : ''}`}
       >
         <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={BASE_SIZE} />
@@ -148,6 +147,84 @@ function DockDivider() {
       className="w-px bg-white/20 mx-1 self-stretch flex-shrink-0"
       style={{ minHeight: BASE_SIZE }}
     />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Launchpad button — magnifies + tooltips exactly like a dock icon, */
+/*  so the whole dock responds uniformly as the cursor sweeps across.  */
+/* ------------------------------------------------------------------ */
+
+interface LaunchpadButtonProps {
+  mouseX: MotionValue<number>;
+  reduced: boolean;
+  open: boolean;
+  pulse: boolean;
+  mono: boolean;
+  isDark: boolean;
+  onToggle: () => void;
+}
+
+function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle }: LaunchpadButtonProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const scale = useDockMagnification(mouseX, ref, reduced);
+  const layoutWidth = useTransform(scale, (s) => Math.round(s * BASE_SIZE));
+
+  return (
+    <motion.div
+      ref={ref}
+      style={{ width: layoutWidth, height: BASE_SIZE }}
+      className="relative flex-shrink-0 flex items-end justify-center"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <AnimatePresence>
+        {hovered && (
+          <motion.span
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
+            transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+            style={{ transformOrigin: 'center bottom' }}
+            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-8 -translate-x-1/2
+                       whitespace-nowrap rounded-md border border-white/15 bg-black/75 px-2 py-1
+                       font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md"
+          >
+            All apps
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      {/* Pulse ring — first-time visitors only */}
+      {pulse && (
+        <span
+          className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 rounded-[12px] animate-ping"
+          style={{
+            width: BASE_SIZE,
+            height: BASE_SIZE,
+            background: mono
+              ? (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.22)')
+              : 'rgba(59,130,246,0.35)',
+            animationDuration: '1.6s',
+          }}
+        />
+      )}
+
+      <motion.button
+        data-magnetic
+        style={{ scale, originY: 1, width: BASE_SIZE, height: BASE_SIZE }}
+        onClick={onToggle}
+        aria-label="Launchpad, explore all apps"
+        className={`relative flex items-center justify-center rounded-[12px] cursor-pointer transition-colors duration-150 ${
+          open
+            ? 'bg-white/25 dark:bg-white/20'
+            : 'bg-white/10 dark:bg-white/[0.08] hover:bg-white/20 dark:hover:bg-white/15'
+        }`}
+      >
+        <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
+      </motion.button>
+    </motion.div>
   );
 }
 
@@ -211,39 +288,20 @@ export default function Taskbar() {
         onMouseMove={(e) => mouseX.set(e.clientX)}
         onMouseLeave={() => mouseX.set(-1)}
       >
-        {/* Launchpad button */}
-        <div className="relative flex-shrink-0" style={{ width: BASE_SIZE, height: BASE_SIZE }}>
-          {/* Pulse ring — only for first-time visitors */}
-          {firstVisit && !launchpadOpen && (
-            <span
-              className="absolute inset-0 rounded-[11px] pointer-events-none animate-ping"
-              style={{
-                background: mono
-                  ? (mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.22)')
-                  : 'rgba(59,130,246,0.35)',
-                animationDuration: '1.6s',
-              }}
-            />
-          )}
-          <button
-            data-magnetic="button"
-            onClick={() => {
-              setLaunchpadOpen(!launchpadOpen);
-              setFirstVisit(false);
-              localStorage.setItem('devos_hint_dismissed', '1');
-            }}
-            className={`
-              w-full h-full rounded-[11px] flex items-center justify-center
-              transition-all duration-150 cursor-pointer
-              ${launchpadOpen
-                ? 'bg-white/25 dark:bg-white/20'
-                : 'bg-white/10 dark:bg-white/8 hover:bg-white/20 dark:hover:bg-white/15'}
-            `}
-            title="Launchpad — explore all apps"
-          >
-            <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
-          </button>
-        </div>
+        {/* Launchpad button — magnifies + tooltips like a dock icon */}
+        <LaunchpadButton
+          mouseX={mouseX}
+          reduced={reduced}
+          open={launchpadOpen}
+          pulse={firstVisit && !launchpadOpen}
+          mono={mono}
+          isDark={mode === 'dark'}
+          onToggle={() => {
+            setLaunchpadOpen(!launchpadOpen);
+            setFirstVisit(false);
+            localStorage.setItem('devos_hint_dismissed', '1');
+          }}
+        />
 
         <DockDivider />
 
