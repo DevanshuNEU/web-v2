@@ -19,20 +19,25 @@ import {
   ContextMenuLabel,
 } from '@/components/ui/context-menu';
 import { useOSStore } from '@/store/osStore';
+import { useIsMono } from '@/hooks/usePalette';
 
 interface DesktopContextMenuProps {
   children: React.ReactNode;
 }
 
-const ITEM_CLASS =
+const ITEM_BASE =
   'group relative flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 ' +
   'font-mono text-[12.5px] text-text-secondary outline-none transition-colors duration-100 ' +
-  'focus:bg-text/[0.07] focus:text-text data-[highlighted]:bg-text/[0.07] data-[highlighted]:text-text';
+  'focus:text-text data-[highlighted]:text-text';
 
-/** The shell-prompt glyph that leads every command; brightens on highlight. */
-function Prompt() {
+/** The shell-prompt glyph that leads every command; brightens (or accents) on highlight. */
+function Prompt({ mono }: { mono: boolean }) {
   return (
-    <span className="font-mono text-[12px] text-text-secondary/40 transition-colors duration-100 group-data-[highlighted]:text-text/70">
+    <span
+      className={`font-mono text-[12px] text-text-secondary/40 transition-colors duration-100 ${
+        mono ? 'group-data-[highlighted]:text-text/70' : 'group-data-[highlighted]:text-accent'
+      }`}
+    >
       ›
     </span>
   );
@@ -40,6 +45,13 @@ function Prompt() {
 
 export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
   const openWindow = useOSStore(state => state.openWindow);
+  // Monochrome by default; "fun" (colour) mode lets the single accent tint the highlight.
+  const mono = useIsMono();
+  const ITEM_CLASS = `${ITEM_BASE} ${
+    mono
+      ? 'focus:bg-text/[0.07] data-[highlighted]:bg-text/[0.07]'
+      : 'focus:bg-accent/10 data-[highlighted]:bg-accent/10'
+  }`;
 
   return (
     <ContextMenu>
@@ -63,7 +75,7 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
           }}
           className={ITEM_CLASS}
         >
-          <Prompt />
+          <Prompt mono={mono} />
           <span className="flex-1">search devOS</span>
           <kbd className="font-mono text-[10px] text-text-secondary/40">⌘K</kbd>
         </ContextMenuItem>
@@ -71,31 +83,31 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
         <ContextMenuSeparator className="my-1 bg-text/10" />
 
         <ContextMenuItem onClick={() => openWindow('about-me')} className={ITEM_CLASS}>
-          <Prompt />
+          <Prompt mono={mono} />
           <span>open ./about-me</span>
         </ContextMenuItem>
 
         <ContextMenuItem onClick={() => openWindow('file-explorer')} className={ITEM_CLASS}>
-          <Prompt />
+          <Prompt mono={mono} />
           <span>ls -la ~/projects</span>
         </ContextMenuItem>
 
         <ContextMenuItem onClick={() => openWindow('terminal')} className={ITEM_CLASS}>
-          <Prompt />
+          <Prompt mono={mono} />
           <span>open Terminal.app</span>
         </ContextMenuItem>
 
         <ContextMenuSeparator className="my-1 bg-text/10" />
 
         <ContextMenuItem onClick={() => openWindow('display-options')} className={ITEM_CLASS}>
-          <Prompt />
+          <Prompt mono={mono} />
           <span>theme --customize</span>
         </ContextMenuItem>
 
         <ContextMenuSeparator className="my-1 bg-text/10" />
 
         <ContextMenuItem onClick={() => window.location.reload()} className={ITEM_CLASS}>
-          <Prompt />
+          <Prompt mono={mono} />
           <span>git pull .</span>
         </ContextMenuItem>
 

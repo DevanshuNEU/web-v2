@@ -25,6 +25,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
+import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
   getSpotlightIndex,
@@ -67,6 +68,9 @@ export default function Spotlight() {
   const openWindow = useOSStore(state => state.openWindow);
   const openAssistant = useAssistantUiStore(state => state.openAssistant);
   const reduced = useReducedMotion();
+  // Fully monochrome by default; "fun" (colour) mode lets a single accent through
+  // on the moving selection and the Ask hero glyph — never the old per-category rainbow.
+  const mono = useIsMono();
 
   // -- Build sections + a flat row list (the flat list drives keyboard nav). --
   const { sections, flatRows } = useMemo(() => {
@@ -223,6 +227,7 @@ export default function Spotlight() {
                       row={row}
                       selected={row.index === selIdx}
                       reduced={!!reduced}
+                      mono={mono}
                       onRun={() => runRow(row)}
                       onHover={() => setSelIdx(row.index)}
                     />
@@ -254,13 +259,16 @@ function Hint({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RowView({ row, selected, reduced, onRun, onHover }: {
-  row: Row; selected: boolean; reduced: boolean; onRun: () => void; onHover: () => void;
+function RowView({ row, selected, reduced, mono, onRun, onHover }: {
+  row: Row; selected: boolean; reduced: boolean; mono: boolean; onRun: () => void; onHover: () => void;
 }) {
-  const glyph = row.kind === 'ask' ? '✦' : GLYPH[row.item.category];
-  const title = row.kind === 'ask' ? 'Ask Devanshu' : row.item.title;
-  const tag = row.kind === 'ask' ? 'ASK' : CATEGORY_TAG[row.item.category];
-  const subtitle = row.kind === 'ask' ? 'Opens a chat with Devanshu' : row.item.subtitle;
+  const isAsk = row.kind === 'ask';
+  const glyph = isAsk ? '✦' : GLYPH[row.item.category];
+  const title = isAsk ? 'Ask Devanshu' : row.item.title;
+  const tag = isAsk ? 'ASK' : CATEGORY_TAG[row.item.category];
+  const subtitle = isAsk ? 'Opens a chat with Devanshu' : row.item.subtitle;
+  // In fun mode the Ask hero carries the single accent; everything else stays ink.
+  const askAccent = isAsk && !mono;
 
   return (
     <button
@@ -274,25 +282,25 @@ function RowView({ row, selected, reduced, onRun, onHover }: {
         <motion.div
           layoutId="cmd-selection"
           transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 560, damping: 44, mass: 0.6 }}
-          className="absolute inset-x-2 inset-y-0 z-0 rounded-xl bg-text/[0.06]"
+          className={`absolute inset-x-2 inset-y-0 z-0 rounded-xl ${mono ? 'bg-text/[0.06]' : 'bg-accent/10'}`}
         >
-          <span className="absolute left-0 top-1/2 h-[56%] w-[2px] -translate-y-1/2 rounded-full bg-text/70" />
+          <span className={`absolute left-0 top-1/2 h-[56%] w-[2px] -translate-y-1/2 rounded-full ${mono ? 'bg-text/70' : 'bg-accent'}`} />
         </motion.div>
       )}
 
-      <span className="relative z-10 w-3 shrink-0 text-center font-mono text-[13px] text-text-secondary/70">
+      <span className={`relative z-10 w-3 shrink-0 text-center font-mono text-[13px] ${askAccent ? 'text-accent' : 'text-text-secondary/70'}`}>
         {glyph}
       </span>
 
       <span className="relative z-10 min-w-0 flex-1">
         <span className="block truncate text-[13.5px] font-medium text-text">
           {title}
-          {row.kind === 'ask' && <span className="text-text-secondary"> “{row.query}”</span>}
+          {isAsk && <span className={askAccent ? 'text-accent' : 'text-text-secondary'}> “{row.query}”</span>}
         </span>
         <span className="block truncate text-[11.5px] leading-snug text-text-secondary/65">{subtitle}</span>
       </span>
 
-      <span className="relative z-10 shrink-0 font-mono text-[9.5px] uppercase tracking-[0.16em] text-text-secondary/45">
+      <span className={`relative z-10 shrink-0 font-mono text-[9.5px] uppercase tracking-[0.16em] ${askAccent ? 'text-accent/70' : 'text-text-secondary/45'}`}>
         {tag}
       </span>
       {selected && (
