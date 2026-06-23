@@ -239,8 +239,8 @@ export const projectMeta: Record<string, ProjectMeta> = {
     status: 'active',
     story: [
       "Finding specialty medication in a shortage is genuinely miserable. You call pharmacy after pharmacy, get put on hold, and half the time they say 'in stock' and then it's not. CallBudget fixes the calling problem.",
-      "It reframes the search as Bayesian active sensing: a HistGradientBoosting model ranks pharmacies by predicted stock probability, a voice agent navigates IVRs and hold music, and calibrated abstention suppresses false-positive-in-stock answers — the ones that send patients to empty shelves.",
-      "The result is a 47% reduction in expected calls (4.3 to 2.3 avg) with false-positive rate suppressed from ~10% to ~0%. Shipped as an MCP server so it drops into any agentic workflow. Built on a 19-pharmacy Boston corpus for Adderall XR 20mg, entirely on public data (NPPES, RxNorm, DEA ARCOS) — zero PHI.",
+      "It reframes the search as Bayesian active sensing: a HistGradientBoosting model ranks pharmacies by predicted stock probability, a voice agent navigates IVRs and hold music, and calibrated abstention suppresses false-positive-in-stock answers, the ones that send patients to empty shelves.",
+      "The result is a 47% reduction in expected calls (4.3 to 2.3 avg) with false-positive rate suppressed from ~10% to ~0%. Shipped as an MCP server so it drops into any agentic workflow. Built on a 19-pharmacy Boston corpus for Adderall XR 20mg, entirely on public data (NPPES, RxNorm, DEA ARCOS). Zero PHI.",
     ],
     achievements: [
       { metric: '47%', label: 'Fewer calls to find', detail: 'Bayesian active sensing vs naive random calling' },
@@ -260,7 +260,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     story: [
       "There is a real question nobody has measured cleanly: when you pile on MCP servers, does discrimination interference degrade code retrieval? Tool Crowding is the pre-registered, open-methodology benchmark designed to answer it.",
       "The key methodological move: a padded-N=1 control (adapted from Chroma's text-retrieval work) isolates interference from prompt-length effects. The harness varies N as a continuous variable and measures pass@1 degradation. Conflict of interest (built OpenCodeIntel) is disclosed upfront with a mandatory leave-OCI-out sensitivity run.",
-      "Exploratory probes already found something interesting: a task-framing x agent-persona interaction that prior art (RAG-MCP, LongFuncEval, MCPVerse, LiveMCPBench) did not report. The methodology is locked across 10 binding design docs. The sweep is paused — turns out frontier model API bills are real. Will pick up when the budget does.",
+      "Exploratory probes already found something interesting: a task-framing x agent-persona interaction that prior art (RAG-MCP, LongFuncEval, MCPVerse, LiveMCPBench) did not report. The methodology is locked across 10 binding design docs. The sweep is paused. Turns out frontier model API bills are real. Will pick up when the budget does.",
     ],
     achievements: [
       { metric: 'Pre-registered', label: 'Before any data', detail: '4 scenario abstracts, locked decision rules, kill criteria' },
@@ -278,9 +278,9 @@ export const projectMeta: Record<string, ProjectMeta> = {
     category: 'personal',
     status: 'completed',
     story: [
-      "Freelance work for ParseWave. The brief: author a benchmark suite of systems debugging tasks that are hard enough to measure LLM agent reliability — not just pass/fail on obvious bugs.",
+      "Freelance work for ParseWave. The brief: author a benchmark suite of systems debugging tasks that are hard enough to measure LLM agent reliability, not just pass/fail on obvious bugs.",
       "Turns out Opus 4.8 passes naive 'find the bug' tasks 4 out of 5 times. That is not a benchmark, that is a tutorial. Tasks here are calibrated to 0-2/5 agent pass rate. Each uses Harbor format: oracle/nop baselines, anti-cheat measures (hash-locked backends, nonce echo), preflight checks.",
-      "Three tasks shipped: nginx-502, fd-leak-emfile, and concurrent-ledger (the one where the winning fix — minimal-scope locking — drops latency from 5.2s to 0.95s and is genuinely non-obvious).",
+      "Three tasks shipped: nginx-502, fd-leak-emfile, and concurrent-ledger (the one where the winning fix, minimal-scope locking, drops latency from 5.2s to 0.95s and is genuinely non-obvious).",
     ],
     achievements: [
       { metric: '3', label: 'Harbor-verified tasks', detail: 'nginx-502, fd-leak-emfile, concurrent-ledger' },
@@ -298,7 +298,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     category: 'personal',
     status: 'completed',
     story: [
-      "Open-source contribution to entire.io. Entire gives AI coding agents checkpoint/rewind/lifecycle hooks — External Agents is the protocol layer that lets any agent (Kiro, Amp, Cursor, Claude Code) plug in without native support.",
+      "Open-source contribution to entire.io. Entire gives AI coding agents checkpoint/rewind/lifecycle hooks. External Agents is the protocol layer that lets any agent (Kiro, Amp, Cursor, Claude Code) plug in without native support.",
       "Subcommand interface over stdin/stdout. Each agent binary implements the protocol contract; the lifecycle harness auto-discovers and builds them all; shared integration tests run across every CLI in one pass.",
       "Shipped two production agents: Kiro (hooks + transcript analysis) and Amp (hooks + transcript + token calculation + compact transcripts). Three test layers: generic protocol compliance, per-agent unit/build, lifecycle integration.",
     ],
@@ -319,7 +319,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     status: 'completed',
     story: [
       "IBM watsonx Orchestrate hackathon. The problem: manually authoring Journey Success test cases for watsonx agents is tedious and error-prone. Test Forge is a multi-tool agent that reads deployed agent specs and generates validated test cases automatically.",
-      "Tool lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Test cases cover happy path, edge cases, and failure scenarios with strict/fuzzy/optional argument matching plus response text keywords — all goals must pass for a test to succeed.",
+      "Tool lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Test cases cover happy path, edge cases, and failure scenarios with strict/fuzzy/optional argument matching plus response text keywords. All goals must pass for a test to succeed.",
       "Built on IBM's ADK + watsonx Orchestrate MCP server, integrated with Bob IDE. Demonstrates manager/collaborator agent composition: manager agents coordinate via named collaborators; collaborator agents own the tools.",
     ],
     achievements: [
