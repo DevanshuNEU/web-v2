@@ -93,9 +93,11 @@ describe('TerminalApp chrome', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the example-command placeholder hint on an empty input', () => {
+  it('shows a rotating example-command placeholder hint on an empty input', () => {
     render(<TerminalApp />);
-    expect(screen.getByText('try: projects')).toBeInTheDocument();
+    // The hint now rotates through TERMINAL_SUGGESTIONS (one pick per mount),
+    // so assert the "try: <suggestion>" shape rather than a fixed command.
+    expect(screen.getByText(/^try: \S/)).toBeInTheDocument();
   });
 });
 
