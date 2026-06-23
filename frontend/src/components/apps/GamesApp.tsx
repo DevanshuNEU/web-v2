@@ -31,6 +31,7 @@ import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMono } from '@/hooks/usePalette';
+import { useSwipe } from '@/hooks/useSwipe';
 import { Hairline, MetaLabel } from '@/components/editorial';
 import { Plotter } from '@/components/signature';
 import { strokeSet } from '@/lib/signature/plotter';
@@ -68,6 +69,7 @@ const CARDS = [
     subtitle: 'Nokia 3310 edition',
     genre: 'Arcade',
     controls: '← → ↑ ↓ · Space pause',
+    controlsMobile: 'Swipe or tap controls',
     hsKey: 'devos-snake-hs',
     hsLabel: 'pts',
   },
@@ -77,6 +79,7 @@ const CARDS = [
     subtitle: "The programmer's meditation",
     genre: 'Puzzle',
     controls: '← → ↑ · Space drop · P pause',
+    controlsMobile: 'Tap controls',
     hsKey: 'devos-tetris-hs',
     hsLabel: 'pts',
   },
@@ -86,6 +89,7 @@ const CARDS = [
     subtitle: 'Code faster than your linter',
     genre: 'Reflex',
     controls: 'Start typing to begin',
+    controlsMobile: 'Tap to type',
     hsKey: 'devos-typeracer-hs',
     hsLabel: 'WPM',
   },
@@ -103,14 +107,17 @@ function SelectorEntry({
   number,
   card,
   reduced,
+  isMobile,
   onSelect,
 }: {
   number: string;
   card: (typeof CARDS)[number];
   reduced: boolean | null;
+  isMobile: boolean;
   onSelect: () => void;
 }) {
   const best = bestScore(card.hsKey);
+  const controls = isMobile ? card.controlsMobile : card.controls;
   return (
     <button
       type="button"
@@ -137,7 +144,7 @@ function SelectorEntry({
         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-text-secondary/70">
           <MetaLabel>{card.genre}</MetaLabel>
           <span aria-hidden className="font-mono-meta opacity-40">·</span>
-          <MetaLabel className="truncate">{card.controls}</MetaLabel>
+          <MetaLabel className="truncate">{controls}</MetaLabel>
         </span>
       </span>
 
@@ -151,7 +158,7 @@ function SelectorEntry({
   );
 }
 
-function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
+function Launcher({ onSelect, isMobile }: { onSelect: (id: GameId) => void; isMobile: boolean }) {
   const reduced = useReducedMotion();
 
   return (
@@ -188,6 +195,7 @@ function Launcher({ onSelect }: { onSelect: (id: GameId) => void }) {
                 number={String(i + 1).padStart(2, '0')}
                 card={card}
                 reduced={reduced}
+                isMobile={isMobile}
                 onSelect={() => onSelect(card.id)}
               />
               {i < CARDS.length - 1 && <Hairline className="mx-1" />}
@@ -334,7 +342,7 @@ function ControlsHint({ children }: { children: React.ReactNode }) {
 
 const SNAKE_GRID = 20;
 
-function SnakeGameView({ onBack }: { onBack: () => void }) {
+function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boolean }) {
   const mono = useIsMono();
   const reduced = useReducedMotion();
   const [cellSize, setCellSize] = useState(18);
@@ -415,6 +423,18 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
 
   useEffect(() => { draw(); }, [draw]);
 
+  // Single source of truth for direction changes (keyboard, swipe, D-pad all
+  // funnel through here). Applies the same opposite-direction reversal guard.
+  const changeDir = useCallback((d: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
+    const opp: Record<string, string> = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' };
+    if (d !== opp[dirRef.current]) dirRef.current = d;
+  }, []);
+
+  // Shared pause toggle (space key + on-screen pause button).
+  const togglePause = useCallback(() => {
+    setStatus(s => { const next = s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s; statusRef.current = next; return next; });
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -423,24 +443,29 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
         ArrowUp: 'UP', w: 'UP', W: 'UP', ArrowDown: 'DOWN', s: 'DOWN', S: 'DOWN',
         ArrowLeft: 'LEFT', a: 'LEFT', A: 'LEFT', ArrowRight: 'RIGHT', d: 'RIGHT', D: 'RIGHT',
       };
-      const opp: Record<string, string> = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' };
       const d = map[e.key];
-      if (d && d !== opp[dirRef.current]) { e.preventDefault(); dirRef.current = d; }
+      if (d) { e.preventDefault(); changeDir(d); }
       if (e.key === ' ') {
         e.preventDefault();
-        setStatus(s => { const next = s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s; statusRef.current = next; return next; });
+        togglePause();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [changeDir, togglePause]);
+
+  // Swipe input maps to the same guarded direction change.
+  const swipe = useSwipe({ onSwipe: (dir) => changeDir(({ left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN' } as const)[dir]) });
 
   const canvasSize = SNAKE_GRID * cellSize;
+
+  // Shared button style for on-screen controls - mirrors Tetris exactly.
+  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none focus-visible:outline-none";
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <GameHeader title="Snake" score={score} best={best} onBack={onBack} onReset={startGame} />
-      <div ref={containerRef} className="flex-1 flex items-center justify-center p-4 bg-surface/20 overflow-hidden">
+      <div ref={containerRef} {...swipe} className="flex-1 flex items-center justify-center p-4 bg-surface/20 overflow-hidden touch-none">
         <div className="relative">
           <canvas ref={canvasRef} width={canvasSize} height={canvasSize} className="border border-border" />
           {status !== 'playing' && (
@@ -473,7 +498,45 @@ function SnakeGameView({ onBack }: { onBack: () => void }) {
           )}
         </div>
       </div>
-      <ControlsHint>Arrow keys / WASD · Space to pause</ControlsHint>
+
+      {/* ── On-screen controls - touch & small-window play ── */}
+      <div className="flex-shrink-0">
+        <Hairline />
+        <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface/10">
+          {/* D-pad */}
+          <button className={ctrlBtn} onClick={() => changeDir('UP')} title="Up (↑)" aria-label="Move up">
+            <ChevronUp size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => changeDir('LEFT')} title="Left (←)" aria-label="Move left">
+            <ChevronLeft size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => changeDir('DOWN')} title="Down (↓)" aria-label="Move down">
+            <ChevronDown size={16} />
+          </button>
+          <button className={ctrlBtn} onClick={() => changeDir('RIGHT')} title="Right (→)" aria-label="Move right">
+            <ChevronRight size={16} />
+          </button>
+
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Action button - Start when idle/over, otherwise pause/resume */}
+          <button
+            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none ${
+              mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
+            }`}
+            style={mono ? undefined : { background: '#22c55e' }}
+            onClick={() => {
+              if (status === 'idle' || status === 'over') startGame();
+              else togglePause();
+            }}
+            title="Start / Pause (Space)"
+          >
+            {status === 'idle' || status === 'over' ? 'Start' : status === 'paused' ? 'Resume' : 'Pause'}
+          </button>
+        </div>
+      </div>
+
+      <ControlsHint>{isMobile ? 'Swipe or tap the controls' : 'Arrow keys / WASD · Space to pause'}</ControlsHint>
     </div>
   );
 }
@@ -646,7 +709,7 @@ function drawTetCell(ctx: CanvasRenderingContext2D, c: number, r: number, color:
 // TETRIS GAME - responsive canvas + focus-based keyboard + button controls
 // ─────────────────────────────────────────────────────────────────────────────
 
-function TetrisGame({ onBack }: { onBack: () => void }) {
+function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolean }) {
   const mono = useIsMono();
   const reduced = useReducedMotion();
   const [state, dispatch] = useReducer(
@@ -735,9 +798,9 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
       ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(cs * 0.8)}px system-ui`; ctx.textAlign = 'center';
       ctx.fillText('PAUSED', W / 2, H / 2 - 6);
       ctx.font = `${Math.round(cs * 0.55)}px system-ui`; ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.fillText('P or Space to resume', W / 2, H / 2 + cs);
+      ctx.fillText(isMobile ? 'Tap pause to resume' : 'P or Space to resume', W / 2, H / 2 + cs);
     }
-  }, [state, cs, mono]);
+  }, [state, cs, mono, isMobile]);
 
   // Draw next piece preview
   useEffect(() => {
@@ -784,7 +847,7 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
               {state.status === 'idle' ? (
                 <>
                   <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Tetris</h2>
-                  <MetaLabel className="text-text-secondary/65">Click Start or press Space</MetaLabel>
+                  <MetaLabel className="text-text-secondary/65">{isMobile ? 'Tap Start to begin' : 'Click Start or press Space'}</MetaLabel>
                   <OverlayButton onClick={() => dispatch({ type: 'START' })} mono={mono} accent="#6366f1" accentHover="#818cf8">Start</OverlayButton>
                 </>
               ) : (
@@ -855,6 +918,8 @@ function TetrisGame({ onBack }: { onBack: () => void }) {
           </button>
         </div>
       </div>
+
+      {isMobile && <ControlsHint>Tap the controls below</ControlsHint>}
     </div>
   );
 }
@@ -886,7 +951,7 @@ const CODE_SNIPPETS = [
   },
 ];
 
-function TypeRacerGame({ onBack }: { onBack: () => void }) {
+function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolean }) {
   const mono = useIsMono();
   const reduced = useReducedMotion();
   const [snippetIdx, setSnippetIdx] = useState(0);
@@ -1008,7 +1073,8 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
                   : 'text-red-400 bg-red-500/25 rounded-sm';
               }
             }
-            if (isCursor && status !== 'done') cls += ' border-l-2 border-accent';
+            // Typing cursor is chrome: ink in mono, the single accent only in Fun.
+            if (isCursor && status !== 'done') cls += mono ? ' border-l-2 border-text' : ' border-l-2 border-accent';
             if (char === '\n') return <span key={i}><span className={cls}>↵</span>{'\n'}</span>;
             return <span key={i} className={cls}>{char === ' ' ? '\u00A0' : char}</span>;
           })}
@@ -1056,7 +1122,7 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
         </AnimatePresence>
       </div>
 
-      <ControlsHint>Type exactly · capitalization and punctuation count</ControlsHint>
+      <ControlsHint>{isMobile ? 'Tap the field and type' : 'Type exactly · capitalization and punctuation count'}</ControlsHint>
     </div>
   );
 }
@@ -1065,9 +1131,10 @@ function TypeRacerGame({ onBack }: { onBack: () => void }) {
 // Root
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GamesApp() {
+export default function GamesApp({ variant = 'desktop' }: { variant?: 'desktop' | 'mobile' }) {
   const [game, setGame] = useState<GameId>('launcher');
   const reduced = useReducedMotion();
+  const isMobile = variant === 'mobile';
 
   // Selector <-> game transition: an occasional surface, so a single ease-out
   // slide (transform + opacity) is allowed; it collapses to instant under
@@ -1080,10 +1147,10 @@ export default function GamesApp() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <AnimatePresence mode="wait">
-        {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} /></motion.div>}
-        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGameView  onBack={() => setGame('launcher')} /></motion.div>}
-        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={() => setGame('launcher')} /></motion.div>}
-        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={() => setGame('launcher')} /></motion.div>}
+        {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} isMobile={isMobile} /></motion.div>}
+        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGameView  onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
+        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
+        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
       </AnimatePresence>
     </div>
   );
