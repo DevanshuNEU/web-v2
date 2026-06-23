@@ -25,6 +25,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
+import { useTerminalStore } from '@/store/terminalStore';
 import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
@@ -32,25 +33,13 @@ import {
   type SpotlightItem,
   type SpotlightCategory,
 } from '@/lib/spotlightIndex';
-
-const CATEGORY_LABEL: Record<SpotlightCategory, string> = {
-  app: 'Apps', project: 'Projects', skill: 'Skills', command: 'Commands',
-};
-const CATEGORY_TAG: Record<SpotlightCategory, string> = {
-  app: 'OPEN', project: 'OPEN', skill: 'VIEW', command: 'RUN',
-};
-const GLYPH: Record<SpotlightCategory, string> = {
-  app: '▸', project: '▸', skill: '▸', command: '›',
-};
-
-/** Curated idle suggestions, looked up from the live index by id. */
-const SUGGESTED_IDS = [
-  'app:about-me',
-  'app:projects',
-  'app:skills-dashboard',
-  'cmd:hire devanshu',
-  'app:terminal',
-];
+import {
+  CATEGORY_LABEL,
+  CATEGORY_TAG,
+  GLYPH,
+  CATEGORY_ORDER,
+  SUGGESTED_IDS,
+} from '@/lib/spotlightPresentation';
 
 type Row =
   | { key: string; index: number; kind: 'ask'; query: string }
@@ -91,7 +80,7 @@ export default function Spotlight() {
         arr.push({ key: item.id, index: 0, kind: 'item', item });
         byCat.set(item.category, arr);
       }
-      (['app', 'project', 'skill', 'command'] as SpotlightCategory[]).forEach(cat => {
+      CATEGORY_ORDER.forEach(cat => {
         push(CATEGORY_LABEL[cat], byCat.get(cat) ?? []);
       });
     } else {
@@ -124,7 +113,10 @@ export default function Spotlight() {
     switch (item.action.type) {
       case 'openApp':      openWindow(item.action.appType); break;
       case 'openProjects': openWindow('projects'); break;
-      case 'openTerminal': openWindow('terminal'); break;
+      case 'openTerminal':
+        useTerminalStore.getState().setPendingCommand(item.action.command);
+        openWindow('terminal');
+        break;
     }
   }, [close, openWindow]);
 

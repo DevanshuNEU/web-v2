@@ -6,6 +6,7 @@ import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useOSStore } from '@/store/osStore';
 import { useMobileStore } from '@/store/mobileStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
+import { useTerminalStore } from '@/store/terminalStore';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { MetaLabel, Hairline } from '@/components/editorial';
@@ -255,6 +256,8 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const openWindow = useOSStore(state => state.openWindow);
   const openApp = useMobileStore(state => state.openApp);
   const openAssistant = useAssistantUiStore(state => state.openAssistant);
+  const pendingCommand = useTerminalStore(s => s.pendingCommand);
+  const setPendingCommand = useTerminalStore(s => s.setPendingCommand);
   const { mode, toggleMode } = useTheme();
   const mono = useIsMono();
   const reduced = useReducedMotion();
@@ -364,6 +367,17 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
 
     setInput('');
   }, [trackEvent, openWindowOrApp, openAssistant, toggleMode, mode]);
+
+  // Consume a Spotlight / App Library "command" handoff: if a command was
+  // stashed in terminalStore before this mount (e.g. "hire devanshu"), run it
+  // once then clear the slot. Mirrors ChatPanel's seed consumption. Works on
+  // both desktop and mobile since both mount this shared component.
+  useEffect(() => {
+    if (pendingCommand) {
+      handleCommand(pendingCommand);
+      setPendingCommand(null);
+    }
+  }, [pendingCommand, handleCommand, setPendingCommand]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
