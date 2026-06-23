@@ -31,6 +31,36 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Baseline security headers for all routes
+      // NOTE: Content-Security-Policy is intentionally deferred. A strict CSP
+      // risks breaking framer-motion, PostHog analytics, inline JSON-LD, and
+      // Next.js inline runtime; adding it the night before launch is too risky.
+      // Revisit CSP post-launch with proper testing.
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+        ],
+      },
     ];
   },
 };
