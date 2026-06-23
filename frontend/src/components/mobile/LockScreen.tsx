@@ -87,12 +87,12 @@ export default function LockScreen() {
               className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${
                 mono
                   ? 'bg-white/12 border border-white/25 text-white/85'
-                  : 'bg-green-500/15 border border-green-500/25 text-green-400'
+                  : 'bg-accent/15 border border-accent/25 text-accent'
               }`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                  mono ? 'bg-white/90' : 'bg-green-400'
+                  mono ? 'bg-white/90' : 'bg-accent'
                 }`}
               />
               Available

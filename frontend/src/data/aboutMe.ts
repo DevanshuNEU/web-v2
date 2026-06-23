@@ -83,17 +83,17 @@ export const originStory: OriginCard[] = [
   {
     iconName: 'Gamepad2',
     title:    'The 8-year-old kid',
-    text:     "My father brought home our first laptop. I went straight for the games, but Google blew my mind. This thing had answers to everything. That curiosity never stopped — it just got more focused.",
+    text:     "My father brought home our first laptop. I went straight for the games, but Google blew my mind. This thing had answers to everything. That curiosity never stopped. It just got more focused.",
   },
   {
     iconName: 'Disc',
     title:    'Digit magazine weekends',
-    text:     "Every Friday, new CDs full of software to explore. Those weekends shaped everything — breaking things, fixing them, learning how computers actually work. That hands-on exploration became my approach to learning.",
+    text:     "Every Friday, new CDs full of software to explore. Those weekends shaped everything: breaking things, fixing them, learning how computers actually work. That hands-on exploration became my approach to learning.",
   },
   {
     iconName: 'Monitor',
     title:    'The "Hello World" moment',
-    text:     "10th standard. First C program. Discovered for loops and pattern making. Right there, I knew — I wanted to be a software engineer. Not just use technology, but build it.",
+    text:     "10th standard. First C program. Discovered for loops and pattern making. Right there, I knew: I wanted to be a software engineer. Not just use technology, but build it.",
   },
   {
     iconName: 'Rocket',

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotion } from 'framer-motion';
-import { ArrowUp, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, X } from 'lucide-react';
 import { clampMessages, sanitizeVoice } from '@/lib/conciergeContext';
 import { useChatStore } from '@/store/chatStore';
 import { TypingDots, StreamCaret } from '@/components/os/TypingDots';
@@ -153,19 +153,25 @@ export default function ChatPanel({
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-surface text-text">
+    // `container-type: size` makes the panel its own query container so the
+    // empty-state rhythm scales off the panel's OWN height (cqh) — roomy on the
+    // full-screen DevAI app, compact in the 380×560 desktop orb — with no
+    // breakpoints and no coupling to the host.
+    <div className="flex flex-col h-full w-full overflow-hidden bg-surface text-text [container-type:size]">
       {/* Presence header */}
       {showHeader && (
-        <header className="flex items-center gap-3 px-5 py-3.5 border-b border-border flex-shrink-0">
+        <header className="flex items-center gap-3 px-5 py-4 border-b border-border flex-shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-text leading-none">Devanshu</span>
-              <span className="text-[10px] uppercase tracking-wider text-text-secondary border border-border rounded px-1 py-0.5 leading-none">
+              <span className="text-[15px] font-semibold tracking-[-0.01em] text-text leading-none">
+                Devanshu
+              </span>
+              <span className="text-[9.5px] font-medium uppercase tracking-[0.14em] text-text-secondary border border-border rounded-[5px] px-1.5 py-1 leading-none">
                 AI
               </span>
             </div>
-            <div className="text-[11px] text-text-secondary mt-1 leading-none">
-              {busy ? 'thinking…' : 'AI, trained on my work'}
+            <div className="text-[11.5px] text-text-secondary mt-1.5 leading-none transition-colors">
+              {busy ? 'thinking…' : 'Trained on my work, answering as me'}
             </div>
           </div>
           {onClose && (
@@ -182,7 +188,7 @@ export default function ChatPanel({
       )}
 
       {/* Thread */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         {empty ? (
           <EmptyState reduced={!!reduced} onPick={send} />
         ) : (
@@ -237,8 +243,10 @@ export default function ChatPanel({
         )}
       </div>
 
-      {/* Error / composer */}
-      <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-border">
+      {/* Error / composer. The bottom safe-area inset keeps the input clear of
+          the iOS home indicator on the full-screen surface; it resolves to 0 in
+          the desktop orb, so the same tree is correct in both hosts. */}
+      <div className="flex-shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 border-t border-border">
         {error && (
           <div className="flex items-center gap-3 px-1 pb-2 text-[12px] text-text-secondary">
             <span>
@@ -269,7 +277,8 @@ export default function ChatPanel({
             placeholder="Ask Devanshu anything"
             spellCheck={false}
             data-no-focus-ring
-            className="flex-1 bg-transparent resize-none outline-none text-[15px] text-text placeholder:text-text-secondary/60 leading-relaxed py-1.5 max-h-32"
+            // 16px min so iOS Safari never pinch-zooms on focus.
+            className="flex-1 bg-transparent resize-none outline-none text-[16px] text-text placeholder:text-text-secondary/60 leading-relaxed py-1.5 max-h-32"
           />
           <button
             type="submit"
@@ -288,26 +297,59 @@ export default function ChatPanel({
 }
 
 function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string) => void }) {
+  // Strong custom ease-out (the shell's --ease-out token) for the entrance; the
+  // children stagger in just behind the container. Reduced-motion drops all
+  // movement and shows everything at rest.
+  const ease = [0.23, 1, 0.32, 1] as const;
   return (
     <motion.div
-      initial={reduced ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="h-full flex flex-col items-center justify-center text-center gap-6 px-6"
+      initial={reduced ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25, ease }}
+      // Editorial, calm: a single left-aligned column that sits a fluid distance
+      // from the top (off-centre reads as a real surface, not a cramped sheet),
+      // with rhythm that opens up on the full-screen app and tightens in the orb
+      // via cqh — the panel is its own size container.
+      className="flex min-h-full flex-col justify-start px-6 pt-[clamp(2rem,14cqh,6rem)] pb-8 gap-[clamp(1.25rem,4cqh,2rem)]"
     >
-      <div className="space-y-1.5">
-        <p className="text-[15px] text-text">Ask me anything about what I build.</p>
-        <p className="text-xs text-text-secondary">An AI trained on my work, answering as me.</p>
+      <div className="space-y-[clamp(0.5rem,1.5cqh,0.75rem)]">
+        <motion.p
+          initial={reduced ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: reduced ? 0 : 0.04, ease }}
+          className="text-[clamp(1.0625rem,5cqh,1.375rem)] font-medium tracking-[-0.01em] leading-snug text-text text-balance"
+        >
+          Ask me anything about what I build.
+        </motion.p>
+        <motion.p
+          initial={reduced ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: reduced ? 0 : 0.09, ease }}
+          className="text-[13px] leading-relaxed text-text-secondary max-w-[42ch]"
+        >
+          An AI trained on my work, answering in the first person as me. Pick a
+          thread to start, or just type below.
+        </motion.p>
       </div>
-      <div className="flex flex-wrap justify-center gap-2 max-w-md">
-        {STARTERS.map((s) => (
-          <button
+
+      <div className="flex flex-col items-stretch gap-2">
+        {STARTERS.map((s, i) => (
+          <motion.button
             key={s}
+            type="button"
+            initial={reduced ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.26, delay: reduced ? 0 : 0.14 + i * 0.05, ease }}
             onClick={() => onPick(s)}
-            className="rounded-full border border-border px-3 py-1.5 text-[13px] text-text-secondary hover:text-text hover:border-text-secondary transition-colors active:scale-95"
+            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-bg/40 px-4 py-3 text-left text-[14px] text-text-secondary transition-[color,border-color,transform] duration-150 ease-[var(--ease-out)] hover:text-text hover:border-text-secondary active:scale-[0.99]"
           >
-            {s}
-          </button>
+            <span className="leading-snug">{s}</span>
+            <ArrowUpRight
+              size={15}
+              strokeWidth={2}
+              className="flex-shrink-0 text-text-secondary/40 transition-colors duration-150 group-hover:text-text"
+            />
+          </motion.button>
         ))}
       </div>
     </motion.div>

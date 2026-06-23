@@ -15,7 +15,7 @@ export type CommandResult =
   | { type: 'action'; action: 'openWindow'; payload: AppType }
   | { type: 'action'; action: 'openAssistant'; payload: string }
   | { type: 'action'; action: 'toggleTheme' }
-  | { type: 'special'; id: 'matrix' | 'hire' | 'confetti' };
+  | { type: 'special'; id: 'matrix' | 'hire' };
 
 export type TerminalContext = {
   openWindow: (appType: AppType) => void;
@@ -24,6 +24,42 @@ export type TerminalContext = {
 };
 
 export type CommandHandler = (args: string[], ctx: TerminalContext) => CommandResult;
+
+/**
+ * Single source of truth for contact details. The `contact`, `secret`,
+ * `github`, and `about` handlers reference this so the canonical email and
+ * links never drift between commands.
+ */
+export const CONTACT = {
+  email: 'chicholikar.d@northeastern.edu',
+  linkedin: 'linkedin.com/in/devanshuchicholikar',
+  github: 'github.com/DevanshuNEU',
+  web: 'opencodeintel.com',
+} as const;
+
+/** Aliases accepted by the `open` command, mapped to their app windows. */
+export const OPEN_APP_ALIASES: Record<string, AppType> = {
+  'about': 'about-me',
+  'about-me': 'about-me',
+  'projects': 'projects',
+  'skills': 'skills-dashboard',
+  'skill-tree': 'skills-dashboard',
+  'analytics': 'analytics',
+  'contact': 'contact',
+  'ping': 'contact',
+  'terminal': 'terminal',
+  'games': 'games',
+  'arcade': 'games',
+  'settings': 'display-options',
+  'preferences': 'display-options',
+  'finder': 'file-explorer',
+  'files': 'file-explorer',
+  'resume': 'resume',
+  'changelog': 'changelog',
+};
+
+/** Valid arguments to the `theme` command. */
+export const THEME_ARGS = ['dark', 'light'] as const;
 
 export const commandRegistry: Record<string, CommandHandler> = {
   help: () => [
@@ -117,10 +153,10 @@ export const commandRegistry: Record<string, CommandHandler> = {
   contact: () => [
     'Let\'s connect:',
     '',
-    '  mail  chicholikar.d@northeastern.edu',
-    '  link  linkedin.com/in/devanshuchicholikar',
-    '  code  github.com/DevanshuNEU',
-    '  web   opencodeintel.com',
+    `  mail  ${CONTACT.email}`,
+    `  link  ${CONTACT.linkedin}`,
+    `  code  ${CONTACT.github}`,
+    `  web   ${CONTACT.web}`,
     '',
     '  Or just open the Ping Me app and send a message.',
     '  (The contact form actually sends email now.)',
@@ -142,26 +178,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
   },
 
   open: (args, ctx) => {
-    const appMap: Record<string, AppType> = {
-      'about': 'about-me',
-      'about-me': 'about-me',
-      'projects': 'projects',
-      'skills': 'skills-dashboard',
-      'skill-tree': 'skills-dashboard',
-      'analytics': 'analytics',
-      'contact': 'contact',
-      'ping': 'contact',
-      'terminal': 'terminal',
-      'games': 'games',
-      'arcade': 'games',
-      'settings': 'display-options',
-      'preferences': 'display-options',
-      'finder': 'file-explorer',
-      'files': 'file-explorer',
-      'resume': 'resume',
-      'changelog': 'changelog',
-    };
-    const app = appMap[args[0]?.toLowerCase() ?? ''];
+    const app = OPEN_APP_ALIASES[args[0]?.toLowerCase() ?? ''];
     if (!app) {
       return [
         `open: no app named '${args[0] ?? '(nothing)'}'`,
@@ -197,7 +214,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
   },
 
   github: () => [
-    '  GitHub: github.com/DevanshuNEU',
+    `  GitHub: ${CONTACT.github}`,
     '  Org:    github.com/OpenCodeIntel',
     '',
     '  Personal repos: ~18  |  Org repos: 3',
@@ -214,8 +231,8 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '       |   ∆   |        Host:   Next.js 15',
     '        \\ ___ /         Kernel: React 19',
     '      ___/   \\___       Shell:  Terminal.app',
-    '     /           \\      Theme:  Glass morphism',
-    '    |  devOS v2.0 |     Icons:  Lucide',
+    '     /           \\      Theme:  Monochrome',
+    '    |  devOS v2.0 |     Icons:  Lucide + Phosphor',
     '     \\___________/      Memory: Too much Zustand',
     '',
     '  [TypeScript] [Python] [AWS] [Docker] [Terraform]',
@@ -268,7 +285,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  The boot sequence with fake POST messages? Guilty.',
     '',
     '  Reach out. Let\'s build something cool together.',
-    '  chicholikar.d@northeastern.edu',
+    `  ${CONTACT.email}`,
     '',
   ],
 
@@ -309,4 +326,101 @@ export function resolveCommand(input: string): {
   const handler = commandRegistry[baseCmd];
   if (!handler) return null;
   return { handler, args, baseCmd };
+}
+
+/** Every registered command name, in registry order. */
+export const commandNames = Object.keys(commandRegistry);
+
+/**
+ * Curated, recruiter-pointed suggestions surfaced as the rotating empty-state
+ * hint on the input line. Not the full command list on purpose.
+ */
+export const TERMINAL_SUGGESTIONS = [
+  'hire devanshu',
+  'tour',
+  'projects',
+  'about',
+  'secret',
+];
+
+/** Longest common prefix shared by every string in the list. */
+function longestCommonPrefix(items: string[]): string {
+  if (items.length === 0) return '';
+  let prefix = items[0];
+  for (let i = 1; i < items.length; i++) {
+    const candidate = items[i];
+    let j = 0;
+    while (j < prefix.length && j < candidate.length && prefix[j] === candidate[j]) {
+      j++;
+    }
+    prefix = prefix.slice(0, j);
+    if (prefix === '') break;
+  }
+  return prefix;
+}
+
+/**
+ * Resolve completion state for an input token. Pure string logic over a fixed
+ * pool of candidate names. Never invokes a handler.
+ *
+ *   - candidates: pool entries that start with `token` (case-insensitive)
+ *   - commonPrefix: longest common prefix of candidates (for Tab-to-fill)
+ *   - ghost: case-SENSITIVE remainder of the first candidate that exactly
+ *     `startsWith(token)`, else '' (lowercase typing gets a ghost, mismatched
+ *     case does not — avoids showing a ghost that wouldn't actually complete)
+ */
+function completeToken(token: string, pool: string[]): {
+  ghost: string;
+  candidates: string[];
+  commonPrefix: string;
+} {
+  const lower = token.toLowerCase();
+  const candidates = pool.filter((name) => name.toLowerCase().startsWith(lower));
+  const commonPrefix = longestCommonPrefix(candidates);
+  let ghost = '';
+  for (const candidate of candidates) {
+    if (candidate.startsWith(token)) {
+      ghost = candidate.slice(token.length);
+      break;
+    }
+  }
+  return { ghost, candidates, commonPrefix };
+}
+
+/**
+ * Pure, testable autocomplete helper for the terminal input line.
+ *
+ * Tokenizes like `resolveCommand` (leading whitespace stripped, split on runs
+ * of whitespace) and returns the ghost suffix, the candidate pool, and the
+ * longest common prefix. Handles command-name completion and arg completion
+ * for `open <app>` and `theme <mode>`. Returns empty state for everything else.
+ */
+export function getCompletions(input: string): {
+  ghost: string;
+  candidates: string[];
+  commonPrefix: string;
+} {
+  const empty = { ghost: '', candidates: [], commonPrefix: '' };
+  if (input.trim() === '') return empty;
+
+  const parts = input.replace(/^\s+/, '').split(/\s+/);
+
+  // Single token, no trailing space → complete the command name.
+  if (parts.length === 1) {
+    return completeToken(parts[0], commandNames);
+  }
+
+  // Two tokens → arg completion for `open` / `theme` only.
+  if (parts.length === 2) {
+    const base = parts[0].toLowerCase();
+    const arg = parts[1];
+    if (base === 'open') {
+      return completeToken(arg, Object.keys(OPEN_APP_ALIASES));
+    }
+    if (base === 'theme') {
+      return completeToken(arg, [...THEME_ARGS]);
+    }
+  }
+
+  return empty;
 }

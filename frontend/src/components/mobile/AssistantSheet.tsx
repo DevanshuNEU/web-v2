@@ -1,40 +1,43 @@
 'use client';
 
 /**
- * AssistantSheet — the mobile floating assistant.
+ * AssistantSheet — the mobile assistant launcher FAB.
  *
  * A monochrome FAB pinned to the bottom-right, offset above the sticky dock so
- * it never collides with it. Tapping opens a bottom sheet that slides up and
- * hosts the shared ChatPanel. A dim backdrop (tap to close) sits behind the
- * sheet. Hidden while the phone is locked.
+ * it never collides with it. Tapping calls openAssistant(), which on mobile
+ * routes to the dedicated full-screen DevAI chat app (opened through the mobile
+ * AppView; that view owns its own Done/close affordance). This component no
+ * longer hosts a bottom sheet — it is purely the launcher. Hidden while the
+ * phone is locked.
  *
- * Strictly neutral tokens (no accent). Reduced-motion collapses the slide.
+ * Strictly neutral tokens (no accent).
  */
 
-import { useReducedMotion, motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare } from 'lucide-react';
 import { useMobileStore } from '@/store/mobileStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
-import { spring, withReduced } from '@/lib/motion';
-import ChatPanel from '@/components/chat/ChatPanel';
+import { isImmersiveApp } from '@/lib/mobileAppRegistry';
 
 // The dock (icon 54 + py-3 + mb-3) is ~96px tall above the safe area; the FAB
 // floats 16px above that so a thumb never lands on both.
 const DOCK_CLEARANCE = 96;
 
 export default function AssistantSheet() {
-  const reduced = useReducedMotion();
   const locked = useMobileStore((s) => s.locked);
+  const spotlightOpen = useMobileStore((s) => s.spotlightOpen);
+  const openAppType = useMobileStore((s) => s.openAppType);
   const open = useAssistantUiStore((s) => s.open);
   const openAssistant = useAssistantUiStore((s) => s.openAssistant);
-  const closeAssistant = useAssistantUiStore((s) => s.closeAssistant);
 
   if (locked) return null;
 
   return (
     <>
-      {/* FAB — hidden while the sheet is open so it doesn't sit over the sheet */}
-      {!open && (
+      {/* FAB — hidden while the spotlight is open, while an immersive app
+          (Games / Terminal / Files) owns the screen so it never sits over the
+          app's own controls, and while the DevAI chat itself is open (tapping
+          it again would be a no-op). Still floats on home + reading apps. */}
+      {!open && !spotlightOpen && !isImmersiveApp(openAppType) && openAppType !== 'dev-ai' && (
         <button
           type="button"
           onClick={() => openAssistant()}
@@ -49,45 +52,6 @@ export default function AssistantSheet() {
           <MessageSquare size={22} strokeWidth={2} />
         </button>
       )}
-
-      <AnimatePresence>
-        {open && (
-          <>
-            {/* Dim backdrop — tap to close */}
-            <motion.div
-              key="assistant-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: reduced ? 0 : 0.18 }}
-              onClick={closeAssistant}
-              className="fixed inset-0 z-[70] bg-black/40"
-            />
-
-            {/* Bottom sheet */}
-            <motion.div
-              key="assistant-sheet"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={withReduced(spring.bubble, reduced)}
-              className="fixed inset-x-0 bottom-0 z-[71] h-[85dvh] flex flex-col
-                         overflow-hidden rounded-t-3xl border-t border-border bg-surface shadow-2xl"
-              style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-              role="dialog"
-              aria-label="Chat with Devanshu"
-            >
-              {/* Grabber */}
-              <div className="flex-shrink-0 flex justify-center pt-2.5 pb-1">
-                <div className="w-10 h-1 rounded-full bg-border" />
-              </div>
-              <div className="flex-1 min-h-0">
-                <ChatPanel onClose={closeAssistant} />
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </>
   );
 }

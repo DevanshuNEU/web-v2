@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import { useMobileStore } from '@/store/mobileStore';
 import { getHomePages } from '@/lib/mobileAppRegistry';
 import HomePage from './HomePage';
+import AppLibraryPage from './AppLibraryPage';
 import PageDots from './PageDots';
 import Dock from './Dock';
 import StatusBar from './StatusBar';
@@ -54,11 +55,16 @@ export default function HomeScreen({ onOpenApp }: HomeScreenProps) {
         {pages.map((page, i) => (
           <HomePage key={i} apps={page} onOpen={onOpenApp} />
         ))}
+        {/* App Library — the last page. Swipe past the final home page to reach
+            the flat all-apps grid + consolidated search. Reports its index as
+            pages.length to the scroll listener above. */}
+        <AppLibraryPage />
       </div>
 
-      {/* Page dots */}
+      {/* Page dots — one per home page, plus a trailing search glyph standing in
+          for the App Library page (active when currentPage === pages.length). */}
       <div className="flex-shrink-0 py-2">
-        <PageDots count={pages.length} active={currentPage} />
+        <PageDots count={pages.length} active={currentPage} showLibrary />
       </div>
 
       {/* Dock */}

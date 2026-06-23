@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createRateLimiter, clientIp } from '@/lib/rateLimit';
 
 const TO_EMAIL = 'chicholikar.d@northeastern.edu';
 const FROM_EMAIL = 'devOS <onboarding@resend.dev>'; // Use verified domain in production
+
+// Conservative throttle for a public contact form: per-IP sliding window plus a
+// global daily ceiling. Always on in-memory; durable via Upstash if configured.
+const limiter = createRateLimiter({ prefix: 'contact', perMinute: 5, dailyCeiling: 50 });
 
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 503 });
     }
+
+    const { tooMany } = await limiter.limit(clientIp(req));
+    if (tooMany) {
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+    }
+
     const resend = new Resend(process.env.RESEND_API_KEY);
     const body = await req.json();
     const { name, email, company, subject, message } = body;

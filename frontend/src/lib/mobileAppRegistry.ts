@@ -53,10 +53,28 @@ export const HOME_PAGES: AppType[][] = [
   // Page 1 — supporting evidence. Activity first (top-left) because it's the
   // single highest-credibility surface: real, live, can't be faked. Browser
   // sits here too: it shows the shipped products running on the open web.
-  ['github-activity', 'skills-dashboard', 'analytics', 'changelog', 'browser'],
+  ['dev-ai', 'github-activity', 'skills-dashboard', 'analytics', 'changelog', 'browser'],
   // Page 2 — utilities, settings, easter eggs
   ['terminal', 'games', 'file-explorer', 'display-options'],
 ];
+
+/**
+ * Immersive apps own the full screen and carry their own controls (a game
+ * board + D-pad, a terminal, a file browser), so the floating "Ask Devanshu"
+ * assistant FAB would collide with them. The FAB hides while one of these is
+ * open; it still floats on the home screen and over the reading/content apps
+ * (About, Projects, Resume, Changelog, …).
+ */
+export const IMMERSIVE_APP_TYPES: ReadonlySet<AppType> = new Set<AppType>([
+  'terminal',
+  'games',
+  'file-explorer',
+]);
+
+/** True when the open app owns the screen and the assistant FAB should hide. */
+export function isImmersiveApp(appType: AppType | null): boolean {
+  return appType != null && IMMERSIVE_APP_TYPES.has(appType);
+}
 
 /** Resolve full mobile metadata for an app. */
 export function getMobileApp(appType: AppType): MobileAppRegistration {

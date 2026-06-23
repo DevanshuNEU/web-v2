@@ -49,7 +49,7 @@
  * untouched. No hardcoded numbers anywhere.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ExternalLink, AlertCircle } from 'lucide-react';
 import { useTheme } from '@/store/themeStore';
@@ -414,11 +414,15 @@ function dotStyle(
   const size = `calc(var(--cell) * ${sizeFrac})`;
 
   if (mono) {
-    // Graphite density ramp: empty barely above the background, hottest near the
-    // foreground. Direction follows the surface (light ink on dark, dark ink on
-    // light) so the busiest day always reads as the most "present".
+    // Graphite density ramp: a light->dark gray scale where empty days sit just
+    // above the background and the busiest day reads near the foreground.
+    // Direction follows the surface (light ink on dark, dark ink on light) so the
+    // hottest day is always the most "present". The opacity steps are spaced an
+    // even ~0.20 apart with a floor lifted off zero so each level stays a
+    // distinct graphite tone even on the small mobile cell (~8px), where the dot
+    // bottoms out at the clamp floor; the size channel reinforces the same ramp.
     const ink = mode === 'dark' ? '255,255,255' : '17,17,17';
-    const op = [0.07, 0.26, 0.46, 0.68, 0.92][idx];
+    const op = [0.1, 0.3, 0.5, 0.7, 0.92][idx];
     return { width: size, height: size, background: `rgba(${ink},${op})` };
   }
   // Color (Fun) palette: GitHub's official greens, full-size dots.

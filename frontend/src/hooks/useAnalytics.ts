@@ -179,6 +179,7 @@ function formatAppName(appType: AppType): string {
     'github-activity': 'GitHub Activity',
     'browser': 'Browser',
     'help': 'Help',
+    'dev-ai': 'DevAI',
   };
   return names[appType] || appType;
 }

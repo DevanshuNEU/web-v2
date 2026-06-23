@@ -16,11 +16,17 @@
 
 import React from 'react';
 import { ChevronRight, ExternalLink } from 'lucide-react';
+import { useIsMono } from '@/hooks/usePalette';
 
 export interface MobileActionRowProps {
   /** Icon inside the colored tile on the left. */
   icon: React.ReactNode;
-  /** Tile background (CSS color or gradient). Default iOS blue. */
+  /**
+   * Tile background (CSS color or gradient). In color mode defaults to the
+   * accent; in mono mode an explicit value is still honored (so semantic
+   * colors like destructive red survive), otherwise it falls back to a
+   * graphite ink tile.
+   */
   iconBackground?: string;
   /** Icon color inside the tile. Default white. */
   iconColor?: string;
@@ -48,8 +54,8 @@ const TILE_BASE_CLASSES =
 
 export default function MobileActionRow({
   icon,
-  iconBackground = '#007AFF',
-  iconColor = '#ffffff',
+  iconBackground,
+  iconColor,
   title,
   subtitle,
   accessory,
@@ -57,9 +63,18 @@ export default function MobileActionRow({
   href,
   className = '',
 }: MobileActionRowProps) {
+  const mono = useIsMono();
   const isLink = !!href;
   const resolvedAccessory: 'chevron' | 'external' | 'none' =
     accessory ?? (isLink ? 'external' : onClick ? 'chevron' : 'none');
+
+  // Accent tile survives only in color mode; mono collapses the *default*
+  // tile to graphite ink. An explicit iconBackground (e.g. semantic
+  // destructive red) is always honored — that color carries meaning.
+  const resolvedBackground =
+    iconBackground ??
+    (mono ? 'rgb(var(--color-text))' : 'rgb(var(--color-accent))');
+  const resolvedColor = iconColor ?? 'rgb(var(--color-surface))';
 
   const inner = (
     <>
@@ -69,8 +84,8 @@ export default function MobileActionRow({
         style={{
           width: 44,
           height: 44,
-          background: iconBackground,
-          color: iconColor,
+          background: resolvedBackground,
+          color: resolvedColor,
         }}
       >
         {icon}

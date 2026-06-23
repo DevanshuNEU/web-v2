@@ -47,40 +47,84 @@ export interface TourStep {
   glyph: string;
   title: string;
   body: string;
+  chips?: string[];
 }
 
-export const TOUR_STEPS: TourStep[] = [
+export const TOUR_STEPS_DESKTOP: TourStep[] = [
   {
     glyph: '✳',
     title: 'Welcome to devOS',
-    body: "This isn't a regular portfolio. It's a desktop OS / windows, a dock, a launchpad, even a terminal. Everything is interactive. Spend two minutes here and you'll know your way around.",
+    body: "This isn't a regular portfolio. It's an interactive OS / windows, a dock, a launchpad, even a terminal. Spend about two minutes here and you'll know your way around.",
+  },
+  {
+    glyph: '⌘',
+    title: 'Command palette',
+    body: 'Press ⌘K from anywhere to jump to any app, project, or skill / or ask my AI in plain English.',
+    chips: ['⌘ K'],
+  },
+  {
+    glyph: '☰',
+    title: 'Right-click anywhere',
+    body: 'A context menu with quick actions / open apps, jump to the terminal, customize the theme, reload.',
+    chips: ['right-click'],
   },
   {
     glyph: '▭',
-    title: 'The dock at the bottom',
-    body: 'Those icons along the bottom edge are your starting points. Hover for a peek, click to open. About Me, Projects, Activity, Terminal, Resume, Contact, and this Help app are all pinned there.',
+    title: 'The dock + windows',
+    body: 'Open apps from the dock at the bottom. Drag a window by its title bar; the three dots close, minimize, and maximize it. The grid icon is the launchpad / every app, with search.',
+    chips: ['launchpad'],
   },
   {
-    glyph: '⊞',
-    title: 'Launchpad has everything',
-    body: 'Click the grid icon (leftmost in the dock) to see every app / including ones not pinned, like Skill Tree, Analytics, Finder, Changelog, and Arcade. The search bar at the top filters as you type.',
-  },
-  {
-    glyph: '◰',
-    title: 'Windows behave like macOS',
-    body: 'Drag a window by its title bar. The three buttons on the top-left close, minimize, and maximize. Multiple apps can stay open at once / click any window to bring it forward.',
-  },
-  {
-    glyph: '▢',
-    title: 'On a phone? It morphs',
-    body: 'Open this on a mobile browser and the whole desktop becomes a pocket OS / a home screen with rounded app tiles, a status bar, and an iOS-style dock. Same content, designed for thumbs.',
+    glyph: '◑',
+    title: 'Ask + make it yours',
+    body: 'The chat orb in the bottom-right asks my AI anything. In Settings, switch the palette (Fun / mono) or flip light / dark.',
   },
   {
     glyph: '◆',
     title: "You're set",
-    body: 'Close this whenever you are ready. The Help app is always in the dock if you want to come back. Now go open About Me / start there.',
+    body: 'Close this whenever you are ready. Help is always in the dock if you want to come back. Now go open About Me / start there.',
   },
 ];
+
+export const TOUR_STEPS_MOBILE: TourStep[] = [
+  {
+    glyph: '✳',
+    title: 'Welcome',
+    body: "This isn't a regular portfolio. It's a pocket OS / a home screen of app tiles, a status bar, and an iOS-style dock. Spend about two minutes here and you'll know your way around.",
+  },
+  {
+    glyph: '▤',
+    title: 'Swipe to the App Library',
+    body: 'Swipe between home pages. Past the last page is the App Library / every app in one grid, with search up top.',
+    chips: ['swipe ←'],
+  },
+  {
+    glyph: '⌕',
+    title: 'Search or ask',
+    body: 'The App Library search finds any app, project, or skill / or ask my AI anything.',
+    chips: ['search'],
+  },
+  {
+    glyph: '▢',
+    title: 'Open + pull to dismiss',
+    body: 'Tap a tile to open it full screen. Pull down from the top to close it / just like iOS.',
+    chips: ['pull down'],
+  },
+  {
+    glyph: '◑',
+    title: 'DevAI + make it yours',
+    body: 'Open DevAI to chat with my AI. In Settings, switch the palette (Fun / mono) or flip light / dark.',
+  },
+  {
+    glyph: '◆',
+    title: "You're set",
+    body: 'Close this whenever you are ready. Help lives in the App Library if you want to come back. Now go open About Me / start there.',
+  },
+];
+
+// Back-compat alias for data tests / external consumers: the desktop set is
+// the canonical tour.
+export const TOUR_STEPS = TOUR_STEPS_DESKTOP;
 
 // ---------------------------------------------------------------------------
 // Apps glossary - curated set surfaced in the reference.
@@ -105,16 +149,27 @@ export const APPS_IN_HELP: AppType[] = [
 // Shortcut / gesture rows.
 // ---------------------------------------------------------------------------
 
-export const SHORTCUTS: { keys: string[]; description: string }[] = [
-  { keys: ['Click dock icon'], description: 'Open an app' },
-  { keys: ['Drag title bar'], description: 'Move a window' },
-  { keys: ['Red dot'], description: 'Close window' },
-  { keys: ['Yellow dot'], description: 'Minimize to dock' },
-  { keys: ['Green dot'], description: 'Maximize / restore' },
-  { keys: ['Click launchpad'], description: 'See every app' },
-  { keys: ['Type in launchpad'], description: 'Filter apps by name' },
-  { keys: ['Esc'], description: 'Close the Launchpad' },
+type Shortcut = { keys: string[]; description: string };
+
+export const SHORTCUTS_DESKTOP: Shortcut[] = [
+  { keys: ['⌘ K'], description: 'Open the command palette' },
+  { keys: ['right-click'], description: 'Open the context menu' },
+  { keys: ['drag title bar'], description: 'Move a window' },
+  { keys: ['◦', '◦', '◦'], description: 'Close / minimize / maximize a window' },
+  { keys: ['Esc'], description: 'Close the launchpad or palette' },
+  { keys: ['⌘ ⇧ T'], description: 'Play the guided demo' },
 ];
+
+export const SHORTCUTS_MOBILE: Shortcut[] = [
+  { keys: ['swipe ←'], description: 'Move between home pages / to the App Library' },
+  { keys: ['tap'], description: 'Open an app full screen' },
+  { keys: ['pull down'], description: 'Dismiss the open app' },
+  { keys: ['tap + hold'], description: 'Rearrange tiles' },
+  { keys: ['search'], description: 'Find an app or ask my AI' },
+];
+
+// Back-compat alias for data tests / external consumers.
+export const SHORTCUTS = SHORTCUTS_DESKTOP;
 
 // ---------------------------------------------------------------------------
 // Reference sections - single source for both the rail and the document.
@@ -132,15 +187,28 @@ const SECTIONS = [
 
 const SECTION_DOM_ID = (id: SectionId) => `help-section-${id}`;
 
+// ---------------------------------------------------------------------------
+// KeyCap - a single mono key/gesture chip in the house kbd style. Shared by
+// the tour chip rows and the Reference shortcut table.
+// ---------------------------------------------------------------------------
+
+function KeyCap({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="border border-border px-2 py-0.5 font-mono-meta uppercase tracking-wide text-text-secondary">
+      {children}
+    </kbd>
+  );
+}
+
 // ===========================================================================
 // Tour view
 // ===========================================================================
 
-function TourView({ onExit }: { onExit: () => void }) {
+function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) {
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
-  const current = TOUR_STEPS[step];
-  const total = TOUR_STEPS.length;
+  const current = steps[step];
+  const total = steps.length;
   const isLast = step === total - 1;
 
   const next = () => {
@@ -209,6 +277,17 @@ function TourView({ onExit }: { onExit: () => void }) {
             >
               {current.body}
             </motion.p>
+
+            {current.chips && current.chips.length > 0 && (
+              <motion.div
+                variants={reveal.item(reduced)}
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                {current.chips.map((chip) => (
+                  <KeyCap key={chip}>{chip}</KeyCap>
+                ))}
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </div>
@@ -227,7 +306,7 @@ function TourView({ onExit }: { onExit: () => void }) {
 
         {/* Hairline step ticks - monochrome, current filled, rest hairline. */}
         <div className="flex items-center gap-1.5" aria-hidden>
-          {TOUR_STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <span
               key={i}
               className={`h-px w-5 transition-colors ${i === step ? 'bg-text' : 'bg-border'}`}
@@ -251,7 +330,13 @@ function TourView({ onExit }: { onExit: () => void }) {
 // Reference section bodies
 // ===========================================================================
 
-function OverviewBody({ onStartTour }: { onStartTour: () => void }) {
+function OverviewBody({
+  onStartTour,
+  tourLength,
+}: {
+  onStartTour: () => void;
+  tourLength: number;
+}) {
   return (
     <div className="flex max-w-[68ch] flex-col gap-6">
       <p className="text-lg leading-relaxed text-text-secondary">
@@ -269,7 +354,7 @@ function OverviewBody({ onStartTour }: { onStartTour: () => void }) {
         onClick={onStartTour}
         className="w-fit font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
       >
-        Take the {TOUR_STEPS.length}-step tour &rarr;
+        Take the {tourLength}-step tour &rarr;
       </button>
     </div>
   );
@@ -308,24 +393,22 @@ function AppsBody() {
   );
 }
 
-function ShortcutsBody() {
+function ShortcutsBody({ variant }: { variant: 'desktop' | 'mobile' }) {
+  const rows = variant === 'mobile' ? SHORTCUTS_MOBILE : SHORTCUTS_DESKTOP;
+  const intro =
+    variant === 'mobile'
+      ? 'Mostly taps and swipes. A few gestures behave just like iOS.'
+      : 'Two keys do most of the work. The rest behaves just like macOS.';
   return (
     <div className="flex max-w-[60ch] flex-col">
-      <p className="mb-6 leading-relaxed text-text-secondary">
-        Mostly clicks. A couple of gestures behave just like macOS.
-      </p>
+      <p className="mb-6 leading-relaxed text-text-secondary">{intro}</p>
       <Hairline />
-      {SHORTCUTS.map((row) => (
+      {rows.map((row) => (
         <React.Fragment key={row.description}>
           <div className="flex items-center justify-between gap-4 py-3">
             <span className="flex flex-wrap items-center gap-1.5">
-              {row.keys.map((k) => (
-                <kbd
-                  key={k}
-                  className="border border-border px-2 py-0.5 font-mono-meta uppercase tracking-wide text-text-secondary"
-                >
-                  {k}
-                </kbd>
+              {row.keys.map((k, i) => (
+                <KeyCap key={`${k}-${i}`}>{k}</KeyCap>
               ))}
             </span>
             <span className="text-sm text-text-secondary">{row.description}</span>
@@ -383,15 +466,19 @@ function CreditsBody() {
 
 function SectionBody({
   id,
+  variant,
+  tourLength,
   onStartTour,
 }: {
   id: SectionId;
+  variant: 'desktop' | 'mobile';
+  tourLength: number;
   onStartTour: () => void;
 }) {
   switch (id) {
-    case 'overview':  return <OverviewBody onStartTour={onStartTour} />;
+    case 'overview':  return <OverviewBody onStartTour={onStartTour} tourLength={tourLength} />;
     case 'apps':      return <AppsBody />;
-    case 'shortcuts': return <ShortcutsBody />;
+    case 'shortcuts': return <ShortcutsBody variant={variant} />;
     case 'mobile':    return <MobileBody />;
     case 'credits':   return <CreditsBody />;
   }
@@ -403,9 +490,11 @@ function SectionBody({
 
 function ReferenceView({
   variant,
+  tourLength,
   onStartTour,
 }: {
   variant: 'desktop' | 'mobile';
+  tourLength: number;
   onStartTour: () => void;
 }) {
   const reduced = useReducedMotion();
@@ -472,7 +561,12 @@ function ReferenceView({
               variants={reveal.item(reduced)}
             >
               <EditorialSection number={number} eyebrow={label} title={label}>
-                <SectionBody id={id} onStartTour={onStartTour} />
+                <SectionBody
+                  id={id}
+                  variant={variant}
+                  tourLength={tourLength}
+                  onStartTour={onStartTour}
+                />
               </EditorialSection>
             </motion.div>
           ))}
@@ -552,12 +646,18 @@ export default function HelpApp({ variant = 'desktop' }: HelpAppProps) {
     }
   }, []);
 
+  const steps = variant === 'mobile' ? TOUR_STEPS_MOBILE : TOUR_STEPS_DESKTOP;
+
   return (
     <div className="h-full">
       {mode === 'tour' ? (
-        <TourView onExit={() => setMode('reference')} />
+        <TourView steps={steps} onExit={() => setMode('reference')} />
       ) : (
-        <ReferenceView variant={variant} onStartTour={() => setMode('tour')} />
+        <ReferenceView
+          variant={variant}
+          tourLength={steps.length}
+          onStartTour={() => setMode('tour')}
+        />
       )}
     </div>
   );

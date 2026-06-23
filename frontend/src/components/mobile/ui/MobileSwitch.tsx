@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { useIsMono } from '@/hooks/usePalette';
 
 export interface MobileSwitchProps {
   on: boolean;
@@ -28,6 +29,11 @@ export default function MobileSwitch({
   label,
   className = '',
 }: MobileSwitchProps) {
+  const mono = useIsMono();
+  // The "on" fill is a single accent. In color mode it stays the iOS-green
+  // signal; in mono it collapses to the graphite ink (text token) so identity
+  // reads from the handle position, not hue.
+  const onFill = mono ? 'bg-text' : 'bg-green-500';
   return (
     <button
       type="button"
@@ -37,12 +43,12 @@ export default function MobileSwitch({
       disabled={disabled}
       onClick={() => onChange?.(!on)}
       className={`relative inline-flex items-center w-[51px] h-[31px] rounded-full flex-shrink-0 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${
-        on ? 'bg-green-500' : 'bg-black/15 dark:bg-white/15'
+        on ? onFill : 'bg-text/15'
       } ${className}`}
     >
       <span
         aria-hidden
-        className={`absolute top-0.5 left-0.5 w-[27px] h-[27px] rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-transform duration-200 ease-out ${
+        className={`absolute top-0.5 left-0.5 w-[27px] h-[27px] rounded-full bg-surface shadow-[var(--shadow-sm)] transition-transform duration-200 ease-out ${
           on ? 'translate-x-[20px]' : 'translate-x-0'
         }`}
       />

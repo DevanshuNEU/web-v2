@@ -54,7 +54,7 @@ import {
   setSoundEnabled,
   playSound,
 } from '@/hooks/useSoundEffects';
-import { withReduced } from '@/lib/motion';
+import { spring, withReduced } from '@/lib/motion';
 import MobilePushView, {
   useMobileNavigation,
   type PushViewEntry,
@@ -92,20 +92,16 @@ function MonoSwitch({
       aria-checked={on}
       aria-label={label}
       onClick={() => onChange?.(!on)}
-      className={`relative h-[31px] w-[51px] shrink-0 rounded-full border transition-colors duration-200
+      className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-text/30
-                  ${on ? 'border-text bg-text' : 'border-border bg-transparent'}`}
+                  ${on ? 'bg-text' : 'bg-text/15'}`}
     >
       <motion.span
         aria-hidden
         layout
-        transition={withReduced(
-          { type: 'spring', damping: 22, stiffness: 420, mass: 0.6 },
-          reduced,
-        )}
-        className={`absolute top-1/2 h-[25px] w-[25px] -translate-y-1/2 rounded-full shadow-sm
-                    ${on ? 'bg-bg' : 'bg-text'}`}
-        style={{ left: on ? 'calc(100% - 28px)' : '3px' }}
+        transition={withReduced(spring.bubble, reduced)}
+        className="absolute top-1/2 h-[27px] w-[27px] -translate-y-1/2 rounded-full bg-surface shadow-[var(--shadow-sm)] ring-[0.5px] ring-border/40"
+        style={{ left: on ? 'calc(100% - 29px)' : '2px' }}
       />
     </button>
   );
@@ -337,8 +333,8 @@ function DisplayBrightnessView() {
                   style={{
                     background: color,
                     boxShadow: isActive
-                      ? `0 0 0 3px var(--bg, #fff), 0 0 0 5px ${color}`
-                      : '0 1px 4px rgba(0,0,0,0.18)',
+                      ? `0 0 0 3px var(--bg), 0 0 0 5px ${color}`
+                      : 'var(--shadow-sm)',
                   }}
                 >
                   {isActive && (
@@ -403,7 +399,7 @@ function WallpaperView() {
                 ? {
                     background: `linear-gradient(${wallpaper.gradientConfig.angle}deg, ${wallpaper.gradientConfig.colors.join(',')})`,
                   }
-                : { background: 'var(--surface, #eee)' }
+                : { background: 'var(--surface)' }
             }
             aria-hidden
           />
