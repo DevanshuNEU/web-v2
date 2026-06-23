@@ -10,11 +10,13 @@
  */
 
 import { Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import { useMobileStore } from '@/store/mobileStore';
 import { usePullToDismiss } from '@/hooks/usePullToDismiss';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useIsMono } from '@/hooks/usePalette';
+import { spring, withReduced } from '@/lib/motion';
 import ErrorBoundary from '@/components/util/ErrorBoundary';
 import StatusBar from './StatusBar';
 import type { AppType } from '../../../../shared/types';
@@ -27,6 +29,8 @@ export default function AppView() {
   const openAppType = useMobileStore((s) => s.openAppType);
   const closeApp = useMobileStore((s) => s.closeApp);
   const haptics = useHaptics();
+  const reduced = useReducedMotion();
+  const mono = useIsMono();
 
   const { offsetY, handlers } = usePullToDismiss({
     onDismiss: () => {
@@ -43,28 +47,35 @@ export default function AppView() {
           initial={{ y: '100%' }}
           animate={{ y: offsetY }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+          transition={withReduced(spring.bubble, reduced)}
           className="absolute inset-0 z-30 flex flex-col bg-bg text-text overflow-hidden"
         >
-          {/* Drag handle / status bar — pull-down dismisses; "Done" is the visible affordance. */}
+          {/* Drag handle / status bar / nav row — pull-down dismisses; "Done" is
+              the visible affordance. The grabber pill sits at the very top centre;
+              "Done" lives in its own nav row BELOW the status bar so it never
+              collides with the signal/wifi/battery cluster. */}
           <div
             {...handlers}
             className="flex-shrink-0 pt-safe relative cursor-grab active:cursor-grabbing"
           >
-            <StatusBar light={false} />
             <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-9 h-1 rounded-full bg-text-secondary/30" />
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => {
-                haptics('light');
-                closeApp();
-              }}
-              aria-label="Close app"
-              className="touch-target absolute top-0 right-2 px-3 flex items-center justify-center text-accent text-[15px] font-medium active:opacity-50 transition-opacity cursor-pointer"
-            >
-              Done
-            </button>
+            <StatusBar light={false} />
+            <div className="flex h-11 items-center justify-end px-2">
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  haptics('light');
+                  closeApp();
+                }}
+                aria-label="Close app"
+                className={`touch-target flex h-full items-center justify-center px-3 text-[15px] font-medium active:opacity-50 transition-opacity cursor-pointer ${
+                  mono ? 'text-text-secondary' : 'text-accent'
+                }`}
+              >
+                Done
+              </button>
+            </div>
           </div>
 
           {/* App body */}

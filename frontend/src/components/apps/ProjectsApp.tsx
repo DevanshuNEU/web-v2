@@ -796,7 +796,8 @@ function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
               <button
                 key={repo.name}
                 onClick={() => openDetail(repo)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-black/5 dark:active:bg-white/5 transition-colors"
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
+                            ${mono ? 'active:bg-text/[0.06]' : 'active:bg-accent/10'}`}
               >
                 <span className="font-mono-meta text-text-secondary/50 w-6 shrink-0 tabular-nums">
                   {String(i + 1).padStart(2, '0')}

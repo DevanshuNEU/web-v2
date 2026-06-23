@@ -25,8 +25,10 @@ import {
   motion,
   AnimatePresence,
   useDragControls,
+  useReducedMotion,
   type PanInfo,
 } from 'framer-motion';
+import { spring, withReduced, INSTANT } from '@/lib/motion';
 
 export interface MobileBottomSheetProps {
   open: boolean;
@@ -59,6 +61,7 @@ export default function MobileBottomSheet({
   className = '',
 }: MobileBottomSheetProps) {
   const dragControls = useDragControls();
+  const reduced = useReducedMotion();
 
   const handleDragEnd = (
     _: PointerEvent | MouseEvent | TouchEvent,
@@ -87,7 +90,7 @@ export default function MobileBottomSheet({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={reduced ? INSTANT : { duration: 0.2 }}
               />
             </Dialog.Overlay>
 
@@ -115,8 +118,13 @@ export default function MobileBottomSheet({
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 32, stiffness: 350 }}
-                className={`fixed bottom-0 left-0 right-0 z-[70] max-h-[90vh] flex flex-col bg-surface text-text rounded-t-[14px] shadow-[0_-8px_32px_rgba(0,0,0,0.18)] pb-safe ${className}`}
+                transition={withReduced(spring.bubble, reduced)}
+                // Upward-cast variant of --shadow-lg (same 8px/32px geometry,
+                // theme-matched 0.10 light / 0.40 dark opacity). A bottom sheet
+                // must cast its shadow up, so we can't use the downward shadow-lg
+                // utility directly; the alpha tracks the token scale instead of
+                // the previous arbitrary 0.18.
+                className={`fixed bottom-0 left-0 right-0 z-[70] max-h-[90vh] flex flex-col bg-surface text-text rounded-t-[14px] shadow-[0_-8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_-8px_32px_rgba(0,0,0,0.4)] pb-safe ${className}`}
               >
                 {/* Drag-handle area — only this region starts a drag.
                     Content underneath remains free to scroll. */}
@@ -132,19 +140,19 @@ export default function MobileBottomSheet({
                   {!hideHandle && (
                     <div
                       data-testid="sheet-handle"
-                      className="w-9 h-[5px] rounded-full bg-black/25 dark:bg-white/30"
+                      className="w-9 h-[5px] rounded-full bg-text-secondary/40"
                     />
                   )}
                 </div>
 
                 <div
-                  className={`px-5 pt-1 pb-3 ${hideTitle ? '' : 'border-b border-black/[0.06] dark:border-white/[0.06]'}`}
+                  className={`px-5 pt-1 pb-3 ${hideTitle ? '' : 'border-b border-border/60'}`}
                 >
                   <Dialog.Title
                     className={
                       hideTitle
                         ? 'sr-only'
-                        : 'text-[17px] font-semibold leading-tight'
+                        : 'text-title font-semibold leading-tight'
                     }
                   >
                     {title}

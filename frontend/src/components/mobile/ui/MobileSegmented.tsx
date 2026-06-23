@@ -52,7 +52,7 @@ function MobileSegmented<T extends string = string>({
     <div
       role="group"
       aria-label={label}
-      className={`relative inline-flex p-[2px] rounded-[9px] bg-black/[0.06] dark:bg-white/[0.08] ${
+      className={`relative inline-flex p-[2px] rounded-[9px] bg-text/[0.06] ${
         fullWidth ? 'w-full' : ''
       } ${className}`}
     >
@@ -61,7 +61,7 @@ function MobileSegmented<T extends string = string>({
       <span
         aria-hidden
         data-testid="segmented-thumb"
-        className="absolute top-[2px] bottom-[2px] rounded-[7px] bg-white dark:bg-neutral-600 shadow-[0_2px_4px_rgba(0,0,0,0.12),0_0_0_0.5px_rgba(0,0,0,0.04)] transition-transform duration-200 ease-out"
+        className="absolute top-[2px] bottom-[2px] rounded-[7px] bg-surface shadow-[var(--shadow-sm)] ring-[0.5px] ring-border/40 transition-transform duration-200 ease-out"
         style={{
           width: `calc((100% - 4px) / ${options.length})`,
           transform: `translateX(calc(${selectedIndex} * 100%))`,

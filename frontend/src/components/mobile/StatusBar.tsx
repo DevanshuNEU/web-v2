@@ -17,7 +17,10 @@ export default function StatusBar({ light = true }: { light?: boolean }) {
     return () => clearInterval(id);
   }, []);
 
-  const color = light ? 'text-white' : 'text-black';
+  // `light` = rendered over the (always-dark) phone wallpaper → white for legibility
+  // in both palettes. Otherwise the bar sits on the app surface and derives its ink
+  // from the semantic `--color-text` token, so it adapts to mono/color automatically.
+  const color = light ? 'text-white' : 'text-text';
 
   return (
     <div className={`flex items-center justify-between px-6 h-11 text-[15px] font-semibold ${color} select-none`}>

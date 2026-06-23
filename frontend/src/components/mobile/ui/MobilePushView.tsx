@@ -35,8 +35,10 @@ import {
   motion,
   AnimatePresence,
   useDragControls,
+  useReducedMotion,
   type PanInfo,
 } from 'framer-motion';
+import { spring, withReduced } from '@/lib/motion';
 import MobileNavBar from './MobileNavBar';
 
 export interface PushViewEntry {
@@ -158,6 +160,7 @@ function StackedView({
 }: StackedViewProps) {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
   const canSwipeBack = isTop && index > 0 && enableSwipeBack;
 
   /**
@@ -202,7 +205,7 @@ function StackedView({
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
       exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 32, stiffness: 350 }}
+      transition={withReduced(spring.window, reduced)}
       style={{ zIndex: index + 1 }}
       className="absolute inset-0 flex flex-col bg-bg"
     >

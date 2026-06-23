@@ -34,7 +34,7 @@ export default function IconTile({
       style={{
         background: color,
         color: iconColor,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        boxShadow: 'var(--shadow-sm)',
       }}
     >
       {icon}
