@@ -23,6 +23,7 @@ import {
   Github,
   Compass,
   LifeBuoy,
+  MessageSquare,
 } from 'lucide-react';
 import {
   IdentificationCard,
@@ -76,6 +77,7 @@ const components = {
   'github-activity': lazy(() => import('@/components/apps/GitHubActivityApp')),
   'browser': lazy(() => import('@/components/apps/BrowserApp')),
   'help': lazy(() => import('@/components/apps/HelpApp')),
+  'dev-ai': lazy(() => import('@/components/apps/DevAiApp')),
 };
 
 // ---------------------------------------------------------------------------
@@ -208,6 +210,17 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     defaultPosition: { x: 200, y: 100 },
     pinnedToDock: false,
     launchpad: true,
+  },
+  'dev-ai': {
+    component: components['dev-ai'],
+    icon: MessageSquare,
+    iconColor: 'indigo',
+    defaultSize: { width: 420, height: 620 },
+    defaultPosition: { x: 320, y: 120 },
+    // Mobile-only surface: opened through the mobile AppView, never the
+    // desktop dock or Launchpad (the desktop assistant orb stays the desktop path).
+    pinnedToDock: false,
+    launchpad: false,
   },
 };
 

@@ -173,6 +173,11 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     windowTitle: 'Help.app',
     description: 'New here? Start the tour',
   },
+  'dev-ai': {
+    title: 'DevAI',
+    windowTitle: 'DevAI',
+    description: 'Chat with my AI',
+  },
 };
 
 // ---------------------------------------------------------------------------

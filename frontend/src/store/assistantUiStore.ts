@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useChatStore } from '@/store/chatStore';
+import { useMobileStore } from '@/store/mobileStore';
 
 /**
  * UI state for the floating assistant (desktop orb + mobile sheet).
@@ -12,7 +13,8 @@ import { useChatStore } from '@/store/chatStore';
 interface AssistantUiStore {
   open: boolean;
   /** Open the assistant. If a seed question is given, hand it to chatStore so
-   *  the panel sends it on mount. */
+   *  the panel sends it on mount. Platform-aware: on mobile this routes to the
+   *  dedicated full-screen DevAI app; on desktop it shows the floating orb. */
   openAssistant: (seed?: string) => void;
   /** Hide the assistant surface. Does NOT clear the conversation. */
   closeAssistant: () => void;
@@ -25,7 +27,15 @@ export const useAssistantUiStore = create<AssistantUiStore>((set, get) => ({
   openAssistant: (seed) => {
     const q = seed?.trim();
     if (q) useChatStore.getState().setSeed(q);
-    set({ open: true });
+
+    // Mobile routes to the dedicated full-screen DevAI app (opened through the
+    // mobile AppView). Desktop keeps the floating orb path untouched.
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile) {
+      useMobileStore.getState().openApp('dev-ai');
+    } else {
+      set({ open: true });
+    }
   },
 
   closeAssistant: () => set({ open: false }),

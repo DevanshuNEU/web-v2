@@ -27,7 +27,8 @@ export type AppType =
   | 'changelog'
   | 'github-activity'
   | 'browser'
-  | 'help';
+  | 'help'
+  | 'dev-ai';
 
 // API Types
 export interface AnalyticsEvent {
