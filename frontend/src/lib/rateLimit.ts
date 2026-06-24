@@ -19,11 +19,26 @@ export type RateLimiterOptions = {
 };
 
 /**
- * Extract the client IP the same way the concierge route does: first value of
- * `x-forwarded-for`, trimmed, falling back to 'anon'.
+ * Extract the real client IP. Vercel sets `x-real-ip` to the untampered
+ * client address; `x-forwarded-for` is user-controllable and only used as a
+ * last-resort fallback so spoofed headers cannot bypass per-IP rate limits.
  */
 export function clientIp(req: NextRequest): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
+  return (
+    req.headers.get('x-real-ip')?.trim() ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'anon'
+  );
+}
+
+/** Escape the five characters that matter in an HTML context. */
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
 export function createRateLimiter({ prefix, perMinute, dailyCeiling }: RateLimiterOptions): RateLimiter {

@@ -102,7 +102,8 @@ export async function POST(req: NextRequest) {
 
   // Throttle + daily spend ceiling (always on; Upstash if configured).
   const limiter = await getLimiter();
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
+  const ip = req.headers.get('x-real-ip')?.trim() ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
   const limited = await limiter.limit(ip);
   if (limited?.tooMany) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });

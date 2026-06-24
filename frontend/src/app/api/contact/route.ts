@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { createRateLimiter, clientIp } from '@/lib/rateLimit';
+import { createRateLimiter, clientIp, escapeHtml } from '@/lib/rateLimit';
 
 const TO_EMAIL = 'chicholikar.d@northeastern.edu';
 const FROM_EMAIL = 'devOS <onboarding@resend.dev>'; // Use verified domain in production
@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
           </div>
           <div style="background: #f9f9f9; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e5e5e5;">
             <table style="width: 100%; border-collapse: collapse;">
-              <tr><td style="padding: 8px 0; color: #888; font-size: 13px; width: 100px;">From</td><td style="padding: 8px 0; font-weight: 500;">${name}</td></tr>
-              <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0;"><a href="mailto:${email}" style="color: #007AFF;">${email}</a></td></tr>
-              ${company ? `<tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Company</td><td style="padding: 8px 0;">${company}</td></tr>` : ''}
-              <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subject</td><td style="padding: 8px 0; font-weight: 500;">${subject}</td></tr>
+              <tr><td style="padding: 8px 0; color: #888; font-size: 13px; width: 100px;">From</td><td style="padding: 8px 0; font-weight: 500;">${escapeHtml(name)}</td></tr>
+              <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Email</td><td style="padding: 8px 0;"><a href="mailto:${escapeHtml(email)}" style="color: #007AFF;">${escapeHtml(email)}</a></td></tr>
+              ${company ? `<tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Company</td><td style="padding: 8px 0;">${escapeHtml(company)}</td></tr>` : ''}
+              <tr><td style="padding: 8px 0; color: #888; font-size: 13px;">Subject</td><td style="padding: 8px 0; font-weight: 500;">${escapeHtml(subject)}</td></tr>
             </table>
             <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 16px 0;" />
             <p style="margin: 0; line-height: 1.7; color: #333; white-space: pre-wrap;">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
