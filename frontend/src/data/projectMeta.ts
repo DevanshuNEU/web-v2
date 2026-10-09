@@ -26,157 +26,226 @@ export interface ProjectMeta {
 }
 
 export const projectMeta: Record<string, ProjectMeta> = {
-  'financial-copilot': {
-    displayName: 'Financial Copilot',
-    tagline: 'Because manual bookkeeping is so 2019',
+  'opencodeintel': {
+    displayName: 'OpenCodeIntel',
+    tagline: 'Code search for AI coding agents',
+    descriptionOverride: "Code-search platform for AI coding agents: hybrid BM25 + vector retrieval with reranking, tree-sitter AST chunking, a web app, a REST API and a 12-tool MCP server.",
+    featured: true,
+    category: 'org',
+    status: 'active',
+    story: [
+      "OpenCodeIntel is a code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server that give an agent real context on a codebase instead of letting it guess.",
+      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. A query runs both, fuses the results with reciprocal rank fusion and reranks them with a cross-encoder. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
+      "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On production, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
+    ],
+    achievements: [
+      { metric: '94%', label: 'Hit@1, research eval', detail: '14 open-source codebases, 665 queries' },
+      { metric: '641ms', label: 'p50 cold search, production', detail: 'Embedding, hybrid retrieval and reranking' },
+      { metric: '242ms', label: 'p50 cached repeat', detail: 'End to end from Boston, measured Oct 2026' },
+      { metric: '12', label: 'MCP tools', detail: 'stdio for local agents, streamable HTTP for Claude.ai' },
+    ],
+    extraTech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React', 'TypeScript'],
+  },
+
+  'overhear': {
+    displayName: 'Overhear',
+    tagline: 'A QA analyst for voice agents',
+    descriptionOverride: "AI QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic's real database. Code decides the facts, an LLM-as-a-judge scores the rest.",
     featured: true,
     category: 'personal',
     status: 'active',
     story: [
-      "Ever tried managing receipts manually? Yeah, it's painful. Financial Copilot actually understands your receipts and turns them into organized financial data automatically.",
-      "The cool part? It uses OCR to read receipts (even the blurry ones), NLP to understand what everything means, and then organizes it all in a way that actually makes sense. No more shoebox full of crumpled receipts.",
-      "Built with React 18 and TypeScript on the frontend because type safety matters, and Flask on the backend because sometimes Python just gets the job done. The whole thing runs in Docker containers with proper CI/CD because deploying manually is also very 2019.",
+      "Voice agents fail quietly. They offer a slot that does not exist, skip the identity check or book the wrong provider, and the call still sounds fine. Overhear grades every call a Retell healthcare-scheduling agent takes against the clinic's real database.",
+      "Facts are decided in code. The grader replays the agent's tool calls in time order against Postgres, so 3 of the 7 rubric dimensions, carrying 50% of the score, never depend on a model. An LLM-as-a-judge scores the other 4, including safety, escalation and conversational quality.",
+      "On a 39-call golden dataset with 4 planted failure types, it caught 23 of 23 planted failures (macro-F1 0.89) with 0.99 self-consistency across 3 repeat runs. Adversarial cases showed where the judge over-flags (precision 0.60 and 0.67 on two types), and the eval page says so. Built in 7 days: 39 commits, 27 merged PRs, 132 tests.",
     ],
     achievements: [
-      { metric: '60%', label: 'Less manual bookkeeping', detail: 'Nobody has time for manual data entry' },
-      { metric: '<200ms', label: 'Response times', detail: 'Smart caching and query optimization' },
-      { metric: '100%', label: 'Automated deployments', detail: 'Safe rollbacks and staged rollouts' },
-      { metric: 'OCR+NLP', label: 'AI integration', detail: 'Turns messy receipts into clean data' },
+      { metric: '23/23', label: 'Planted failures caught', detail: '4 failure types on a 39-call golden dataset' },
+      { metric: '0.89', label: 'Macro-F1', detail: 'Small, mostly synthetic set with one labeler' },
+      { metric: '50%', label: 'Of the score decided in code', detail: '3 of 7 dimensions replayed against the database' },
+      { metric: '132', label: 'Vitest cases', detail: '38 files over in-memory PGlite databases' },
     ],
-    extraTech: ['React 18', 'TypeScript', 'Flask', 'PostgreSQL', 'OpenAI API', 'Docker', 'GitHub Actions'],
+    extraTech: ['Next.js', 'TypeScript', 'Retell', 'Claude API', 'Postgres', 'Drizzle', 'PGlite', 'Vitest', 'Railway'],
+  },
+
+  'callbudget': {
+    displayName: 'CallBudget',
+    tagline: 'Finds a hard-to-find drug in fewer calls',
+    descriptionOverride: "Active-sensing pharmacy search: predict which pharmacy has a hard-to-find drug, call the most likely first through a voice agent, and learn from every call.",
+    featured: true,
+    category: 'personal',
+    status: 'active',
+    story: [
+      "Finding a drug during a shortage means calling pharmacy after pharmacy, and half the time 'in stock' turns out to be wrong. CallBudget treats it as a search problem: predict which pharmacy is most likely to have it, call that one first, and learn from every answer.",
+      "A HistGradientBoosting ranker scores pharmacies by predicted stock. A Claude-driven voice agent (Pipecat, Deepgram, Cartesia) places the calls, which for now go to a simulated pharmacist on real pharmacy data. Self-consistency voting lets it abstain instead of guessing, so a shaky answer never sends a patient to an empty shelf.",
+      "On a 19-pharmacy Boston pool, expected calls to find the drug fell from 4.3 to 2.3 (47%). With the extractor rigged to misread stock 25% of the time, false 'in stock' answers fell from 10% to 0%. It ships as a 4-tool FastMCP server, and every input is public data (NPPES, RxNorm, DEA ARCOS) with zero PHI. There is a Loom walkthrough on the repo.",
+    ],
+    achievements: [
+      { metric: '47%', label: 'Fewer calls to find', detail: '4.3 to 2.3 expected calls vs a shuffled baseline' },
+      { metric: '10% to 0%', label: "False 'in stock' answers", detail: 'Self-consistency voting under a 25%-unreliable extractor' },
+      { metric: '4', label: 'MCP tools', detail: 'predict, plan, eval and converse over FastMCP' },
+      { metric: 'Zero PHI', label: 'Public data only', detail: 'NPPES, RxNorm and DEA ARCOS inputs' },
+    ],
+    extraTech: ['Python', 'scikit-learn', 'FastMCP', 'Pipecat', 'Deepgram', 'Cartesia', 'Optuna', 'DuckDB', 'Claude API'],
+  },
+
+  'lco': {
+    displayName: 'Saar',
+    tagline: 'A Claude.ai token and cost meter that runs entirely in the browser',
+    descriptionOverride: "Chrome extension that tracks Claude.ai token usage and cost in real time, entirely in the browser. Published on the Chrome Web Store.",
+    featured: true,
+    category: 'org',
+    status: 'active',
+    story: [
+      "Saar is a Chrome extension, published on the Chrome Web Store, that shows Claude.ai token usage and cost in real time. There is no backend, so nothing leaves the browser.",
+      "It runs in three contexts: a page-context script that intercepts Claude.ai's streaming responses and reads exact token counts, a content script that draws the overlay in a Shadow DOM, and a service worker running a BPE tokenizer.",
+      "v1.0.0 cleared Chrome Web Store review in May 2026. v1.0.2 removed a permission Google flagged as unused.",
+    ],
+    achievements: [
+      { metric: '1,808', label: 'Vitest tests', detail: '63 files, 2.1s suite, plus Playwright e2e' },
+      { metric: 'Published', label: 'Chrome Web Store', detail: 'Chrome MV3, getsaar.com' },
+      { metric: '0', label: 'Backend servers', detail: 'Usage data never leaves the browser' },
+      { metric: '3', label: 'Extension contexts', detail: 'Page script, content script, service worker' },
+    ],
+    extraTech: ['TypeScript', 'WXT', 'Chrome MV3', 'React', 'Vitest', 'Playwright'],
+  },
+
+  'saar': {
+    displayName: 'saar CLI',
+    tagline: 'Writes the context files coding agents need',
+    descriptionOverride: "Statically analyzes a codebase and generates agent context files (AGENTS.md, CLAUDE.md, .cursorrules). Published on PyPI.",
+    featured: true,
+    category: 'org',
+    status: 'active',
+    story: [
+      "saar CLI is a Python command-line tool, published on PyPI, that statically analyzes a codebase (package manager, logging, auth patterns and more) and writes the context files coding agents read: AGENTS.md, CLAUDE.md and .cursorrules.",
+      "Coding agents do far better with context about the project, and nobody enjoys writing or maintaining that file. Point saar at a repo and it writes it for you.",
+    ],
+    achievements: [
+      { metric: '22', label: 'Releases on PyPI', detail: 'v0.2.0 to v0.6.0' },
+      { metric: '3', label: 'Context formats', detail: 'AGENTS.md, CLAUDE.md, .cursorrules' },
+      { metric: 'Python', label: 'Static analysis', detail: 'Stack, patterns and conventions from the code' },
+    ],
+    extraTech: ['Python', 'Static analysis', 'CLI', 'PyPI'],
+  },
+
+  'web-v2': {
+    displayName: 'Portfolio OS',
+    tagline: "You're looking at it right now",
+    descriptionOverride: "A desktop operating system in a browser tab: window manager, terminal and dock, built from scratch.",
+    featured: true,
+    category: 'meta',
+    status: 'active',
+    story: [
+      "This portfolio itself. A desktop OS in a browser tab, built with Next.js 15, React 19, Framer Motion and Zustand. Because a static page felt boring.",
+      "Boot sequence, draggable windows, a real terminal, dock magnification and an iOS-style phone shell on mobile, plus this very Projects app you're reading through.",
+    ],
+    achievements: [
+      { metric: 'From scratch', label: 'Window manager', detail: 'Windows, terminal, dock and apps' },
+      { metric: 'Mobile', label: 'Phone shell', detail: 'iOS-style home screen and app library' },
+      { metric: 'Next.js 15', label: 'React 19', detail: 'TypeScript and Zustand throughout' },
+    ],
+    extraTech: ['Next.js 15', 'React 19', 'TypeScript', 'Framer Motion', 'Zustand', 'Tailwind CSS'],
+  },
+
+  'financial-copilot': {
+    displayName: 'Financial Copilot',
+    tagline: 'An AI expense tracker that tells you what you can spend today',
+    descriptionOverride: "AI expense tracker with automatic categorization, category budgets, spending insights and a daily safe-to-spend figure.",
+    featured: true,
+    category: 'personal',
+    status: 'completed',
+    story: [
+      "Financial Copilot (ExpenseSink) is an AI expense tracker. Log an expense and it gets categorized automatically, counted against its category budget and folded into dashboards and AI spending insights.",
+      "It also works out a daily safe-to-spend figure and compares each week with the last, so a bad week shows up before the month is gone.",
+      "React 18 and TypeScript with Recharts on the front end; Supabase Edge Functions (Deno), Postgres and Supabase Auth behind it; deployed on Vercel.",
+    ],
+    achievements: [
+      { metric: 'Auto', label: 'Expense categorization', detail: 'No manual tagging' },
+      { metric: 'Daily', label: 'Safe-to-spend figure', detail: 'Budgets tracked per category' },
+      { metric: 'AI', label: 'Spending insights', detail: 'Plus week-over-week comparisons' },
+      { metric: 'Edge', label: 'Serverless backend', detail: 'Supabase Edge Functions on Deno' },
+    ],
+    extraTech: ['React 18', 'TypeScript', 'Tailwind CSS', 'Recharts', 'Supabase', 'PostgreSQL', 'Vercel'],
+  },
+
+  'SecureScale': {
+    displayName: 'SecureScale',
+    tagline: 'Infrastructure that actually stays up',
+    featured: true,
+    category: 'personal',
+    status: 'completed',
+    story: [
+      "You know what's harder than writing code? Making sure it stays running in production. SecureScale is a fully automated AWS infrastructure setup designed to not break at 3 AM.",
+      "The whole thing is Infrastructure as Code in modular Terraform: VPC, ALB, auto-scaling groups, RDS and S3 encrypted with KMS, across multiple availability zones, with least-privilege IAM, Packer-built AMIs, GitHub Actions and CloudWatch monitoring.",
+      "Provisioning went from 2 hours to 10 minutes, cloud spend dropped 30%, and it held 99.9% uptime.",
+    ],
+    achievements: [
+      { metric: '99.9%', label: 'Uptime', detail: 'Fault-tolerant multi-AZ design' },
+      { metric: '2h to 10m', label: 'Environment provisioning', detail: 'Terraform, Packer and GitHub Actions' },
+      { metric: '30%', label: 'Cloud spend cut', detail: 'Rightsizing and resource allocation' },
+      { metric: 'KMS + IAM', label: 'Defense in depth', detail: 'Least privilege, encryption, NAT isolation' },
+    ],
+    extraTech: ['AWS', 'Terraform', 'Packer', 'GitHub Actions', 'CloudWatch', 'Docker', 'PostgreSQL'],
+  },
+
+  'tool-crowding': {
+    displayName: 'Tool Crowding Benchmark',
+    tagline: 'Does an agent pick the wrong tool when too many MCP servers are loaded?',
+    featured: false,
+    category: 'personal',
+    status: 'experimental',
+    story: [
+      "When an agent has dozens of MCP tools loaded, does it start picking the wrong one? Tool Crowding is a harness built to measure that cleanly, with the design and its hypotheses pre-registered before any data.",
+      "Every trial is cache-cold: a per-trial nonce defeats prompt caching, a runtime assertion halts the run on a cache hit, and server SHAs plus tool schemas hash into every run ID, so a result can be reproduced byte for byte.",
+      "Status: harness built, 19 exploratory trials run, the 144-trial pilot not run yet. The exploratory trials found no mis-routing with 6 dissimilar tools, which points at task ambiguity and agent persona rather than raw tool count.",
+    ],
+    achievements: [
+      { metric: '345', label: 'Harness tests', detail: 'Fail-closed, cache-cold enforcement' },
+      { metric: '199', label: 'Synthetic tools', detail: 'The corpus agents choose from' },
+      { metric: '144', label: 'Pre-registered trials', detail: 'Factorial design locked before data' },
+      { metric: '19', label: 'Exploratory trials run', detail: 'Pilot not run yet' },
+    ],
+    extraTech: ['Python', 'MCP', 'pytest', 'Anthropic API', 'Apache 2.0'],
   },
 
   'mem-machines': {
     displayName: 'Mem Machines',
-    tagline: 'Serverless pipelines that handle 1000+ RPM without breaking a sweat',
+    tagline: 'Serverless ingestion on GCP with multi-tenant isolation and PII redaction',
     featured: false,
     category: 'personal',
     status: 'completed',
     story: [
-      "Mem Machines is a serverless data ingestion pipeline built entirely on GCP: Cloud Run, Pub/Sub, and Firestore working in concert to handle high-throughput data streams.",
-      "The architecture is event-driven: messages land in Pub/Sub, Cloud Run workers spin up to process them, and results land in Firestore. No servers to manage, auto-scales to demand, and the bill only arrives for actual work done.",
-      "Stress-tested at 1000+ requests per minute without breaking a sweat. Turns out serverless + event-driven is a genuinely good idea.",
+      "Mem Machines is a serverless data ingestion pipeline built entirely on GCP: Cloud Run, Pub/Sub and Firestore working together on high-throughput data streams.",
+      "The architecture is event-driven: messages land in Pub/Sub, Cloud Run workers spin up to process them, and results land in Firestore. Tenants stay isolated and PII is redacted on the way in. No servers to manage, it scales with demand, and the bill only arrives for actual work done.",
     ],
     achievements: [
-      { metric: '1000+', label: 'RPM throughput', detail: 'Fully serverless, auto-scales to demand' },
       { metric: '3', label: 'GCP services', detail: 'Cloud Run + Pub/Sub + Firestore' },
       { metric: '0', label: 'Servers managed', detail: 'Fully serverless architecture' },
+      { metric: 'PII', label: 'Automatic redaction', detail: 'Before anything is stored' },
       { metric: 'Event-driven', label: 'Architecture', detail: 'Decoupled, resilient, scalable' },
     ],
     extraTech: ['Python', 'GCP Cloud Run', 'Pub/Sub', 'Firestore', 'Docker'],
   },
 
-  'opencodeintel': {
-    displayName: 'OpenCodeIntel',
-    tagline: 'Making code understand itself',
+  'bob-wxo-hackathon': {
+    displayName: 'watsonx Test Forge',
+    tagline: 'Hackathon: auto-generate Journey Success test cases for IBM watsonx agents',
     featured: true,
-    category: 'org',
-    status: 'active',
-    story: [
-      "OpenCodeIntel is a code intelligence platform that helps developers understand their codebases faster. Think of it as giving your code a brain: static analysis, semantic search, dependency graphs, and AI-powered insights.",
-      "Built under the OpenCodeIntel org to be open and collaborative. The platform indexes repositories and makes their structure, patterns, and relationships queryable through a clean API.",
-      "The goal: reduce the time from 'I need to understand this codebase' to 'I actually understand this codebase' from days to minutes.",
-    ],
-    achievements: [
-      { metric: 'Hybrid', label: 'AST + lexical retrieval', detail: 'Deep code structure + fast keyword search' },
-      { metric: 'Open source', label: 'MIT licensed', detail: 'Built to be forked and extended' },
-      { metric: 'Static analysis', label: 'Core feature', detail: 'Deep code structure understanding' },
-      { metric: 'API-first', label: 'Design', detail: 'Integrates with any dev workflow' },
-    ],
-    extraTech: ['TypeScript', 'Node.js', 'Static Analysis'],
-  },
-
-  'saar': {
-    displayName: 'Saar',
-    tagline: "Auto-generates the CLAUDE.md you forgot to write",
-    featured: true,
-    category: 'org',
-    status: 'active',
-    story: [
-      "Saar (سار, roughly \"it happened\") is a CLI tool that automatically generates CLAUDE.md and .cursorrules files by running static analysis on your codebase.",
-      "The problem it solves: AI coding assistants are dramatically more useful when they have context about your project. But writing and maintaining that context file is tedious. Saar reads your code and writes it for you.",
-      "Point it at any repo. It figures out the stack, patterns, conventions, and important context, then outputs a structured file your AI assistant can use. Available at getsaar.com.",
-    ],
-    achievements: [
-      { metric: 'Auto-gen', label: 'CLAUDE.md + .cursorrules', detail: 'No manual context writing needed' },
-      { metric: 'Python', label: 'Static analysis engine', detail: 'Deep AST parsing and pattern detection' },
-      { metric: 'Any repo', label: 'Works on', detail: 'Language-agnostic analysis' },
-      { metric: 'Live', label: 'At getsaar.com', detail: 'Deployed and being used' },
-    ],
-    extraTech: ['Python', 'AST parsing', 'CLI tool'],
-  },
-
-  'moderationkit': {
-    displayName: 'ModerationKit',
-    tagline: 'AI content moderation that actually works',
-    featured: false,
-    category: 'personal',
-    status: 'active',
-    story: [
-      "ModerationKit is an AI-powered content moderation platform that helps developers integrate content safety into their applications without building it from scratch.",
-      "The API accepts text, images, or structured content and returns moderation decisions with confidence scores and explanations. Deployed at moderationkit.vercel.app.",
-      "Built TypeScript end-to-end for type safety from API contract to response shape.",
-    ],
-    achievements: [
-      { metric: 'Multi-modal', label: 'Text + Image moderation', detail: 'One API for all content types' },
-      { metric: 'Live', label: 'At moderationkit.vercel.app', detail: 'Production deployment on Vercel' },
-      { metric: 'Confidence scores', label: 'With explanations', detail: 'Not just yes/no decisions' },
-      { metric: 'REST API', label: 'Easy integration', detail: 'Drop-in for any stack' },
-    ],
-    extraTech: ['TypeScript', 'Next.js', 'AI/ML APIs', 'Vercel'],
-  },
-
-  'moderkit-extension': {
-    displayName: 'ModerKit Extension',
-    tagline: "Browser extension with a memory better than yours",
-    featured: false,
-    category: 'personal',
-    status: 'active',
-    story: [
-      "A browser extension companion to ModerationKit that brings persistent AI memory and content moderation directly into your browsing experience.",
-      "The extension maintains context across sessions. It remembers what you were working on, what you've flagged, and surfaces relevant information when you need it.",
-    ],
-    achievements: [
-      { metric: 'Persistent', label: 'Cross-session memory', detail: 'Context survives browser restarts' },
-      { metric: 'Browser native', label: 'Extension API', detail: 'Deep browser integration' },
-    ],
-    extraTech: ['JavaScript', 'Browser Extension API', 'Chrome API'],
-  },
-
-  'testpulse-ai': {
-    displayName: 'TestPulse AI',
-    tagline: 'AI-powered test intelligence for Playwright suites',
-    featured: false,
-    category: 'personal',
-    status: 'active',
-    story: [
-      "TestPulse AI is a dashboard that brings intelligence to your Playwright test suites. It tracks test health over time, identifies flaky tests, surfaces patterns, and gives you AI-generated recommendations for improving test stability.",
-      "Because 'the tests are failing' is not a useful insight. 'These 3 tests have failed 40% of the time for the past week, and here's why' actually is.",
-    ],
-    achievements: [
-      { metric: 'Playwright', label: 'Native integration', detail: 'Hooks into your existing test suite' },
-      { metric: 'AI-powered', label: 'Flakiness detection', detail: 'Pattern recognition across test runs' },
-      { metric: 'Dashboard', label: 'Test health over time', detail: 'Historical trends and anomalies' },
-      { metric: 'Actionable', label: 'Recommendations', detail: "Not just metrics, but what to do about them" },
-    ],
-    extraTech: ['TypeScript', 'Playwright', 'Recharts', 'Next.js'],
-  },
-
-  'windborne-weather-app': {
-    displayName: 'Windborne',
-    tagline: 'Weather visualization that makes meteorologists jealous',
-    featured: false,
     category: 'personal',
     status: 'completed',
     story: [
-      "Windborne is a weather visualization platform built with TypeScript that turns raw meteorological data into beautiful, interactive charts and maps.",
-      "Uses real weather APIs to surface current conditions, forecasts, and historical trends in a clean, readable interface.",
+      "IBM watsonx Orchestrate hackathon. The problem: manually authoring Journey Success test cases for watsonx agents is tedious and error-prone. Test Forge is a multi-tool agent that reads deployed agent specs and generates validated test cases automatically.",
+      "Tool lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Test cases cover happy path, edge cases, and failure scenarios with strict/fuzzy/optional argument matching plus response text keywords. All goals must pass for a test to succeed.",
+      "Built on IBM's ADK + watsonx Orchestrate MCP server, integrated with Bob IDE. Demonstrates manager/collaborator agent composition: manager agents coordinate via named collaborators; collaborator agents own the tools.",
     ],
     achievements: [
-      { metric: 'Live', label: 'Deployed on Vercel', detail: 'Real weather data, real time' },
-      { metric: 'Interactive', label: 'Charts and maps', detail: 'Built with Recharts and mapping libraries' },
+      { metric: '4', label: 'Tools implemented', detail: 'list, get_spec, generate, upload with ToolResponse wrapping' },
+      { metric: '13', label: 'Unit tests passing', detail: 'Schema validation, error handling, tool contracts' },
+      { metric: 'Hackathon', label: 'IBM ADK', detail: 'Built on IBM ADK and watsonx Orchestrate' },
+      { metric: 'Journey Success', label: 'Evaluation metric', detail: 'Tool-call + text-keyword matching' },
     ],
-    extraTech: ['TypeScript', 'Weather APIs', 'Recharts', 'Next.js'],
+    extraTech: ['Python', 'IBM watsonx ADK', 'Pydantic', 'pytest', 'Groq/OpenAI LLMs'],
   },
 
   'campus-resources': {
@@ -195,166 +264,17 @@ export const projectMeta: Record<string, ProjectMeta> = {
     ],
     extraTech: ['TypeScript', 'Next.js', 'Vercel'],
   },
-
-  'lco': {
-    displayName: 'LCO',
-    tagline: 'Local Context Optimizer',
-    featured: true,
-    category: 'org',
-    status: 'active',
-    story: [
-      "LCO (Local Context Optimizer) is a tool for optimizing the context passed to AI coding assistants. Works hand-in-hand with Saar to ensure your AI gets the right context at the right time.",
-    ],
-    achievements: [
-      { metric: 'Context', label: 'Optimization engine', detail: 'Smarter AI context management' },
-    ],
-    extraTech: ['TypeScript'],
-  },
-
-  'SecureScale': {
-    displayName: 'SecureScale',
-    tagline: 'Infrastructure that actually stays up',
-    featured: true,
-    category: 'personal',
-    status: 'completed',
-    story: [
-      "You know what's harder than writing code? Making sure it stays running in production. SecureScale is a completely automated AWS infrastructure setup designed to not break at 3 AM.",
-      "The whole thing is Infrastructure as Code using Terraform. No more 'it works on my machine' problems. Multi-AZ across availability zones, automated CI/CD pipelines, comprehensive monitoring, and cost optimization that actually saves money.",
-      "Achieved 99.9% uptime. That's not marketing speak. It's measured.",
-    ],
-    achievements: [
-      { metric: '99.9%', label: 'Uptime achieved', detail: 'Fault-tolerant multi-AZ design' },
-      { metric: '85%', label: 'Less deployment effort', detail: 'Automation beats manual work' },
-      { metric: '65%', label: 'Faster releases', detail: 'Blue-green deployments, zero downtime' },
-      { metric: '30%', label: 'Cost reduction', detail: 'Rightsizing and resource allocation' },
-    ],
-    extraTech: ['AWS', 'Terraform', 'GitHub Actions', 'CloudWatch', 'Docker', 'PostgreSQL'],
-  },
-
-  'callbudget': {
-    displayName: 'CallBudget',
-    tagline: 'Teach a pharmacy-finder to call less and find more',
-    featured: true,
-    category: 'personal',
-    status: 'active',
-    story: [
-      "Finding specialty medication in a shortage is genuinely miserable. You call pharmacy after pharmacy, get put on hold, and half the time they say 'in stock' and then it's not. CallBudget fixes the calling problem.",
-      "It reframes the search as Bayesian active sensing: a HistGradientBoosting model ranks pharmacies by predicted stock probability, a voice agent navigates IVRs and hold music, and calibrated abstention suppresses false-positive-in-stock answers, the ones that send patients to empty shelves.",
-      "The result is a 47% reduction in expected calls (4.3 to 2.3 avg) with false-positive rate suppressed from ~10% to ~0%. Shipped as an MCP server so it drops into any agentic workflow. Built on a 19-pharmacy Boston corpus for Adderall XR 20mg, entirely on public data (NPPES, RxNorm, DEA ARCOS). Zero PHI.",
-    ],
-    achievements: [
-      { metric: '47%', label: 'Fewer calls to find', detail: 'Bayesian active sensing vs naive random calling' },
-      { metric: '~0%', label: 'False-positive suppressed', detail: 'Self-consistency voting; safety is a hard constraint' },
-      { metric: 'MCP native', label: 'Ships as MCP server', detail: 'Drops into any agentic workflow via FastMCP' },
-      { metric: 'Zero PHI', label: '100% public data', detail: 'NPPES + RxNorm + DEA ARCOS + FDA/ASHP' },
-    ],
-    extraTech: ['Python', 'scikit-learn', 'DuckDB', 'FastMCP', 'Pipecat', 'Deepgram', 'Optuna', 'Claude API'],
-  },
-
-  'tool-crowding': {
-    displayName: 'Tool Crowding Benchmark',
-    tagline: 'Does adding more MCP servers hurt code retrieval? Here is the experiment.',
-    featured: true,
-    category: 'personal',
-    status: 'experimental',
-    story: [
-      "There is a real question nobody has measured cleanly: when you pile on MCP servers, does discrimination interference degrade code retrieval? Tool Crowding is the pre-registered, open-methodology benchmark designed to answer it.",
-      "The key methodological move: a padded-N=1 control (adapted from Chroma's text-retrieval work) isolates interference from prompt-length effects. The harness varies N as a continuous variable and measures pass@1 degradation. Conflict of interest (built OpenCodeIntel) is disclosed upfront with a mandatory leave-OCI-out sensitivity run.",
-      "Exploratory probes already found something interesting: a task-framing x agent-persona interaction that prior art (RAG-MCP, LongFuncEval, MCPVerse, LiveMCPBench) did not report. The methodology is locked across 10 binding design docs. The sweep is paused. Turns out frontier model API bills are real. Will pick up when the budget does.",
-    ],
-    achievements: [
-      { metric: 'Pre-registered', label: 'Before any data', detail: '4 scenario abstracts, locked decision rules, kill criteria' },
-      { metric: '10', label: 'Binding design docs', detail: 'Methodology locked end-to-end before first trial' },
-      { metric: 'New finding', label: 'Framing x persona', detail: 'Not reported by RAG-MCP, LongFuncEval, or MCPVerse' },
-      { metric: 'Paused', label: 'API budget constraint', detail: 'Harness ready; sweep resumes when funds do' },
-    ],
-    extraTech: ['Python', 'pytest', 'Anthropic API', 'Claude Sonnet/Opus', 'Apache 2.0'],
-  },
-
-  'parsewave-terminal-bench': {
-    displayName: 'ParseWave Terminal-Bench',
-    tagline: 'Contract work: LLM debugging benchmarks calibrated to actually discriminate',
-    featured: true,
-    category: 'personal',
-    status: 'completed',
-    story: [
-      "Freelance work for ParseWave. The brief: author a benchmark suite of systems debugging tasks that are hard enough to measure LLM agent reliability, not just pass/fail on obvious bugs.",
-      "Turns out Opus 4.8 passes naive 'find the bug' tasks 4 out of 5 times. That is not a benchmark, that is a tutorial. Tasks here are calibrated to 0-2/5 agent pass rate. Each uses Harbor format: oracle/nop baselines, anti-cheat measures (hash-locked backends, nonce echo), preflight checks.",
-      "Three tasks shipped: nginx-502, fd-leak-emfile, and concurrent-ledger (the one where the winning fix, minimal-scope locking, drops latency from 5.2s to 0.95s and is genuinely non-obvious).",
-    ],
-    achievements: [
-      { metric: '3', label: 'Harbor-verified tasks', detail: 'nginx-502, fd-leak-emfile, concurrent-ledger' },
-      { metric: '0-2/5', label: 'Target agent pass rate', detail: 'Calibrated to discriminate, not tutor' },
-      { metric: '5.2s to 0.95s', label: 'Oracle vs naive on ledger', detail: 'Minimal-scope lock is the non-obvious move' },
-      { metric: 'Gig', label: 'Contract for ParseWave', detail: 'Delivered on spec, Harbor-verified' },
-    ],
-    extraTech: ['Python', 'pytest', 'Go', 'Nginx', 'PostgreSQL', 'Harbor format'],
-  },
-
-  'external-agents-fork': {
-    displayName: 'Entire External Agents',
-    tagline: 'OSS contribution: protocol bridge so any AI coding agent plugs into Entire',
-    featured: true,
-    category: 'personal',
-    status: 'completed',
-    story: [
-      "Open-source contribution to entire.io. Entire gives AI coding agents checkpoint/rewind/lifecycle hooks. External Agents is the protocol layer that lets any agent (Kiro, Amp, Cursor, Claude Code) plug in without native support.",
-      "Subcommand interface over stdin/stdout. Each agent binary implements the protocol contract; the lifecycle harness auto-discovers and builds them all; shared integration tests run across every CLI in one pass.",
-      "Shipped two production agents: Kiro (hooks + transcript analysis) and Amp (hooks + transcript + token calculation + compact transcripts). Three test layers: generic protocol compliance, per-agent unit/build, lifecycle integration.",
-    ],
-    achievements: [
-      { metric: '2', label: 'Agents shipped', detail: 'Kiro and Amp, both protocol-compliant' },
-      { metric: '3-layer', label: 'Test architecture', detail: 'Protocol compliance + agent unit + lifecycle integration' },
-      { metric: 'Auto-discovery', label: 'Lifecycle harness', detail: 'No hardcoded agent list' },
-      { metric: 'OSS', label: 'Contribution to entire.io', detail: 'Apache 2.0, merged upstream' },
-    ],
-    extraTech: ['Go', 'bash', 'Python', 'Entire CLI', 'GitHub Actions'],
-  },
-
-  'bob-wxo-hackathon': {
-    displayName: 'watsonx Test Forge',
-    tagline: 'Hackathon: auto-generate Journey Success test cases for IBM watsonx agents',
-    featured: true,
-    category: 'personal',
-    status: 'completed',
-    story: [
-      "IBM watsonx Orchestrate hackathon. The problem: manually authoring Journey Success test cases for watsonx agents is tedious and error-prone. Test Forge is a multi-tool agent that reads deployed agent specs and generates validated test cases automatically.",
-      "Tool lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Test cases cover happy path, edge cases, and failure scenarios with strict/fuzzy/optional argument matching plus response text keywords. All goals must pass for a test to succeed.",
-      "Built on IBM's ADK + watsonx Orchestrate MCP server, integrated with Bob IDE. Demonstrates manager/collaborator agent composition: manager agents coordinate via named collaborators; collaborator agents own the tools.",
-    ],
-    achievements: [
-      { metric: '4', label: 'Tools implemented', detail: 'list, get_spec, generate, upload with ToolResponse wrapping' },
-      { metric: '13', label: 'Unit tests passing', detail: 'Schema validation, error handling, tool contracts' },
-      { metric: 'Hackathon', label: 'IBM ADK', detail: 'Full deployment pipeline on watsonx Orchestrate' },
-      { metric: 'Journey Success', label: 'Evaluation metric', detail: 'Tool-call + text-keyword matching' },
-    ],
-    extraTech: ['Python', 'IBM watsonx ADK', 'Pydantic', 'pytest', 'Groq/OpenAI LLMs'],
-  },
-
-  'web-v2': {
-    displayName: "devOS",
-    tagline: "You're looking at it right now",
-    featured: false,
-    category: 'meta',
-    status: 'active',
-    story: [
-      "This portfolio itself. A desktop OS simulator built with Next.js 15, React 19, Framer Motion, and Zustand. Because a static page felt boring.",
-      "Features a boot sequence, draggable windows, a real terminal, macOS-style dock magnification, and this very Projects app you're reading through.",
-    ],
-    achievements: [
-      { metric: 'devOS v2.0', label: 'Full OS metaphor', detail: 'Boot sequence, windows, dock, apps' },
-      { metric: 'Next.js 15', label: 'React 19', detail: 'Latest and greatest' },
-    ],
-    extraTech: ['Next.js 15', 'React 19', 'TypeScript', 'Framer Motion', 'Zustand', 'Tailwind CSS'],
-  },
 };
 
 /** Get all featured projects in display order */
 export function getFeaturedProjects(): string[] {
   const explicit = [
-    'lco',
-    'saar',
     'opencodeintel',
+    'overhear',
+    'callbudget',
+    'lco',
+    'web-v2',
+    'saar',
     'financial-copilot',
   ];
   // Append any featured projects not explicitly listed, preserving declaration order
@@ -362,4 +282,15 @@ export function getFeaturedProjects(): string[] {
     k => projectMeta[k].featured && !explicit.includes(k)
   );
   return [...explicit, ...rest].filter(k => k in projectMeta);
+}
+
+/**
+ * Sort key that puts featured projects first, in getFeaturedProjects() order.
+ * Everything else ranks after them; Array.prototype.sort is stable, so the
+ * rest keep their incoming order (GitHub's most-recently-pushed first).
+ */
+export function featuredRank(name: string): number {
+  const order = getFeaturedProjects();
+  const i = order.indexOf(name);
+  return i === -1 ? order.length : i;
 }
