@@ -76,7 +76,7 @@ export const RESUME: ResumeData = {
   // Personal info pulled from portfolio.json - update there, reflects here
   name:    personalInfo.name,
   title:   personalInfo.title,
-  tagline: 'AI Engineer · MCP & Agent Systems · Boston, MA (Open to Relocation)',
+  tagline: 'Software Engineer · AI Engineer · MCP & Agent Systems · Boston, MA (Open to Relocation)',
   contact: {
     email:    personalInfo.email,
     phone:    personalInfo.phone,

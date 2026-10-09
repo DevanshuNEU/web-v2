@@ -3,7 +3,7 @@
 /**
  * Spotlight — the devOS command layer.
  *
- * Trigger:  Cmd/Ctrl+K        Dismiss:  Escape / backdrop click
+ * Trigger:  Cmd/Ctrl+K or /   Dismiss:  Escape / backdrop click
  *
  * A monochrome, editorial-mono command surface. Searches apps / projects /
  * skills / commands; the "Ask Devanshu" row hands the query to the floating
@@ -40,6 +40,7 @@ import {
   CATEGORY_ORDER,
   SUGGESTED_IDS,
 } from '@/lib/spotlightPresentation';
+import { isPaletteShortcut, isSlashShortcut, isTypingTarget } from '@/lib/shortcuts';
 
 type Row =
   | { key: string; index: number; kind: 'ask'; query: string }
@@ -134,19 +135,27 @@ export default function Spotlight() {
   // -- Keyboard --
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if (isPaletteShortcut(e)) {
         e.preventDefault();
-        isOpen ? close() : open();
+        if (!e.repeat) { if (isOpen) close(); else open(); }
+        return;
+      }
+      if (!isOpen && isSlashShortcut(e) && !isTypingTarget(e.target)) {
+        e.preventDefault();
+        open();
         return;
       }
       if (!isOpen) return;
-      if (e.key === 'Escape')    { e.preventDefault(); close(); return; }
+      // stopPropagation: Escape closes the palette only, not the window behind it.
+      if (e.key === 'Escape')    { e.preventDefault(); e.stopPropagation(); close(); return; }
       if (e.key === 'ArrowDown') { e.preventDefault(); setSelIdx(i => Math.min(i + 1, maxIdx)); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); setSelIdx(i => Math.max(i - 1, 0)); return; }
       if (e.key === 'Enter')     { e.preventDefault(); const row = flatRows[selIdx]; if (row) runRow(row); }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    // Window + capture phase: runs before any app's own key handling, so an
+    // app that stops propagation can never swallow the palette shortcut.
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [isOpen, close, open, flatRows, selIdx, maxIdx, runRow]);
 
   const handleQueryChange = (value: string) => {

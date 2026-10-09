@@ -92,15 +92,15 @@ export default function MobileFallback() {
         <h1 className="text-3xl font-bold tracking-tight mb-1">
           Devanshu Chicholikar
         </h1>
-        <p className="text-white/60 text-sm mb-1">AI Engineer · Boston, MA</p>
+        <p className="text-white/60 text-sm mb-1">Software + AI Engineer · Boston, MA</p>
         <p className="text-white/40 text-xs">
           MS Software Engineering · Northeastern University · May 2026
         </p>
 
         <p className="mt-4 text-sm text-white/70 leading-relaxed max-w-sm">
           I ship AI to production end to end: MCP servers, RAG, evals and voice
-          agents, plus the full-stack and infra work around them. Open to AI Engineer
-          and Forward Deployed Engineer roles.
+          agents, plus the full-stack and infra work around them. Open to Software
+          Engineer, AI Engineer and Forward Deployed Engineer roles.
         </p>
       </header>
 

@@ -152,12 +152,14 @@ export const APPS_IN_HELP: AppType[] = [
 type Shortcut = { keys: string[]; description: string };
 
 export const SHORTCUTS_DESKTOP: Shortcut[] = [
-  { keys: ['⌘ K'], description: 'Open the command palette' },
+  { keys: ['⌘ K'], description: 'Open the command palette (or press /)' },
   { keys: ['right-click'], description: 'Open the context menu' },
   { keys: ['drag title bar'], description: 'Move a window' },
   { keys: ['◦', '◦', '◦'], description: 'Close / minimize / maximize a window' },
   { keys: ['Esc'], description: 'Close the launchpad or palette' },
-  { keys: ['⌘ ⇧ T'], description: 'Play the guided demo' },
+  { keys: ['⌥ T'], description: 'Play the guided demo' },
+  { keys: ['⌥ 1-4'], description: 'Open About, Projects, Skill Tree, Contact' },
+  { keys: ['⌥ W'], description: 'Close the focused window' },
 ];
 
 export const SHORTCUTS_MOBILE: Shortcut[] = [

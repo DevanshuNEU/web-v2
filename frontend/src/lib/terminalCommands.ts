@@ -8,6 +8,7 @@
  */
 
 import { runRecruiterTour } from './recruiterTour';
+import { opinions } from '@/data/aboutMe';
 import type { AppType } from '../../../shared/types';
 
 export type CommandResult =
@@ -69,6 +70,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '║  about         Who I am                   ║',
     '║  projects      What I\'ve built             ║',
     '║  skills        Things I know               ║',
+    '║  opinions      Strongly held               ║',
     '║  contact       How to reach me             ║',
     '║  hire devanshu A very good idea            ║',
     '║  ask <q>       Open the assistant and ask   ║',
@@ -77,7 +79,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '║  theme <mode>  dark | light                ║',
     '║  github        My GitHub stats             ║',
     '║  neofetch      System info                 ║',
-    '║  matrix        Do the thing                ║',
+    '║  matrix        Full screen. Do the thing   ║',
     '║  cowsay <msg>  Classic                     ║',
     '║  secret        ???                         ║',
     '║  clear         Start fresh                 ║',
@@ -100,7 +102,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
   about: () => [
     '┌──────────────────────────────────────────┐',
     '│  Devanshu Chicholikar                    │',
-    '│  AI Engineer                             │',
+    '│  Software + AI Engineer                  │',
     '├──────────────────────────────────────────┤',
     '│  MS Software Engineering                 │',
     '│  Northeastern University                 │',
@@ -108,7 +110,8 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '│  Location: Boston, MA                    │',
     '└──────────────────────────────────────────┘',
     '',
-    '  Currently: Open to AI Engineer and Forward Deployed Engineer roles.',
+    '  Currently: Open to Software Engineer, AI Engineer',
+    '             and Forward Deployed Engineer roles.',
     '  Specialties: MCP servers, code intelligence,',
     '              AI dev tools, RAG, full-stack.',
     '',
@@ -131,6 +134,15 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  ->  Mem Machines        Serverless GCP ingestion pipeline',
     '',
     '  Double-click the Projects icon to explore them.',
+    '',
+  ],
+
+  opinions: () => [
+    'Initializing opinions... strongly held',
+    '',
+    ...opinions.map(line => `  ->  ${line}`),
+    '',
+    '  Disagree? `ask` the assistant. It argues back.',
     '',
   ],
 
@@ -245,7 +257,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
       'Starting recruiter tour...',
       'About Me → Projects → Resume  (watch the desktop)',
       '',
-      '  Shortcut: Cmd+Shift+T  anytime.',
+      '  Shortcut: Option+T anytime.',
       '',
     ];
   },
