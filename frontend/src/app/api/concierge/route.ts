@@ -101,29 +101,44 @@ export async function POST(req: NextRequest) {
   }
 
   // Throttle + daily spend ceiling (always on; Upstash if configured).
-  const limiter = await getLimiter();
   const ip = req.headers.get('x-real-ip')?.trim() ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-  const limited = await limiter.limit(ip);
+  let limited: { tooMany: boolean } | void;
+  try {
+    const limiter = await getLimiter();
+    limited = await limiter.limit(ip);
+  } catch (err) {
+    // A dead or misconfigured Upstash must not take the concierge down with
+    // it (an unhandled throw here was an empty 500). Fall back to the
+    // in-memory limiter, which still enforces the per-IP and daily caps.
+    console.error('Concierge limiter failed, using in-memory fallback:', err);
+    limited = inMemoryLimit(ip);
+  }
   if (limited?.tooMany) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 
-  const client = new Anthropic();
-  const stream = client.messages.stream({
-    model: process.env.CONCIERGE_MODEL || DEFAULT_MODEL,
-    max_tokens: MAX_TOKENS,
-    // Grounding lives in a cached system block: stable prefix, so repeat
-    // questions read it at ~0.1x input cost instead of re-billing it.
-    system: [
-      {
-        type: 'text',
-        text: buildConciergeSystem(),
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: thread,
-  });
+  let stream: ReturnType<Anthropic['messages']['stream']>;
+  try {
+    const client = new Anthropic();
+    stream = client.messages.stream({
+      model: process.env.CONCIERGE_MODEL || DEFAULT_MODEL,
+      max_tokens: MAX_TOKENS,
+      // Grounding lives in a cached system block: stable prefix, so repeat
+      // questions read it at ~0.1x input cost instead of re-billing it.
+      system: [
+        {
+          type: 'text',
+          text: buildConciergeSystem(),
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: thread,
+    });
+  } catch (err) {
+    console.error('Concierge request setup failed:', err);
+    return NextResponse.json({ error: 'concierge_failed' }, { status: 500 });
+  }
 
   // Stream only the text deltas as plain text — the client just appends them.
   const encoder = new TextEncoder();

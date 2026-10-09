@@ -28,7 +28,7 @@ export const identity = {
   name:         personalInfo.name,
   title:        personalInfo.title,
   location:     personalInfo.location,
-  availability: 'Open to AI Engineer and Forward Deployed Engineer roles',
+  availability: 'Open to Software Engineer, AI Engineer and Forward Deployed Engineer roles',
   photo:        '/devanshu-photo.png',
 } as const;
 
@@ -38,7 +38,7 @@ export const identity = {
 // ---------------------------------------------------------------------------
 
 export const mastheadSpecLine = [
-  'AI ENGINEER',
+  'SOFTWARE + AI ENGINEER',
   'MCP · RAG · EVALS',
   'BOSTON',
   'OCI / OVERHEAR / SAAR',
@@ -70,7 +70,7 @@ export const specs: SpecItem[] = [
 
 export const quickIntro = [
   "Hey! I ship AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents, plus the full-stack, infra and design work around them. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server), and Overhear grades every call a voice agent takes against a clinic's real database. MS Software Engineering Systems from Northeastern, finished May 2026.",
-  "Before that I spent two years full-time building a Java / Spring Boot quotation platform, and TA'd Network Structures & Cloud Computing for 100+ grad students across two semesters. I genuinely love solving complex problems, whether it's optimizing APIs, architecting fault-tolerant infrastructure, or building tools that people actually use. The challenge of making complex things work simply? That's what gets me excited.",
+  "Before that I spent two years full-time building a Java / Spring Boot quotation platform, and TA'd Network Structures & Cloud Computing for 100+ grad students across two semesters. Teaching set my bar: if I can't explain it at 11 PM to someone whose AWS setup is on fire, I don't understand it yet.",
 ] as const;
 
 export interface OriginCard {
@@ -104,8 +104,8 @@ export const originStory: OriginCard[] = [
 
 export const whatImAbout = [
   "I build systems that work reliably under pressure. Distributed systems. Cloud infrastructure. APIs that respond fast. UIs that people can actually use.",
-  "But it's not just about the tech. It's about understanding the problem, communicating with teams, making smart trade-offs, and shipping things that matter.",
-  "I'm here to learn, grow, and work on projects that actually make a difference. Always excited about opportunities that push boundaries.",
+  "Half the job never makes the resume: figuring out what the customer actually needs, saying no to the clever version, and shipping the one that works.",
+  "If it isn't measured, I don't trust it, my own work included. That's why every project here comes with its numbers and its caveats.",
 ] as const;
 
 export interface FunFact {
@@ -125,10 +125,27 @@ export const funFacts: FunFact[] = [
 // ---------------------------------------------------------------------------
 
 export const lookingFor = [
-  'Teams building things that matter, not just chasing metrics',
-  'Places that value engineering excellence and smart decisions',
+  'Teams that ship to real users every week',
+  'Engineers who argue with data and change their minds when it disagrees',
   'Environment between startup energy and structured growth',
   'Good paycheck + security (being realistic here)',
+] as const;
+
+// ---------------------------------------------------------------------------
+// Opinions (strongly held). The first three are lines from his own posts; the
+// rest come from what the projects actually measured. Rendered in About >
+// What Excites Me, the terminal `opinions` command, and the concierge context.
+// ---------------------------------------------------------------------------
+
+export const opinions = [
+  "You're paying for tokens the model isn't reading.",
+  "The model isn't smarter. It's just enough. And \"just enough\" is what actually ships.",
+  'Scale was never the moat.',
+  'Some rerankers make code search worse. I know because I tried one, measured it, and wrote it down.',
+  "If the database already knows the answer, don't ask the LLM. Overhear's judge never grades a fact it could make up.",
+  '"I don\'t know" is a feature. A confident wrong "in stock" sends someone to an empty pharmacy shelf.',
+  'My eval set is 39 calls, mostly synthetic, one labeler. That sentence sits right next to the F1, where it belongs.',
+  "Pineapple belongs on pizza. This one isn't data-driven.",
 ] as const;
 
 export interface LearningItem {

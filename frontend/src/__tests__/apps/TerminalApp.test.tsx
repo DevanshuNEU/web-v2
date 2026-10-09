@@ -165,11 +165,20 @@ describe('TerminalApp command loop (must keep working)', () => {
 });
 
 describe('TerminalApp easter egg + history', () => {
-  it('matrix renders the special canvas (easter egg preserved)', () => {
-    const { container } = render(<TerminalApp />);
+  it('matrix takes over the whole screen and any key exits it', () => {
+    render(<TerminalApp />);
     type('matrix');
     enter();
-    expect(container.querySelector('canvas')).not.toBeNull();
+    // Portaled to <body>, above the whole OS, with its own canvas.
+    const overlay = screen.getByRole('dialog', { name: /matrix/i });
+    expect(overlay.parentElement).toBe(document.body);
+    expect(overlay.querySelector('canvas')).not.toBeNull();
+
+    fireEvent.keyDown(window, { key: 'x' });
+    expect(screen.queryByRole('dialog', { name: /matrix/i })).toBeNull();
+    // The exiting key never reaches the terminal input.
+    expect(input().value).toBe('');
+    expect(screen.getByText(/follow the white rabbit/i)).toBeInTheDocument();
   });
 
   it('ArrowUp / ArrowDown navigate command history', () => {

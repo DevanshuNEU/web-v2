@@ -185,7 +185,8 @@ export function JourneySection() {
           that impact real people&apos;s work.
         </p>
         <p className="text-lg text-text leading-relaxed">
-          That&apos;s what I&apos;m here for. That&apos;s what gets me excited.
+          Requirements arrived by phone call. Nobody wrote tickets. Best training for
+          forward deployed work I could have asked for.
         </p>
       </section>
 

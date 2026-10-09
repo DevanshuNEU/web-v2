@@ -5,7 +5,7 @@
  * Projects, and Resume in sequence with delays, like a kiosk demo.
  *
  * Usage:
- *   runRecruiterTour()  — called from terminal `tour` command or Cmd+Shift+T
+ *   runRecruiterTour()  — called from terminal `tour` command or Option+T
  *
  * Implementation notes:
  *   - Uses Zustand store getState() calls directly (no React hooks needed)

@@ -28,7 +28,7 @@ export interface ProjectMeta {
 export const projectMeta: Record<string, ProjectMeta> = {
   'opencodeintel': {
     displayName: 'OpenCodeIntel',
-    tagline: 'Code search for AI coding agents',
+    tagline: 'Code search for AI coding agents, so they stop guessing',
     descriptionOverride: "Code-search platform for AI coding agents: hybrid BM25 + vector retrieval with reranking, tree-sitter AST chunking, a web app, a REST API and a 12-tool MCP server.",
     featured: true,
     category: 'org',
@@ -49,7 +49,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
 
   'overhear': {
     displayName: 'Overhear',
-    tagline: 'A QA analyst for voice agents',
+    tagline: "A QA analyst for voice agents. It listens to every call so you don't have to",
     descriptionOverride: "AI QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic's real database. Code decides the facts, an LLM-as-a-judge scores the rest.",
     featured: true,
     category: 'personal',
@@ -70,7 +70,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
 
   'callbudget': {
     displayName: 'CallBudget',
-    tagline: 'Finds a hard-to-find drug in fewer calls',
+    tagline: 'Teach a pharmacy-finder to call less and find more',
     descriptionOverride: "Active-sensing pharmacy search: predict which pharmacy has a hard-to-find drug, call the most likely first through a voice agent, and learn from every call.",
     featured: true,
     category: 'personal',
@@ -150,7 +150,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
 
   'financial-copilot': {
     displayName: 'Financial Copilot',
-    tagline: 'An AI expense tracker that tells you what you can spend today',
+    tagline: 'Because manual bookkeeping is so 2019',
     descriptionOverride: "AI expense tracker with automatic categorization, category budgets, spending insights and a daily safe-to-spend figure.",
     featured: true,
     category: 'personal',

@@ -1,5 +1,6 @@
 import React from "react";
 import { Hairline } from "@/components/editorial";
+import { opinions } from "@/data/aboutMe";
 
 /**
  * ExcitesSection - narrative, typeset as a plain editorial column.
@@ -107,22 +108,20 @@ export function ExcitesSection() {
       </section>
 
       <section className="flex flex-col gap-3">
+        <p className="font-mono-meta">Initializing opinions... strongly held</p>
         <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
-          Technology that actually matters
+          Things I&apos;ll argue about
         </h3>
-        <p className="text-lg text-text-secondary leading-relaxed">
-          Here&apos;s what really drives me: building things that solve real problems.
-          Not tech for tech&apos;s sake.
-        </p>
-        <p className="text-lg text-text-secondary leading-relaxed">
-          Whether it&apos;s optimizing an API so users don&apos;t wait, building
-          infrastructure that doesn&apos;t crash at 3 AM, or creating interfaces people
-          can actually use: it&apos;s all about impact.
-        </p>
-        <p className="text-lg text-text leading-relaxed">
-          Technology that makes someone&apos;s life easier, businesses more efficient,
-          or impossible things possible. That&apos;s what I&apos;m here for.
-        </p>
+        <ul className="flex flex-col">
+          {opinions.map((line) => (
+            <li
+              key={line}
+              className="text-lg text-text-secondary leading-relaxed py-2.5 border-b border-border last:border-b-0"
+            >
+              {line}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <Hairline />
@@ -139,8 +138,8 @@ export function ExcitesSection() {
         </p>
         <p className="text-lg text-text-secondary leading-relaxed">
           Their website redesign (the OS-style one) literally inspired this portfolio
-          you&apos;re looking at right now. Would genuinely love to work with teams
-          like that.
+          you&apos;re looking at right now. I&apos;d love to work on a team like
+          that.
         </p>
       </section>
     </div>
