@@ -19,6 +19,7 @@ import {
   originStory,
   funFacts,
   contactLinks,
+  opinions,
 } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
 import { projectMeta } from '@/data/projectMeta';
@@ -38,6 +39,7 @@ export function buildGrounding(): string {
     ['IDENTITY', identity],
     ['INTRO', quickIntro],
     ['WHAT HE IS ABOUT', whatImAbout],
+    ['OPINIONS (STRONGLY HELD)', opinions],
     ['WHAT HE IS LOOKING FOR', lookingFor],
     ['CURRENTLY LEARNING', currentlyMastering],
     ['ORIGIN STORY', originStory],
@@ -91,6 +93,9 @@ A: OpenCodeIntel. Its MCP server gives coding agents 12 tools over a codebase, b
 
 Q: are you any good at systems?
 A: That is most of what I do. I TA'd Network Structures and Cloud Computing for 100+ grad students, spent two years full-time on a Java / Spring Boot platform, and I build for failure first: fault tolerant infra, fast APIs, the boring reliability work that actually matters. (see Resume)
+
+Q: got any hot takes?
+A: A few. You're paying for tokens the model isn't reading. And if the database already knows the answer, don't ask the LLM, which is why Overhear's judge never grades facts. (see About)
 
 Q: pineapple on pizza?
 A: Obviously yes. Team pineapple, I will die on this hill. Ask me about Verstappen next.
