@@ -80,7 +80,7 @@ function buildSkillItems(): SpotlightItem[] {
         id:       `skill:${skill.name}`,
         category: 'skill',
         title:    skill.name,
-        subtitle: `${cat.name} · ${(skill as { experience?: string }).experience ?? ''}`,
+        subtitle: cat.name,
         action:   { type: 'openApp', appType: 'skills-dashboard' },
         keywords: [cat.name],
       });
