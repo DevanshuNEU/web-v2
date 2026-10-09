@@ -7,7 +7,8 @@ import { useOSStore } from '@/store/osStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { getAppLabel } from '@/lib/appRegistry';
 import { isSoundEnabled, setSoundEnabled } from '@/hooks/useSoundEffects';
-import { Sun, Moon, Wifi, Volume2, VolumeX, BatteryMedium } from 'lucide-react';
+import { Sun, Moon, Volume2, VolumeX } from 'lucide-react';
+import { WifiTray, BatteryTray } from './TrayMenus';
 
 // Rotates when the desktop is idle (no focused window)
 const DEV_STATUSES = [
@@ -17,7 +18,7 @@ const DEV_STATUSES = [
   'coffee → code → repeat',
   'forward deployed, always',
   'RAG pipeline. not a salad.',
-  'open to opportunities',
+  'open to AI Engineer + FDE roles',
   'git push --force-with-feelings',
   'null pointer? never heard of her.',
   'localhost:3000 is home',
@@ -118,31 +119,9 @@ export default function MenuBar() {
 
       {/* Right — system tray */}
       <div className="flex items-center gap-0.5">
-        {/* Wifi indicator */}
-        <div
-          className="flex items-center justify-center w-7 h-6 rounded-md cursor-default
-                     hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100"
-          title="Connected"
-        >
-          <Wifi
-            size={13}
-            strokeWidth={2}
-            style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }}
-          />
-        </div>
-
-        {/* Battery indicator */}
-        <div
-          className="flex items-center justify-center w-7 h-6 rounded-md cursor-default
-                     hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100"
-          title="Battery"
-        >
-          <BatteryMedium
-            size={14}
-            strokeWidth={1.8}
-            style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)' }}
-          />
-        </div>
+        {/* Wi-Fi and battery: tray menus with easter eggs (TrayMenus.tsx) */}
+        <WifiTray isDark={isDark} />
+        <BatteryTray isDark={isDark} />
 
         {/* Volume / mute toggle */}
         <button
