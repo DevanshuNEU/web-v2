@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
 import type { AppType } from '../../../shared/types';
 
 /**
@@ -15,8 +16,12 @@ import type { AppType } from '../../../shared/types';
 interface MobileStore {
   // Lock
   locked: boolean;
+  /** True only after an explicit lock(); the initial lock is not the user's. */
+  lockedByUser: boolean;
   unlock: () => void;
   lock: () => void;
+  /** Drop a stale initial lock when this tab already booted (e.g. desktop, then resized to mobile). */
+  syncLockWithSession: () => void;
 
   // Home
   currentPage: number;
@@ -69,13 +74,19 @@ function popHistoryEntry() {
 }
 
 export const useMobileStore = create<MobileStore>((set) => ({
-  // Lock
-  locked: true,
-  unlock: () => set({ locked: false }),
+  // Lock: the lock screen plays once per visit, like the desktop boot.
+  locked: !hasBootedThisSession(),
+  lockedByUser: false,
+  unlock: () => {
+    markBootedThisSession();
+    set({ locked: false, lockedByUser: false });
+  },
   lock: () => {
     popHistoryEntry();
-    set({ locked: true, openAppType: null, openApps: [] });
+    set({ locked: true, lockedByUser: true, openAppType: null, openApps: [] });
   },
+  syncLockWithSession: () =>
+    set((s) => (s.locked && !s.lockedByUser && hasBootedThisSession() ? { locked: false } : {})),
 
   // Home
   currentPage: 0,

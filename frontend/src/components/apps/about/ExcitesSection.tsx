@@ -28,8 +28,9 @@ export function ExcitesSection() {
           is the most interesting problem I&apos;ve found.
         </p>
         <p className="text-lg text-text-secondary leading-relaxed">
-          That&apos;s what OpenCodeIntel is: a production MCP server that gives coding
-          agents real code intelligence instead of letting them guess. Building at the
+          That&apos;s what OpenCodeIntel is: a code-search platform (web app, API and
+          MCP server) that gives coding agents real context instead of letting them
+          guess. Building at the
           MCP layer isn&apos;t just calling a model. It&apos;s designing how it thinks
           about a problem, and it has to be{" "}
           <em className="emphasis-underline not-italic text-text">reliable</em> in

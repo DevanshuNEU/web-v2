@@ -11,12 +11,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createRateLimiter, clientIp, escapeHtml } from '@/lib/rateLimit';
+
+// Tight limit: this is a one-shot notification, not a chat surface.
+const limiter = createRateLimiter({ prefix: 'notify-hire', perMinute: 3, dailyCeiling: 20 });
 
 const TO_EMAIL   = 'chicholikar.d@northeastern.edu';
 const FROM_EMAIL = 'devOS <onboarding@resend.dev>';
 
 export async function POST(req: NextRequest) {
   try {
+    const { tooMany } = await limiter.limit(clientIp(req));
+    if (tooMany) {
+      return NextResponse.json({ ok: true }); // silent to visitor; just drop it
+    }
+
     if (!process.env.RESEND_API_KEY) {
       // Silently succeed — visitor shouldn't see a broken terminal
       return NextResponse.json({ ok: true });
@@ -54,7 +63,7 @@ export async function POST(req: NextRequest) {
               </tr>
               <tr>
                 <td style="padding: 6px 0; color: #888;">Browser</td>
-                <td style="padding: 6px 0; color: #111; font-size: 12px;">${userAgent.substring(0, 120)}</td>
+                <td style="padding: 6px 0; color: #111; font-size: 12px;">${escapeHtml(userAgent.substring(0, 120))}</td>
               </tr>
             </table>
             <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 16px 0;" />

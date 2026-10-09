@@ -116,7 +116,7 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
   'skills-dashboard': {
     title: 'Skill Tree',
     windowTitle: 'Skill Tree.app',
-    description: 'XP earned over the years',
+    description: 'What I build with, and how deep it goes',
   },
   'analytics': {
     title: 'Analytics',

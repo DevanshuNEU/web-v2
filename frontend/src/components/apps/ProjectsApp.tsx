@@ -47,7 +47,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
-import { projectMeta } from '@/data/projectMeta';
+import { projectMeta, featuredRank } from '@/data/projectMeta';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
 import IconTile from '@/components/mobile/ui/IconTile';
 import MobileSection from '@/components/mobile/ui/MobileSection';
@@ -627,12 +627,12 @@ function EmptyStage() {
 // ---------------------------------------------------------------------------
 
 function buildStaticRepos(): EnrichedRepo[] {
-  return Object.entries(projectMeta).map(([name, meta]) => ({
+  const repos = Object.entries(projectMeta).map(([name, meta]) => ({
     name,
     displayName: meta.displayName,
     tagline: meta.tagline,
     description: meta.descriptionOverride ?? meta.tagline,
-    htmlUrl: `https://github.com/DevanshuNEU/${name}`,
+    htmlUrl: `https://github.com/${meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU'}/${name}`,
     homepage: null,
     language: meta.extraTech?.[0] ?? null,
     stars: 0,
@@ -647,6 +647,7 @@ function buildStaticRepos(): EnrichedRepo[] {
     extraTech: meta.extraTech ?? [],
     org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
   }));
+  return repos.sort((a, b) => featuredRank(a.name) - featuredRank(b.name));
 }
 
 // ---------------------------------------------------------------------------

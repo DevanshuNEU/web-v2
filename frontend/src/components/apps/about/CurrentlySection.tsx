@@ -38,8 +38,8 @@ export function CurrentlySection() {
           The work I want next
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
-          Founding-engineer and AI-engineer roles at AI and dev-tools startups. Not
-          just sending resumes everywhere. I want teams where I can actually
+          AI Engineer and Forward Deployed Engineer roles. Not just sending resumes
+          everywhere. I want teams where I can actually
           contribute, where my input matters, where I can take charge of meaningful
           work and make an impact.
         </p>
@@ -53,7 +53,7 @@ export function CurrentlySection() {
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
           TA&apos;d Network Structures &amp; Cloud Computing (CSYE6225). Graded
-          assignments, held office hours, helped 60+ grad students debug their AWS
+          assignments, held office hours, helped 100+ grad students debug their AWS
           infrastructure at 11 PM, explained why their database queries were slow,
           reviewed code, answered endless questions.
         </p>
@@ -70,14 +70,16 @@ export function CurrentlySection() {
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
           Most of my energy goes into building at the MCP layer right now.{" "}
-          <span className="text-text">OpenCodeIntel</span> is a production MCP server
-          that gives coding agents real code intelligence through hybrid AST + BM25 +
-          Cohere retrieval.{" "}
+          <span className="text-text">OpenCodeIntel</span> is a code-search platform
+          for coding agents: a web app, a REST API and a 12-tool MCP server over
+          hybrid BM25 + vector retrieval with reranking.{" "}
+          <span className="text-text">Overhear</span> is a QA analyst for voice
+          agents, evaluated on a 39-call golden dataset.{" "}
           <span className="text-text">Saar</span> is a Chrome extension on the Web
-          Store that reads Claude.ai streams to catch context rot.
+          Store that meters Claude.ai tokens and cost in real time.
         </p>
         <p className="text-lg text-text-secondary leading-relaxed">
-          Both come from the same itch: making LLMs genuinely useful for the work
+          All three come from the same itch: making LLMs genuinely useful for the work
           developers actually do, not just demos.
         </p>
       </section>

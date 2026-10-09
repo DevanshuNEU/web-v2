@@ -314,11 +314,11 @@ function SkillCard({
         </div>
       </div>
 
-      {/* Level read-out: weighted dot meter + named tier + experience. */}
+      {/* Level read-out: weighted dot meter + named tier. */}
       <div className="flex items-center justify-between gap-3">
         <DotMeter level={skill.level} />
         <MetaLabel className="text-text-secondary shrink-0">
-          {LEVEL_LABEL[skill.level]} <span aria-hidden className="opacity-40 mx-1">/</span> {skill.xp}
+          {LEVEL_LABEL[skill.level]}
         </MetaLabel>
       </div>
 

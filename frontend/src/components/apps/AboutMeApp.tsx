@@ -135,8 +135,8 @@ function OverviewBody() {
   return (
     <div className="flex flex-col gap-8 max-w-[68ch]">
       <p className="text-lg text-text-secondary leading-relaxed">
-        I build AI dev tools at the MCP layer: production MCP servers, retrieval
-        that actually works, and tools people ship with.
+        I ship AI to production end to end: MCP servers, retrieval that actually
+        works, evals that catch real failures, and voice agents.
       </p>
 
       <dl className="flex flex-col">
@@ -460,8 +460,8 @@ function AboutMeMobile() {
         <motion.section {...sectionMotion} id={SECTION_DOM_ID("overview")} data-section-id="overview" className="about-snap flex flex-col gap-4">
           <MetaLabel as="p"><span>01</span><span aria-hidden className="mx-2 opacity-50">/</span>Overview</MetaLabel>
           <p className="text-base text-text-secondary leading-relaxed">
-            I build AI dev tools at the MCP layer: production MCP servers, retrieval
-            that actually works, and tools people ship with.
+            I ship AI to production end to end: MCP servers, retrieval that actually
+            works, evals that catch real failures, and voice agents.
           </p>
           <MobileSection>
             {specs.map(({ key, value }) => (

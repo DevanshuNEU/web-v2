@@ -31,8 +31,8 @@ export interface StartLink {
 
 /** The start-page grid: Devanshu's properties first, then the code. */
 export const START_LINKS: StartLink[] = [
-  { label: 'OpenCodeIntel', url: 'https://opencodeintel.com', note: 'Production MCP code-intelligence server' },
-  { label: 'Saar',          url: 'https://getsaar.com',       note: 'Context-rot coaching for Claude.ai' },
+  { label: 'OpenCodeIntel', url: 'https://opencodeintel.com', note: 'Code search for AI coding agents' },
+  { label: 'Saar',          url: 'https://getsaar.com',       note: 'Claude.ai token and cost meter' },
   { label: 'Portfolio',     url: 'https://devanshuchicholikar.com', note: 'This, on the open web' },
   { label: 'GitHub',        url: 'https://github.com/DevanshuNEU', note: 'The code' },
 ];

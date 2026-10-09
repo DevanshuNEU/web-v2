@@ -169,7 +169,7 @@ export function JourneySection() {
 
       <section className="flex flex-col gap-3">
         <h3 className="editorial-head text-text text-[clamp(1.5rem,4cqi,2rem)]">
-          Then came internships
+          Then came real jobs
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
           Turns out software engineering isn&apos;t just writing code. It&apos;s
@@ -179,9 +179,10 @@ export function JourneySection() {
           <span className="text-text">&quot;perfect&quot;</span> because shipping matters.
         </p>
         <p className="text-lg text-text-secondary leading-relaxed">
-          Working on real systems: optimizing APIs for actual users, building
-          infrastructure that needs to stay up, solving problems that impact real
-          people&apos;s work.
+          An internship at Pitney Bowes, then two years full-time at Jaksh
+          Enterprise building a Java / Spring Boot quotation platform: optimizing
+          APIs for actual customers, talking to the client directly, solving problems
+          that impact real people&apos;s work.
         </p>
         <p className="text-lg text-text leading-relaxed">
           That&apos;s what I&apos;m here for. That&apos;s what gets me excited.
@@ -194,8 +195,8 @@ export function JourneySection() {
           Being a TA
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
-          TA&apos;d Network Structures &amp; Cloud Computing and databases. It was
-          humbling. Try explaining why someone&apos;s AWS infrastructure isn&apos;t
+          TA&apos;d Network Structures &amp; Cloud Computing for 100+ grad students
+          across two semesters. It was humbling. Try explaining why someone&apos;s AWS infrastructure isn&apos;t
           working at 11 PM. Nothing tests whether you actually understand something
           like teaching it.
         </p>
@@ -218,13 +219,13 @@ export function JourneySection() {
           real work developers do.
         </p>
         <p className="text-lg text-text-secondary leading-relaxed">
-          <span className="text-text">OpenCodeIntel</span> is a production MCP server
-          that gives coding agents real code intelligence: hybrid retrieval over your
-          repo with AST structure, BM25 keywords, and Cohere reranking, so the agent
-          stops guessing about your codebase.{" "}
-          <span className="text-text">Saar</span> is a Chrome extension on the Web
-          Store that reads Claude.ai streams to catch context rot before it wrecks an
-          answer.
+          <span className="text-text">OpenCodeIntel</span> is a code-search platform
+          for coding agents (web app, API and MCP server): hybrid retrieval over your
+          repo with tree-sitter chunks, BM25 keywords, vectors and reranking, so the
+          agent stops guessing about your codebase.{" "}
+          <span className="text-text">Overhear</span> grades every call a voice agent
+          takes against the clinic&apos;s real database, with code deciding the facts
+          and an LLM judge scoring the rest.
         </p>
         <p className="text-lg text-text leading-relaxed">
           Same kid, same curiosity. Just pointed at the most interesting layer

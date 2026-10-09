@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     default: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
     template: '%s | Devanshu Chicholikar'
   },
-  description: 'AI engineer building dev tools at the MCP (Model Context Protocol) layer. Creator of OpenCodeIntel, a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval, and Saar. MS, Northeastern. Boston.',
+  description: 'AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
   keywords: [
     'Devanshu Chicholikar',
     'MCP',
@@ -61,7 +61,11 @@ export const metadata: Metadata = {
     'Saar',
     'LLM tooling',
     'AI agents',
-    'founding engineer',
+    'Forward Deployed Engineer',
+    'LLM-as-a-judge',
+    'LLM evals',
+    'voice agents',
+    'Overhear',
     'Boston AI Engineer',
     'Northeastern University'
   ],
@@ -72,7 +76,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://devanshuchicholikar.com',
     title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
-    description: 'AI engineer building dev tools at the MCP layer. Creator of OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval) and Saar.',
+    description: 'AI engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
     siteName: 'Devanshu Chicholikar Portfolio',
     images: [{
       url: '/devanshu-photo.png',
@@ -84,7 +88,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
-    description: 'AI engineer building dev tools at the MCP layer. Creator of OpenCodeIntel (MCP server with hybrid RAG retrieval) and Saar.',
+    description: 'AI engineer: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel and Overhear.',
     images: ['/devanshu-photo.png'],
   },
   robots: {
@@ -132,7 +136,7 @@ const jsonLd = {
         addressCountry: 'US',
       },
       description:
-        'AI engineer building dev tools at the MCP (Model Context Protocol) layer. Creator of OpenCodeIntel, a production MCP server with hybrid AST + BM25 + Cohere RAG retrieval, and Saar.',
+        'AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
       knowsAbout: [
         'Model Context Protocol (MCP)',
         'Retrieval-Augmented Generation (RAG)',
@@ -141,6 +145,8 @@ const jsonLd = {
         'Code intelligence',
         'Hybrid retrieval (AST, BM25, reranking)',
         'AI agents',
+        'LLM evaluation (LLM-as-a-judge, golden datasets)',
+        'Voice agents',
         'LLM tooling',
         'Semantic search',
         'TypeScript',
@@ -157,7 +163,7 @@ const jsonLd = {
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Any',
       description:
-        'A production MCP server that gives coding agents real code intelligence through hybrid retrieval over a repository: AST structure, BM25 keyword search, and Cohere reranking (RAG).',
+        'A code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server over hybrid BM25 + vector retrieval with reranking (RAG).',
       author: { '@id': PERSON_ID },
       keywords: 'MCP, Model Context Protocol, RAG, code intelligence, hybrid retrieval, AI agents',
     },
@@ -168,9 +174,19 @@ const jsonLd = {
       applicationCategory: 'BrowserApplication',
       operatingSystem: 'Chrome',
       description:
-        'A Chrome extension on the Web Store that intercepts Claude.ai streams to coach against context rot.',
+        'A Chrome extension on the Chrome Web Store that tracks Claude.ai token usage and cost in real time, entirely in the browser.',
       author: { '@id': PERSON_ID },
-      keywords: 'Claude.ai, context engineering, LLM tooling, AI dev tools',
+      keywords: 'Claude.ai, token usage, LLM cost, Chrome extension, AI dev tools',
+    },
+    {
+      '@type': 'SoftwareSourceCode',
+      name: 'Overhear',
+      codeRepository: 'https://github.com/DevanshuNEU/overhear',
+      programmingLanguage: 'TypeScript',
+      description:
+        'A QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic database, with code deciding the facts and an LLM-as-a-judge scoring tone and safety, evaluated on a 39-call golden dataset.',
+      author: { '@id': PERSON_ID },
+      keywords: 'voice agents, LLM-as-a-judge, LLM evals, golden dataset, Retell',
     },
   ],
 };
@@ -201,30 +217,37 @@ export default function RootLayout({
 
         {/* Server-rendered semantic content for crawlers and AI search. The
             visible app is a client-rendered SPA, so this block is the indexable
-            source of truth — keep it accurate and on-message. */}
+            source of truth, so keep it accurate and on-message. */}
         <div className="sr-only">
-          <h1>Devanshu Chicholikar — AI Engineer (MCP &amp; RAG dev tools)</h1>
+          <h1>Devanshu Chicholikar, AI Engineer (MCP servers, RAG, evals, voice agents)</h1>
           <p>
-            I build AI dev tools at the MCP (Model Context Protocol) layer. I created
-            OpenCodeIntel, a production MCP server that gives coding agents real code
-            intelligence through hybrid retrieval (RAG) over a repository: AST structure,
-            BM25 keyword search, and Cohere reranking. I also built Saar, a Chrome
-            extension on the Web Store that intercepts Claude.ai streams to coach against
-            context rot. MS in Software Engineering Systems from Northeastern University
-            (May 2026). Based in Boston, MA. Open to founding-engineer and AI-engineer
-            roles at AI and dev-tools startups.
+            I am an AI engineer in Boston. I ship AI systems to production end to end:
+            MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and
+            voice agents, plus the full-stack, infra and design work around them. MS in
+            Software Engineering Systems from Northeastern University (May 2026). Open
+            to AI Engineer and Forward Deployed Engineer roles anywhere in the US.
           </p>
           <h2>Projects</h2>
           <ul>
-            <li>OpenCodeIntel — production MCP server with hybrid AST + BM25 + Cohere RAG retrieval for code intelligence</li>
-            <li>Saar — Chrome extension that intercepts Claude.ai streams for context-rot coaching</li>
-            <li>devOS — this interactive desktop-style portfolio, built with Next.js 15 and React 19</li>
+            <li>OpenCodeIntel: a code-search platform for AI coding agents (web app, REST API and a 12-tool MCP server). Hybrid BM25 + vector retrieval with reranking; 94% Hit@1 on a 665-query research eval across 14 open-source codebases; p50 641ms for a cold production search, 242ms cached.</li>
+            <li>Overhear: a QA analyst for voice agents. Code checks every call against the clinic database and an LLM-as-a-judge scores tone and safety; 23 of 23 planted failures caught on a 39-call golden dataset, macro-F1 0.89.</li>
+            <li>CallBudget: predicts which pharmacy has a hard-to-find drug and calls the likeliest first through a voice agent; expected calls fell from 4.3 to 2.3 and false &quot;in stock&quot; answers from 10% to 0%. Ships as a FastMCP server.</li>
+            <li>Saar: a Chrome extension on the Chrome Web Store that tracks Claude.ai token usage and cost in real time, entirely in the browser.</li>
+            <li>saar CLI: a Python CLI on PyPI that writes AGENTS.md, CLAUDE.md and .cursorrules from static analysis of a codebase.</li>
+            <li>Portfolio OS: this interactive desktop-style portfolio, built with Next.js 15 and React 19.</li>
+            <li>Financial Copilot: an AI expense tracker on React and Supabase Edge Functions.</li>
+          </ul>
+          <h2>Experience</h2>
+          <ul>
+            <li>Graduate Teaching Assistant, CSYE 6225 Network Structures and Cloud Computing, Northeastern University, Sep 2025 to May 2026: cloud on AWS for 100+ graduate students across two semesters.</li>
+            <li>Software Engineer, Jaksh Enterprise, Aug 2022 to Jul 2024 (full-time): Java / Spring Boot quotation engine for 590+ products; quote-page p95 latency cut 65%.</li>
+            <li>Software Development Engineer Intern, Pitney Bowes, Jan 2022 to Jul 2022: REST APIs and Angular workflows for PitneyShipPro.</li>
           </ul>
           <h2>Expertise</h2>
           <p>
-            Model Context Protocol (MCP), Retrieval-Augmented Generation (RAG), AI agents,
-            LLM tooling, hybrid retrieval, semantic search, code intelligence, TypeScript,
-            Python, Node.js, AWS.
+            Model Context Protocol (MCP), Retrieval-Augmented Generation (RAG), LLM
+            evaluation (LLM-as-a-judge, golden datasets), voice agents, AI agents, hybrid
+            retrieval, TypeScript, Python, React, Next.js, FastAPI, AWS, Terraform.
           </p>
           <h2>Contact</h2>
           <p>Email: chicholikar.d@northeastern.edu</p>

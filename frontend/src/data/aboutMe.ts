@@ -28,7 +28,7 @@ export const identity = {
   name:         personalInfo.name,
   title:        personalInfo.title,
   location:     personalInfo.location,
-  availability: 'Open to founding-engineer + AI-engineer roles',
+  availability: 'Open to AI Engineer and Forward Deployed Engineer roles',
   photo:        '/devanshu-photo.png',
 } as const;
 
@@ -39,9 +39,9 @@ export const identity = {
 
 export const mastheadSpecLine = [
   'AI ENGINEER',
-  'MCP-LAYER DEV TOOLS',
+  'MCP · RAG · EVALS',
   'BOSTON',
-  'OCI / SAAR / CALLBUDGET',
+  'OCI / OVERHEAR / SAAR',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -56,11 +56,11 @@ export interface SpecItem {
 }
 
 export const specs: SpecItem[] = [
-  { key: 'Discipline',  value: 'AI engineering · dev tools' },
-  { key: 'Layer',       value: 'MCP / agent workflow' },
+  { key: 'Discipline',  value: 'AI engineering · forward deployed' },
+  { key: 'Layer',       value: 'MCP · RAG · evals · voice agents' },
   { key: 'Stack',       value: 'TypeScript · Python · Go · AWS' },
-  { key: 'Retrieval',   value: 'Hybrid AST + BM25 + Cohere rerank' },
-  { key: 'Shipping',    value: 'OpenCodeIntel · Saar · CallBudget' },
+  { key: 'Retrieval',   value: 'BM25 + vectors, RRF fusion, rerank' },
+  { key: 'Shipping',    value: 'OpenCodeIntel · Overhear · CallBudget · Saar' },
   { key: 'Based in',    value: 'Boston, MA' },
 ];
 
@@ -69,8 +69,8 @@ export const specs: SpecItem[] = [
 // ---------------------------------------------------------------------------
 
 export const quickIntro = [
-  "Hey! I build AI dev tools at the MCP layer. OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere retrieval) and Saar (a Chrome extension on the Web Store that intercepts Claude.ai SSE streams for context-rot coaching). MS Software Engineering Systems from Northeastern, finished May 2026.",
-  "Before the MCP stuff I TA'd Network Structures & Cloud Computing for 60+ grad students. I genuinely love solving complex problems, whether it's optimizing APIs, architecting fault-tolerant infrastructure, or building tools that people actually use. The challenge of making complex things work simply? That's what gets me excited.",
+  "Hey! I ship AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents, plus the full-stack, infra and design work around them. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server), and Overhear grades every call a voice agent takes against a clinic's real database. MS Software Engineering Systems from Northeastern, finished May 2026.",
+  "Before that I spent two years full-time building a Java / Spring Boot quotation platform, and TA'd Network Structures & Cloud Computing for 100+ grad students across two semesters. I genuinely love solving complex problems, whether it's optimizing APIs, architecting fault-tolerant infrastructure, or building tools that people actually use. The challenge of making complex things work simply? That's what gets me excited.",
 ] as const;
 
 export interface OriginCard {

@@ -30,12 +30,6 @@ describe('SKILLS array', () => {
     }
   });
 
-  it('every skill has a non-empty xp string', () => {
-    for (const skill of SKILLS) {
-      expect(skill.xp.trim(), `skill ${skill.name} has empty xp`).not.toBe('');
-    }
-  });
-
   it('all skill ids are unique', () => {
     const ids = SKILLS.map(s => s.id);
     const unique = new Set(ids);

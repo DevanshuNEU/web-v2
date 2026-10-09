@@ -176,8 +176,9 @@ export const useOSStore = create<OSStore>()(
       version: 1,
       // Discard pre-v1 layouts cleanly (no noisy migrate warning, no restore).
       migrate: () => ({ windows: [], activeWindowId: null, nextZIndex: 1000, windowCounter: 1 }),
-      // Boot state is intentionally NOT persisted: the boot sequence always
-      // replays. Only the window layout is restored.
+      // Boot state is intentionally NOT persisted here: page.tsx skips the
+      // boot on a same-tab refresh via lib/bootSession. Only the window
+      // layout is restored.
       partialize: (state) => ({
         windows: state.windows,
         activeWindowId: state.activeWindowId,

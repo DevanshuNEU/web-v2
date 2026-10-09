@@ -359,19 +359,73 @@ function DownloadControl() {
 }
 
 // ---------------------------------------------------------------------------
-// PDF surface - reskinned chrome around the unchanged iframe embed.
+// PDF surface - iframe embed with iOS fallback.
+// iOS Safari and Chrome on iOS cannot render PDFs in iframes (blank white
+// frame). Detect on mount and swap to a download/open link instead.
 // ---------------------------------------------------------------------------
 
+function usePdfEmbedSupported(): boolean {
+  const [supported, setSupported] = useState(true);
+  useEffect(() => {
+    // All browsers on iOS (iPhone/iPad) use WebKit and cannot embed PDFs.
+    // iPad Pro in desktop mode reports MacIntel but has maxTouchPoints > 1.
+    const ua = navigator.userAgent;
+    const isIOS =
+      /iPhone|iPad|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) setSupported(false);
+  }, []);
+  return supported;
+}
+
 function PdfSurface() {
+  const canEmbed = usePdfEmbedSupported();
+
+  if (!canEmbed) {
+    return (
+      <motion.div
+        key="pdf-fallback"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } }}
+        exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] as const } }}
+        className="flex flex-1 flex-col items-center justify-center gap-6 bg-bg px-8"
+      >
+        <p className="max-w-[36ch] text-center text-sm leading-relaxed text-text-secondary">
+          PDF preview is not supported on this device.
+        </p>
+        <a
+          href={PDF_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex origin-center items-center gap-2 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
+        >
+          <MetaLabel className="text-text transition-opacity [@media(hover:hover)and(pointer:fine)]:group-hover:opacity-70">
+            Open PDF
+          </MetaLabel>
+          <span
+            aria-hidden
+            className="block h-px w-4 origin-left scale-x-100 bg-text/60 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
+          />
+        </a>
+        <a
+          href={PDF_HREF}
+          download={PDF_DOWNLOAD}
+          className="group inline-flex origin-center items-center"
+        >
+          <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
+            Download PDF
+          </MetaLabel>
+        </a>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       key="pdf"
       initial={{ opacity: 0 }}
-      animate={{
-        opacity: 1,
-        transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
-      }}
-      exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
+      animate={{ opacity: 1, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } }}
+      exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] as const } }}
       className="flex-1 overflow-hidden bg-bg"
     >
       <iframe

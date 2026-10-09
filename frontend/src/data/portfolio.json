@@ -1,14 +1,14 @@
 {
   "personalInfo": {
     "name": "Devanshu Chicholikar",
-    "title": "AI Engineer · MCP-layer dev tools",
+    "title": "AI Engineer · MCP, RAG, evals, voice agents",
     "location": "Boston, MA",
     "email": "chicholikar.d@northeastern.edu",
     "phone": "(857) 339-8803",
     "linkedin": "https://www.linkedin.com/in/devanshuchicholikar/",
-    "github": "https://github.com/devanshuNEU",
-    "portfolio": "https://devanshu.dev",
-    "status": "Open to founding-engineer + AI-engineer roles at AI and dev-tools startups",
+    "github": "https://github.com/DevanshuNEU",
+    "portfolio": "https://www.devanshuchicholikar.com",
+    "status": "Open to AI Engineer and Forward Deployed Engineer roles",
     "graduation": "May 2026",
     "degree": "MS in Software Engineering Systems",
     "university": "Northeastern University"
@@ -16,7 +16,7 @@
   
   "bio": {
     "greeting": "Hey there!",
-    "intro": "I'm a software engineer building AI dev tools at the MCP layer. OpenCodeIntel (a production MCP server with hybrid AST + BM25 + Cohere retrieval) and Saar (a Chrome extension on the Web Store that intercepts Claude.ai SSE streams for context-rot coaching). Recently finished my MS at Northeastern.",
+    "intro": "I'm an AI engineer who ships AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server); Overhear grades voice-agent calls against a clinic's real database. Recently finished my MS at Northeastern.",
     "passion": "I get genuinely excited about solving complex problems with clean, efficient code. Whether it's optimizing API performance, automating deployments, or building user-friendly interfaces, I'm all about creating technology that just works.",
     "personal": "When I'm not coding, you'll probably find me exploring Boston, learning new tech, or working on side projects (like this interactive portfolio you're experiencing right now!)."
   },
@@ -26,19 +26,13 @@
       "metric": "65%",
       "description": "API latency reduction through optimization",
       "color": "orange",
-      "impact": "Improved user experience across thousands of daily users"
+      "impact": "Quote pages at Jaksh Enterprise, p95 800ms to 280ms"
     },
     {
       "metric": "99.9%",
       "description": "Uptime with fault-tolerant AWS design", 
       "color": "blue",
       "impact": "Enterprise-grade reliability and availability"
-    },
-    {
-      "metric": "35%",
-      "description": "User engagement increase",
-      "color": "green", 
-      "impact": "Enhanced platform usability and retention"
     }
   ],
 
@@ -52,7 +46,6 @@
           {
             "name": "React/Next.js",
             "level": 90,
-            "experience": "4+ years",
             "status": "expert",
             "projects": ["Financial Copilot", "Portfolio OS"],
             "isCurrentlyUsing": true
@@ -60,15 +53,13 @@
           {
             "name": "TypeScript",
             "level": 85,
-            "experience": "3+ years", 
             "status": "advanced",
-            "projects": ["Financial Copilot", "SecureScale"],
+            "projects": ["Financial Copilot", "Overhear", "Saar"],
             "isCurrentlyUsing": true
           },
           {
             "name": "Tailwind CSS",
             "level": 80,
-            "experience": "2+ years",
             "status": "advanced",
             "projects": ["Portfolio OS"],
             "isCurrentlyUsing": true
@@ -83,31 +74,27 @@
           {
             "name": "Node.js/Express",
             "level": 85,
-            "experience": "3+ years",
             "status": "advanced", 
-            "projects": ["MERN Platform"],
+            "projects": ["Portfolio OS"],
             "isCurrentlyUsing": true
           },
           {
-            "name": "Python/Flask",
+            "name": "Python/FastAPI",
             "level": 75,
-            "experience": "2+ years",
             "status": "intermediate",
-            "projects": ["Financial Copilot"],
+            "projects": ["OpenCodeIntel", "CallBudget"],
             "isCurrentlyUsing": true
           },
           {
             "name": "Go",
             "level": 30,
-            "experience": "6 months",
             "status": "learning",
-            "projects": ["Portfolio OS Backend"],
+            "projects": [],
             "isCurrentlyLearning": true
           },
           {
             "name": "REST/gRPC APIs",
             "level": 80,
-            "experience": "3+ years",
             "status": "advanced",
             "projects": ["PitneyShipPro", "Financial Copilot"],
             "isCurrentlyUsing": true
@@ -122,7 +109,6 @@
           {
             "name": "AWS",
             "level": 75,
-            "experience": "2+ years",
             "status": "intermediate-advanced",
             "projects": ["SecureScale"],
             "services": ["EC2", "S3", "RDS", "Lambda", "VPC", "IAM", "CloudWatch"],
@@ -131,7 +117,6 @@
           {
             "name": "Terraform",
             "level": 70,
-            "experience": "1+ years",
             "status": "intermediate",
             "projects": ["SecureScale"],
             "isCurrentlyUsing": true
@@ -139,18 +124,16 @@
           {
             "name": "Docker/Kubernetes",
             "level": 65,
-            "experience": "2+ years", 
             "status": "intermediate",
-            "projects": ["Financial Copilot", "SecureScale"],
+            "projects": ["SecureScale"],
             "isCurrentlyUsing": true
           },
           {
             "name": "CI/CD",
             "level": 80,
-            "experience": "2+ years",
             "status": "advanced",
             "projects": ["SecureScale", "Financial Copilot"],
-            "tools": ["GitHub Actions", "Jenkins"],
+            "tools": ["GitHub Actions"],
             "isCurrentlyUsing": true
           }
         ]
@@ -163,7 +146,6 @@
           {
             "name": "PostgreSQL",
             "level": 75,
-            "experience": "3+ years",
             "status": "advanced",
             "projects": ["Financial Copilot", "SecureScale"],
             "isCurrentlyUsing": true
@@ -171,17 +153,15 @@
           {
             "name": "MongoDB",
             "level": 70,
-            "experience": "2+ years",
             "status": "intermediate",
-            "projects": ["MERN Platform"],
+            "projects": [],
             "isCurrentlyUsing": false
           },
           {
             "name": "Redis",
             "level": 60,
-            "experience": "1+ years",
             "status": "intermediate",
-            "projects": ["Performance Optimization"],
+            "projects": ["OpenCodeIntel"],
             "isCurrentlyUsing": true
           }
         ]
@@ -220,7 +200,7 @@
       },
       {
         "category": "Monitoring",
-        "items": ["Prometheus", "Grafana", "CloudWatch", "EFK Stack"]
+        "items": ["CloudWatch", "Sentry"]
       }
     ]
   }

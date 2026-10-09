@@ -86,16 +86,16 @@ export const RESUME: ResumeData = {
   },
 
   summary:
-    'AI engineer building MCP and agent infrastructure: production MCP servers, hybrid AST plus embedding retrieval, and rigorous LLM evaluation. OpenCodeIntel is a production MCP server hitting 94% average Hit@1 across 14 codebases; CallBudget is an agentic pharmacy-stock system with a calibrated-abstention voice guardrail; tool-crowding is a pre-registered MCP tool-selection benchmark. Earlier work spans Java / Spring Boot and AWS platform engineering, plus teaching cloud computing to 60+ graduate students.',
+    'AI engineer who ships AI to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents, plus the full-stack, infra and design work around them. OpenCodeIntel is a code-search platform for AI coding agents (web app, REST API, 12-tool MCP server) at 94% Hit@1 on a 14-codebase research eval; Overhear grades voice-agent calls with code checks plus an LLM judge on a 39-call golden dataset; CallBudget cuts expected pharmacy calls 47% with a voice agent that abstains instead of guessing. Earlier: two years full-time on a Java / Spring Boot quotation platform, and teaching cloud computing on AWS to 100+ graduate students.',
 
   experience: [
     {
       company:  'Northeastern University',
-      role:     'Graduate Teaching Assistant, Cloud Computing & Networks',
+      role:     'Graduate Teaching Assistant, CSYE 6225 Network Structures and Cloud Computing',
       period:   'Sep 2025 - May 2026',
       location: 'Boston, MA',
       bullets: [
-        'Taught AWS, Terraform, and distributed systems to 60+ graduate students; authored a Docker + GitHub Actions CI/CD lab adopted as official course content across 3 sections (180+ students)',
+        'Taught AWS, Terraform, and distributed systems to 100+ graduate students across two semesters; authored a Docker + GitHub Actions CI/CD lab adopted as official course content across 3 sections (180+ students)',
         'Led system-design and code reviews for 15 cloud-native API project teams, coaching on scalability, fault tolerance, and API design',
       ],
     },
@@ -105,9 +105,9 @@ export const RESUME: ResumeData = {
       period:   'Aug 2022 - Jul 2024',
       location: 'Ahmedabad, India',
       bullets: [
-        'Developed a Java / Spring Boot product-catalog and quotation engine for 590+ customizable products serving a 10K+ customer base, over PostgreSQL and a rules-based pricing module',
+        'Developed a Java / Spring Boot product-catalog and quotation engine for 590+ customizable products serving a 10K+ B2B customer base, over PostgreSQL and a rules-based pricing module',
         'Cut quote-page p95 latency 65% (800ms to 280ms) via PostgreSQL indexing, Redis caching, and async processing',
-        'Owned delivery end-to-end as one of two contract engineers: gathered client requirements and shipped via Dockerized CI/CD, cutting release cycles from 2 weeks to 3 days',
+        'Owned delivery end-to-end as one of two engineers: gathered client requirements, scoped functional specs, and shipped via Dockerized CI/CD on GitHub Actions, cutting release cycles from 2 weeks to 3 days',
       ],
     },
     {
@@ -145,7 +145,7 @@ export const RESUME: ResumeData = {
     },
     {
       category: 'AI & Agents / Eval',
-      items: ['Agent tool-calling', 'RAG (hybrid AST + embeddings, BM25 + reranking)', 'LLM evaluation (calibrated abstention, self-consistency, guardrails, LLM-as-judge)', 'Voice agents (Pipecat, Deepgram)', 'tree-sitter', 'Context engineering'],
+      items: ['Agent tool-calling', 'RAG (hybrid AST + embeddings, BM25 + reranking)', 'LLM evaluation (LLM-as-a-judge, golden datasets, calibrated abstention, self-consistency, guardrails)', 'Voice agents (Pipecat, Deepgram)', 'tree-sitter', 'Context engineering'],
     },
     {
       category: 'Languages',
@@ -172,24 +172,31 @@ export const RESUME: ResumeData = {
   projects: [
     {
       name:   'OpenCodeIntel',
-      tech:   'Python · FastAPI · MCP · tree-sitter · Pinecone · Redis · React · TypeScript',
-      period: 'Sep 2024 - Present',
-      desc:   'Production MCP server (12 tools: semantic code search, dependency graph, impact analysis, context assembly) enabling AI agents (Claude, Cursor) to retrieve codebase context at p95 208ms via a hybrid AST + embedding RAG pipeline. Benchmarked to 94% average Hit@1 across 14 OSS codebases (700-query eval), +8.4 points from cross-encoder reranking isolated via a 98-run ablation.',
+      tech:   'Python · FastAPI · FastMCP · tree-sitter · Pinecone · Redis · React · TypeScript',
+      period: 'Nov 2025 - Present',
+      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from cross-encoder reranking isolated via a 98-run ablation. Production search: p50 641ms cold, 242ms cached.',
       link:   'opencodeintel.com',
+    },
+    {
+      name:   'Overhear',
+      tech:   'TypeScript · Next.js · Retell · Claude API · Postgres · Drizzle · Vitest',
+      period: 'Sep 2026',
+      desc:   'AI QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic database on a 7-dimension rubric. 3 dimensions (50% of the score) are decided in code by replaying the agent tool calls; an LLM-as-a-judge scores the rest. Caught 23 of 23 planted failures on a 39-call golden dataset, macro-F1 0.89, 0.99 self-consistency across 3 runs.',
+      link:   'github.com/DevanshuNEU/overhear',
     },
     {
       name:   'CallBudget',
       tech:   'Python · FastMCP · scikit-learn · Optuna · Pipecat · Deepgram · DuckDB',
       period: '2026',
-      desc:   'Agentic system deployed end-to-end against a real pharmacy-stock workflow: a FastMCP server (predict / plan / eval) over a learned stock-probability ranker, cutting expected calls-to-find from 4.3 to 2.3 (about 47%) on a 19-pharmacy simulation. A Claude-driven voice agent with guardrails (calibrated abstention + self-consistency) cut false-positive in-stock from about 10% to near 0%.',
+      desc:   'Agentic pharmacy-stock search: a FastMCP server (predict / plan / eval / converse) over a learned stock-probability ranker cuts expected calls-to-find from 4.3 to 2.3 (47%) on a 19-pharmacy simulation. A Claude-driven voice agent, tested against a simulated pharmacist, abstains through self-consistency voting, driving false "in stock" answers from 10% to 0%.',
       link:   'github.com/DevanshuNEU/callbudget',
     },
     {
-      name:   'tool-crowding',
-      tech:   'Python · MCP · Anthropic API · pytest',
-      period: '2026',
-      desc:   'Pre-registered, fail-closed MCP eval harness (345 tests, 199-tool corpus, 144-trial factorial) measuring agent tool-selection under crowding, with cache-cold enforcement (per-trial nonce + hard-halt assertion) for byte-level reproducibility. Falsified the naive more-tools-degrade-routing hypothesis, isolating the failure to a task-ambiguity by agent-persona interaction.',
-      link:   'github.com/DevanshuNEU/tool-crowding',
+      name:   'Saar',
+      tech:   'TypeScript · WXT · Chrome MV3 · React · Vitest · Playwright',
+      period: 'Mar 2026 - Present',
+      desc:   'Chrome MV3 extension on the Chrome Web Store that tracks Claude.ai token usage and cost in real time, entirely client-side: a page-context interceptor decodes Anthropic SSE streams, a Shadow-DOM overlay renders usage, and a service worker runs a BPE tokenizer. 1,808 Vitest tests across 63 files.',
+      link:   'getsaar.com',
     },
     {
       name:   'SecureScale',

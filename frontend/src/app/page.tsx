@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
 import Desktop from '@/components/os/Desktop';
 import WindowManager from '@/components/os/WindowManager';
@@ -13,6 +13,7 @@ import PhoneShell from '@/components/mobile/PhoneShell';
 import Spotlight from '@/components/os/Spotlight';
 import AppSwitcher from '@/components/os/AppSwitcher';
 import AssistantBubble from '@/components/assistant/AssistantBubble';
+import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -43,13 +44,24 @@ export default function Home() {
     check();
     window.addEventListener('resize', check);
 
+    // A refresh in the same tab skips the boot; only a new visit replays it.
+    if (hasBootedThisSession()) setBooted();
+
     setMounted(true);
 
     return () => window.removeEventListener('resize', check);
   }, [setBooted]);
 
+  // Re-check on a mobile-to-desktop switch: unlocking the phone shell marks
+  // the session, and the desktop should not replay the boot after that.
+  // Layout effect so BootSequence never paints for a frame.
+  useLayoutEffect(() => {
+    if (!isMobile && !isBooted && hasBootedThisSession()) setBooted();
+  }, [isMobile, isBooted, setBooted]);
+
   useEffect(() => {
     if (!isBooted) return;
+    markBootedThisSession();
 
     // Auto-open About Me on the very first visit ever.
     // A short delay lets the desktop finish mounting so the window entrance

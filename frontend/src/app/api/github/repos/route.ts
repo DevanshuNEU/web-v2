@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserRepos, getOrgRepos } from '@/lib/github';
-import { projectMeta } from '@/data/projectMeta';
+import { projectMeta, featuredRank } from '@/data/projectMeta';
 
 export const revalidate = 3600; // 1 hour
 
@@ -95,6 +95,9 @@ export async function GET() {
         });
       }
     }
+
+    // Featured projects lead, in the order projectMeta defines.
+    unique.sort((a, b) => featuredRank(a.name) - featuredRank(b.name));
 
     return NextResponse.json(unique, {
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' },
