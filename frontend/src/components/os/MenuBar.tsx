@@ -18,7 +18,7 @@ const DEV_STATUSES = [
   'coffee → code → repeat',
   'forward deployed, always',
   'RAG pipeline. not a salad.',
-  'open to AI Engineer + FDE roles',
+  'open to SWE, AI and FDE roles',
   'git push --force-with-feelings',
   'null pointer? never heard of her.',
   'localhost:3000 is home',

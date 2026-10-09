@@ -38,7 +38,7 @@ export function CurrentlySection() {
           The work I want next
         </h3>
         <p className="text-lg text-text-secondary leading-relaxed">
-          AI Engineer and Forward Deployed Engineer roles. I want to sit close to the
+          Software Engineer, AI Engineer and Forward Deployed Engineer roles. I want to sit close to the
           people using the thing, write the code, and measure whether it worked.
         </p>
         <p className="font-mono-meta">What I&apos;m looking for</p>

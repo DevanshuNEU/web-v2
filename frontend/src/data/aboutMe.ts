@@ -28,7 +28,7 @@ export const identity = {
   name:         personalInfo.name,
   title:        personalInfo.title,
   location:     personalInfo.location,
-  availability: 'Open to AI Engineer and Forward Deployed Engineer roles',
+  availability: 'Open to Software Engineer, AI Engineer and Forward Deployed Engineer roles',
   photo:        '/devanshu-photo.png',
 } as const;
 
@@ -38,7 +38,7 @@ export const identity = {
 // ---------------------------------------------------------------------------
 
 export const mastheadSpecLine = [
-  'AI ENGINEER',
+  'SOFTWARE + AI ENGINEER',
   'MCP · RAG · EVALS',
   'BOSTON',
   'OCI / OVERHEAR / SAAR',

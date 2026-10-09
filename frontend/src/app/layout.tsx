@@ -42,17 +42,20 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   metadataBase: new URL('https://devanshuchicholikar.com'),
   title: {
-    default: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
+    default: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
     template: '%s | Devanshu Chicholikar'
   },
-  description: 'AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
+  description: 'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
   keywords: [
     'Devanshu Chicholikar',
     'MCP',
     'Model Context Protocol',
     'RAG',
     'Retrieval-Augmented Generation',
+    'Software Engineer',
     'AI Engineer',
+    'Full-Stack Engineer',
+    'Backend Engineer',
     'AI dev tools',
     'MCP server',
     'code intelligence',
@@ -66,6 +69,7 @@ export const metadata: Metadata = {
     'LLM evals',
     'voice agents',
     'Overhear',
+    'Boston Software Engineer',
     'Boston AI Engineer',
     'Northeastern University'
   ],
@@ -75,8 +79,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: 'https://devanshuchicholikar.com',
-    title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
-    description: 'AI engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
+    title: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
+    description: 'Software and AI engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
     siteName: 'Devanshu Chicholikar Portfolio',
     images: [{
       url: '/devanshu-photo.png',
@@ -87,8 +91,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Devanshu Chicholikar | AI Engineer, MCP & RAG Dev Tools',
-    description: 'AI engineer: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel and Overhear.',
+    title: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
+    description: 'Software and AI engineer: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel and Overhear.',
     images: ['/devanshu-photo.png'],
   },
   robots: {
@@ -115,7 +119,7 @@ const jsonLd = {
       '@type': 'Person',
       '@id': PERSON_ID,
       name: 'Devanshu Chicholikar',
-      jobTitle: 'AI Engineer',
+      jobTitle: ['Software Engineer', 'AI Engineer', 'Forward Deployed Engineer'],
       url: 'https://devanshuchicholikar.com',
       image: 'https://devanshuchicholikar.com/devanshu-photo.png',
       sameAs: [
@@ -136,7 +140,7 @@ const jsonLd = {
         addressCountry: 'US',
       },
       description:
-        'AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
+        'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
       knowsAbout: [
         'Model Context Protocol (MCP)',
         'Retrieval-Augmented Generation (RAG)',
@@ -219,13 +223,14 @@ export default function RootLayout({
             visible app is a client-rendered SPA, so this block is the indexable
             source of truth, so keep it accurate and on-message. */}
         <div className="sr-only">
-          <h1>Devanshu Chicholikar, AI Engineer (MCP servers, RAG, evals, voice agents)</h1>
+          <h1>Devanshu Chicholikar, Software Engineer and AI Engineer (MCP servers, RAG, evals, voice agents)</h1>
           <p>
-            I am an AI engineer in Boston. I ship AI systems to production end to end:
+            I am a software engineer and AI engineer in Boston. I ship AI systems to production end to end:
             MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and
             voice agents, plus the full-stack, infra and design work around them. MS in
             Software Engineering Systems from Northeastern University (May 2026). Open
-            to AI Engineer and Forward Deployed Engineer roles anywhere in the US.
+            to Software Engineer, AI Engineer and Forward Deployed Engineer roles
+            anywhere in the US.
           </p>
           <h2>Projects</h2>
           <ul>
