@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { useOSStore } from '@/store/osStore';
 import Desktop from '@/components/os/Desktop';
 import WindowManager from '@/components/os/WindowManager';
@@ -51,6 +51,13 @@ export default function Home() {
 
     return () => window.removeEventListener('resize', check);
   }, [setBooted]);
+
+  // Re-check on a mobile-to-desktop switch: unlocking the phone shell marks
+  // the session, and the desktop should not replay the boot after that.
+  // Layout effect so BootSequence never paints for a frame.
+  useLayoutEffect(() => {
+    if (!isMobile && !isBooted && hasBootedThisSession()) setBooted();
+  }, [isMobile, isBooted, setBooted]);
 
   useEffect(() => {
     if (!isBooted) return;

@@ -262,7 +262,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Live', label: 'At campus-resources.vercel.app', detail: 'Deployed and accessible' },
       { metric: 'Searchable', label: 'Resource directory', detail: 'Fast filtering and discovery' },
     ],
-    extraTech: ['TypeScript', 'Next.js', 'Vercel'],
+    extraTech: ['React', 'TypeScript', 'Tailwind CSS', 'Vite', 'Vercel'],
   },
 };
 
