@@ -86,8 +86,8 @@ describe('FileExplorerApp folder rail', () => {
 
     const all = rows.find((r) => /^All/i.test(r.textContent ?? ''));
     expect(all).toBeDefined();
-    // 12 projects total -> "12" padded.
-    expect(all!.textContent).toMatch(/12/);
+    // 11 projects total -> "11" padded.
+    expect(all!.textContent).toMatch(/11/);
   });
 
   it('filters the file list when a folder is selected', async () => {
@@ -96,16 +96,16 @@ describe('FileExplorerApp folder rail', () => {
     render(<FileExplorerApp />);
 
     const before = screen.getAllByTestId('finder-file-row').length;
-    expect(before).toBe(12);
+    expect(before).toBe(11);
 
-    const systems = screen
+    const research = screen
       .getAllByTestId('finder-folder-row')
-      .find((r) => /Systems/i.test(r.textContent ?? ''))!;
-    await user.click(systems);
+      .find((r) => /Research/i.test(r.textContent ?? ''))!;
+    await user.click(research);
 
     const after = screen.getAllByTestId('finder-file-row');
     expect(after.length).toBe(1);
-    expect(after[0].textContent).toMatch(/Distributed KV Store/i);
+    expect(after[0].textContent).toMatch(/Tool Crowding/i);
   });
 });
 
@@ -200,7 +200,7 @@ describe('FileExplorerApp resilience + persona', () => {
     render(<FileExplorerApp />);
 
     await waitFor(() =>
-      expect(screen.getAllByTestId('finder-file-row').length).toBe(12),
+      expect(screen.getAllByTestId('finder-file-row').length).toBe(11),
     );
     // No stars cell appears, but the status label still does (local data).
     expect(screen.getAllByText('ACTIVE').length).toBeGreaterThan(0);
@@ -219,7 +219,7 @@ describe('FileExplorerApp mobile variant', () => {
     render(<FileExplorerApp variant="mobile" />);
 
     expect(screen.getByTestId('push-view-container')).toBeInTheDocument();
-    expect(screen.getAllByTestId('finder-file-row').length).toBe(12);
+    expect(screen.getAllByTestId('finder-file-row').length).toBe(11);
   });
 
   it('pushes an editorial detail view when a file row is tapped', async () => {
