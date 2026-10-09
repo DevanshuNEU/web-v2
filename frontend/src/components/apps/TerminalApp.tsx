@@ -17,6 +17,7 @@ import {
   TERMINAL_SUGGESTIONS,
 } from '@/lib/terminalCommands';
 import { renderLine } from '@/lib/linkifyTerminal';
+import MatrixFullscreen from '@/components/effects/MatrixFullscreen';
 import type { AppType } from '../../../../shared/types';
 
 // ---------------------------------------------------------------------------
@@ -43,53 +44,20 @@ const BOX_GLYPHS = /[║│╔╚╗╝└┌┐┘─┤├]/;
 // ---------------------------------------------------------------------------
 
 function MatrixRain({ onDone }: { onDone: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const mono = useIsMono();
+  // Starts full screen; once the visitor exits it collapses to one line in the
+  // scrollback, so re-renders of older blocks never relaunch it.
+  const [active, setActive] = useState(true);
+  const exit = useCallback(() => {
+    setActive(false);
+    onDone();
+  }, [onDone]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    const cols = Math.floor(canvas.width / 14);
-    const drops = Array(cols).fill(1);
-
-    // Fun keeps the classic Matrix green; mono falls to glowing white on black.
-    const glyphColor = mono ? '#f5f5f5' : '#00ff41';
-
-    const draw = () => {
-      ctx.fillStyle = 'rgba(0,0,0,0.05)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = glyphColor;
-      ctx.font = '13px monospace';
-
-      drops.forEach((y, i) => {
-        const char = String.fromCharCode(0x30a0 + Math.random() * 96);
-        ctx.fillText(char, i * 14, y * 14);
-        if (y * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
-        drops[i]++;
-      });
-    };
-
-    const interval = setInterval(draw, 40);
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      onDone();
-    }, 4000);
-
-    return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [onDone, mono]);
-
+  if (active) return <MatrixFullscreen mono={mono} onExit={exit} />;
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-32 rounded-lg overflow-hidden"
-      style={{ background: 'black' }}
-    />
+    <p className={mono ? 'text-white/55' : 'text-green-400/70'}>
+      Wake up, recruiter. Follow the white rabbit: hire devanshu
+    </p>
   );
 }
 
