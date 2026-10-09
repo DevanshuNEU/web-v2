@@ -397,7 +397,7 @@ function PdfSurface() {
           href={PDF_HREF}
           target="_blank"
           rel="noopener noreferrer"
-          className="group inline-flex origin-center items-center gap-2 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] focus-visible:outline-none"
+          className="group inline-flex origin-center items-center gap-2 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
         >
           <MetaLabel className="text-text transition-opacity [@media(hover:hover)and(pointer:fine)]:group-hover:opacity-70">
             Open PDF
@@ -410,7 +410,7 @@ function PdfSurface() {
         <a
           href={PDF_HREF}
           download={PDF_DOWNLOAD}
-          className="group inline-flex origin-center items-center focus-visible:outline-none"
+          className="group inline-flex origin-center items-center"
         >
           <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
             Download PDF

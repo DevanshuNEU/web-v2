@@ -14,7 +14,7 @@
  * screen unlocks automatically into About Me after the dramatic moment.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useMobileStore } from '@/store/mobileStore';
 import { useTheme } from '@/store/themeStore';
@@ -30,8 +30,16 @@ const FIRST_VISIT_KEY = 'devos-first-visit';
 export default function PhoneShell() {
   const locked = useMobileStore((s) => s.locked);
   const openApp = useMobileStore((s) => s.openApp);
+  const syncLockWithSession = useMobileStore((s) => s.syncLockWithSession);
   const { wallpaper, mode } = useTheme();
   const mono = useIsMono();
+
+  // The store's initial lock is read once at module load. If this tab booted
+  // on the desktop and was then resized to mobile, skip the lock screen.
+  // Layout effect so the stale lock screen never paints.
+  useLayoutEffect(() => {
+    syncLockWithSession();
+  }, [syncLockWithSession]);
 
   // First-visit auto-open About Me, mirroring src/app/page.tsx
   useEffect(() => {
