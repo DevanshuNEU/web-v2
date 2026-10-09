@@ -257,7 +257,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
       'Starting recruiter tour...',
       'About Me → Projects → Resume  (watch the desktop)',
       '',
-      '  Shortcut: Cmd+Shift+T  anytime.',
+      '  Shortcut: Option+T anytime.',
       '',
     ];
   },
