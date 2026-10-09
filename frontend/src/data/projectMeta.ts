@@ -12,6 +12,8 @@ export interface Achievement {
 }
 
 export interface ProjectMeta {
+  /** URL slug for /projects/[slug]. Stable: changing it breaks indexed links. */
+  slug: string;
   displayName: string;
   tagline: string;
   story: string[];
@@ -23,10 +25,17 @@ export interface ProjectMeta {
   descriptionOverride?: string;
   /** Tech stack (augments GitHub topics) */
   extraTech?: string[];
+  /** Public source repo. Omitted when the code is not public. */
+  repoUrl?: string;
+  /** Live site, package page or walkthrough. */
+  liveUrl?: string;
+  /** Label for liveUrl when it is not a website ("Walkthrough", "PyPI"). */
+  liveLabel?: string;
 }
 
 export const projectMeta: Record<string, ProjectMeta> = {
   'opencodeintel': {
+    slug: 'opencodeintel',
     displayName: 'OpenCodeIntel',
     tagline: 'Code search for AI coding agents, so they stop guessing',
     descriptionOverride: "Code-search platform for AI coding agents: hybrid BM25 + vector retrieval with reranking, tree-sitter AST chunking, a web app, a REST API and a 12-tool MCP server.",
@@ -45,9 +54,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '12', label: 'MCP tools', detail: 'stdio for local agents, streamable HTTP for Claude.ai' },
     ],
     extraTech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React', 'TypeScript'],
+    repoUrl: 'https://github.com/OpenCodeIntel/opencodeintel',
+    liveUrl: 'https://opencodeintel.com',
   },
 
   'overhear': {
+    slug: 'overhear',
     displayName: 'Overhear',
     tagline: "A QA analyst for voice agents. It listens to every call so you don't have to",
     descriptionOverride: "AI QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic's real database. Code decides the facts, an LLM-as-a-judge scores the rest.",
@@ -66,9 +78,11 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '132', label: 'Vitest cases', detail: '38 files over in-memory PGlite databases' },
     ],
     extraTech: ['Next.js', 'TypeScript', 'Retell', 'Claude API', 'Postgres', 'Drizzle', 'PGlite', 'Vitest', 'Railway'],
+    repoUrl: 'https://github.com/DevanshuNEU/overhear',
   },
 
   'callbudget': {
+    slug: 'callbudget',
     displayName: 'CallBudget',
     tagline: 'Teach a pharmacy-finder to call less and find more',
     descriptionOverride: "Active-sensing pharmacy search: predict which pharmacy has a hard-to-find drug, call the most likely first through a voice agent, and learn from every call.",
@@ -87,9 +101,13 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Zero PHI', label: 'Public data only', detail: 'NPPES, RxNorm and DEA ARCOS inputs' },
     ],
     extraTech: ['Python', 'scikit-learn', 'FastMCP', 'Pipecat', 'Deepgram', 'Cartesia', 'Optuna', 'DuckDB', 'Claude API'],
+    repoUrl: 'https://github.com/DevanshuNEU/callbudget',
+    liveUrl: 'https://www.loom.com/share/0231954a438c4b3ab011fd21f4f41bf2',
+    liveLabel: 'Walkthrough',
   },
 
   'lco': {
+    slug: 'saar',
     displayName: 'Saar',
     tagline: 'A Claude.ai token and cost meter that runs entirely in the browser',
     descriptionOverride: "Chrome extension that tracks Claude.ai token usage and cost in real time, entirely in the browser. Published on the Chrome Web Store.",
@@ -108,9 +126,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '3', label: 'Extension contexts', detail: 'Page script, content script, service worker' },
     ],
     extraTech: ['TypeScript', 'WXT', 'Chrome MV3', 'React', 'Vitest', 'Playwright'],
+    repoUrl: 'https://github.com/OpenCodeIntel/lco',
+    liveUrl: 'https://getsaar.com',
   },
 
   'saar': {
+    slug: 'saar-cli',
     displayName: 'saar CLI',
     tagline: 'Writes the context files coding agents need',
     descriptionOverride: "Statically analyzes a codebase and generates agent context files (AGENTS.md, CLAUDE.md, .cursorrules). Published on PyPI.",
@@ -127,9 +148,13 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Python', label: 'Static analysis', detail: 'Stack, patterns and conventions from the code' },
     ],
     extraTech: ['Python', 'Static analysis', 'CLI', 'PyPI'],
+    repoUrl: 'https://github.com/OpenCodeIntel/saar',
+    liveUrl: 'https://pypi.org/project/saar/',
+    liveLabel: 'PyPI',
   },
 
   'web-v2': {
+    slug: 'portfolio-os',
     displayName: 'Portfolio OS',
     tagline: "You're looking at it right now",
     descriptionOverride: "A desktop operating system in a browser tab: window manager, terminal and dock, built from scratch.",
@@ -146,9 +171,11 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Next.js 15', label: 'React 19', detail: 'TypeScript and Zustand throughout' },
     ],
     extraTech: ['Next.js 15', 'React 19', 'TypeScript', 'Framer Motion', 'Zustand', 'Tailwind CSS'],
+    repoUrl: 'https://github.com/DevanshuNEU/web-v2',
   },
 
   'financial-copilot': {
+    slug: 'financial-copilot',
     displayName: 'Financial Copilot',
     tagline: 'Because manual bookkeeping is so 2019',
     descriptionOverride: "AI expense tracker with automatic categorization, category budgets, spending insights and a daily safe-to-spend figure.",
@@ -167,9 +194,11 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Edge', label: 'Serverless backend', detail: 'Supabase Edge Functions on Deno' },
     ],
     extraTech: ['React 18', 'TypeScript', 'Tailwind CSS', 'Recharts', 'Supabase', 'PostgreSQL', 'Vercel'],
+    repoUrl: 'https://github.com/DevanshuNEU/financial-copilot',
   },
 
   'SecureScale': {
+    slug: 'securescale',
     displayName: 'SecureScale',
     tagline: 'Infrastructure that actually stays up',
     featured: true,
@@ -190,6 +219,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   },
 
   'tool-crowding': {
+    slug: 'tool-crowding',
     displayName: 'Tool Crowding Benchmark',
     tagline: 'Does an agent pick the wrong tool when too many MCP servers are loaded?',
     featured: false,
@@ -207,9 +237,11 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '19', label: 'Exploratory trials run', detail: 'Pilot not run yet' },
     ],
     extraTech: ['Python', 'MCP', 'pytest', 'Anthropic API', 'Apache 2.0'],
+    repoUrl: 'https://github.com/DevanshuNEU/tool-crowding',
   },
 
   'mem-machines': {
+    slug: 'mem-machines',
     displayName: 'Mem Machines',
     tagline: 'Serverless ingestion on GCP with multi-tenant isolation and PII redaction',
     featured: false,
@@ -226,9 +258,11 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Event-driven', label: 'Architecture', detail: 'Decoupled, resilient, scalable' },
     ],
     extraTech: ['Python', 'GCP Cloud Run', 'Pub/Sub', 'Firestore', 'Docker'],
+    repoUrl: 'https://github.com/DevanshuNEU/mem-machines',
   },
 
   'bob-wxo-hackathon': {
+    slug: 'watsonx-test-forge',
     displayName: 'watsonx Test Forge',
     tagline: 'Hackathon: auto-generate Journey Success test cases for IBM watsonx agents',
     featured: true,
@@ -249,6 +283,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
   },
 
   'campus-resources': {
+    slug: 'campus-resources',
     displayName: 'Campus Resources',
     tagline: 'Helping students find what they actually need',
     featured: false,
@@ -263,6 +298,8 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: 'Searchable', label: 'Resource directory', detail: 'Fast filtering and discovery' },
     ],
     extraTech: ['React', 'TypeScript', 'Tailwind CSS', 'Vite', 'Vercel'],
+    repoUrl: 'https://github.com/DevanshuNEU/campus-resources',
+    liveUrl: 'https://campus-resources.vercel.app',
   },
 };
 
@@ -293,4 +330,15 @@ export function featuredRank(name: string): number {
   const order = getFeaturedProjects();
   const i = order.indexOf(name);
   return i === -1 ? order.length : i;
+}
+
+/** Every project in display order: featured first, then the rest as declared. */
+export function getAllProjectKeys(): string[] {
+  return Object.keys(projectMeta).sort((a, b) => featuredRank(a) - featuredRank(b));
+}
+
+/** Look a project up by its URL slug. */
+export function getProjectBySlug(slug: string): { key: string; meta: ProjectMeta } | null {
+  const key = Object.keys(projectMeta).find(k => projectMeta[k].slug === slug);
+  return key ? { key, meta: projectMeta[key] } : null;
 }

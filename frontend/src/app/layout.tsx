@@ -15,6 +15,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
+import { SITE_URL, SITE_DESCRIPTION, absoluteUrl } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,12 +41,12 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://devanshuchicholikar.com'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
     template: '%s | Devanshu Chicholikar'
   },
-  description: 'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
+  description: SITE_DESCRIPTION,
   keywords: [
     'Devanshu Chicholikar',
     'MCP',
@@ -78,23 +79,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://devanshuchicholikar.com',
+    url: '/',
     title: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
     description: 'Software and AI engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
-    siteName: 'Devanshu Chicholikar Portfolio',
-    images: [{
-      url: '/devanshu-photo.png',
-      width: 1200,
-      height: 630,
-      alt: 'Devanshu Chicholikar'
-    }]
+    siteName: 'Devanshu Chicholikar',
+    // Images come from the opengraph-image.tsx file next to each route.
   },
+  // Title, description and image fall back to the per-page Open Graph tags.
   twitter: {
     card: 'summary_large_image',
-    title: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
-    description: 'Software and AI engineer: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel and Overhear.',
-    images: ['/devanshu-photo.png'],
   },
+
   robots: {
     index: true,
     follow: true,
@@ -111,7 +106,7 @@ export const metadata: Metadata = {
 // JSON-LD structured data for SEO. A @graph links the Person to the products
 // they built, and knowsAbout enumerates the exact topics search engines and
 // AI search should associate with Devanshu (MCP, RAG, code intelligence).
-const PERSON_ID = 'https://devanshuchicholikar.com/#devanshu';
+const PERSON_ID = `${SITE_URL}/#devanshu`;
 const jsonLd = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -120,8 +115,8 @@ const jsonLd = {
       '@id': PERSON_ID,
       name: 'Devanshu Chicholikar',
       jobTitle: ['Software Engineer', 'AI Engineer', 'Forward Deployed Engineer'],
-      url: 'https://devanshuchicholikar.com',
-      image: 'https://devanshuchicholikar.com/devanshu-photo.png',
+      url: SITE_URL,
+      image: absoluteUrl('/devanshu-photo.png'),
       sameAs: [
         'https://www.linkedin.com/in/devanshuchicholikar/',
         'https://github.com/DevanshuNEU',
@@ -139,8 +134,7 @@ const jsonLd = {
         addressRegion: 'MA',
         addressCountry: 'US',
       },
-      description:
-        'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.',
+      description: SITE_DESCRIPTION,
       knowsAbout: [
         'Model Context Protocol (MCP)',
         'Retrieval-Augmented Generation (RAG)',
@@ -218,48 +212,6 @@ export default function RootLayout({
             <Toaster />
           </ThemeProvider>
         </PostHogProvider>
-
-        {/* Server-rendered semantic content for crawlers and AI search. The
-            visible app is a client-rendered SPA, so this block is the indexable
-            source of truth, so keep it accurate and on-message. */}
-        <div className="sr-only">
-          <h1>Devanshu Chicholikar, Software Engineer and AI Engineer (MCP servers, RAG, evals, voice agents)</h1>
-          <p>
-            I am a software engineer and AI engineer in Boston. I ship AI systems to production end to end:
-            MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and
-            voice agents, plus the full-stack, infra and design work around them. MS in
-            Software Engineering Systems from Northeastern University (May 2026). Open
-            to Software Engineer, AI Engineer and Forward Deployed Engineer roles
-            anywhere in the US.
-          </p>
-          <h2>Projects</h2>
-          <ul>
-            <li>OpenCodeIntel: a code-search platform for AI coding agents (web app, REST API and a 12-tool MCP server). Hybrid BM25 + vector retrieval with reranking; 94% Hit@1 on a 665-query research eval across 14 open-source codebases; p50 641ms for a cold production search, 242ms cached.</li>
-            <li>Overhear: a QA analyst for voice agents. Code checks every call against the clinic database and an LLM-as-a-judge scores tone and safety; 23 of 23 planted failures caught on a 39-call golden dataset, macro-F1 0.89.</li>
-            <li>CallBudget: predicts which pharmacy has a hard-to-find drug and calls the likeliest first through a voice agent; expected calls fell from 4.3 to 2.3 and false &quot;in stock&quot; answers from 10% to 0%. Ships as a FastMCP server.</li>
-            <li>Saar: a Chrome extension on the Chrome Web Store that tracks Claude.ai token usage and cost in real time, entirely in the browser.</li>
-            <li>saar CLI: a Python CLI on PyPI that writes AGENTS.md, CLAUDE.md and .cursorrules from static analysis of a codebase.</li>
-            <li>Portfolio OS: this interactive desktop-style portfolio, built with Next.js 15 and React 19.</li>
-            <li>Financial Copilot: an AI expense tracker on React and Supabase Edge Functions.</li>
-          </ul>
-          <h2>Experience</h2>
-          <ul>
-            <li>Graduate Teaching Assistant, CSYE 6225 Network Structures and Cloud Computing, Northeastern University, Sep 2025 to May 2026: cloud on AWS for 100+ graduate students across two semesters.</li>
-            <li>Software Engineer, Jaksh Enterprise, Aug 2022 to Jul 2024 (full-time): Java / Spring Boot quotation engine for 590+ products; quote-page p95 latency cut 65%.</li>
-            <li>Software Development Engineer Intern, Pitney Bowes, Jan 2022 to Jul 2022: REST APIs and Angular workflows for PitneyShipPro.</li>
-          </ul>
-          <h2>Expertise</h2>
-          <p>
-            Model Context Protocol (MCP), Retrieval-Augmented Generation (RAG), LLM
-            evaluation (LLM-as-a-judge, golden datasets), voice agents, AI agents, hybrid
-            retrieval, TypeScript, Python, React, Next.js, FastAPI, AWS, Terraform.
-          </p>
-          <h2>Contact</h2>
-          <p>Email: chicholikar.d@northeastern.edu</p>
-          <p>Location: Boston, MA</p>
-          <p>GitHub: github.com/DevanshuNEU</p>
-          <p>LinkedIn: linkedin.com/in/devanshuchicholikar</p>
-        </div>
 
         <Analytics />
       </body>

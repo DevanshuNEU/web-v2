@@ -56,7 +56,7 @@ export interface SpecItem {
 }
 
 export const specs: SpecItem[] = [
-  { key: 'Discipline',  value: 'AI engineering · forward deployed' },
+  { key: 'Discipline',  value: 'Software + AI engineering · forward deployed' },
   { key: 'Layer',       value: 'MCP · RAG · evals · voice agents' },
   { key: 'Stack',       value: 'TypeScript · Python · Go · AWS' },
   { key: 'Retrieval',   value: 'BM25 + vectors, RRF fusion, rerank' },

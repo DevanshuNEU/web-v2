@@ -41,7 +41,7 @@ export default function PhoneShell() {
     syncLockWithSession();
   }, [syncLockWithSession]);
 
-  // First-visit auto-open About Me, mirroring src/app/page.tsx
+  // First-visit auto-open About Me, mirroring components/os/DesktopHome.tsx
   useEffect(() => {
     if (locked) return;
     if (typeof window === 'undefined') return;
