@@ -76,7 +76,9 @@ export default function WindowManager() {
   }, [openWindowKey]);
 
   return (
-    <AnimatePresence mode="popLayout">
+    // initial={false}: windows restored from the saved layout appear in place
+    // instead of flying in again on every load. Windows opened later animate.
+    <AnimatePresence mode="popLayout" initial={false}>
       {visibleWindows.map((window) => {
         const registration = appRegistry[window.appType];
         if (!registration) return null;

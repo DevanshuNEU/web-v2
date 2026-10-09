@@ -13,6 +13,7 @@ import PhoneShell from '@/components/mobile/PhoneShell';
 import Spotlight from '@/components/os/Spotlight';
 import AppSwitcher from '@/components/os/AppSwitcher';
 import AssistantBubble from '@/components/assistant/AssistantBubble';
+import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -43,6 +44,9 @@ export default function Home() {
     check();
     window.addEventListener('resize', check);
 
+    // A refresh in the same tab skips the boot; only a new visit replays it.
+    if (hasBootedThisSession()) setBooted();
+
     setMounted(true);
 
     return () => window.removeEventListener('resize', check);
@@ -50,6 +54,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!isBooted) return;
+    markBootedThisSession();
 
     // Auto-open About Me on the very first visit ever.
     // A short delay lets the desktop finish mounting so the window entrance

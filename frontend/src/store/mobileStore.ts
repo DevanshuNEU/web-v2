@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
 import type { AppType } from '../../../shared/types';
 
 /**
@@ -69,9 +70,12 @@ function popHistoryEntry() {
 }
 
 export const useMobileStore = create<MobileStore>((set) => ({
-  // Lock
-  locked: true,
-  unlock: () => set({ locked: false }),
+  // Lock: the lock screen plays once per visit, like the desktop boot.
+  locked: !hasBootedThisSession(),
+  unlock: () => {
+    markBootedThisSession();
+    set({ locked: false });
+  },
   lock: () => {
     popHistoryEntry();
     set({ locked: true, openAppType: null, openApps: [] });
