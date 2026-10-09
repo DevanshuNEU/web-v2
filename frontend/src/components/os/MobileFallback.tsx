@@ -44,33 +44,33 @@ const LINKS = [
 
 const FEATURED_PROJECTS = [
   {
-    name: 'devOS',
-    tagline: "This portfolio. A full macOS-inspired desktop OS built in Next.js.",
-    tech: ['Next.js', 'TypeScript', 'Framer Motion'],
-    url: 'https://devanshuchicholikar.com',
-  },
-  {
     name: 'OpenCodeIntel',
-    tagline: 'Code intelligence platform with semantic search across repositories.',
-    tech: ['Python', 'TypeScript', 'AWS'],
-    url: 'https://github.com/OpenCodeIntel',
+    tagline: 'Code search for AI coding agents: web app, REST API and a 12-tool MCP server.',
+    tech: ['Python', 'MCP', 'RAG'],
+    url: 'https://github.com/OpenCodeIntel/opencodeintel',
   },
   {
-    name: 'Financial Copilot',
-    tagline: 'OCR + NLP receipt automation pipeline with 95%+ extraction accuracy.',
-    tech: ['Python', 'React', 'GCP'],
-    url: 'https://github.com/DevanshuNEU',
+    name: 'Overhear',
+    tagline: 'QA analyst for voice agents: code checks the facts, an LLM-as-a-judge scores the rest.',
+    tech: ['TypeScript', 'Next.js', 'Evals'],
+    url: 'https://github.com/DevanshuNEU/overhear',
   },
   {
-    name: 'SecureScale',
-    tagline: 'Fault-tolerant AWS infrastructure with 99.9% uptime via Terraform.',
-    tech: ['AWS', 'Terraform', 'Docker'],
-    url: 'https://github.com/DevanshuNEU',
+    name: 'CallBudget',
+    tagline: 'Finds a hard-to-find drug in fewer calls: 4.3 to 2.3 expected calls.',
+    tech: ['Python', 'FastMCP', 'Voice agents'],
+    url: 'https://github.com/DevanshuNEU/callbudget',
+  },
+  {
+    name: 'Portfolio OS',
+    tagline: 'This portfolio. A desktop OS in a browser tab, built in Next.js.',
+    tech: ['Next.js', 'TypeScript', 'Framer Motion'],
+    url: 'https://www.devanshuchicholikar.com',
   },
 ];
 
 const SKILLS = [
-  'TypeScript', 'React', 'Next.js', 'Python', 'Node.js',
+  'MCP', 'RAG', 'LLM evals', 'TypeScript', 'React', 'Next.js', 'Python', 'Node.js',
   'AWS', 'GCP', 'Docker', 'Terraform', 'PostgreSQL', 'Go',
 ];
 
@@ -92,14 +92,15 @@ export default function MobileFallback() {
         <h1 className="text-3xl font-bold tracking-tight mb-1">
           Devanshu Chicholikar
         </h1>
-        <p className="text-white/60 text-sm mb-1">Software Engineer · Boston, MA</p>
+        <p className="text-white/60 text-sm mb-1">AI Engineer · Boston, MA</p>
         <p className="text-white/40 text-xs">
           MS Software Engineering · Northeastern University · May 2026
         </p>
 
         <p className="mt-4 text-sm text-white/70 leading-relaxed max-w-sm">
-          Full-stack engineer focused on distributed systems, cloud infrastructure,
-          and building things that actually scale. Open to full-time roles.
+          I ship AI to production end to end: MCP servers, RAG, evals and voice
+          agents, plus the full-stack and infra work around them. Open to AI Engineer
+          and Forward Deployed Engineer roles.
         </p>
       </header>
 
