@@ -24,3 +24,10 @@ export function absoluteUrl(path = '/'): string {
   if (path === '/' || path === '') return SITE_URL;
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
+
+/**
+ * IndexNow key (Bing, Yandex, Seznam, Naver). Public by design: the protocol
+ * proves ownership by serving it at /<key>.txt (public/21df0414fc3ef7991eb651f5819eee5b.txt).
+ * scripts/indexnow.mjs carries the same value; a test keeps them in sync.
+ */
+export const INDEXNOW_KEY = '21df0414fc3ef7991eb651f5819eee5b';

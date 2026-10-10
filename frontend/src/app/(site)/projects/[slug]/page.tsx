@@ -6,6 +6,8 @@ import { projectDescription, projectPath, STATUS_LABEL } from '@/lib/seoContent'
 import Section from '@/components/site/Section';
 import MetaLabel from '@/components/editorial/MetaLabel';
 import { PERSON_NAME } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { graph, projectNode, breadcrumbNode } from '@/lib/structuredData';
 
 type Params = { slug: string };
 
@@ -50,6 +52,16 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
 
   return (
     <article>
+      <JsonLd
+        data={graph(
+          projectNode(meta),
+          breadcrumbNode([
+            { name: 'Home', path: '/' },
+            { name: 'Projects', path: '/projects' },
+            { name: meta.displayName, path: projectPath(slug) },
+          ]),
+        )}
+      />
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <Link href="/projects"><MetaLabel className="text-text-secondary hover:text-text">Projects</MetaLabel></Link>
         <MetaLabel className="text-text-secondary">{STATUS_LABEL[meta.status]}</MetaLabel>
