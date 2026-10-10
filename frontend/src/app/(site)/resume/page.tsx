@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Section from '@/components/site/Section';
 import { RESUME } from '@/data/resume';
-import { PERSON_NAME } from '@/lib/site';
+import { PERSON_NAME, absoluteUrl } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { graph, breadcrumbNode, personRef } from '@/lib/structuredData';
 
 const DESCRIPTION =
   'Resume of Devanshu Chicholikar, software engineer and AI engineer in Boston: experience, projects (OpenCodeIntel, Overhear, CallBudget, Saar), education and skills.';
@@ -18,6 +20,12 @@ export default function ResumePage() {
 
   return (
     <article>
+      <JsonLd
+        data={graph(
+          { '@type': 'WebPage', url: absoluteUrl('/resume'), name: `Resume | ${PERSON_NAME}`, about: personRef },
+          breadcrumbNode([{ name: 'Home', path: '/' }, { name: 'Resume', path: '/resume' }]),
+        )}
+      />
       <h1 className="editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">{RESUME.name}</h1>
       <p className="mt-4 text-[17px] text-text-secondary">{RESUME.tagline}</p>
       <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[15px]">

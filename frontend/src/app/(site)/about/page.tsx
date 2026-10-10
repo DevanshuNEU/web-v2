@@ -6,6 +6,8 @@ import { RESUME } from '@/data/resume';
 import { projectMeta, getFeaturedProjects } from '@/data/projectMeta';
 import { projectPath } from '@/lib/seoContent';
 import { PERSON_NAME } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { graph, profilePageNode, breadcrumbNode } from '@/lib/structuredData';
 
 const DESCRIPTION =
   'Devanshu Chicholikar is a software engineer and AI engineer in Boston: MCP servers, RAG, LLM-as-a-judge evals and voice agents, plus the full-stack and infra work around them.';
@@ -22,6 +24,7 @@ export default function AboutPage() {
 
   return (
     <article>
+      <JsonLd data={graph(profilePageNode('/about'), breadcrumbNode([{ name: 'Home', path: '/' }, { name: 'About', path: '/about' }]))} />
       <h1 className="editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">{PERSON_NAME}</h1>
       <p className="mt-4 text-[18px] text-text-secondary">{identity.title}</p>
       <p className="mt-1 text-[15px] text-text-secondary">

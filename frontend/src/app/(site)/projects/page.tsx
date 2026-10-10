@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { projectMeta, getAllProjectKeys } from '@/data/projectMeta';
 import { projectDescription, projectPath, STATUS_LABEL } from '@/lib/seoContent';
 import MetaLabel from '@/components/editorial/MetaLabel';
-import { PERSON_NAME } from '@/lib/site';
+import { PERSON_NAME, absoluteUrl } from '@/lib/site';
+import JsonLd from '@/components/seo/JsonLd';
+import { graph, breadcrumbNode, personRef } from '@/lib/structuredData';
 
 const DESCRIPTION =
   'Projects by Devanshu Chicholikar: OpenCodeIntel (code search for AI coding agents), Overhear (QA for voice agents), CallBudget, Saar and more, with the numbers and the caveats.';
@@ -20,6 +22,26 @@ export default function ProjectsPage() {
 
   return (
     <article>
+      <JsonLd
+        data={graph(
+          {
+            '@type': 'CollectionPage',
+            url: absoluteUrl('/projects'),
+            name: `Projects by ${PERSON_NAME}`,
+            about: personRef,
+            mainEntity: {
+              '@type': 'ItemList',
+              itemListElement: keys.map((key, i) => ({
+                '@type': 'ListItem',
+                position: i + 1,
+                name: projectMeta[key].displayName,
+                url: absoluteUrl(projectPath(projectMeta[key].slug)),
+              })),
+            },
+          },
+          breadcrumbNode([{ name: 'Home', path: '/' }, { name: 'Projects', path: '/projects' }]),
+        )}
+      />
       <h1 className="editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">Projects</h1>
       <p className="mt-4 text-[18px] text-text-secondary">What I shipped, with the numbers and the caveats.</p>
 

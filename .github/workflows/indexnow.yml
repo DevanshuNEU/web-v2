@@ -1,0 +1,25 @@
+# Ping IndexNow after every successful production deploy, so Bing (which
+# feeds ChatGPT search) recrawls changed pages within hours instead of days.
+# Vercel posts the deployment_status event; previews are ignored.
+name: IndexNow
+
+on: deployment_status
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: frontend/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Give the production alias a moment to point at the new build.
+      - run: sleep 30
+      - run: node frontend/scripts/indexnow.mjs

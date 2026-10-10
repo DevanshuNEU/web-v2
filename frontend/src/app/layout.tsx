@@ -15,7 +15,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
-import { SITE_URL, SITE_DESCRIPTION, absoluteUrl } from "@/lib/site";
+import { SITE_URL, SITE_DESCRIPTION } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -103,92 +103,6 @@ export const metadata: Metadata = {
   },
 };
 
-// JSON-LD structured data for SEO. A @graph links the Person to the products
-// they built, and knowsAbout enumerates the exact topics search engines and
-// AI search should associate with Devanshu (MCP, RAG, code intelligence).
-const PERSON_ID = `${SITE_URL}/#devanshu`;
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Person',
-      '@id': PERSON_ID,
-      name: 'Devanshu Chicholikar',
-      jobTitle: ['Software Engineer', 'AI Engineer', 'Forward Deployed Engineer'],
-      url: SITE_URL,
-      image: absoluteUrl('/devanshu-photo.png'),
-      sameAs: [
-        'https://www.linkedin.com/in/devanshuchicholikar/',
-        'https://github.com/DevanshuNEU',
-        'https://github.com/OpenCodeIntel',
-        'https://opencodeintel.com',
-        'https://getsaar.com',
-      ],
-      alumniOf: {
-        '@type': 'CollegeOrUniversity',
-        name: 'Northeastern University',
-      },
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: 'Boston',
-        addressRegion: 'MA',
-        addressCountry: 'US',
-      },
-      description: SITE_DESCRIPTION,
-      knowsAbout: [
-        'Model Context Protocol (MCP)',
-        'Retrieval-Augmented Generation (RAG)',
-        'AI dev tools',
-        'MCP servers',
-        'Code intelligence',
-        'Hybrid retrieval (AST, BM25, reranking)',
-        'AI agents',
-        'LLM evaluation (LLM-as-a-judge, golden datasets)',
-        'Voice agents',
-        'LLM tooling',
-        'Semantic search',
-        'TypeScript',
-        'Python',
-        'Node.js',
-        'AWS',
-        'Distributed systems',
-      ],
-    },
-    {
-      '@type': 'SoftwareApplication',
-      name: 'OpenCodeIntel',
-      url: 'https://opencodeintel.com',
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Any',
-      description:
-        'A code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server over hybrid BM25 + vector retrieval with reranking (RAG).',
-      author: { '@id': PERSON_ID },
-      keywords: 'MCP, Model Context Protocol, RAG, code intelligence, hybrid retrieval, AI agents',
-    },
-    {
-      '@type': 'SoftwareApplication',
-      name: 'Saar',
-      url: 'https://getsaar.com',
-      applicationCategory: 'BrowserApplication',
-      operatingSystem: 'Chrome',
-      description:
-        'A Chrome extension on the Chrome Web Store that tracks Claude.ai token usage and cost in real time, entirely in the browser.',
-      author: { '@id': PERSON_ID },
-      keywords: 'Claude.ai, token usage, LLM cost, Chrome extension, AI dev tools',
-    },
-    {
-      '@type': 'SoftwareSourceCode',
-      name: 'Overhear',
-      codeRepository: 'https://github.com/DevanshuNEU/overhear',
-      programmingLanguage: 'TypeScript',
-      description:
-        'A QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic database, with code deciding the facts and an LLM-as-a-judge scoring tone and safety, evaluated on a 39-call golden dataset.',
-      author: { '@id': PERSON_ID },
-      keywords: 'voice agents, LLM-as-a-judge, LLM evals, golden dataset, Retell',
-    },
-  ],
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -200,10 +114,6 @@ export default function RootLayout({
         <meta name="google-site-verification" content="F3zO-86yLvebJBNNSRX5vrSEOmQrQVsvZ3Dx5NEJXkI" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}>
         <PostHogProvider>
