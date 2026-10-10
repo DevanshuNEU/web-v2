@@ -114,7 +114,10 @@ export function breadcrumbNode(trail: Array<{ name: string; path: string }>): No
 }
 
 export function projectNode(meta: ProjectMeta): Node {
-  const sameAs = [meta.repoUrl, meta.liveUrl].filter((u): u is string => Boolean(u));
+  // A walkthrough video is about the project, not the project, so it goes in
+  // subjectOf. Live sites and package pages (PyPI) identify it: sameAs.
+  const walkthrough = meta.liveLabel === 'Walkthrough' ? meta.liveUrl : undefined;
+  const sameAs = [meta.repoUrl, walkthrough ? undefined : meta.liveUrl].filter((u): u is string => Boolean(u));
   return {
     '@type': meta.repoUrl ? 'SoftwareSourceCode' : 'CreativeWork',
     '@id': `${absoluteUrl(projectPath(meta.slug))}#project`,
@@ -124,6 +127,7 @@ export function projectNode(meta: ProjectMeta): Node {
     url: absoluteUrl(projectPath(meta.slug)),
     ...(meta.repoUrl && { codeRepository: meta.repoUrl }),
     ...(sameAs.length > 0 && { sameAs }),
+    ...(walkthrough && { subjectOf: { '@type': 'CreativeWork', name: `${meta.displayName} walkthrough`, url: walkthrough } }),
     ...(meta.extraTech && { keywords: meta.extraTech.join(', ') }),
     author: personRef,
     creator: personRef,

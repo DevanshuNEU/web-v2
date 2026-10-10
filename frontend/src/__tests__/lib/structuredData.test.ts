@@ -71,6 +71,19 @@ describe('projects', () => {
     expect(projectNode(projectMeta.opencodeintel).sameAs).toContain('https://opencodeintel.com');
     expect(projectNode(projectMeta.lco).sameAs).toContain('https://getsaar.com');
   });
+
+  it('keeps a walkthrough video out of sameAs and describes it with subjectOf', () => {
+    const node = projectNode(projectMeta.callbudget);
+    expect(node.sameAs).toEqual(['https://github.com/DevanshuNEU/callbudget']);
+    expect(node.subjectOf).toEqual({
+      '@type': 'CreativeWork',
+      name: 'CallBudget walkthrough',
+      url: 'https://www.loom.com/share/0231954a438c4b3ab011fd21f4f41bf2',
+    });
+    // A package page still identifies the project.
+    expect(projectNode(projectMeta.saar).sameAs).toContain('https://pypi.org/project/saar/');
+    expect(projectNode(projectMeta.saar)).not.toHaveProperty('subjectOf');
+  });
 });
 
 describe('graph and serialization', () => {
