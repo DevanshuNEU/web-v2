@@ -29,6 +29,12 @@ export interface EnrichedRepo {
   liveLabel?: string;
 }
 
+function sameUrl(a: string, b: string | undefined): boolean {
+  if (!b) return false;
+  const norm = (u: string) => u.trim().replace(/\/+$/, '').toLowerCase();
+  return norm(a) === norm(b);
+}
+
 export async function GET() {
   try {
     const [personalRepos, orgRepos] = await Promise.all([
@@ -59,7 +65,9 @@ export async function GET() {
           extraTech: meta?.extraTech ?? [],
           org,
           slug: meta?.slug,
-          liveLabel: repo.homepage ? undefined : meta?.liveLabel,
+          // Keep the label when GitHub's homepage is the same link projectMeta names
+          // (callbudget's Loom, saar's PyPI page); a different homepage gets the default.
+          liveLabel: !repo.homepage || sameUrl(repo.homepage, meta?.liveUrl) ? meta?.liveLabel : undefined,
         };
       });
 
