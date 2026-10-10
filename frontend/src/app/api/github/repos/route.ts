@@ -23,6 +23,16 @@ export interface EnrichedRepo {
   achievements: { metric: string; label: string; detail: string }[];
   extraTech: string[];
   org: 'DevanshuNEU' | 'OpenCodeIntel';
+  /** /projects/[slug] page, when the project has one. */
+  slug?: string;
+  /** Label for homepage when it is not a website ("Walkthrough", "PyPI"). */
+  liveLabel?: string;
+}
+
+function sameUrl(a: string, b: string | undefined): boolean {
+  if (!b) return false;
+  const norm = (u: string) => u.trim().replace(/\/+$/, '').toLowerCase();
+  return norm(a) === norm(b);
 }
 
 export async function GET() {
@@ -41,7 +51,7 @@ export async function GET() {
           tagline: meta?.tagline ?? repo.description ?? '',
           description: repo.description,
           htmlUrl: repo.html_url,
-          homepage: repo.homepage,
+          homepage: repo.homepage || meta?.liveUrl || null,
           language: repo.language,
           stars: repo.stargazers_count,
           forks: repo.forks_count,
@@ -54,6 +64,10 @@ export async function GET() {
           achievements: meta?.achievements ?? [],
           extraTech: meta?.extraTech ?? [],
           org,
+          slug: meta?.slug,
+          // Keep the label when GitHub's homepage is the same link projectMeta names
+          // (callbudget's Loom, saar's PyPI page); a different homepage gets the default.
+          liveLabel: !repo.homepage || sameUrl(repo.homepage, meta?.liveUrl) ? meta?.liveLabel : undefined,
         };
       });
 
@@ -78,8 +92,8 @@ export async function GET() {
           displayName: meta.displayName,
           tagline: meta.tagline,
           description: meta.descriptionOverride ?? meta.tagline,
-          htmlUrl: '',
-          homepage: null,
+          htmlUrl: meta.repoUrl ?? '',
+          homepage: meta.liveUrl ?? null,
           language: meta.extraTech?.[0] ?? null,
           stars: 0,
           forks: 0,
@@ -92,6 +106,8 @@ export async function GET() {
           achievements: meta.achievements,
           extraTech: meta.extraTech ?? [],
           org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
+          slug: meta.slug,
+          liveLabel: meta.liveLabel,
         });
       }
     }

@@ -45,6 +45,7 @@ import {
   Code,
   ChevronRight,
   FolderOpen,
+  Link2,
 } from 'lucide-react';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
 import { projectMeta, featuredRank } from '@/data/projectMeta';
@@ -385,7 +386,7 @@ function IndexColumn({
 
 function ProjectLinks({ repo, size = 'desktop' }: { repo: EnrichedRepo; size?: 'desktop' | 'mobile' }) {
   const pad = size === 'mobile' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-[clamp(0.72rem,1.4cqi,0.8rem)]';
-  if (!repo.htmlUrl && !repo.homepage) return null;
+  if (!repo.htmlUrl && !repo.homepage && !repo.slug) return null;
   return (
     <div className="flex flex-wrap gap-2">
       {repo.htmlUrl && (
@@ -408,7 +409,19 @@ function ProjectLinks({ repo, size = 'desktop' }: { repo: EnrichedRepo; size?: '
           className={`inline-flex items-center gap-2 bg-text text-bg font-medium
                       transition-transform duration-150 ease-out active:scale-[0.98] ${pad}`}
         >
-          <ExternalLink size={13} /> Live Demo
+          <ExternalLink size={13} /> {repo.liveLabel ?? 'Live Demo'}
+        </a>
+      )}
+      {repo.slug && (
+        <a
+          href={`/projects/${repo.slug}`}
+          target="_blank"
+          rel="noopener"
+          className={`inline-flex items-center gap-2 border border-border text-text font-medium
+                      transition-[transform,border-color] duration-150 ease-out
+                      hover:border-text/40 active:scale-[0.98] ${pad}`}
+        >
+          <Link2 size={13} /> Permalink
         </a>
       )}
     </div>
@@ -632,8 +645,8 @@ function buildStaticRepos(): EnrichedRepo[] {
     displayName: meta.displayName,
     tagline: meta.tagline,
     description: meta.descriptionOverride ?? meta.tagline,
-    htmlUrl: `https://github.com/${meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU'}/${name}`,
-    homepage: null,
+    htmlUrl: meta.repoUrl ?? '',
+    homepage: meta.liveUrl ?? null,
     language: meta.extraTech?.[0] ?? null,
     stars: 0,
     forks: 0,
@@ -646,6 +659,8 @@ function buildStaticRepos(): EnrichedRepo[] {
     achievements: meta.achievements,
     extraTech: meta.extraTech ?? [],
     org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
+    slug: meta.slug,
+    liveLabel: meta.liveLabel,
   }));
   return repos.sort((a, b) => featuredRank(a.name) - featuredRank(b.name));
 }
