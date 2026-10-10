@@ -225,8 +225,8 @@ export function JourneySection() {
           repo with tree-sitter chunks, BM25 keywords, vectors and reranking, so the
           agent stops guessing about your codebase.{" "}
           <span className="text-text">Overhear</span> grades every call a voice agent
-          takes against the clinic&apos;s real database, with code deciding the facts
-          and an LLM judge scoring the rest.
+          takes: code checks what the call log proves, and an LLM judge checks what
+          the agent said against the clinic&apos;s real slots.
         </p>
         <p className="text-lg text-text leading-relaxed">
           Same kid, same curiosity. Just pointed at the most interesting layer

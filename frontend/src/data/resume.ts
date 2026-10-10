@@ -174,7 +174,7 @@ export const RESUME: ResumeData = {
       name:   'OpenCodeIntel',
       tech:   'Python · FastAPI · FastMCP · tree-sitter · Pinecone · Redis · React · TypeScript',
       period: 'Nov 2025 - Present',
-      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from cross-encoder reranking isolated via a 98-run ablation. Production search: p50 641ms cold, 242ms cached.',
+      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from reranking (Voyage rerank-2) isolated via a 98-run ablation. Production search: p50 641ms cold, 242ms cached.',
       link:   'opencodeintel.com',
     },
     {
@@ -188,7 +188,7 @@ export const RESUME: ResumeData = {
       name:   'CallBudget',
       tech:   'Python · FastMCP · scikit-learn · Optuna · Pipecat · Deepgram · DuckDB',
       period: '2026',
-      desc:   'Agentic pharmacy-stock search: a FastMCP server (predict / plan / eval / converse) over a learned stock-probability ranker cuts expected calls-to-find from 4.3 to 2.3 (47%) on a 19-pharmacy simulation. A Claude-driven voice agent, tested against a simulated pharmacist, abstains through self-consistency voting, driving false "in stock" answers from 10% to 0%.',
+      desc:   'Agentic pharmacy-stock search: a FastMCP server (predict / plan / eval / converse) over a learned stock-probability ranker cuts expected calls-to-find from 4.3 to 2.3 (47%) on a 19-pharmacy simulation. An abstention layer on the stock extractor (self-consistency voting) drives false "in stock" answers from 10% to 0% under a deliberately unreliable extractor; a Claude-driven voice agent, tested against a simulated pharmacist, handles the calls.',
       link:   'github.com/DevanshuNEU/callbudget',
     },
     {
