@@ -129,7 +129,7 @@ describe('FileExplorerApp detail pane', () => {
       screen.getByRole('heading', { name: 'CallBudget', level: 2 }),
     ).toBeInTheDocument();
     // Long description (overview) is now visible.
-    expect(screen.getByText(/Bayesian active sensing/i)).toBeInTheDocument();
+    expect(screen.getByText(/active sensing under a calling budget/i)).toBeInTheDocument();
     expect(screen.getByText('Overview')).toBeInTheDocument();
     expect(screen.getByText('Stack')).toBeInTheDocument();
   });

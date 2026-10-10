@@ -142,7 +142,7 @@ export const opinions = [
   "The model isn't smarter. It's just enough. And \"just enough\" is what actually ships.",
   'Scale was never the moat.',
   'Some rerankers make code search worse. I know because I tried one, measured it, and wrote it down.',
-  "If the database already knows the answer, don't ask the LLM. Overhear's judge never grades a fact it could make up.",
+  'If code can check it, don\'t ask an LLM. In Overhear, code decides whether the caller was verified before anything got booked. The judge only rules on what the agent said.',
   '"I don\'t know" is a feature. A confident wrong "in stock" sends someone to an empty pharmacy shelf.',
   'My eval set is 39 calls, mostly synthetic, one labeler. That sentence sits right next to the F1, where it belongs.',
   "Pineapple belongs on pizza. This one isn't data-driven.",
