@@ -69,7 +69,7 @@ export const specs: SpecItem[] = [
 // ---------------------------------------------------------------------------
 
 export const quickIntro = [
-  "Hey! I ship AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents, plus the full-stack, infra and design work around them. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server), and Overhear grades every call a voice agent takes against a clinic's real database. MS Software Engineering Systems from Northeastern, finished May 2026.",
+  "Hey! I ship AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents, plus the full-stack, infra and design work around them. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server), and Overhear grades every call a voice agent takes: code checks the call log, and an LLM judge checks what the agent said against the clinic's real open slots. MS Software Engineering Systems from Northeastern, finished May 2026.",
   "Before that I spent two years full-time building a Java / Spring Boot quotation platform, and TA'd Network Structures & Cloud Computing for 100+ grad students across two semesters. Teaching set my bar: if I can't explain it at 11 PM to someone whose AWS setup is on fire, I don't understand it yet.",
 ] as const;
 

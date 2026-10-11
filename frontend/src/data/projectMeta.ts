@@ -44,7 +44,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     status: 'active',
     story: [
       "OpenCodeIntel is a code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server that give an agent real context on a codebase instead of letting it guess.",
-      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. A query runs both, fuses the results with reciprocal rank fusion and reranks them with a cross-encoder. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
+      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. A query runs both, fuses the results with reciprocal rank fusion and reranks the top results (Voyage rerank-2 in the research eval, Cohere rerank-v3.5 in production). The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
       "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On production, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
     ],
     achievements: [
@@ -67,7 +67,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     category: 'personal',
     status: 'active',
     story: [
-      "Voice agents fail quietly. They offer a slot that does not exist, skip the identity check or book the wrong provider, and the call still sounds fine. Overhear grades every call a Retell healthcare-scheduling agent takes against the clinic's real database.",
+      "Voice agents fail quietly. They offer a slot that does not exist, skip the identity check or book the wrong provider, and the call still sounds fine. Overhear grades every call a Retell healthcare-scheduling agent takes: code checks the call's action log, and an LLM judge checks what the agent said against the clinic's real open slots.",
       "The split is the point. Code reads the call's action log in time order: was the patient verified before anything got booked, did the booking go through, did any tool call fail. Those 3 of 7 rubric dimensions carry 50% of the score and never depend on a model. An LLM-as-a-judge, handed the clinic's real open slots from Postgres, grades the other 4: invented slots, the wrong provider, safety and tone.",
       "On a 39-call golden dataset with 4 planted failure types, it caught 23 of 23 planted failures (macro-F1 0.89) with 0.99 self-consistency across 3 repeat runs. In one earlier run the judge missed an identity check skipped behind medical advice; the code check caught it, matching the gold labels 14 of 14. Adversarial cases showed where the judge over-flags (precision 0.60 and 0.67 on two types), and the eval page says so. Built in 7 days: 39 commits, 27 merged PRs, 132 tests.",
     ],
@@ -85,7 +85,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     slug: 'callbudget',
     displayName: 'CallBudget',
     tagline: 'Teach a pharmacy-finder to call less and find more',
-    descriptionOverride: "Active-sensing pharmacy search: predict which pharmacy has a hard-to-find drug, call the most likely first through a voice agent, and learn from every call.",
+    descriptionOverride: "Active-sensing pharmacy search: predict which pharmacy most likely has a hard-to-find drug, rank who a voice agent should call first, and learn from every answer. Tested on a simulated pharmacist with real pharmacy data.",
     featured: true,
     category: 'personal',
     status: 'active',
