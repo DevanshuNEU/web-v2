@@ -27,7 +27,8 @@ export function buildLlmsTxt(): string {
     '',
     ...getAllProjectKeys().map(key => {
       const meta = projectMeta[key];
-      return `- [${meta.displayName}](${absoluteUrl(projectPath(meta.slug))}): ${projectDescription(meta, 320)}`;
+      const research = meta.researchUrl ? ` Research data: ${meta.researchUrl}` : '';
+      return `- [${meta.displayName}](${absoluteUrl(projectPath(meta.slug))}): ${projectDescription(meta, 320)}${research}`;
     }),
     '',
     '## Experience',

@@ -84,6 +84,11 @@ describe('projects', () => {
     expect(projectNode(projectMeta.saar).sameAs).toContain('https://pypi.org/project/saar/');
     expect(projectNode(projectMeta.saar)).not.toHaveProperty('subjectOf');
   });
+
+  it('points the OpenCodeIntel numbers at the public research data with isBasedOn', () => {
+    expect(projectNode(projectMeta.opencodeintel).isBasedOn).toBe('https://github.com/OpenCodeIntel/retrieval-research');
+    expect(projectNode(projectMeta.overhear)).not.toHaveProperty('isBasedOn');
+  });
 });
 
 describe('graph and serialization', () => {

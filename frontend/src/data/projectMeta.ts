@@ -31,6 +31,8 @@ export interface ProjectMeta {
   liveUrl?: string;
   /** Label for liveUrl when it is not a website ("Walkthrough", "PyPI"). */
   liveLabel?: string;
+  /** Public repo with the data behind the headline numbers (query sets, raw results). */
+  researchUrl?: string;
 }
 
 export const projectMeta: Record<string, ProjectMeta> = {
@@ -56,6 +58,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     extraTech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React', 'TypeScript'],
     repoUrl: 'https://github.com/OpenCodeIntel/opencodeintel',
     liveUrl: 'https://opencodeintel.com',
+    researchUrl: 'https://github.com/OpenCodeIntel/retrieval-research',
   },
 
   'overhear': {
