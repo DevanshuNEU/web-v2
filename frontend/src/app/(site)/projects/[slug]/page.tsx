@@ -85,6 +85,11 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
               Source on GitHub
             </a>
           )}
+          {meta.researchUrl && (
+            <a href={meta.researchUrl} className="px-3 py-1.5 border border-border font-medium">
+              Research data
+            </a>
+          )}
         </p>
       )}
 

@@ -52,6 +52,8 @@ interface Project {
   live?: string;
   /** Label for the live link when it is not a website (a walkthrough, a package page). */
   liveLabel?: string;
+  /** Public repo with the data behind the headline numbers. */
+  research?: string;
   status: 'production' | 'active' | 'archived' | 'wip';
   highlight?: boolean;
 }
@@ -73,6 +75,7 @@ const PROJECTS: Project[] = [
     tech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React'],
     github: 'https://github.com/OpenCodeIntel/opencodeintel',
     live: 'https://opencodeintel.com',
+    research: 'https://github.com/OpenCodeIntel/retrieval-research',
     status: 'active',
     highlight: true,
   },
@@ -420,6 +423,7 @@ function DetailBody({
           <div className="flex flex-wrap gap-x-8 gap-y-3">
             {project.github && <EditorialLink href={project.github} label="GitHub" />}
             {project.live && <EditorialLink href={project.live} label={project.liveLabel ?? 'Live Site'} />}
+            {project.research && <EditorialLink href={project.research} label="Research Data" />}
           </div>
         </motion.div>
       )}

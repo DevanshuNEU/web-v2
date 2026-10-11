@@ -126,6 +126,7 @@ export function projectNode(meta: ProjectMeta): Node {
     description: projectDescription(meta, 320),
     url: absoluteUrl(projectPath(meta.slug)),
     ...(meta.repoUrl && { codeRepository: meta.repoUrl }),
+    ...(meta.researchUrl && { isBasedOn: meta.researchUrl }),
     ...(sameAs.length > 0 && { sameAs }),
     ...(walkthrough && { subjectOf: { '@type': 'CreativeWork', name: `${meta.displayName} walkthrough`, url: walkthrough } }),
     ...(meta.extraTech && { keywords: meta.extraTech.join(', ') }),
