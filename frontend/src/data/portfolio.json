@@ -16,7 +16,7 @@
   
   "bio": {
     "greeting": "Hey there!",
-    "intro": "I'm an AI engineer who ships AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server); Overhear grades voice-agent calls against a clinic's real database. Recently finished my MS at Northeastern.",
+    "intro": "I'm an AI engineer who ships AI systems to production end to end: MCP servers, RAG with retrieval evals, LLM-as-a-judge eval harnesses and voice agents. OpenCodeIntel is a code-search platform for AI coding agents (web app, API and MCP server); Overhear grades every voice-agent call with code checks on the call log plus an LLM judge that checks what the agent said against the clinic's real open slots. Recently finished my MS at Northeastern.",
     "passion": "I get genuinely excited about solving complex problems with clean, efficient code. Whether it's optimizing API performance, automating deployments, or building user-friendly interfaces, I'm all about creating technology that just works.",
     "personal": "When I'm not coding, you'll probably find me exploring Boston, learning new tech, or working on side projects (like this interactive portfolio you're experiencing right now!)."
   },

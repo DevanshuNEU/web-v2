@@ -76,7 +76,7 @@ export const RESUME: ResumeData = {
   // Personal info pulled from portfolio.json - update there, reflects here
   name:    personalInfo.name,
   title:   personalInfo.title,
-  tagline: 'Software Engineer · AI Engineer · MCP & Agent Systems · Boston, MA (Open to Relocation)',
+  tagline: 'Software Engineer · AI Engineer · Forward Deployed Engineer · Boston, MA (Open to Relocation)',
   contact: {
     email:    personalInfo.email,
     phone:    personalInfo.phone,
@@ -181,7 +181,7 @@ export const RESUME: ResumeData = {
       name:   'Overhear',
       tech:   'TypeScript · Next.js · Retell · Claude API · Postgres · Drizzle · Vitest',
       period: 'Sep 2026',
-      desc:   'AI QA analyst for voice agents: grades every call a Retell scheduling agent takes against the clinic database on a 7-dimension rubric. 3 dimensions (50% of the score) are decided in code by replaying the agent tool calls; an LLM-as-a-judge scores the rest. Caught 23 of 23 planted failures on a 39-call golden dataset, macro-F1 0.89, 0.99 self-consistency across 3 runs.',
+      desc:   'AI QA analyst for voice agents: grades every call a Retell scheduling agent takes on a 7-dimension rubric. 3 dimensions (50% of the score) are decided in code from the call\'s action log; an LLM-as-a-judge checks what the agent said against the real open slots and scores the rest. Caught 23 of 23 planted failures on a 39-call golden dataset, macro-F1 0.89, 0.99 self-consistency across 3 runs.',
       link:   'github.com/DevanshuNEU/overhear',
     },
     {

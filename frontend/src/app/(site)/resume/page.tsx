@@ -6,7 +6,7 @@ import JsonLd from '@/components/seo/JsonLd';
 import { graph, breadcrumbNode, personRef } from '@/lib/structuredData';
 
 const DESCRIPTION =
-  'Resume of Devanshu Chicholikar, software engineer and AI engineer in Boston: experience, projects (OpenCodeIntel, Overhear, CallBudget, Saar), education and skills.';
+  'Resume of Devanshu Chicholikar, software engineer, AI engineer and forward deployed engineer in Boston: experience, projects (OpenCodeIntel, Overhear, CallBudget, Saar), education and skills.';
 
 export const metadata: Metadata = {
   title: 'Resume',
