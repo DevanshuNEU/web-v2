@@ -38,6 +38,17 @@ export const posts: Post[] = [
     sourceUrl: 'https://github.com/OpenCodeIntel/retrieval-research',
     keywords: ['code search', 'reranking', 'retrieval evaluation', 'hybrid retrieval', 'RAG', 'ablation study'],
   },
+  {
+    slug: 'llm-judge-missed-id-check',
+    title: "My LLM judge missed a skipped ID check. 24 lines of code didn't.",
+    description:
+      'My LLM judge caught a scheduling bot giving medical advice and missed that it booked without verifying the caller. A 24-line check on the tool log caught it.',
+    datePublished: '2026-10-12',
+    card: { title: 'My LLM judge missed a skipped ID check', subtitle: "24 lines of code didn't." },
+    project: 'overhear',
+    sourceUrl: 'https://github.com/DevanshuNEU/overhear',
+    keywords: ['LLM-as-a-judge', 'voice agents', 'AI evaluation', 'eval harness', 'golden dataset', 'Retell'],
+  },
 ];
 
 const CONTENT_DIR = join(process.cwd(), 'src/content/writing');

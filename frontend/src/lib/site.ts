@@ -7,7 +7,7 @@
 export const SITE_URL = 'https://www.devanshuchicholikar.com';
 export const SITE_NAME = 'Devanshu Chicholikar';
 export const PERSON_NAME = 'Devanshu Chicholikar';
-export const ROLE_LINE = 'Software Engineer, AI Engineer';
+export const ROLE_LINE = 'Software Engineer, AI Engineer, Forward Deployed Engineer';
 
 export const SITE_DESCRIPTION =
   'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.';

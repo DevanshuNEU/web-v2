@@ -31,6 +31,7 @@ describe('posts', () => {
       if (p.sourceUrl) expect(p.sourceUrl).toMatch(/^https:\/\//);
     }
     expect(getPostsForProject('opencodeintel').map(p => p.slug)).toContain('rerankers-code-search');
+    expect(getPostsForProject('overhear').map(p => p.slug)).toContain('llm-judge-missed-id-check');
   });
 
   it('sort newest first', () => {

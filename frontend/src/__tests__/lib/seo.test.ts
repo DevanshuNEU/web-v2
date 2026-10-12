@@ -5,7 +5,7 @@ import { buildLlmsTxt } from '@/lib/llmsTxt';
 import { projectMeta, getAllProjectKeys, getProjectBySlug } from '@/data/projectMeta';
 import { posts } from '@/data/writing';
 import { projectDescription } from '@/lib/seoContent';
-import { SITE_URL, absoluteUrl } from '@/lib/site';
+import { SITE_URL, ROLE_LINE, absoluteUrl } from '@/lib/site';
 
 const keys = Object.keys(projectMeta);
 
@@ -30,6 +30,12 @@ describe('project slugs', () => {
   it('never point a repo link at a repo that is not public', () => {
     expect(projectMeta.SecureScale.repoUrl).toBeUndefined();
     expect(projectMeta['bob-wxo-hackathon'].repoUrl).toBeUndefined();
+  });
+});
+
+describe('role line', () => {
+  it('names all three roles on every link-preview card', () => {
+    expect(ROLE_LINE).toBe('Software Engineer, AI Engineer, Forward Deployed Engineer');
   });
 });
 
