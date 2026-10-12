@@ -46,12 +46,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
     status: 'active',
     story: [
       "OpenCodeIntel is a code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server that give an agent real context on a codebase instead of letting it guess.",
-      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. A query runs both, fuses the results with reciprocal rank fusion and reranks the top results (Voyage rerank-2 in the research eval, Cohere rerank-v3.5 in production). The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
-      "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On production, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
+      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. On the API and MCP search path, a query runs both, fuses the results with reciprocal rank fusion and reranks the top results (Voyage rerank-2 in the research eval, Cohere rerank-v3.5 in production). The public playground runs a lighter path: vector search with keyword and code-graph boosts, no model reranking. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
+      "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On the public playground, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
     ],
     achievements: [
       { metric: '94%', label: 'Hit@1, research eval', detail: '14 open-source codebases, 665 queries' },
-      { metric: '641ms', label: 'p50 cold search, production', detail: 'Embedding, hybrid retrieval and reranking' },
+      { metric: '641ms', label: 'p50 cold search, public playground', detail: 'Vector search with keyword and code-graph boosts' },
       { metric: '242ms', label: 'p50 cached repeat', detail: 'End to end from Boston, measured Oct 2026' },
       { metric: '12', label: 'MCP tools', detail: 'stdio for local agents, streamable HTTP for Claude.ai' },
     ],
@@ -72,7 +72,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     story: [
       "Voice agents fail quietly. They offer a slot that does not exist, skip the identity check or book the wrong provider, and the call still sounds fine. Overhear grades every call a Retell healthcare-scheduling agent takes: code checks the call's action log, and an LLM judge checks what the agent said against the clinic's real open slots.",
       "The split is the point. Code reads the call's action log in time order: was the patient verified before anything got booked, did the booking go through, did any tool call fail. Those 3 of 7 rubric dimensions carry 50% of the score and never depend on a model. An LLM-as-a-judge, handed the clinic's real open slots from Postgres, grades the other 4: invented slots, the wrong provider, safety and tone.",
-      "On a 39-call golden dataset with 4 planted failure types, it caught 23 of 23 planted failures (macro-F1 0.89) with 0.99 self-consistency across 3 repeat runs. In one earlier run the judge missed an identity check skipped behind medical advice; the code check caught it, matching the gold labels 14 of 14. Adversarial cases showed where the judge over-flags (precision 0.60 and 0.67 on two types), and the eval page says so. Built in 7 days: 39 commits, 27 merged PRs, 132 tests.",
+      "On a 39-call golden dataset with 4 planted failure types, it caught 23 of 23 planted failures (macro-F1 0.89) with 0.99 self-consistency across 3 repeat runs. In one earlier run the judge missed an identity check skipped behind medical advice; the code check caught it, matching the gold labels 14 of 14. Adversarial cases showed where the judge over-flags (precision 0.60 and 0.67 on two types), and the eval page says so. Built in 7 days, with 39 commits and 27 merged PRs that week, and 132 tests.",
     ],
     achievements: [
       { metric: '23/23', label: 'Planted failures caught', detail: '4 failure types on a 39-call golden dataset' },
@@ -93,13 +93,13 @@ export const projectMeta: Record<string, ProjectMeta> = {
     category: 'personal',
     status: 'active',
     story: [
-      "Finding a drug during a shortage means calling pharmacy after pharmacy, and half the time 'in stock' turns out to be wrong. CallBudget treats it as a search problem: predict which pharmacy is most likely to have it, call that one first, and learn from every answer.",
+      "Finding a drug during a shortage means calling pharmacy after pharmacy, and an 'in stock' answer can still be wrong. CallBudget treats it as a search problem: predict which pharmacy is most likely to have it, call that one first, and learn from every answer.",
       "A HistGradientBoosting ranker scores pharmacies by predicted stock. A Claude-driven voice agent (Pipecat, Deepgram, Cartesia) handles the conversation, tested against a simulated pharmacist on real pharmacy data. In the evals, every stock answer goes through an extractor that reads it several times and abstains when the reads disagree, so a shaky answer never sends a patient to an empty shelf. Wiring that vote into the live call is next.",
       "On a 19-pharmacy Boston pool, expected calls to find the drug fell from 4.3 to 2.3 (47%). With the extractor rigged to misread stock 25% of the time, false 'in stock' answers fell from 10% to 0% at 3 votes, and 5 votes held 0% while abstaining on 51% of calls instead of 69%. It ships as a 4-tool FastMCP server. Real inputs are NPPES pharmacies, RxNorm and the FDA shortage window; call outcomes are synthetic, with zero PHI. There is a Loom walkthrough on the repo.",
     ],
     achievements: [
-      { metric: '47%', label: 'Fewer calls to find', detail: '4.3 to 2.3 expected calls vs a shuffled baseline' },
-      { metric: '10% to 0%', label: "False 'in stock' answers", detail: 'Self-consistency voting under a 25%-unreliable extractor' },
+      { metric: '47%', label: 'Fewer calls to find, simulated', detail: '4.3 to 2.3 expected calls vs a shuffled baseline' },
+      { metric: '10% to 0%', label: "False 'in stock' answers, simulated", detail: 'Self-consistency voting under a 25%-unreliable extractor' },
       { metric: '4', label: 'MCP tools', detail: 'predict, plan, eval and converse over FastMCP' },
       { metric: 'Zero PHI', label: 'Real public inputs', detail: 'NPPES, RxNorm and FDA shortage data; synthetic outcomes' },
     ],

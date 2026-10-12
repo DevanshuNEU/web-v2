@@ -4,7 +4,7 @@ The search is for OpenCodeIntel. You type "listen for state changes" and it shou
 
 66.7%.
 
-Two queries got better and four got worse. "Check if state objects are equal" used to find `shallow`. After reranking it found `compareEntries`, a helper that `shallow` calls. Close enough to be annoying, wrong enough to count. A local BGE reranker did worse, 61.9% to 47.6%, though it ran against a weaker first stage.
+Two queries got better and four got worse ([the results file](https://github.com/OpenCodeIntel/retrieval-research/blob/main/results/exp04_20251218_173747.json)). "Check if state objects are equal" used to find `shallow`. After reranking it found `compareEntries`, a helper that `shallow` calls. Close enough to be annoying, wrong enough to count. A local BGE reranker did worse, 61.9% to 47.6%, though it ran against a weaker first stage.
 
 ## I wrote down the wrong lesson
 
@@ -23,7 +23,7 @@ By December 20 the pipeline looked different:
 - The query set changed, from 21 queries to 32.
 - I'd changed the labels. More on that below, because it's the part I'm least proud of.
 
-After that, `rerank-2` never made a codebase worse. Flask went from 60% to 72%, with six queries fixed and none broken. Across 14 codebases in Python, JavaScript, TypeScript, Java and Go, the average went from 78% to 94%.
+After that, `rerank-2` never made a codebase worse. Flask went from 60% to 72%, with six queries fixed and none broken. Across 14 codebases in four languages (Python, JavaScript and TypeScript, Java, Go), the average went from 78% to 94%.
 
 My guess is the input. A reranker scoring 30 candidates of half-cut-off code has a lot of noise to read through. I never ran the test that would settle it, so treat that as a guess.
 
@@ -39,7 +39,7 @@ Then I "corrected" the labels. Every one of the six corrections added the answer
 
 The 94% runs on queries generated from function names. `CreateBatchInBatches` becomes "create batch in batches," which shares most of its words with the answer. It's an open-book exam. The log itself guessed real-world queries would land at 70 to 80%.
 
-So the evidence I'd put weight on is the ablation from December 21, which ran 14 configurations on 7 codebases for 98 runs in all. Four of those codebases used 20 plain-English queries each instead of ones generated from names, like "open database connection" for GORM. I wrote a few of them and had Claude write the rest from my examples, so they're closer to how people search but they aren't an independent benchmark. On those 80 queries, reranking raised the number of right answers at rank 1 from 70 to 77. Across all seven codebases, the full system scored 92.1% with reranking and 83.7% without.
+So the evidence I'd put weight on is the [ablation from December 21](https://github.com/OpenCodeIntel/retrieval-research/blob/main/RESEARCH_LOG.md), which ran 14 configurations on 7 codebases for 98 runs in all. Four of those codebases used 20 plain-English queries each instead of ones generated from names, like "open database connection" for GORM. I wrote a few of them and had Claude write the rest from my examples, so they're closer to how people search but they aren't an independent benchmark. On those 80 queries, reranking raised the number of right answers at rank 1 from 70 to 77. Across all seven codebases, the full system scored 92.1% with reranking and 83.7% without.
 
 The same table had a result I didn't see coming. Without reranking, summary embeddings alone scored 84.1%, level with the full three-way fusion at 83.7%. With reranking on, the fusion beat the best single retriever on one codebase out of seven. I'd built three retrievers, and one retriever plus a reranker did nearly the same job.
 

@@ -70,7 +70,7 @@ const PROJECTS: Project[] = [
     id: 'opencodeintel',
     name: 'OpenCodeIntel',
     description: 'Code-search platform for AI coding agents: web app, REST API and MCP server',
-    longDescription: 'A code-search platform that gives AI coding agents real context on a codebase: a web app, a REST API and a 12-tool MCP server. Tree-sitter splits code into function-level chunks (Python, JavaScript, TypeScript); search fuses BM25 and vector results with reciprocal rank fusion, then reranks the top results (Voyage rerank-2 in the research eval). 94% Hit@1 on a 665-query research eval across 14 open-source codebases. On production, p50 641ms for a cold search and 242ms for cached repeats.',
+    longDescription: 'A code-search platform that gives AI coding agents real context on a codebase: a web app, a REST API and a 12-tool MCP server. Tree-sitter splits code into function-level chunks (Python, JavaScript, TypeScript); search fuses BM25 and vector results with reciprocal rank fusion, then reranks the top results (Voyage rerank-2 in the research eval). 94% Hit@1 on a 665-query research eval across 14 open-source codebases. On the public playground (vector search with keyword and code-graph boosts), p50 641ms for a cold search and 242ms for cached repeats.',
     category: 'AI / Agents',
     tech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React'],
     github: 'https://github.com/OpenCodeIntel/opencodeintel',

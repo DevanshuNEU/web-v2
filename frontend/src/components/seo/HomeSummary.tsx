@@ -10,17 +10,18 @@ import Link from 'next/link';
 import { identity, quickIntro, contactLinks } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
 import { projectMeta, getAllProjectKeys } from '@/data/projectMeta';
-import { projectDescription, projectPath } from '@/lib/seoContent';
+import { getAllPosts } from '@/data/writing';
+import { SITE_PAGES, projectDescription, projectPath, writingPath } from '@/lib/seoContent';
 import { PERSON_NAME } from '@/lib/site';
 
 export default function HomeSummary() {
   return (
     <div className="sr-only">
-      <h1>{PERSON_NAME}, Software Engineer and AI Engineer (MCP servers, RAG, evals, voice agents)</h1>
+      <h1>{PERSON_NAME}, Software Engineer, AI Engineer and Forward Deployed Engineer (MCP servers, RAG, evals, voice agents)</h1>
       <p>{identity.availability}. Based in {identity.location}.</p>
       {quickIntro.map(p => <p key={p}>{p}</p>)}
       <nav aria-label="Pages">
-        <Link href="/about">About</Link> <Link href="/projects">Projects</Link> <Link href="/resume">Resume</Link>
+        {SITE_PAGES.map(p => <Link key={p.path} href={p.path}>{p.title}</Link>)}
       </nav>
       <h2>Projects</h2>
       <ul>
@@ -32,6 +33,14 @@ export default function HomeSummary() {
             </li>
           );
         })}
+      </ul>
+      <h2>Writing</h2>
+      <ul>
+        {getAllPosts().map(post => (
+          <li key={post.slug}>
+            <Link href={writingPath(post.slug)}>{post.title}</Link>: {post.description}
+          </li>
+        ))}
       </ul>
       <h2>Experience</h2>
       <ul>
