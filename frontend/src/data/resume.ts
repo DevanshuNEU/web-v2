@@ -174,7 +174,7 @@ export const RESUME: ResumeData = {
       name:   'OpenCodeIntel',
       tech:   'Python · FastAPI · FastMCP · tree-sitter · Pinecone · Redis · React · TypeScript',
       period: 'Nov 2025 - Present',
-      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from reranking (Voyage rerank-2) isolated via a 98-run ablation. Production search: p50 641ms cold, 242ms cached.',
+      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from reranking (Voyage rerank-2) isolated via a 98-run ablation. Public playground search: p50 641ms cold, 242ms cached.',
       link:   'opencodeintel.com',
     },
     {

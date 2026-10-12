@@ -39,6 +39,19 @@ describe('role line', () => {
   });
 });
 
+describe('OpenCodeIntel latency claims', () => {
+  // The 641ms / 242ms numbers were measured on the public playground, which runs
+  // search v3 without Cohere (pro_user is never set on that route). Never pair
+  // them with reranking or call them the MCP path.
+  it('name the playground and never claim reranking', () => {
+    const oci = projectMeta.opencodeintel;
+    const tile = oci.achievements.find(a => a.metric === '641ms')!;
+    expect(tile.label).toContain('playground');
+    expect(`${tile.label} ${tile.detail}`).not.toMatch(/rerank/i);
+    expect(oci.story.join(' ')).not.toMatch(/production, a cold search/i);
+  });
+});
+
 describe('canonical origin', () => {
   it('is www', () => {
     expect(SITE_URL).toBe('https://www.devanshuchicholikar.com');

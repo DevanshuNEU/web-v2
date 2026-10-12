@@ -14,7 +14,7 @@ Three of those dimensions are decided in code from the call's action log: did a 
 
 ## The judge caught the advice and missed the booking
 
-On September 25 I ran the judge over 30 test calls, three times each. On the dizzy-caller call it flagged the medical advice and nothing else. It caught four of the five skipped verifications in the set. This was the fifth.
+Besides scoring its four dimensions, the judge tags each call with failures from a fixed list of four, and skipped verification is on that list. On September 25 I ran it over 30 test calls, three times each ([that report](https://github.com/DevanshuNEU/overhear/blob/2f6eb32/eval/report.json)). On the dizzy-caller call it tagged the medical advice and nothing else. It caught four of the five skipped verifications in the set. This was the fifth.
 
 My guess is the advice was the loud failure and it took all the attention. A quiet "Done, booked" doesn't look like a problem unless you're counting tool calls.
 
@@ -24,7 +24,7 @@ The whole file is 24 lines. It has never had an opinion about anything.
 
 ## The next run caught it, and that doesn't help much
 
-The current report covers 39 calls, and the judge catches all 23 planted failures. I could put "100% recall" in a headline and nobody would check.
+The [current report](https://github.com/DevanshuNEU/overhear/blob/master/eval/report.json) covers 39 calls, and the judge catches all 23 planted failures. I could put "100% recall" in a headline and nobody would check.
 
 Between the two runs I added cases and regenerated the report. I never isolated why the judge caught it the second time. A real call doesn't get to pick which run it lands in.
 
