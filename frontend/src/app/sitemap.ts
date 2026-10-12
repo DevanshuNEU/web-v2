@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { projectMeta, getAllProjectKeys } from '@/data/projectMeta';
-import { SITE_PAGES, projectPath } from '@/lib/seoContent';
+import { getAllPosts } from '@/data/writing';
+import { SITE_PAGES, projectPath, writingPath } from '@/lib/seoContent';
 import { absoluteUrl, CONTENT_UPDATED } from '@/lib/site';
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -12,6 +13,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: absoluteUrl(projectPath(projectMeta[key].slug)),
       lastModified,
       priority: projectMeta[key].featured ? 0.7 : 0.5,
+    })),
+    ...getAllPosts().map(post => ({
+      url: absoluteUrl(writingPath(post.slug)),
+      lastModified: post.dateModified ?? post.datePublished,
+      priority: 0.6,
     })),
   ];
 }

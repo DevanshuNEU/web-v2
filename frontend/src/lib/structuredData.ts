@@ -15,7 +15,8 @@
 import { identity, contactLinks } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
 import type { ProjectMeta } from '@/data/projectMeta';
-import { projectDescription, projectPath } from './seoContent';
+import type { Post } from '@/data/writing';
+import { projectDescription, projectPath, writingPath } from './seoContent';
 import { SITE_URL, SITE_NAME, PERSON_NAME, SITE_DESCRIPTION, CONTENT_UPDATED, absoluteUrl } from './site';
 
 export const PERSON_ID = `${SITE_URL}/#devanshu`;
@@ -132,6 +133,34 @@ export function projectNode(meta: ProjectMeta): Node {
     ...(meta.extraTech && { keywords: meta.extraTech.join(', ') }),
     author: personRef,
     creator: personRef,
+  };
+}
+
+/**
+ * BlogPosting for a /writing post. The author is the Person by @id, so the post
+ * joins the same identity as the profile pages. The project it is about and
+ * the public data it rests on are linked, so a reader (or a model) can check
+ * the claims.
+ */
+export function articleNode(post: Post, words: number, project?: ProjectMeta): Node {
+  const url = absoluteUrl(writingPath(post.slug));
+  return {
+    '@type': 'BlogPosting',
+    '@id': `${url}#article`,
+    headline: post.title,
+    description: post.description,
+    url,
+    mainEntityOfPage: url,
+    datePublished: post.datePublished,
+    dateModified: post.dateModified ?? post.datePublished,
+    inLanguage: 'en-US',
+    wordCount: words,
+    keywords: post.keywords.join(', '),
+    isPartOf: { '@id': WEBSITE_ID },
+    author: personRef,
+    publisher: { '@id': PERSON_ID },
+    ...(post.sourceUrl && { isBasedOn: post.sourceUrl }),
+    ...(project && { about: { '@id': `${absoluteUrl(projectPath(project.slug))}#project`, name: project.displayName } }),
   };
 }
 

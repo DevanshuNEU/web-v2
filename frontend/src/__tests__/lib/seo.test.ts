@@ -3,6 +3,7 @@ import robots from '@/app/robots';
 import sitemap from '@/app/sitemap';
 import { buildLlmsTxt } from '@/lib/llmsTxt';
 import { projectMeta, getAllProjectKeys, getProjectBySlug } from '@/data/projectMeta';
+import { posts } from '@/data/writing';
 import { projectDescription } from '@/lib/seoContent';
 import { SITE_URL, absoluteUrl } from '@/lib/site';
 
@@ -44,11 +45,12 @@ describe('sitemap', () => {
   const entries = sitemap();
   const urls = entries.map(e => e.url);
 
-  it('lists home, the three pages and every project on www', () => {
+  it('lists home, the four pages, every project and every post on www', () => {
     expect(urls).toContain(SITE_URL);
-    for (const p of ['/about', '/projects', '/resume']) expect(urls).toContain(`${SITE_URL}${p}`);
+    for (const p of ['/about', '/projects', '/resume', '/writing']) expect(urls).toContain(`${SITE_URL}${p}`);
     for (const k of keys) expect(urls).toContain(`${SITE_URL}/projects/${projectMeta[k].slug}`);
-    expect(urls).toHaveLength(4 + keys.length);
+    for (const post of posts) expect(urls).toContain(`${SITE_URL}/writing/${post.slug}`);
+    expect(urls).toHaveLength(5 + keys.length + posts.length);
     for (const u of urls) expect(u.startsWith(SITE_URL)).toBe(true);
   });
 

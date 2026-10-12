@@ -17,7 +17,7 @@ export const SITE_DESCRIPTION =
  * so bump it whenever data/ changes in a way a reader would notice. Search
  * engines stop trusting lastmod that moves on every build.
  */
-export const CONTENT_UPDATED = '2026-10-09';
+export const CONTENT_UPDATED = '2026-10-12';
 
 /** Absolute URL on the canonical origin, for sitemap, OG and JSON-LD. */
 export function absoluteUrl(path = '/'): string {
