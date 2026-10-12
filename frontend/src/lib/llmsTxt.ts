@@ -8,7 +8,8 @@
 import { identity, quickIntro, opinions, contactLinks } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
 import { projectMeta, getAllProjectKeys } from '@/data/projectMeta';
-import { SITE_PAGES, projectDescription, projectPath } from '@/lib/seoContent';
+import { getAllPosts } from '@/data/writing';
+import { SITE_PAGES, projectDescription, projectPath, writingPath } from '@/lib/seoContent';
 import { absoluteUrl, PERSON_NAME, SITE_DESCRIPTION } from '@/lib/site';
 
 export function buildLlmsTxt(): string {
@@ -30,6 +31,10 @@ export function buildLlmsTxt(): string {
       const research = meta.researchUrl ? ` Research data: ${meta.researchUrl}` : '';
       return `- [${meta.displayName}](${absoluteUrl(projectPath(meta.slug))}): ${projectDescription(meta, 320)}${research}`;
     }),
+    '',
+    '## Writing',
+    '',
+    ...getAllPosts().map(post => `- [${post.title}](${absoluteUrl(writingPath(post.slug))}): ${post.description}`),
     '',
     '## Experience',
     '',

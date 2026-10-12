@@ -4,7 +4,8 @@ import Section from '@/components/site/Section';
 import { identity, quickIntro, whatImAbout, opinions, specs, contactLinks } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
 import { projectMeta, getFeaturedProjects } from '@/data/projectMeta';
-import { projectPath } from '@/lib/seoContent';
+import { getAllPosts } from '@/data/writing';
+import { projectPath, writingPath } from '@/lib/seoContent';
 import { PERSON_NAME } from '@/lib/site';
 import JsonLd from '@/components/seo/JsonLd';
 import { graph, profilePageNode, breadcrumbNode } from '@/lib/structuredData';
@@ -21,6 +22,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   const featured = getFeaturedProjects().slice(0, 4);
+  const writing = getAllPosts().slice(0, 3);
 
   return (
     <article>
@@ -74,6 +76,21 @@ export default function AboutPage() {
         </ul>
         <Link href="/projects" className="text-[15px] underline underline-offset-4">All projects</Link>
       </Section>
+
+      {writing.length > 0 && (
+        <Section label="Writing">
+          <ul className="flex flex-col gap-3 text-[16px]">
+            {writing.map(post => (
+              <li key={post.slug}>
+                <Link href={writingPath(post.slug)} className="font-medium underline underline-offset-4">
+                  {post.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link href="/writing" className="text-[15px] underline underline-offset-4">All writing</Link>
+        </Section>
+      )}
 
       <Section label="Experience">
         <ul className="flex flex-col gap-4 text-[16px]">

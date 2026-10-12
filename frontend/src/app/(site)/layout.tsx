@@ -1,5 +1,5 @@
 /**
- * Plain-HTML pages (/about, /projects, /projects/[slug], /resume).
+ * Plain-HTML pages (/about, /projects, /projects/[slug], /resume, /writing).
  *
  * The desktop at / is a client-rendered OS, which crawlers and AI search see
  * as a near-empty shell. These pages carry the same content as real HTML,
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/about', label: 'About' },
   { href: '/projects', label: 'Projects' },
   { href: '/resume', label: 'Resume' },
+  { href: '/writing', label: 'Writing' },
 ];
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {

@@ -10,10 +10,15 @@ export const SITE_PAGES = [
   { path: '/about', title: 'About', description: 'Who I am, how I got here, my experience, and the opinions I will argue about.' },
   { path: '/projects', title: 'Projects', description: 'What I shipped, with the numbers and the caveats.' },
   { path: '/resume', title: 'Resume', description: 'Experience, projects, education and skills. PDF included.' },
+  { path: '/writing', title: 'Writing', description: 'Write-ups of real findings from my projects, mistakes included.' },
 ] as const;
 
 export function projectPath(slug: string): string {
   return `/projects/${slug}`;
+}
+
+export function writingPath(slug: string): string {
+  return `/writing/${slug}`;
 }
 
 /** One-paragraph description for meta tags and listings. */

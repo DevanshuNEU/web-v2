@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { projectMeta, getAllProjectKeys, getProjectBySlug } from '@/data/projectMeta';
-import { projectDescription, projectPath, STATUS_LABEL } from '@/lib/seoContent';
+import { getPostsForProject } from '@/data/writing';
+import { projectDescription, projectPath, writingPath, STATUS_LABEL } from '@/lib/seoContent';
 import Section from '@/components/site/Section';
 import MetaLabel from '@/components/editorial/MetaLabel';
 import { PERSON_NAME } from '@/lib/site';
@@ -44,6 +45,7 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
   const found = getProjectBySlug(slug);
   if (!found) notFound();
   const { meta } = found;
+  const writing = getPostsForProject(found.key);
 
   const keys = getAllProjectKeys();
   const i = keys.indexOf(found.key);
@@ -118,6 +120,20 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
               </div>
             ))}
           </dl>
+        </Section>
+      )}
+
+      {writing.length > 0 && (
+        <Section label="Writing">
+          <ul className="flex flex-col gap-3 text-[16px]">
+            {writing.map(post => (
+              <li key={post.slug}>
+                <Link href={writingPath(post.slug)} className="font-medium underline underline-offset-4">
+                  {post.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Section>
       )}
 

@@ -7,7 +7,7 @@
 export const SITE_URL = 'https://www.devanshuchicholikar.com';
 export const SITE_NAME = 'Devanshu Chicholikar';
 export const PERSON_NAME = 'Devanshu Chicholikar';
-export const ROLE_LINE = 'Software Engineer, AI Engineer';
+export const ROLE_LINE = 'Software Engineer, AI Engineer, Forward Deployed Engineer';
 
 export const SITE_DESCRIPTION =
   'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.';
@@ -17,7 +17,7 @@ export const SITE_DESCRIPTION =
  * so bump it whenever data/ changes in a way a reader would notice. Search
  * engines stop trusting lastmod that moves on every build.
  */
-export const CONTENT_UPDATED = '2026-10-09';
+export const CONTENT_UPDATED = '2026-10-12';
 
 /** Absolute URL on the canonical origin, for sitemap, OG and JSON-LD. */
 export function absoluteUrl(path = '/'): string {
