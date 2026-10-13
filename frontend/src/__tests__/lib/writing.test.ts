@@ -106,8 +106,17 @@ describe('BlogPosting JSON-LD', () => {
     expect(node.url).toBe(`${SITE_URL}/writing/rerankers-code-search`);
     expect(node.isBasedOn).toBe('https://github.com/OpenCodeIntel/retrieval-research');
     expect(node.about).toMatchObject({ '@id': `${SITE_URL}/projects/${projectMeta.opencodeintel.slug}#project` });
-    expect(node.datePublished).toBe(post.datePublished);
     expect(node.wordCount).toBe(900);
+  });
+
+  it('emits datePublished and dateModified as full ISO 8601 datetimes with timezone', () => {
+    for (const p of getAllPosts()) {
+      const n = articleNode(p, 100);
+      expect(n.datePublished).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/);
+      expect(n.dateModified).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/);
+      expect(String(n.datePublished).startsWith(p.datePublished)).toBe(true);
+      expect(String(n.dateModified).startsWith(p.dateModified ?? p.datePublished)).toBe(true);
+    }
   });
 });
 

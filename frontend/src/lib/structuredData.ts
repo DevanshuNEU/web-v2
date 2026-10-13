@@ -17,7 +17,7 @@ import { RESUME } from '@/data/resume';
 import type { ProjectMeta } from '@/data/projectMeta';
 import type { Post } from '@/data/writing';
 import { projectDescription, projectPath, writingPath } from './seoContent';
-import { SITE_URL, SITE_NAME, PERSON_NAME, SITE_DESCRIPTION, CONTENT_UPDATED, absoluteUrl } from './site';
+import { SITE_URL, SITE_NAME, PERSON_NAME, SITE_DESCRIPTION, CONTENT_UPDATED, absoluteUrl, isoDateTime } from './site';
 
 export const PERSON_ID = `${SITE_URL}/#devanshu`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
@@ -97,7 +97,7 @@ export function profilePageNode(path: string): Node {
     url: absoluteUrl(path),
     name: path === '/' ? `${PERSON_NAME} | Software Engineer, AI Engineer` : `About ${PERSON_NAME}`,
     isPartOf: { '@id': WEBSITE_ID },
-    dateModified: CONTENT_UPDATED,
+    dateModified: isoDateTime(CONTENT_UPDATED),
     mainEntity: personNode(),
   };
 }
@@ -151,8 +151,8 @@ export function articleNode(post: Post, words: number, project?: ProjectMeta): N
     description: post.description,
     url,
     mainEntityOfPage: url,
-    datePublished: post.datePublished,
-    dateModified: post.dateModified ?? post.datePublished,
+    datePublished: isoDateTime(post.datePublished),
+    dateModified: isoDateTime(post.dateModified ?? post.datePublished),
     inLanguage: 'en-US',
     wordCount: words,
     keywords: post.keywords.join(', '),

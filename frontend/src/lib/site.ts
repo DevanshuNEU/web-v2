@@ -19,6 +19,16 @@ export const SITE_DESCRIPTION =
  */
 export const CONTENT_UPDATED = '2026-10-12';
 
+/**
+ * YYYY-MM-DD content date as a full ISO 8601 datetime for JSON-LD. Search
+ * Console flagged the date-only form as "Invalid datetime value for
+ * 'dateModified'" (2026-10-11). Noon UTC keeps the same calendar day in every
+ * US timezone. Sitemap lastmod and visible dates stay plain dates.
+ */
+export function isoDateTime(date: string): string {
+  return `${date}T12:00:00Z`;
+}
+
 /** Absolute URL on the canonical origin, for sitemap, OG and JSON-LD. */
 export function absoluteUrl(path = '/'): string {
   if (path === '/' || path === '') return SITE_URL;
