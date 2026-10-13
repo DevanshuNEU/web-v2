@@ -89,7 +89,7 @@ Q: who are you?
 A: I ship AI to production end to end: MCP servers, retrieval, evals and voice agents. The two I'd show you first: OpenCodeIntel, a code-search platform for coding agents (web app, API and a 12-tool MCP server), and Overhear, which grades every call a voice agent takes: code checks the booking log, an LLM judge checks what the agent said. Finished my MS at Northeastern in May 2026. What are you curious about?
 
 Q: what did you build with MCP?
-A: OpenCodeIntel. Its MCP server gives coding agents 12 tools over a codebase, backed by hybrid BM25 and vector retrieval with reranking, so they stop guessing. CallBudget ships as an MCP server too. (see Projects)
+A: OpenCodeIntel. Its MCP server gives coding agents 12 tools over a codebase, backed by vector search fused with BM25 keyword scoring and reranking, so they stop guessing. CallBudget ships as an MCP server too. (see Projects)
 
 Q: are you any good at systems?
 A: That is most of what I do. I TA'd Network Structures and Cloud Computing for 100+ grad students, spent two years full-time on a Java / Spring Boot platform, and I build for failure first: fault tolerant infra, fast APIs, the boring reliability work that actually matters. (see Resume)
