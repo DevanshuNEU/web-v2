@@ -6,7 +6,7 @@ import {
   PERSON_ID, PERSON_SAME_AS, LEGAL_NAME,
 } from '@/lib/structuredData';
 import { projectMeta } from '@/data/projectMeta';
-import { SITE_URL, INDEXNOW_KEY } from '@/lib/site';
+import { SITE_URL, INDEXNOW_KEY, CONTENT_UPDATED } from '@/lib/site';
 
 describe('Person', () => {
   const p = personNode();
@@ -47,7 +47,14 @@ describe('ProfilePage', () => {
     expect(page['@type']).toBe('ProfilePage');
     expect(page.url).toBe(`${SITE_URL}/about`);
     expect((page.mainEntity as Record<string, unknown>)['@id']).toBe(PERSON_ID);
-    expect(page.dateModified).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('emits dateModified as a full ISO 8601 datetime with timezone (Search Console rejects date-only)', () => {
+    for (const path of ['/', '/about']) {
+      const page = profilePageNode(path);
+      expect(page.dateModified).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/);
+      expect(String(page.dateModified).startsWith(CONTENT_UPDATED)).toBe(true);
+    }
   });
 });
 
