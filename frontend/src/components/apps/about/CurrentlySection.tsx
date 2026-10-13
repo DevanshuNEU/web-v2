@@ -70,7 +70,7 @@ export function CurrentlySection() {
           Most of my energy goes into building at the MCP layer right now.{" "}
           <span className="text-text">OpenCodeIntel</span> is a code-search platform
           for coding agents: a web app, a REST API and a 12-tool MCP server over
-          hybrid BM25 + vector retrieval with reranking.{" "}
+          vector search fused with BM25 keyword scoring and reranking.{" "}
           <span className="text-text">Overhear</span> is a QA analyst for voice
           agents, evaluated on a 39-call golden dataset.{" "}
           <span className="text-text">Saar</span> is a Chrome extension on the Web

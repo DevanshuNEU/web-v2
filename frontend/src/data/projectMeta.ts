@@ -40,13 +40,13 @@ export const projectMeta: Record<string, ProjectMeta> = {
     slug: 'opencodeintel',
     displayName: 'OpenCodeIntel',
     tagline: 'Code search for AI coding agents, so they stop guessing',
-    descriptionOverride: "Code-search platform for AI coding agents: hybrid BM25 + vector retrieval with reranking, tree-sitter AST chunking, a web app, a REST API and a 12-tool MCP server.",
+    descriptionOverride: "Code-search platform for AI coding agents: vector search fused with BM25 keyword scoring and reranking, tree-sitter AST chunking, a web app, a REST API and a 12-tool MCP server.",
     featured: true,
     category: 'org',
     status: 'active',
     story: [
       "OpenCodeIntel is a code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server that give an agent real context on a codebase instead of letting it guess.",
-      "Indexing parses each repo with tree-sitter into function-level chunks (Python, JavaScript and TypeScript), embeds them and stores them in Pinecone next to a BM25 index. On the API and MCP search path, a query runs both, fuses the results with reciprocal rank fusion and reranks the top results (Voyage rerank-2 in the research eval, Cohere rerank-v3.5 in production). The public playground runs a lighter path: vector search with keyword and code-graph boosts, no model reranking. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
+      "Indexing parses each repo with tree-sitter into function-level chunks (Python and JavaScript grammars; TypeScript files go through the JavaScript one), embeds them and stores them in Pinecone. On the API and MCP search path, a query pulls the top 50 chunks by vector search, scores them with BM25, fuses the two rankings with reciprocal rank fusion and reranks the top 20 with Cohere rerank-v3.5. The research eval used a full BM25 index and Voyage rerank-2 instead. The public playground runs a lighter path: vector search with keyword and code-graph boosts, no model reranking. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
       "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On the public playground, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
     ],
     achievements: [
