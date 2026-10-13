@@ -146,7 +146,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
       "Coding agents do far better with context about the project, and nobody enjoys writing or maintaining that file. Point saar at a repo and it writes it for you.",
     ],
     achievements: [
-      { metric: '22', label: 'Releases on PyPI', detail: 'v0.2.0 to v0.6.0' },
+      { metric: '20+', label: 'Releases on PyPI', detail: 'since February 2026' },
       { metric: '3', label: 'Context formats', detail: 'AGENTS.md, CLAUDE.md, .cursorrules' },
       { metric: 'Python', label: 'Static analysis', detail: 'Stack, patterns and conventions from the code' },
     ],

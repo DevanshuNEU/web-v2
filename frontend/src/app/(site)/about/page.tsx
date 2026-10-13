@@ -11,7 +11,7 @@ import JsonLd from '@/components/seo/JsonLd';
 import { graph, profilePageNode, breadcrumbNode } from '@/lib/structuredData';
 
 const DESCRIPTION =
-  'Devanshu Chicholikar is a software engineer and AI engineer in Boston: MCP servers, RAG, LLM-as-a-judge evals and voice agents, plus the full-stack and infra work around them.';
+  'Devanshu Chicholikar is a software engineer, AI engineer and forward deployed engineer in Boston: MCP servers, RAG, LLM-as-a-judge evals and voice agents, plus the full-stack and infra work around them.';
 
 export const metadata: Metadata = {
   title: 'About',

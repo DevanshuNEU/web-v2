@@ -119,7 +119,7 @@ const PROJECTS: Project[] = [
     id: 'saar-cli',
     name: 'saar CLI',
     description: 'Writes AGENTS.md, CLAUDE.md and .cursorrules from static analysis',
-    longDescription: 'A Python CLI on PyPI (22 releases) that statically analyzes a codebase (package manager, logging, auth patterns) and generates the context files coding agents read: AGENTS.md, CLAUDE.md and .cursorrules.',
+    longDescription: 'A Python CLI on PyPI (20+ releases since February 2026) that statically analyzes a codebase (package manager, logging, auth patterns) and generates the context files coding agents read: AGENTS.md, CLAUDE.md and .cursorrules.',
     category: 'Dev Tools',
     tech: ['Python', 'Static analysis', 'CLI', 'PyPI'],
     github: 'https://github.com/OpenCodeIntel/saar',

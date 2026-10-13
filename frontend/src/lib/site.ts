@@ -9,15 +9,17 @@ export const SITE_NAME = 'Devanshu Chicholikar';
 export const PERSON_NAME = 'Devanshu Chicholikar';
 export const ROLE_LINE = 'Software Engineer, AI Engineer, Forward Deployed Engineer';
 
+export const HOME_TITLE = `${PERSON_NAME} | ${ROLE_LINE}`;
+
 export const SITE_DESCRIPTION =
-  'Software engineer and AI engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.';
+  'Software engineer, AI engineer and forward deployed engineer in Boston who ships AI to production end to end: MCP servers, RAG, LLM-as-a-judge evals and voice agents. Built OpenCodeIntel, a code-search platform for AI coding agents, and Overhear, a QA analyst for voice agents.';
 
 /**
  * Last time the content behind the pages changed. Sitemap lastmod reads this,
  * so bump it whenever data/ changes in a way a reader would notice. Search
  * engines stop trusting lastmod that moves on every build.
  */
-export const CONTENT_UPDATED = '2026-10-12';
+export const CONTENT_UPDATED = '2026-10-13';
 
 /**
  * YYYY-MM-DD content date as a full ISO 8601 datetime for JSON-LD. Search

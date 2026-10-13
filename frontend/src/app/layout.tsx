@@ -15,7 +15,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
-import { SITE_URL, SITE_DESCRIPTION } from "@/lib/site";
+import { SITE_URL, SITE_DESCRIPTION, HOME_TITLE } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,7 +43,7 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
+    default: HOME_TITLE,
     template: '%s | Devanshu Chicholikar'
   },
   description: SITE_DESCRIPTION,
@@ -80,8 +80,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: '/',
-    title: 'Devanshu Chicholikar | Software Engineer, AI Engineer',
-    description: 'Software and AI engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
+    title: HOME_TITLE,
+    description: 'Software, AI and forward deployed engineer who ships AI to production: MCP servers, RAG, evals and voice agents. Built OpenCodeIntel (code search for AI coding agents) and Overhear (QA for voice agents).',
     siteName: 'Devanshu Chicholikar',
     // Images come from the opengraph-image.tsx file next to each route.
   },
