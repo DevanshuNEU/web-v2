@@ -49,6 +49,17 @@ export const posts: Post[] = [
     sourceUrl: 'https://github.com/DevanshuNEU/overhear',
     keywords: ['LLM-as-a-judge', 'voice agents', 'AI evaluation', 'eval harness', 'golden dataset', 'Retell'],
   },
+  {
+    slug: 'why-i-built-opencodeintel',
+    title: 'Claude kept guessing about my code. So I built it a map.',
+    description:
+      'Why I built OpenCodeIntel: Claude Desktop kept making things up about my repo, and new teammates had no map either. What I built, what the research found, and what production taught me.',
+    datePublished: '2026-10-12',
+    card: { title: 'Claude kept guessing about my code', subtitle: 'So I built it a map.' },
+    project: 'opencodeintel',
+    sourceUrl: 'https://github.com/OpenCodeIntel/opencodeintel',
+    keywords: ['OpenCodeIntel', 'code search', 'MCP', 'AI coding agents', 'codebase context', 'hallucination'],
+  },
 ];
 
 const CONTENT_DIR = join(process.cwd(), 'src/content/writing');

@@ -46,7 +46,7 @@ describe('posts', () => {
       expect(body + p.title + p.description).not.toMatch(/[–—]/);
       expect(body).not.toMatch(/^#(?!# )/m); // only ## headings; the page owns the h1
       expect(body).not.toMatch(/\*\*|__|^\d+\. /m); // no bold or numbered lists, they would render literally
-      expect(body).not.toMatch(/\]\(http:/); // links must be https to be recognised
+      expect(body).not.toMatch(/\]\((?!https:\/\/)/); // links must be absolute https to be recognised
     }
   });
 });
