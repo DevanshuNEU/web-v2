@@ -72,7 +72,7 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
       <p className="mt-4 text-[20px] leading-snug text-text-secondary">{meta.tagline}</p>
       <p className="mt-3 text-[15px] text-text-secondary">
         Built by <Link href="/about" className="text-text underline underline-offset-4">{PERSON_NAME}</Link>,
-        software engineer and AI engineer in Boston.
+        software engineer, AI engineer and forward deployed engineer in Boston.
       </p>
 
       {(meta.repoUrl || meta.liveUrl) && (

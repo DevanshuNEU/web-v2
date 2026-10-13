@@ -102,9 +102,9 @@ export const commandRegistry: Record<string, CommandHandler> = {
   about: () => [
     '┌──────────────────────────────────────────┐',
     '│  Devanshu Chicholikar                    │',
-    '│  Software + AI Engineer                  │',
+    '│  Software, AI, Forward Deployed Engineer │',
     '├──────────────────────────────────────────┤',
-    '│  MS Software Engineering                 │',
+    '│  MS Software Engineering Systems         │',
     '│  Northeastern University                 │',
     '│  Graduated: May 2026                     │',
     '│  Location: Boston, MA                    │',

@@ -32,7 +32,7 @@ Second, describing code in English beat embedding the code itself. Across seven 
 
 ## Then the semester
 
-From January to April it got squeezed in around classes and a TA job. The search v2 code started on January 4 and v3 on January 26. By now the repo has 726 commits, and OpenCodeIntel is a web app, a REST API and a 12-tool MCP server: search, dependency graphs, impact analysis and more.
+From January to April it got squeezed in around classes and a TA job. The search v2 code started on January 4 and v3 on January 26. By now the repo has over 700 commits, and OpenCodeIntel is a web app, a REST API and a 12-tool MCP server: search, dependency graphs, impact analysis and more.
 
 ## What production taught me
 
