@@ -6,7 +6,7 @@ If the model could look up the right code instead of guessing, it would stop mak
 
 ## The same problem, with people
 
-The second push came from people. I saw it during onboarding at a company, and again when friends wanted to contribute to my repos. They didn't know where anything was, and I couldn't walk each of them through it every time.
+The second push came from people. I first felt it as an intern at Pitney Bowes. I never knew where anything lived in the code, and asking the seniors was close to impossible. They had little time for a question that small. Years later I saw it from the other side, when friends wanted to contribute to my repos. They didn't know where anything was, and I couldn't walk each of them through it every time.
 
 A new teammate and a language model are in the same spot on day one. Neither knows the codebase. The teammate asks the author, which doesn't scale. The model guesses, which is worse.
 
