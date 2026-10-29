@@ -530,6 +530,11 @@ body {
    Still window-dynamic via cqi; specificity (0-3-0) beats the base ramp. */
 .app-content .editorial-hero.project-hero { font-size: clamp(1.9rem, 8cqi, 4.5rem); }
 .app-content .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
+/* Sub-heads: the rule above (0-2-0) beats a per-element Tailwind size, so an
+   h3 rendered as big as its h2 section title. Scoped to h3 (0-2-1) so every
+   h2/h1/span .editorial-head keeps its current size; h3s step down to a
+   clear sub-head size in every app. */
+.app-content h3.editorial-head { font-size: clamp(1.5rem, 4.5cqi, 1.875rem); line-height: 1.15; }
 
 /* Body, small text, and mono metadata scale off the WINDOW too, so a small
    window reads proportionally tighter while a maximized one matches the
@@ -555,68 +560,213 @@ body {
 .app-content .text-lg  { font-size: clamp(0.95rem, 2cqi, 1.125rem); }
 
 /* ============================================
-   ABOUT ME — masthead name + responsive index rail
-   The About Me app lives inside .app-content (container-type: inline-size),
-   so everything below scales off the WINDOW (container) width via cqi/@container,
-   never the viewport. Keeps the masthead from clipping and lets the rail go
-   quiet/compact in a small window while staying generous when maximized.
+   ABOUT ME: window-responsive layout
+   `.about-app` is its own query container (named `about`), so these rules key
+   off the WINDOW on desktop and off the screen on mobile, where there is no
+   .app-content. Defaults are the narrow layout; @container rules widen it.
+   Never viewport media queries.
    ============================================ */
+.about-app {
+  container: about / inline-size;
+}
 
-/* Masthead name: serif clamps off container width and is ALLOWED to wrap, so
-   the full "Devanshu Chicholikar" never clips. Pairs with min-w-0 on the flex
-   column in JSX so the serif can shrink below its intrinsic width. */
+/* Type floors: the shared .app-content clamps shrink text with the window
+   (mono labels to ~10px, body to ~13.6px). About keeps body at 15px+ and mono
+   labels at 11px+. Same specificity as the shared rules, declared later. */
+.about-app .text-lg        { font-size: clamp(1rem, 2.2cqi, 1.125rem); }
+.about-app .text-base      { font-size: clamp(0.9375rem, 2cqi, 1rem); }
+.about-app .text-sm        { font-size: 0.9375rem; }
+.about-app .text-xl        { font-size: clamp(1.125rem, 2.6cqi, 1.25rem); }
+.about-app .font-mono-meta { font-size: clamp(0.6875rem, 1.5cqi, 0.8125rem); }
+
+/* Heading ramp: h1 name > h2 section > h3 sub-head. Section titles sit below
+   the name; h3 matches the shared sub-head size (also on mobile, where the
+   .app-content rule does not apply). No mid-word breaks anywhere. */
+.about-app .editorial-head    { overflow-wrap: normal; text-wrap: balance; }
+.about-app h2.editorial-head  { font-size: clamp(2rem, 6.5cqi, 3.25rem); }
+.about-app h3.editorial-head  { font-size: clamp(1.5rem, 4.5cqi, 1.875rem); line-height: 1.15; }
+
+/* Document column padding + rhythm. */
+.about-doc {
+  gap: 4rem;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* Masthead: photo stacked above the text in a narrow window, beside it once
+   there is room. The text column is its own container, so the name sizes off
+   the column it actually sits in: 15cqi keeps "Chicholikar" (the longest
+   word) on one line at every width. */
+.about-masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.about-portrait {
+  width: 7.5rem;
+  height: 7.5rem;
+}
+.about-masthead-text {
+  container: about-mast / inline-size;
+  flex: 1 1 0%;
+  min-width: 0;
+}
 .about-masthead-name {
-  font-size: clamp(2rem, 9cqi, 4.25rem);
-  line-height: 1.04;
-  overflow-wrap: break-word;
+  font-size: clamp(2rem, 15cqi, 4.5rem);
+  line-height: 1.02;
+  overflow-wrap: normal;
+  word-break: keep-all;
   hyphens: none;
+  text-wrap: balance;
+}
+.about-link {
+  min-height: 2.25rem;
+  font-size: 0.9375rem;
 }
 
-/* Index rail: compact + quiet at small container widths, generous when wide. */
+/* Spec sheet: key above value in a narrow window, key column beside the
+   value once there is room. */
+.about-spec-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.3rem 1rem;
+  align-items: baseline;
+}
+
+/* Inline run with one separator: each item carries a leading middot and the
+   list is pulled left by one separator inside a clipping wrapper, so the dot
+   that would start a wrapped line is hidden. No stray dots at line ends
+   either, since dots only ever precede an item. */
+.about-seplist { overflow: hidden; }
+.about-seplist > ul {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 0.15em;
+  margin-left: -1.4em;
+}
+.about-seplist > ul > li { display: flex; min-width: 0; }
+.about-seplist > ul > li::before {
+  content: "\00B7";
+  flex: none;
+  width: 1.4em;
+  text-align: center;
+  color: rgb(var(--color-text-secondary));
+}
+
+/* Opinions: the serif at a reading size. */
+.about-opinion {
+  font-size: clamp(1.25rem, 3.2cqi, 1.5rem);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+/* Project / learning rows: name above text when narrow. */
+.about-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Outside code: one column, two when wide. */
+.about-outside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem 2rem;
+}
+
+/* Contact rows: label, link text, glyph. Label stacks above in a narrow
+   window so the email address never has to break. */
+.about-contact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  padding: 1rem 0.25rem;
+}
+.about-contact-row > :first-child { grid-column: 1 / -1; }
+.about-contact-value { overflow-wrap: anywhere; }
+
+/* "Read the long version" disclosure (native <details>). */
+.about-details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9375rem;
+  color: rgb(var(--color-text));
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: rgb(var(--color-border));
+}
+.about-details > summary::-webkit-details-marker { display: none; }
+.about-details > summary::after {
+  content: "+";
+  font-family: var(--font-geist-mono), monospace;
+  color: rgb(var(--color-text-secondary));
+}
+.about-details[open] > summary::after { content: "\2212"; }
+.about-details > summary:hover { text-decoration-color: rgb(var(--color-text)); }
+
+/* Index rail: hidden in a narrow window, pinned left when wide. */
 .about-rail {
-  width: clamp(11rem, 20cqi, 14rem);
+  display: none;
+  width: clamp(10.5rem, 17cqi, 13rem);
 }
-
-/* Per-row sizing tokens scale down in a narrow window. */
 .about-rail-row {
-  --about-row-py: 1rem;
-  --about-row-num: 0.72rem;
-  --about-row-label: 1.05rem;
-  padding-top: var(--about-row-py);
-  padding-bottom: var(--about-row-py);
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
 }
-.about-rail-row .about-rail-number { font-size: var(--about-row-num); }
-.about-rail-row .about-rail-label  { font-size: var(--about-row-label); line-height: 1.15; }
+.about-rail-row .about-rail-label { font-size: 1.0625rem; line-height: 1.2; }
 
-/* Tighten the whole rail when the window/container is narrow. */
-@container (max-width: 720px) {
-  .about-rail-row {
-    --about-row-py: 0.5rem;
-    --about-row-num: 0.62rem;
-    --about-row-label: 0.9rem;
-  }
+/* Visible keyboard focus for every interactive About element (WCAG 2.4.7):
+   a full ring at text color, not a faint background tint. */
+.about-focus:focus-visible {
+  outline: 2px solid rgb(var(--color-text));
+  outline-offset: 2px;
 }
-@container (max-width: 560px) {
-  .about-rail-row {
-    --about-row-py: 0.4rem;
-    --about-row-num: 0.58rem;
-    --about-row-label: 0.82rem;
-  }
+.about-rail-row.about-focus:focus-visible { outline-offset: -2px; }
+
+/* Anchor scrolls land with a little air. No scroll-snap: it fought free
+   reading on long prose. */
+.about-scroll { scroll-padding-top: 1.5rem; }
+
+@container about (min-width: 480px) {
+  .about-spec-row { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .about-contact-row { grid-template-columns: 5.5rem minmax(0, 1fr) auto; }
+  .about-contact-row > :first-child { grid-column: auto; }
 }
 
-/* ============================================
-   ABOUT ME — buttery scroll + gentle proximity snap
-   Proximity (NOT mandatory) so free scrolling is never fought; sections settle
-   near their start. scroll-padding keeps the snapped top clear of the masthead
-   breathing room. Disabled under reduced motion via the global safety net
-   (scroll-behavior: auto) and the JS branch for anchor scrolls.
-   ============================================ */
-.about-scroll {
-  scroll-snap-type: y proximity;
-  scroll-padding-top: 1.5rem;
+@container about (min-width: 600px) {
+  .about-doc {
+    gap: 5rem;
+    padding: 3rem 2.5rem 5rem;
+  }
+  .about-masthead {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+  }
+  .about-portrait {
+    width: 9rem;
+    height: 9rem;
+  }
+  .about-spec-row { grid-template-columns: 8rem minmax(0, 1fr); }
 }
-.about-snap {
-  scroll-snap-align: start;
-  scroll-snap-stop: normal;
-  scroll-margin-top: 1.5rem;
+
+@container about (min-width: 640px) {
+  .about-outside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container about (min-width: 760px) {
+  .about-rail { display: flex; }
+}
+
+@container about (min-width: 880px) {
+  .about-row {
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    column-gap: 1.5rem;
+  }
 }

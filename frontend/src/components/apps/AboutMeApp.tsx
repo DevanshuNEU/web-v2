@@ -3,51 +3,60 @@
 /**
  * AboutMeApp - "About Devanshu"
  *
- * A single vertically-scrolled, numbered editorial document. The desktop
- * variant pins a numbered index rail on the left (scroll-spy: a scroll
- * listener tracks the section in view with a bottom-of-scroll fallback, so the
- * short last section still highlights; clicking a row scrolls to it). The
- * mobile variant drops the rail for a single scroll.
+ * A single vertically-scrolled editorial document. When the WINDOW is wide
+ * enough, an index rail pins to the left (scroll-spy: a scroll listener tracks
+ * the section in view with a bottom-of-scroll fallback, so the short last
+ * section still highlights; clicking a row scrolls to it). In a narrow window
+ * and on mobile the rail is hidden and the document is a plain single scroll.
  *
- * Random-access without hiding content: every section is always rendered,
- * the rail is navigation, not tabs.
+ * Desktop and mobile render the SAME section list from SECTIONS below. Layout
+ * keys off the window, never the viewport: `.about-app` is a query container
+ * and every breakpoint is an @container rule in globals.css (about-* rules).
  *
- * Persona: identity leaks from specifics (MCP / OCI / Saar / CallBudget),
- * never from role labels, degrees, graduation, or availability framing.
+ * Persona: identity leaks from specifics (MCP / OpenCodeIntel / Saar /
+ * CallBudget), never from degrees, graduation, or visa framing.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAnalyticsStore } from "@/store/analyticsStore";
+import { useOSStore } from "@/store/osStore";
+import { useMobileStore } from "@/store/mobileStore";
 import { useIsMono } from "@/hooks/usePalette";
 import {
   Hairline,
   MetaLabel,
   EditorialSection,
 } from "@/components/editorial";
-import MobileSection from "@/components/mobile/ui/MobileSection";
 import { reveal } from "@/lib/motion";
 import {
   identity,
   mastheadSpecLine,
+  oneLiner,
   specs,
+  contactLinks,
 } from "@/data/aboutMe";
 import Portrait from "./about/Portrait";
+import { SepList } from "./about/SepList";
+import { OpinionsSection } from "./about/OpinionsSection";
+import { BuildingSection } from "./about/BuildingSection";
 import { JourneySection } from "./about/JourneySection";
-import { ExcitesSection } from "./about/ExcitesSection";
-import { CurrentlySection } from "./about/CurrentlySection";
+import { OutsideSection } from "./about/OutsideSection";
 import { ContactSection } from "./about/ContactSection";
 
 // ---------------------------------------------------------------------------
-// Section registry - single source for both the rail and the document.
+// Section registry - single source for the rail and the document, on desktop
+// and mobile alike. `rail` is the short label; `title` is the h2. Overview has
+// no h2: the masthead's h1 is its heading.
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { id: "overview",  number: "01", label: "Overview"        },
-  { id: "journey",   number: "02", label: "Journey"         },
-  { id: "excites",   number: "03", label: "What Excites Me" },
-  { id: "currently", number: "04", label: "Currently"       },
-  { id: "contact",   number: "05", label: "Contact"         },
+  { id: "overview", rail: "Overview",     title: null                      },
+  { id: "opinions", rail: "Opinions",     title: "Things I'll argue about" },
+  { id: "building", rail: "Building",     title: "What I'm building"       },
+  { id: "journey",  rail: "Journey",      title: "Journey"                 },
+  { id: "outside",  rail: "Outside code", title: "Outside code"            },
+  { id: "contact",  rail: "Contact",      title: "Contact"                 },
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
@@ -55,126 +64,148 @@ type SectionId = typeof SECTIONS[number]["id"];
 const SECTION_DOM_ID = (id: SectionId) => `about-section-${id}`;
 
 // ---------------------------------------------------------------------------
-// Masthead - clean grayscale portrait + serif name + mono spec-line + chip.
+// Masthead - portrait, serif name, role line, one-liner, link row, chip.
 //
-// Composition: photo and the text column sit on one editorial baseline (photo
-// left, name/spec/chip right on wide; stacked on narrow). On mount the four
-// pieces stagger in once (photo, name, spec-line, chip). Everything collapses
-// to instant under reduced motion via the shared `reveal` variants.
+// Stacked (photo above name) in a narrow window; photo left of the text once
+// the window is wide enough (`.about-masthead` @container rule). The name is
+// sized off its own column (`.about-masthead-text` is a container), so
+// "Chicholikar" always fits on one line whatever the layout. On mount the
+// pieces stagger in once; instant under reduced motion via `reveal`.
 // ---------------------------------------------------------------------------
 
-function Masthead({ size = 140 }: { size?: number }) {
+function Masthead({
+  onOpenResume,
+  onJumpToContact,
+}: {
+  onOpenResume: () => void;
+  onJumpToContact: () => void;
+}) {
   const mono = useIsMono();
   const reduced = useReducedMotion();
 
+  const linkClass =
+    "about-focus about-link inline-flex items-center border border-border px-3 text-text " +
+    "transition-colors duration-150 hover:bg-text/[0.06]";
+
   return (
-    <motion.div
+    <motion.header
       variants={reveal.container(reduced)}
       initial="hidden"
       animate="show"
-      className="flex flex-col gap-6 sm:flex-row sm:items-end sm:gap-7"
+      className="about-masthead"
     >
       <motion.div variants={reveal.item(reduced)}>
         <Portrait
           src={identity.photo}
           alt={`Portrait of ${identity.name}`}
-          size={size}
+          size={160}
           priority
+          className="about-portrait"
         />
       </motion.div>
 
-      <div className="flex flex-1 flex-col gap-3 min-w-0">
-        <motion.h1
-          variants={reveal.item(reduced)}
-          className="about-masthead-name font-display text-text"
-        >
-          {identity.name}
-        </motion.h1>
+      <div className="about-masthead-text flex flex-col gap-4">
+        <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-2">
+          <h1 className="about-masthead-name font-display text-text">
+            {identity.name}
+          </h1>
+          <SepList items={mastheadSpecLine} className="text-base text-text-secondary" />
+        </motion.div>
 
-        {/* Mono spec-line: MetaLabel cells separated by middots. */}
         <motion.p
           variants={reveal.item(reduced)}
-          className="flex flex-wrap items-center gap-x-1 gap-y-1"
+          className="text-lg text-text leading-relaxed max-w-[52ch]"
         >
-          {mastheadSpecLine.map((cell, i) => (
-            <React.Fragment key={cell}>
-              {i > 0 && (
-                <span aria-hidden className="font-mono-meta opacity-50">&middot;</span>
-              )}
-              <MetaLabel>{cell}</MetaLabel>
-            </React.Fragment>
-          ))}
+          {oneLiner}
         </motion.p>
 
-        {/* Availability - editorial chip: hairline border, filled square, no pulse. */}
-        <motion.span
+        {/* Contact path at the top: the four things a recruiter clicks. */}
+        <motion.nav
           variants={reveal.item(reduced)}
-          className={`inline-flex w-fit items-center gap-2 border px-2.5 py-1
-                      ${mono
-                        ? "border-border"
-                        : "border-green-500/30"}`}
+          aria-label="Contact and links"
+          className="flex flex-wrap gap-2"
         >
-          <span
-            aria-hidden
-            className={`h-2 w-2 ${mono ? "bg-text" : "bg-green-500"}`}
-          />
-          <MetaLabel className={mono ? undefined : "text-green-600 dark:text-green-400"}>
-            Available
-          </MetaLabel>
-        </motion.span>
+          <a href={`mailto:${contactLinks.email}`} className={linkClass}>
+            Email
+          </a>
+          <button type="button" onClick={onOpenResume} className={linkClass}>
+            Resume
+          </button>
+          <a href={contactLinks.github} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            GitHub
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <a href={contactLinks.linkedin} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            LinkedIn
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </motion.nav>
+
+        {/* Availability chip: hairline border, filled square, no pulse. Jumps
+            to Contact, where the full roles line lives. */}
+        <motion.div variants={reveal.item(reduced)}>
+          <button
+            type="button"
+            onClick={onJumpToContact}
+            className={`about-focus inline-flex w-fit items-center gap-2 border px-2.5 py-1.5
+                        transition-colors duration-150 hover:bg-text/[0.06]
+                        ${mono ? "border-border" : "border-green-500/30"}`}
+          >
+            <span
+              aria-hidden
+              className={`h-2 w-2 shrink-0 ${mono ? "bg-text" : "bg-green-500"}`}
+            />
+            <span
+              className={`text-sm ${mono ? "text-text" : "text-green-600 dark:text-green-400"}`}
+            >
+              {identity.availabilityShort}
+            </span>
+            <span className="sr-only">: jump to Contact</span>
+          </button>
+        </motion.div>
       </div>
-    </motion.div>
+    </motion.header>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Overview - spec sheet as a hairline-divided definition list.
+// Overview - spec sheet as a hairline-divided definition list. Values that
+// are a run of items render through SepList so a wrap never strands a dot.
 // ---------------------------------------------------------------------------
 
-function OverviewBody() {
+function SpecSheet() {
   return (
-    <div className="flex flex-col gap-8 max-w-[68ch]">
-      <p className="text-lg text-text-secondary leading-relaxed">
-        I ship AI to production end to end: MCP servers, retrieval that actually
-        works, evals that catch real failures, and voice agents.
-      </p>
-
-      <dl className="flex flex-col">
-        <Hairline />
-        {specs.map(({ key, value }) => (
-          <React.Fragment key={key}>
-            <div className="flex items-baseline gap-4 py-3">
-              <dt className="shrink-0 w-32">
-                <MetaLabel>{key}</MetaLabel>
-              </dt>
-              <dd className="flex-1 font-mono text-sm text-text leading-snug">
-                {value}
-              </dd>
-            </div>
-            <Hairline />
-          </React.Fragment>
-        ))}
-      </dl>
-    </div>
+    <dl className="flex flex-col max-w-[68ch]">
+      <Hairline />
+      {specs.map(({ key, value }) => (
+        <React.Fragment key={key}>
+          <div className="about-spec-row py-3">
+            <dt>
+              <MetaLabel>{key}</MetaLabel>
+            </dt>
+            <dd className="font-mono text-sm text-text leading-snug">
+              <SepList items={value.split(" · ")} />
+            </dd>
+          </div>
+          <Hairline />
+        </React.Fragment>
+      ))}
+    </dl>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Section body dispatch.
-// ---------------------------------------------------------------------------
-
-function SectionBody({ id }: { id: SectionId }) {
+function SectionBody({ id }: { id: Exclude<SectionId, "overview"> }) {
   switch (id) {
-    case "overview":  return <OverviewBody />;
-    case "journey":   return <JourneySection />;
-    case "excites":   return <ExcitesSection />;
-    case "currently": return <CurrentlySection />;
-    case "contact":   return <ContactSection />;
+    case "opinions": return <OpinionsSection />;
+    case "building": return <BuildingSection />;
+    case "journey":  return <JourneySection />;
+    case "outside":  return <OutsideSection />;
+    case "contact":  return <ContactSection />;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Rail row - responsive "01 / Label" index row with a sliding active marker.
+// Rail row - label row with a sliding active marker.
 //
 // The active indicator is a single thin monochrome bar shared across rows via
 // framer-motion `layoutId`, so it GLIDES between rows on scroll/click instead
@@ -186,13 +217,11 @@ function SectionBody({ id }: { id: SectionId }) {
 const RAIL_MARKER_ID = "about-rail-active";
 
 function RailRow({
-  number,
   label,
   active,
   reduced,
   onClick,
 }: {
-  number: string;
   label: string;
   active: boolean;
   reduced: boolean | null;
@@ -204,9 +233,8 @@ function RailRow({
       onClick={onClick}
       data-testid="index-row"
       aria-current={active ? "true" : undefined}
-      className="about-rail-row group relative flex w-full items-center gap-3 px-3 text-left
-                 transition-transform duration-150 ease-out motion-safe:active:scale-[0.98]
-                 focus-visible:outline-none"
+      className="about-rail-row about-focus group relative flex w-full items-center px-4 text-left
+                 transition-transform duration-150 ease-out motion-safe:active:scale-[0.98]"
     >
       {/* Sliding active marker: a thin graphite bar pinned to the row's left
           edge. layoutId makes it glide between rows. */}
@@ -222,13 +250,6 @@ function RailRow({
           }
         />
       )}
-
-      <span
-        className={`about-rail-number font-mono-meta shrink-0 transition-opacity
-                    ${active ? "opacity-100" : "opacity-50 group-hover:opacity-80"}`}
-      >
-        {number}
-      </span>
 
       <span
         className={`about-rail-label font-display min-w-0 flex-1 truncate transition-transform
@@ -317,7 +338,8 @@ function useScrollSpy(
 }
 
 // ---------------------------------------------------------------------------
-// Main app
+// Main app - one layout for desktop and mobile. `variant` only decides how the
+// Resume link opens (a window on desktop, a pushed app on mobile).
 // ---------------------------------------------------------------------------
 
 interface AboutMeAppProps {
@@ -326,6 +348,8 @@ interface AboutMeAppProps {
 
 export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
   const trackEvent = useAnalyticsStore((state) => state.trackEvent);
+  const openWindow = useOSStore((state) => state.openWindow);
+  const openMobileApp = useMobileStore((state) => state.openApp);
   const reduced = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -346,168 +370,72 @@ export default function AboutMeApp({ variant = "desktop" }: AboutMeAppProps) {
         `#${SECTION_DOM_ID(id)}`,
       );
       if (!target) return;
-      const top = target.offsetTop - 24;
+      const top =
+        target.getBoundingClientRect().top -
+        root.getBoundingClientRect().top +
+        root.scrollTop -
+        24;
       root.scrollTo({ top, behavior: reduced ? "auto" : "smooth" });
     },
     [reduced],
   );
 
-  if (variant === "mobile") {
-    return <AboutMeMobile />;
-  }
+  const openResume = useCallback(() => {
+    if (variant === "mobile") openMobileApp("resume");
+    else openWindow("resume");
+  }, [variant, openMobileApp, openWindow]);
 
   return (
-    <div className="h-full flex overflow-hidden">
-      {/* ── Sticky index rail ── width + row sizing scale off the window via
-          @container (see .about-rail / .about-rail-row in globals.css). ── */}
+    <div className={`about-app h-full flex overflow-hidden ${variant === "mobile" ? "bg-bg" : ""}`}>
+      {/* Index rail: shown only when the WINDOW is wide (see .about-rail). */}
       <nav
         aria-label="About sections"
-        className="about-rail hidden md:flex shrink-0 flex-col border-r border-border overflow-y-auto"
+        className="about-rail shrink-0 flex-col border-r border-border overflow-y-auto py-4"
       >
-        <div className="px-4 py-5">
-          <MetaLabel as="p">About</MetaLabel>
-        </div>
-        <Hairline />
-        <div className="flex flex-col py-2">
-          {SECTIONS.map(({ id, number, label }) => (
-            <RailRow
-              key={id}
-              number={number}
-              label={label}
-              active={active === id}
-              reduced={reduced}
-              onClick={() => scrollTo(id)}
-            />
-          ))}
-        </div>
+        {SECTIONS.map(({ id, rail }) => (
+          <RailRow
+            key={id}
+            label={rail}
+            active={active === id}
+            reduced={reduced}
+            onClick={() => scrollTo(id)}
+          />
+        ))}
       </nav>
 
-      {/* ── Scrolled editorial document ── gentle proximity snap, smooth anchor
-          scroll, GPU transform/opacity reveals. ── */}
-      <div ref={scrollRef} className="about-scroll flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-16">
-          <Masthead size={140} />
-
-          {/* Sections reveal once on mount with a stagger (not on scroll): a
-              windowed inner scroll container makes scroll-triggered reveals
-              unreliable, so content must never depend on an in-view trigger. */}
-          <motion.div
-            className="flex flex-col gap-16"
-            variants={reveal.container(reduced)}
-            initial="hidden"
-            animate="show"
-          >
-            {SECTIONS.map(({ id, number, label }) => (
-              <motion.div
-                key={id}
-                id={SECTION_DOM_ID(id)}
-                data-section-id={id}
-                className="about-snap"
-                variants={reveal.item(reduced)}
-              >
-                <EditorialSection
-                  number={number}
-                  eyebrow={label}
-                  title={label}
-                >
+      <div ref={scrollRef} className="about-scroll flex-1 min-w-0 overflow-y-auto">
+        {/* Sections reveal once on mount with a stagger (not on scroll): a
+            windowed inner scroll container makes scroll-triggered reveals
+            unreliable, so content must never depend on an in-view trigger. */}
+        <motion.div
+          className="about-doc mx-auto flex max-w-3xl flex-col"
+          variants={reveal.container(reduced)}
+          initial="hidden"
+          animate="show"
+        >
+          {SECTIONS.map(({ id, title }) => (
+            <motion.div
+              key={id}
+              id={SECTION_DOM_ID(id)}
+              data-section-id={id}
+              variants={reveal.item(reduced)}
+            >
+              {id === "overview" ? (
+                <section aria-label="Overview" className="flex flex-col gap-10">
+                  <Masthead
+                    onOpenResume={openResume}
+                    onJumpToContact={() => scrollTo("contact")}
+                  />
+                  <SpecSheet />
+                </section>
+              ) : (
+                <EditorialSection title={title}>
                   <SectionBody id={id} />
                 </EditorialSection>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Mobile layout - single scroll, no pill tabs, no push view.
-// ---------------------------------------------------------------------------
-
-function AboutMeMobile() {
-  const trackEvent = useAnalyticsStore((state) => state.trackEvent);
-  const reduced = useReducedMotion();
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const handleEnter = useCallback(
-    (id: SectionId) => {
-      trackEvent("section_view", `About Me: ${id}`, { section: id });
-    },
-    [trackEvent],
-  );
-
-  useScrollSpy(scrollRef, handleEnter);
-
-  // Shared reveal wiring for each mobile section: reveal once on mount, never
-  // on scroll. Scroll-triggered reveals inside a windowed scroll container are
-  // unreliable, so content must never depend on an in-view trigger.
-  const sectionMotion = {
-    variants: reveal.item(reduced),
-    initial: "hidden" as const,
-    animate: "show" as const,
-  };
-
-  return (
-    <div ref={scrollRef} className="about-scroll h-full overflow-y-auto bg-bg">
-      <div
-        className="flex flex-col gap-12 pb-12 pt-8"
-        style={{ paddingLeft: "var(--sp-hero-pad)", paddingRight: "var(--sp-hero-pad)" }}
-      >
-        <Masthead size={120} />
-
-        {/* Overview specs - list-shaped, MobileSection. */}
-        <motion.section {...sectionMotion} id={SECTION_DOM_ID("overview")} data-section-id="overview" className="about-snap flex flex-col gap-4">
-          <MetaLabel as="p"><span>01</span><span aria-hidden className="mx-2 opacity-50">/</span>Overview</MetaLabel>
-          <p className="text-base text-text-secondary leading-relaxed">
-            I ship AI to production end to end: MCP servers, retrieval that actually
-            works, evals that catch real failures, and voice agents.
-          </p>
-          <MobileSection>
-            {specs.map(({ key, value }) => (
-              <div key={key} className="flex items-baseline gap-3 px-4 py-3">
-                <span className="shrink-0 w-24 text-label font-medium uppercase tracking-wider text-text-secondary">
-                  {key}
-                </span>
-                <span className="flex-1 font-mono text-sm text-text leading-snug">
-                  {value}
-                </span>
-              </div>
-            ))}
-          </MobileSection>
-        </motion.section>
-
-        {/* Journey - narrative typeset block. */}
-        <motion.section {...sectionMotion} id={SECTION_DOM_ID("journey")} data-section-id="journey" className="about-snap flex flex-col gap-4">
-          <MetaLabel as="p"><span>02</span><span aria-hidden className="mx-2 opacity-50">/</span>Journey</MetaLabel>
-          <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Journey</h2>
-          <Hairline />
-          <JourneySection />
-        </motion.section>
-
-        {/* What Excites Me - narrative typeset block. */}
-        <motion.section {...sectionMotion} id={SECTION_DOM_ID("excites")} data-section-id="excites" className="about-snap flex flex-col gap-4">
-          <MetaLabel as="p"><span>03</span><span aria-hidden className="mx-2 opacity-50">/</span>What Excites Me</MetaLabel>
-          <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">What Excites Me</h2>
-          <Hairline />
-          <ExcitesSection />
-        </motion.section>
-
-        {/* Currently - list-shaped via its own component. */}
-        <motion.section {...sectionMotion} id={SECTION_DOM_ID("currently")} data-section-id="currently" className="about-snap flex flex-col gap-4">
-          <MetaLabel as="p"><span>04</span><span aria-hidden className="mx-2 opacity-50">/</span>Currently</MetaLabel>
-          <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Currently</h2>
-          <Hairline />
-          <CurrentlySection />
-        </motion.section>
-
-        {/* Contact - link rows. */}
-        <motion.section {...sectionMotion} id={SECTION_DOM_ID("contact")} data-section-id="contact" className="about-snap flex flex-col gap-4">
-          <MetaLabel as="p"><span>05</span><span aria-hidden className="mx-2 opacity-50">/</span>Contact</MetaLabel>
-          <h2 className="editorial-head text-text text-[clamp(1.5rem,8vw,2rem)]">Contact</h2>
-          <Hairline />
-          <ContactSection />
-        </motion.section>
+              )}
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
   );
