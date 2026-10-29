@@ -38,3 +38,32 @@ describe('getCompletions', () => {
     expect(getCompletions('PRO').ghost).toBe('');
   });
 });
+
+describe('help output', () => {
+  it('prints an aligned plain list with no box glyphs', async () => {
+    const { commandRegistry, HELP_ROWS } = await import('@/lib/terminalCommands');
+    const ctx = { openWindow: () => {}, toggleTheme: () => {}, currentTheme: 'dark' as const };
+    const lines = commandRegistry.help([], ctx) as string[];
+    expect(lines.join('\n')).not.toMatch(/[║│╔╚╗╝═]/);
+    const rows = lines.filter((l) => HELP_ROWS.some(([cmd]) => l.startsWith(`  ${cmd} `)));
+    expect(rows).toHaveLength(HELP_ROWS.length);
+    // Every description starts in the same column.
+    const cols = new Set(rows.map((l, i) => l.indexOf(HELP_ROWS[i][1])));
+    expect(cols.size).toBe(1);
+  });
+
+  it('suggests close commands and stays quiet for far ones', async () => {
+    const { suggestCommand } = await import('@/lib/terminalCommands');
+    expect(suggestCommand('hlep')).toBe('help');
+    expect(suggestCommand('projcts')).toBe('projects');
+    expect(suggestCommand('x')).toBeNull();
+    expect(suggestCommand('foo')).toBeNull();
+  });
+
+  it('lists every open alias target in the error', async () => {
+    const { commandRegistry } = await import('@/lib/terminalCommands');
+    const ctx = { openWindow: () => {}, toggleTheme: () => {}, currentTheme: 'dark' as const };
+    const out = (commandRegistry.open(['nope'], ctx) as string[]).join(' ');
+    for (const name of ['about', 'help', 'browser', 'activity', 'devai']) expect(out).toContain(name);
+  });
+});

@@ -1,144 +1,142 @@
 'use client';
 
 /**
- * HelpApp - "Help / Welcome to devOS"
+ * HelpApp - "New here?"
  *
  * Two modes share one editorial register:
  *
- *   • Tour - a typeset, step-by-step walkthrough. Serif step titles, a mono
- *     "STEP 02 / 06" counter, hairline dividers, and quiet text-link controls
- *     (Back / Skip / Next). Each step reveals once on mount; advancing remounts
- *     the step (keyed by index) so the stagger replays without any scroll trigger.
+ *   • Walkthrough - a step-by-step intro. Serif step titles, a "Step 2 of 6"
+ *     counter, hairline dividers, a bordered Next and quiet Back / Skip links.
+ *     Skip and Done both mark it seen, Esc leaves it (without closing the
+ *     window), ArrowLeft / ArrowRight step through, and each step change moves
+ *     focus to the step heading so screen readers hear it.
  *
- *   • Reference - a numbered editorial document. Desktop pins a numbered index
- *     rail (click to jump); mobile drops the rail for a single scroll. The apps
- *     glossary is a hairline-divided two-column list; shortcuts are a clean
- *     mono key table with hairline rules.
+ *   • Reference - one scrolling document. When the window is at least 640px
+ *     wide a sticky index rail sits beside it and marks the section in view
+ *     (aria-current); narrower windows (and the phone) get a row of section
+ *     links above the document instead. Every switch keys off the app's own
+ *     query container (`.help-app`, see the C block in globals.css).
  *
- * Tour-seen state persists in localStorage; first-ever open defaults to the
- * tour, and it is always skippable.
+ * The walkthrough is a different thing from the Option+T "Quick tour"
+ * (lib/recruiterTour.ts), which opens About Me, Projects and Resume.
  *
- * Strictly monochrome: three-tone discipline (text / text-secondary / border).
- * No medallions, gradients, colored pills, or pulses. Reveals are mount-based
- * and collapse to instant under reduced motion via the shared `reveal` tokens.
+ * Every claim about the UI here is checked against the code: the dock, the
+ * desktop icons, app names (data/copy.ts via getAppLabel), the Option+digit
+ * map, and the mobile switch (DesktopHome: browser viewport below 768px).
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-  EditorialSection,
-  MetaLabel,
-  Hairline,
-} from '@/components/editorial';
+import { EditorialSection, MetaLabel, Hairline } from '@/components/editorial';
 import { reveal } from '@/lib/motion';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
+import { getDockApps } from '@/lib/mobileAppRegistry';
 import type { AppType } from '../../../../shared/types';
 
 type Mode = 'reference' | 'tour';
 
-const TOUR_SEEN_KEY = 'devos.helpTourSeen';
+export const TOUR_SEEN_KEY = 'devos.helpTourSeen';
+
+const markTourSeen = () => {
+  try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* storage unavailable */ }
+};
+
+/** "A, B, C and D" */
+const listJoin = (items: string[]) =>
+  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
 // ---------------------------------------------------------------------------
-// Tour steps - small mono glyph (single character), serif title, plain body.
-// No icon medallions; the glyph is a quiet typographic marker only.
+// Walkthrough steps.
 // ---------------------------------------------------------------------------
 
 export interface TourStep {
-  glyph: string;
   title: string;
   body: string;
   chips?: string[];
 }
 
+const label = (t: AppType) => getAppLabel(t).title;
+
 export const TOUR_STEPS_DESKTOP: TourStep[] = [
   {
-    glyph: '✳',
     title: 'Welcome to devOS',
-    body: "This isn't a regular portfolio. It's an interactive OS / windows, a dock, a launchpad, even a terminal. Spend about two minutes here and you'll know your way around.",
+    body: "This isn't a regular portfolio. It's an interactive OS: windows, a dock, a launchpad, even a terminal. Two minutes here and you'll know your way around.",
   },
   {
-    glyph: '⌘',
     title: 'Command palette',
-    body: 'Press ⌘K from anywhere to jump to any app, project, or skill / or ask my AI in plain English.',
+    body: 'Press ⌘K (or /) from anywhere to jump to any app, project or skill, or to ask my AI a question.',
     chips: ['⌘ K'],
   },
   {
-    glyph: '☰',
-    title: 'Right-click anywhere',
-    body: 'A context menu with quick actions / open apps, jump to the terminal, customize the theme, reload.',
+    title: 'Right-click the desktop',
+    body: 'Quick actions: search, open apps, jump to the terminal, change the theme, reload.',
     chips: ['right-click'],
   },
   {
-    glyph: '▭',
-    title: 'The dock + windows',
-    body: 'Open apps from the dock at the bottom. Drag a window by its title bar; the three dots close, minimize, and maximize it. The grid icon is the launchpad / every app, with search.',
+    title: 'The dock and windows',
+    body: 'The dock at the bottom holds the main apps. Drag a window by its title bar, and drag any edge or corner to resize it. The three dots at top left close, minimize and maximize it. The grid icon opens the launchpad: every app, with search.',
     chips: ['launchpad'],
   },
   {
-    glyph: '◑',
-    title: 'Ask + make it yours',
-    body: 'The chat orb in the bottom-right asks my AI anything. In Settings, switch the palette (Fun / mono) or flip light / dark.',
+    title: 'Ask and make it yours',
+    body: `The round chat button at the bottom right asks my AI. In ${label('display-options')}, switch the palette (Fun or Mono) or flip between light and dark.`,
   },
   {
-    glyph: '◆',
     title: "You're set",
-    body: 'Close this whenever you are ready. Help is always in the dock if you want to come back. Now go open About Me / start there.',
+    body: `Help stays on the desktop (the life-ring icon, top left) and in the launchpad. Start with ${label('about-me')}.`,
   },
 ];
 
+const mobileDockLabels = () => listJoin(getDockApps().map((a) => a.label));
+
 export const TOUR_STEPS_MOBILE: TourStep[] = [
   {
-    glyph: '✳',
     title: 'Welcome',
-    body: "This isn't a regular portfolio. It's a pocket OS / a home screen of app tiles, a status bar, and an iOS-style dock. Spend about two minutes here and you'll know your way around.",
+    body: `This portfolio works like a phone. The dock holds ${mobileDockLabels()}. Swipe left for more apps and search.`,
   },
   {
-    glyph: '▤',
     title: 'Swipe to the App Library',
-    body: 'Swipe between home pages. Past the last page is the App Library / every app in one grid, with search up top.',
+    body: 'Swipe between home pages. Past the last page is the App Library: every app in one grid, with search at the top.',
     chips: ['swipe ←'],
   },
   {
-    glyph: '⌕',
     title: 'Search or ask',
-    body: 'The App Library search finds any app, project, or skill / or ask my AI anything.',
+    body: 'The App Library search finds any app, project or skill, or asks my AI.',
     chips: ['search'],
   },
   {
-    glyph: '▢',
-    title: 'Open + pull to dismiss',
-    body: 'Tap a tile to open it full screen. Pull down from the top to close it / just like iOS.',
+    title: 'Open and close',
+    body: 'Tap a tile to open it full screen. Pull down from the top, or tap Done, to close it.',
     chips: ['pull down'],
   },
   {
-    glyph: '◑',
-    title: 'DevAI + make it yours',
-    body: 'Open DevAI to chat with my AI. In Settings, switch the palette (Fun / mono) or flip light / dark.',
+    title: 'DevAI and settings',
+    body: 'Open DevAI to chat with my AI. In Settings, switch the palette (Fun or Mono) or flip between light and dark.',
   },
   {
-    glyph: '◆',
     title: "You're set",
-    body: 'Close this whenever you are ready. Help lives in the App Library if you want to come back. Now go open About Me / start there.',
+    body: 'Help lives in the App Library if you want to come back. Start with About Me.',
   },
 ];
 
 // Back-compat alias for data tests / external consumers: the desktop set is
-// the canonical tour.
+// the canonical walkthrough.
 export const TOUR_STEPS = TOUR_STEPS_DESKTOP;
 
 // ---------------------------------------------------------------------------
-// Apps glossary - curated set surfaced in the reference.
+// Apps glossary.
 // ---------------------------------------------------------------------------
 
 export const APPS_IN_HELP: AppType[] = [
   'about-me',
   'projects',
+  'resume',
+  'contact',
   'github-activity',
   'skills-dashboard',
   'analytics',
-  'contact',
+  'browser',
   'terminal',
-  'resume',
   'file-explorer',
   'changelog',
   'games',
@@ -146,28 +144,31 @@ export const APPS_IN_HELP: AppType[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Shortcut / gesture rows.
+// Shortcut / gesture rows. `gesture` rows render as plain text, not keycaps.
 // ---------------------------------------------------------------------------
 
-type Shortcut = { keys: string[]; description: string };
+type Shortcut = { keys: string[]; description: string; gesture?: boolean };
+
+/** Option+1..4, mirrored from hooks/useKeyboardShortcuts.ts (APP_BY_DIGIT). */
+export const OPTION_DIGIT_APPS: AppType[] = ['about-me', 'projects', 'skills-dashboard', 'contact'];
 
 export const SHORTCUTS_DESKTOP: Shortcut[] = [
   { keys: ['⌘ K'], description: 'Open the command palette (or press /)' },
-  { keys: ['right-click'], description: 'Open the context menu' },
-  { keys: ['drag title bar'], description: 'Move a window' },
-  { keys: ['◦', '◦', '◦'], description: 'Close / minimize / maximize a window' },
-  { keys: ['Esc'], description: 'Close the launchpad or palette' },
-  { keys: ['⌥ T'], description: 'Play the guided demo' },
-  { keys: ['⌥ 1-4'], description: 'Open About, Projects, Skill Tree, Contact' },
+  { keys: ['right-click'], description: 'Open the desktop context menu', gesture: true },
+  { keys: ['drag title bar'], description: 'Move a window', gesture: true },
+  { keys: ['drag an edge'], description: 'Resize a window', gesture: true },
+  { keys: ['window buttons'], description: 'Close, minimize or maximize (the dots at top left)', gesture: true },
+  { keys: ['Esc'], description: 'Close the launchpad, the palette or the focused window' },
+  { keys: ['⌥ T'], description: `Quick tour of ${label('about-me')}, ${label('projects')} and ${label('resume')}. Esc stops it` },
+  { keys: ['⌥ 1-4'], description: `Open ${OPTION_DIGIT_APPS.map(label).join(', ')}` },
   { keys: ['⌥ W'], description: 'Close the focused window' },
 ];
 
 export const SHORTCUTS_MOBILE: Shortcut[] = [
-  { keys: ['swipe ←'], description: 'Move between home pages / to the App Library' },
-  { keys: ['tap'], description: 'Open an app full screen' },
-  { keys: ['pull down'], description: 'Dismiss the open app' },
-  { keys: ['tap + hold'], description: 'Rearrange tiles' },
-  { keys: ['search'], description: 'Find an app or ask my AI' },
+  { keys: ['swipe ←'], description: 'Move between home pages and to the App Library', gesture: true },
+  { keys: ['tap'], description: 'Open an app full screen', gesture: true },
+  { keys: ['pull down'], description: 'Close the open app', gesture: true },
+  { keys: ['search'], description: 'Find an app or ask my AI', gesture: true },
 ];
 
 // Back-compat alias for data tests / external consumers.
@@ -179,62 +180,109 @@ export const SHORTCUTS = SHORTCUTS_DESKTOP;
 
 type SectionId = 'overview' | 'apps' | 'shortcuts' | 'mobile' | 'credits';
 
-const SECTIONS = [
-  { id: 'overview',  number: '01', label: 'Overview'   },
-  { id: 'apps',      number: '02', label: 'Apps'       },
-  { id: 'shortcuts', number: '03', label: 'Shortcuts'  },
-  { id: 'mobile',    number: '04', label: 'On a Phone' },
-  { id: 'credits',   number: '05', label: 'Credits'    },
-] as const;
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'overview',  label: 'Overview'   },
+  { id: 'apps',      label: 'Apps'       },
+  { id: 'shortcuts', label: 'Shortcuts'  },
+  { id: 'mobile',    label: 'On a phone' },
+  { id: 'credits',   label: 'Credits'    },
+];
 
 const SECTION_DOM_ID = (id: SectionId) => `help-section-${id}`;
 
 // ---------------------------------------------------------------------------
-// KeyCap - a single mono key/gesture chip in the house kbd style. Shared by
-// the tour chip rows and the Reference shortcut table.
+// KeyCap - a real key in the house kbd style. Never breaks inside the key.
 // ---------------------------------------------------------------------------
 
 function KeyCap({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="border border-border px-2 py-0.5 font-mono-meta uppercase tracking-wide text-text-secondary">
+    <kbd className="shrink-0 whitespace-nowrap border border-border px-2 py-0.5 font-mono text-[0.8125rem] text-text">
       {children}
     </kbd>
   );
 }
 
+const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function KeyOrGesture({ row }: { row: Shortcut }) {
+  if (row.gesture) {
+    return <span className="text-sm text-text">{sentence(row.keys.join(' '))}</span>;
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {row.keys.map((k, i) => (
+        <KeyCap key={`${k}-${i}`}>{k}</KeyCap>
+      ))}
+    </span>
+  );
+}
+
+// Text-link control used by Back / Skip: 44px tall so it is thumb-sized.
+const TEXT_CTRL =
+  'inline-flex min-h-[44px] items-center px-3 text-sm text-text-secondary transition-[color,transform] duration-150 ' +
+  'ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] motion-reduce:active:scale-100';
+
+// Bordered primary control (Next / Done / Start the walkthrough).
+const PRIMARY_CTRL =
+  'inline-flex min-h-[44px] items-center gap-2 border border-text px-4 text-sm font-medium text-text ' +
+  'transition-[background-color,color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ' +
+  'hover:bg-text hover:text-bg active:scale-[0.97] motion-reduce:active:scale-100';
+
 // ===========================================================================
-// Tour view
+// Walkthrough view
 // ===========================================================================
 
 function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) {
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const current = steps[step];
   const total = steps.length;
   const isLast = step === total - 1;
 
-  const next = () => {
-    if (isLast) {
-      try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* storage unavailable */ }
-      onExit();
-    } else {
-      setStep((s) => s + 1);
-    }
-  };
+  // Skip, Done and Esc all end here, so the walkthrough never comes back
+  // uninvited.
+  const exitTour = useCallback(() => {
+    markTourSeen();
+    onExit();
+  }, [onExit]);
+
+  const next = () => (isLast ? exitTour() : setStep((s) => s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
-  const counter = `Step ${String(step + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
+  // Focus the step heading on mount and on every step change: screen readers
+  // announce the new step, and Esc / arrows land on this view.
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+  }, [step]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      // Leave the walkthrough, not the window: stop the global Esc handler.
+      e.preventDefault();
+      e.stopPropagation();
+      exitTour();
+      return;
+    }
+    const t = e.target as HTMLElement;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); back(); }
+  };
+
+  const counter = `Step ${step + 1} of ${total}`;
 
   return (
-    <div className="h-full flex flex-col bg-bg text-text">
-      {/* Header rail: mono kicker + quiet Skip link. */}
-      <div className="flex items-center justify-between px-6 py-4 sm:px-10 shrink-0">
-        <MetaLabel as="p">Tour</MetaLabel>
-        <button
-          type="button"
-          onClick={onExit}
-          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] focus-visible:text-text"
-        >
+    <div
+      role="region"
+      aria-label={`Walkthrough, step ${step + 1} of ${total}`}
+      onKeyDown={onKeyDown}
+      className="help-tour h-full flex flex-col bg-bg text-text"
+    >
+      {/* Header: kicker + Skip. */}
+      <div className="help-tour-bar flex items-center justify-between shrink-0">
+        <MetaLabel as="p">Walkthrough</MetaLabel>
+        <button type="button" onClick={exitTour} className={`${TEXT_CTRL} -mr-3`}>
           Skip
         </button>
       </div>
@@ -243,7 +291,7 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
       {/* Step body. Keyed by step so each step remounts and the stagger replays
           on advance/back - never a scroll-triggered reveal. */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex h-full max-w-xl flex-col justify-center px-6 py-10 sm:px-10">
+        <div className="help-tour-body mx-auto flex min-h-full max-w-xl flex-col justify-center">
           <motion.div
             key={step}
             variants={reveal.container(reduced)}
@@ -255,19 +303,14 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
               <MetaLabel as="p">{counter}</MetaLabel>
             </motion.div>
 
-            <motion.div
+            <motion.h2
+              ref={headingRef}
+              tabIndex={-1}
               variants={reveal.item(reduced)}
-              className="flex items-start gap-4"
+              className="font-display text-[clamp(1.75rem,6cqi,3rem)] leading-tight text-text outline-none [text-wrap:balance]"
             >
-              <span
-                aria-hidden
-                className="font-display text-text/70 leading-none select-none"
-                style={{ fontSize: 'clamp(1.5rem, 5cqi, 2rem)' }}
-              >
-                {current.glyph}
-              </span>
-              <h2 className="editorial-head text-text">{current.title}</h2>
-            </motion.div>
+              {current.title}
+            </motion.h2>
 
             <motion.div variants={reveal.item(reduced)}>
               <Hairline />
@@ -281,10 +324,7 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
             </motion.p>
 
             {current.chips && current.chips.length > 0 && (
-              <motion.div
-                variants={reveal.item(reduced)}
-                className="flex flex-wrap items-center gap-1.5"
-              >
+              <motion.div variants={reveal.item(reduced)} className="flex flex-wrap items-center gap-1.5">
                 {current.chips.map((chip) => (
                   <KeyCap key={chip}>{chip}</KeyCap>
                 ))}
@@ -294,14 +334,16 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
         </div>
       </div>
 
-      {/* Footer: progress count + quiet Back / Next text links. */}
+      {/* Footer: Back / progress ticks / Next. Back is hidden on step 1 (kept
+          in the layout so Next never jumps). */}
       <Hairline />
-      <div className="flex items-center justify-between px-6 py-4 sm:px-10 shrink-0">
+      <div className="help-tour-bar flex items-center justify-between gap-3 shrink-0">
         <button
           type="button"
           onClick={back}
-          disabled={step === 0}
-          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] disabled:opacity-30 disabled:active:scale-100 disabled:hover:text-text-secondary focus-visible:text-text"
+          aria-hidden={step === 0 || undefined}
+          tabIndex={step === 0 ? -1 : undefined}
+          className={`${TEXT_CTRL} -ml-3 ${step === 0 ? 'invisible' : ''}`}
         >
           Back
         </button>
@@ -311,16 +353,12 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
           {steps.map((_, i) => (
             <span
               key={i}
-              className={`h-px w-5 transition-colors ${i === step ? 'bg-text' : 'bg-border'}`}
+              className={`h-px w-4 transition-colors ${i === step ? 'bg-text' : 'bg-border'}`}
             />
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={next}
-          className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
-        >
+        <button type="button" onClick={next} className={PRIMARY_CTRL}>
           {isLast ? 'Done' : 'Next'}
         </button>
       </div>
@@ -333,64 +371,70 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
 // ===========================================================================
 
 function OverviewBody({
+  variant,
   onStartTour,
   tourLength,
 }: {
+  variant: 'desktop' | 'mobile';
   onStartTour: () => void;
   tourLength: number;
 }) {
   return (
     <div className="flex max-w-[68ch] flex-col gap-6">
       <p className="text-lg leading-relaxed text-text-secondary">
-        This portfolio is built as a desktop OS / windows, a dock, a launchpad,
-        and a set of apps you can click around in. Everything worth knowing
-        lives inside one of those apps.
+        {variant === 'mobile'
+          ? 'This portfolio is built like a phone: a home screen, a dock, an App Library and a set of apps you can tap around in.'
+          : 'This portfolio is built as a desktop OS: windows, a dock, a launchpad and a set of apps you can click around in.'}{' '}
+        Everything worth knowing lives inside one of those apps.
       </p>
       <p className="leading-relaxed text-text-secondary">
-        Start with <span className="text-text">About Me</span> for the story,
-        then <span className="text-text">Projects</span> for the things I
-        shipped. The rest is bonus.
+        Start with <span className="text-text">{label('about-me')}</span> for the story,
+        then <span className="text-text">{label('projects')}</span> for the things I
+        shipped. The rest is optional.
       </p>
-      <button
-        type="button"
-        onClick={onStartTour}
-        className="w-fit font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
-      >
-        Take the {tourLength}-step tour &rarr;
+      <button type="button" onClick={onStartTour} className={`${PRIMARY_CTRL} w-fit`}>
+        Start the walkthrough ({tourLength} steps)
       </button>
     </div>
   );
 }
 
-function AppsBody() {
+function AppsBody({ variant }: { variant: 'desktop' | 'mobile' }) {
+  const apps: AppType[] = variant === 'mobile' ? [...APPS_IN_HELP, 'dev-ai'] : APPS_IN_HELP;
   return (
     <div className="flex flex-col">
       <p className="mb-6 max-w-[68ch] leading-relaxed text-text-secondary">
-        Every app and what it is for. Click an icon in the dock or launchpad to
-        open one.
+        {variant === 'mobile'
+          ? 'Every app and what it is for. Tap a tile on the home screen, or find it in the App Library.'
+          : 'Every app and what it is for. The dock holds the main ones; the launchpad (the grid icon in the dock) has them all.'}
       </p>
       <Hairline />
-      {APPS_IN_HELP.map((appType) => {
-        const reg = appRegistry[appType];
-        if (!reg) return null;
-        const label = getAppLabel(appType);
-        return (
-          <React.Fragment key={appType}>
-            <div className="flex items-baseline gap-4 py-3.5">
-              <span
-                className="min-w-0 flex-1 font-display text-text leading-snug"
-                style={{ fontSize: 'clamp(0.9rem, 2.1cqi, 1.0625rem)' }}
-              >
-                {label.title}
-              </span>
-              <span className="flex-1 text-sm leading-snug text-text-secondary">
-                {label.description}
-              </span>
+      <dl className="flex flex-col">
+        {apps.map((appType) => {
+          if (!appRegistry[appType]) return null;
+          const l = getAppLabel(appType);
+          return (
+            <React.Fragment key={appType}>
+              <div className="help-gloss-row py-3.5">
+                <dt className="font-display text-[1.0625rem] leading-snug text-text">{l.title}</dt>
+                <dd className="text-sm leading-snug text-text-secondary">{l.description}</dd>
+              </div>
+              <Hairline />
+            </React.Fragment>
+          );
+        })}
+        {variant === 'desktop' && (
+          <>
+            <div className="help-gloss-row py-3.5">
+              <dt className="font-display text-[1.0625rem] leading-snug text-text">Chat with my AI</dt>
+              <dd className="text-sm leading-snug text-text-secondary">
+                The round chat button at the bottom right. It answers from my resume and project notes.
+              </dd>
             </div>
             <Hairline />
-          </React.Fragment>
-        );
-      })}
+          </>
+        )}
+      </dl>
     </div>
   );
 }
@@ -399,25 +443,23 @@ function ShortcutsBody({ variant }: { variant: 'desktop' | 'mobile' }) {
   const rows = variant === 'mobile' ? SHORTCUTS_MOBILE : SHORTCUTS_DESKTOP;
   const intro =
     variant === 'mobile'
-      ? 'Mostly taps and swipes. A few gestures behave just like iOS.'
-      : 'Two keys do most of the work. The rest behaves just like macOS.';
+      ? 'Mostly taps and swipes. A few gestures behave like iOS.'
+      : '⌘K and right-click do most of the work. Windows behave like macOS.';
   return (
     <div className="flex max-w-[60ch] flex-col">
       <p className="mb-6 leading-relaxed text-text-secondary">{intro}</p>
       <Hairline />
-      {rows.map((row) => (
-        <React.Fragment key={row.description}>
-          <div className="flex items-center justify-between gap-4 py-3">
-            <span className="flex flex-wrap items-center gap-1.5">
-              {row.keys.map((k, i) => (
-                <KeyCap key={`${k}-${i}`}>{k}</KeyCap>
-              ))}
-            </span>
-            <span className="text-sm text-text-secondary">{row.description}</span>
-          </div>
-          <Hairline />
-        </React.Fragment>
-      ))}
+      <dl className="flex flex-col">
+        {rows.map((row) => (
+          <React.Fragment key={row.description}>
+            <div className="help-key-row py-3">
+              <dt><KeyOrGesture row={row} /></dt>
+              <dd className="text-sm leading-snug text-text-secondary">{row.description}</dd>
+            </div>
+            <Hairline />
+          </React.Fragment>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -426,14 +468,13 @@ function MobileBody() {
   return (
     <div className="flex max-w-[68ch] flex-col gap-4">
       <p className="leading-relaxed text-text-secondary">
-        The whole desktop morphs into a pocket OS. A home screen of rounded app
-        tiles, a status bar at the top, an iOS-style dock at the bottom. Tap an
-        app, swipe to go back, or pull down to dismiss.
+        On a phone the desktop becomes a home screen of app tiles, with a status bar
+        at the top and a dock at the bottom. Tap an app to open it full screen; pull
+        down or tap Done to close it.
       </p>
       <p className="leading-relaxed text-text-secondary">
-        Every app has a mobile layout designed for the smaller screen / same
-        content, just sized for thumbs. Try it on your phone, or shrink this
-        window below 768px to see the switch live.
+        Same content, sized for thumbs. Try it on your phone, or make your browser
+        window narrower than 768px.
       </p>
     </div>
   );
@@ -443,7 +484,7 @@ function CreditsBody() {
   return (
     <div className="flex max-w-[68ch] flex-col gap-4">
       <p className="leading-relaxed text-text-secondary">
-        Next.js 15, React 19, TypeScript, Tailwind CSS, Framer Motion, and
+        Next.js 15, React 19, TypeScript, Tailwind CSS, Framer Motion and
         Zustand. Icons from Lucide and Phosphor. Deployed on Vercel.
       </p>
       <p className="leading-relaxed text-text-secondary">
@@ -455,8 +496,8 @@ function CreditsBody() {
           className="text-text underline decoration-border underline-offset-4 transition-colors hover:decoration-text"
         >
           GitHub
-        </a>{' '}
-        / fork it, break it, learn from it.
+        </a>
+        . Fork it, break it, learn from it.
       </p>
       <p className="border-l border-border pl-4 leading-relaxed text-text-secondary italic">
         &ldquo;I made a portfolio that runs an OS so I could justify spending six
@@ -478,8 +519,8 @@ function SectionBody({
   onStartTour: () => void;
 }) {
   switch (id) {
-    case 'overview':  return <OverviewBody onStartTour={onStartTour} tourLength={tourLength} />;
-    case 'apps':      return <AppsBody />;
+    case 'overview':  return <OverviewBody variant={variant} onStartTour={onStartTour} tourLength={tourLength} />;
+    case 'apps':      return <AppsBody variant={variant} />;
     case 'shortcuts': return <ShortcutsBody variant={variant} />;
     case 'mobile':    return <MobileBody />;
     case 'credits':   return <CreditsBody />;
@@ -487,7 +528,8 @@ function SectionBody({
 }
 
 // ===========================================================================
-// Reference view - desktop (index rail) + mobile (single scroll)
+// Reference view - one scroll root; a sticky rail in wide windows, a row of
+// section links in narrow ones.
 // ===========================================================================
 
 function ReferenceView({
@@ -501,6 +543,7 @@ function ReferenceView({
 }) {
   const reduced = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState<SectionId>('overview');
 
   const scrollTo = useCallback(
     (id: SectionId) => {
@@ -508,121 +551,129 @@ function ReferenceView({
       if (!root) return;
       const target = root.querySelector<HTMLElement>(`#${SECTION_DOM_ID(id)}`);
       if (!target) return;
-      root.scrollTo({ top: target.offsetTop - 24, behavior: reduced ? 'auto' : 'smooth' });
+      const top = target.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop - 24;
+      root.scrollTo({ top, behavior: reduced ? 'auto' : 'smooth' });
+      setActive(id);
     },
     [reduced],
   );
 
-  const document = (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div
-        className="mx-auto flex max-w-3xl flex-col gap-16 px-6 py-10 sm:px-10 sm:py-12"
-        style={
-          variant === 'mobile'
-            ? { paddingLeft: 'var(--sp-hero-pad)', paddingRight: 'var(--sp-hero-pad)' }
-            : undefined
+  // Track the section in view: the last one whose top has crossed the upper
+  // 40% of the scroll root.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const visible = new Set<SectionId>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.section as SectionId;
+          if (e.isIntersecting) visible.add(id);
+          else visible.delete(id);
         }
-      >
-        {/* Masthead - serif lede + quiet tour entry. */}
-        <motion.div
-          variants={reveal.container(reduced)}
-          initial="hidden"
-          animate="show"
-          className="flex flex-col gap-3"
-        >
-          <motion.div variants={reveal.item(reduced)}>
-            <MetaLabel as="p">Help / Welcome to devOS</MetaLabel>
-          </motion.div>
-          <motion.h1
-            variants={reveal.item(reduced)}
-            className="editorial-hero font-display text-text"
-          >
-            New here?
-          </motion.h1>
-          <motion.p
-            variants={reveal.item(reduced)}
-            className="max-w-[60ch] text-lg leading-relaxed text-text-secondary"
-          >
-            Two minutes and you will know what every icon does.
-          </motion.p>
-        </motion.div>
-
-        {/* Sections reveal once on mount with a stagger (never on scroll): a
-            windowed inner scroll container makes scroll-triggered reveals
-            unreliable, so content must never depend on an in-view trigger. */}
-        <motion.div
-          className="flex flex-col gap-16"
-          variants={reveal.container(reduced)}
-          initial="hidden"
-          animate="show"
-        >
-          {SECTIONS.map(({ id, number, label }) => (
-            <motion.div
-              key={id}
-              id={SECTION_DOM_ID(id)}
-              variants={reveal.item(reduced)}
-            >
-              <EditorialSection number={number} eyebrow={label} title={label}>
-                <SectionBody
-                  id={id}
-                  variant={variant}
-                  tourLength={tourLength}
-                  onStartTour={onStartTour}
-                />
-              </EditorialSection>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </div>
-  );
-
-  if (variant === 'mobile') {
-    return <div className="h-full overflow-hidden bg-bg text-text flex flex-col">{document}</div>;
-  }
+        const first = SECTIONS.find((s) => visible.has(s.id));
+        if (first) setActive(first.id);
+      },
+      { root, rootMargin: '0px 0px -60% 0px' },
+    );
+    root.querySelectorAll<HTMLElement>('[data-section]').forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
 
   return (
-    <div className="flex h-full overflow-hidden bg-bg text-text">
-      {/* Index rail - mono numbered rows, click to jump. */}
-      <nav
-        aria-label="Help sections"
-        className="hidden w-44 shrink-0 flex-col border-r border-border overflow-y-auto md:flex"
-      >
-        <div className="px-4 py-5">
-          <MetaLabel as="p">Help</MetaLabel>
-        </div>
-        <Hairline />
-        <div className="flex flex-col py-2">
-          {SECTIONS.map(({ id, number, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => scrollTo(id)}
-              data-testid="index-row"
-              className="group flex w-full items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98]"
-            >
-              <span className="font-mono-meta shrink-0 opacity-50 transition-opacity group-hover:opacity-80">
-                {number}
-              </span>
-              <span className="font-display min-w-0 flex-1 truncate text-text-secondary transition-colors group-hover:text-text">
-                {label}
-              </span>
+    <div ref={scrollRef} className="help-app h-full overflow-y-auto bg-bg text-text">
+      <div className="help-shell mx-auto w-full max-w-6xl">
+        {/* Index rail (wide windows only): sticky, marks the section in view. */}
+        <nav aria-label="Help sections" className="help-rail">
+          <div className="flex flex-col py-2">
+            {SECTIONS.map(({ id, label: l }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => scrollTo(id)}
+                aria-current={active === id ? 'true' : undefined}
+                data-testid="index-row"
+                className={`flex w-full items-center border-l py-2 pl-3 pr-2 text-left font-display transition-colors ${
+                  active === id
+                    ? 'border-text text-text'
+                    : 'border-transparent text-text-secondary hover:text-text'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          <Hairline />
+          <div className="py-4">
+            <button type="button" onClick={onStartTour} className={TEXT_CTRL + ' -ml-3'}>
+              Start the walkthrough &rarr;
             </button>
-          ))}
-        </div>
-        <Hairline />
-        <div className="px-4 py-4">
-          <button
-            type="button"
-            onClick={onStartTour}
-            className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
-          >
-            Take the tour &rarr;
-          </button>
-        </div>
-      </nav>
+          </div>
+        </nav>
 
-      {document}
+        <div className="help-doc flex min-w-0 flex-col gap-14">
+          {/* Masthead. */}
+          <motion.div
+            variants={reveal.container(reduced)}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col gap-3"
+          >
+            <motion.h1
+              variants={reveal.item(reduced)}
+              className="font-display text-[clamp(2.25rem,8cqi,4.5rem)] leading-[1.02] text-text"
+            >
+              New here?
+            </motion.h1>
+            <motion.p
+              variants={reveal.item(reduced)}
+              className="max-w-[60ch] text-lg leading-relaxed text-text-secondary"
+            >
+              Start with {label('about-me')}, then {label('projects')}. Everything else is optional.
+            </motion.p>
+          </motion.div>
+
+          {/* Narrow windows: section links in place of the rail. */}
+          <nav aria-label="Help sections" className="help-chips -mt-6 flex gap-x-5 gap-y-1 overflow-x-auto">
+            {SECTIONS.map(({ id, label: l }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => scrollTo(id)}
+                className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap text-sm text-text-secondary underline decoration-border underline-offset-4 hover:text-text"
+              >
+                {l}
+              </button>
+            ))}
+          </nav>
+
+          {/* Sections reveal once on mount with a stagger (never on scroll). */}
+          <motion.div
+            className="flex flex-col gap-14"
+            variants={reveal.container(reduced)}
+            initial="hidden"
+            animate="show"
+          >
+            {SECTIONS.map(({ id, label: l }) => (
+              <motion.div
+                key={id}
+                id={SECTION_DOM_ID(id)}
+                data-section={id}
+                variants={reveal.item(reduced)}
+              >
+                <EditorialSection title={l} className="help-section">
+                  <SectionBody
+                    id={id}
+                    variant={variant}
+                    tourLength={tourLength}
+                    onStartTour={onStartTour}
+                  />
+                </EditorialSection>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -638,7 +689,7 @@ interface HelpAppProps {
 export default function HelpApp({ variant = 'desktop' }: HelpAppProps) {
   const [mode, setMode] = useState<Mode>('reference');
 
-  // First-ever open defaults to the tour.
+  // First-ever open defaults to the walkthrough.
   useEffect(() => {
     try {
       const seen = localStorage.getItem(TOUR_SEEN_KEY);
@@ -651,7 +702,7 @@ export default function HelpApp({ variant = 'desktop' }: HelpAppProps) {
   const steps = variant === 'mobile' ? TOUR_STEPS_MOBILE : TOUR_STEPS_DESKTOP;
 
   return (
-    <div className="h-full">
+    <div className="help-root h-full">
       {mode === 'tour' ? (
         <TourView steps={steps} onExit={() => setMode('reference')} />
       ) : (

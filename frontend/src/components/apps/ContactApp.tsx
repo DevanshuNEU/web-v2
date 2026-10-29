@@ -1,56 +1,65 @@
 "use client";
 
 /**
- * ContactApp - "Ping Me" in the Instrument editorial register.
+ * ContactApp - "Ping Me".
  *
- * A single vertically-scrolled editorial document: an identity masthead
- * (serif name + mono spec metadata + availability chip + hairline-divided
- * reach-me link rows) sits above a contact form. The form keeps every piece
- * of behaviour from the original - the five fields, per-field validation, the
- * real POST to /api/contact, and the submitting / success / error states -
- * but the chrome is rebuilt in the house language: hairline-underline inputs,
- * mono uppercase MetaLabel field labels, and a restrained monochrome submit
- * (text + glyph + hairline), never a filled accent block.
+ * Leads with the form. A short heading and one sentence sit above it; the
+ * reach-me links (email, LinkedIn, GitHub) and the availability chip sit in a
+ * side column when the window is wide (>= 820px) and after the form when it
+ * is narrow. Every layout switch keys off the app's own query container
+ * (`.contact-app`, see the C block in globals.css), never the viewport, so a
+ * resized window behaves like a real app and the phone shell gets the narrow
+ * layout for free.
  *
- * Desktop and mobile share this one layout; the only difference is horizontal
- * padding. The same registry component renders both (mobile passes
- * variant="mobile").
- *
- * Animations: content reveals ONCE on mount via a staggered container, never
- * on scroll - a windowed inner scroll container makes in-view triggers
- * unreliable, so nothing here depends on an IntersectionObserver. Everything
- * collapses to instant under reduced motion via the shared `reveal` variants.
+ * Behaviour:
+ *   - Validation runs on submit and trims before counting. Each error is tied
+ *     to its field (aria-invalid + aria-describedby), a hidden alert sums them
+ *     up, and focus moves to the first invalid field.
+ *   - The real POST to /api/contact. The submit button never disables itself
+ *     (that drops focus to <body>); it is aria-disabled while sending.
+ *   - Success focuses its heading. Failure shows a banner by the submit row
+ *     with copy per status code (503 offline, 429 rate limited, anything else),
+ *     the email address as a mailto link that carries the visitor's text, a
+ *     Copy email button, and a Try again that actually resends.
+ *   - Inputs are 16px on the phone so iOS Safari does not zoom on focus, and
+ *     carry autocomplete / inputMode hints.
  *
  * Persona: identity leaks from specifics (the work + location), never from
  * student / graduation / degree / visa framing.
  */
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Hairline, MetaLabel, EditorialSection } from "@/components/editorial";
+import { Hairline, MetaLabel } from "@/components/editorial";
 import { useIsMono } from "@/hooks/usePalette";
 import { reveal } from "@/lib/motion";
 import { identity, contactLinks } from "@/data/aboutMe";
+import { useOSStore } from "@/store/osStore";
+import { useMobileStore } from "@/store/mobileStore";
 
 // Strong ease-out for UI enter/exit (Kowalski). Never ease-in on UI; keep <300ms.
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
-// Pressable surface shared by every tappable editorial row (link rows, submit,
-// reset, retry). Hairline-hover bg stays, plus:
-//   - tactile :active scale(0.98) settle on a 160ms ease-out (GPU transform only)
-//   - hover motion gated behind a fine pointer so touch taps don't false-fire
-//   - transform + colors animate on their own short ease-out curves
+// Pressable surface for the link rows: hairline-hover tint plus a tactile
+// :active settle. Focus is the global 2px ring.
 const PRESSABLE =
   "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] " +
   "active:scale-[0.98] active:duration-100 motion-reduce:active:scale-100 " +
   "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]";
 
-// Hover-only glyph nudge, gated behind a real (fine) pointer so a touch tap
-// never strands the glyph in its hover position. Collapses under reduced motion.
-const HOVER_NUDGE =
-  "transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] " +
-  "[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5 " +
-  "motion-reduce:transform-none";
+// Primary action: a bordered button, monochrome in both palettes.
+const PRIMARY_BTN =
+  "inline-flex min-h-[44px] items-center justify-center gap-2 border border-text px-5 py-2.5 " +
+  "text-sm font-medium text-text transition-[transform,background-color,color] duration-150 " +
+  "ease-[cubic-bezier(0.23,1,0.32,1)] hover:bg-text hover:text-bg active:scale-[0.98] " +
+  "motion-reduce:active:scale-100";
+
+// Secondary action: hairline border, secondary ink.
+const SECONDARY_BTN =
+  "inline-flex min-h-[44px] items-center justify-center gap-2 border border-border px-4 py-2.5 " +
+  "text-sm text-text transition-[transform,border-color] duration-150 " +
+  "ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-text active:scale-[0.98] " +
+  "motion-reduce:active:scale-100";
 
 interface FormData {
   name: string;
@@ -60,17 +69,78 @@ interface FormData {
   message: string;
 }
 
+type FieldKey = keyof FormData;
+type RequiredKey = "name" | "email" | "subject" | "message";
+
+const REQUIRED: RequiredKey[] = ["name", "email", "subject", "message"];
+
+const FIELD_LABEL: Record<FieldKey, string> = {
+  name: "Name",
+  email: "Email",
+  company: "Company",
+  subject: "Subject",
+  message: "Message",
+};
+
+// Client caps. Generous, but they stop a pasted novel.
+const MAX_LEN: Record<FieldKey, number> = {
+  name: 100,
+  email: 254,
+  company: 100,
+  subject: 150,
+  message: 5000,
+};
+
+const EMPTY_FORM: FormData = { name: "", email: "", company: "", subject: "", message: "" };
+
 type Status = "idle" | "submitting" | "success" | "error";
+
+/** Why a send failed, from the API's status code. */
+export type FailKind = "offline" | "rate_limited" | "failed";
+
+export function failKindFor(status: number | null): FailKind {
+  if (status === 503) return "offline";
+  if (status === 429) return "rate_limited";
+  return "failed";
+}
+
+const FAIL_COPY: Record<FailKind, string> = {
+  offline: "The form is offline right now. Email me instead:",
+  rate_limited: "Too many messages from this network. Wait a minute and try again, or email me:",
+  failed: "Your message didn't send. Your text is still here. Try again, or email me:",
+};
+
+/** Validate one field. Returns the error copy, or null when it passes. */
+export function validateField(key: FieldKey, raw: string): string | null {
+  const value = raw.trim();
+  switch (key) {
+    case "name":
+      if (!value) return "Enter your name";
+      return value.length < 2 ? "Name needs at least 2 characters" : null;
+    case "email":
+      if (!value) return "Enter your email";
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : "Enter an email like name@company.com";
+    case "subject":
+      if (!value) return "Add a subject";
+      return value.length < 2 ? "Subject needs at least 2 characters" : null;
+    case "message":
+      if (!value) return "Write a message";
+      return value.length < 10 ? "Add a bit more detail (10 characters minimum)" : null;
+    default:
+      return null;
+  }
+}
 
 interface ContactAppProps {
   variant?: "desktop" | "mobile";
 }
 
 // ---------------------------------------------------------------------------
-// Masthead spec-line + reach-me rows. Mono metadata, hairline-divided links.
+// Reach-me rows: label above value, so the same row works in the 260px side
+// column and in a full-width narrow window. Values are readable, not raw URLs.
 // ---------------------------------------------------------------------------
 
-const SPEC_LINE = [identity.title, identity.location] as const;
+const displayUrl = (url: string) => url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
 
 interface ReachRow {
   label: string;
@@ -81,83 +151,44 @@ interface ReachRow {
 
 const REACH_ROWS: ReachRow[] = [
   { label: "Email", value: contactLinks.email, href: `mailto:${contactLinks.email}` },
-  { label: "LinkedIn", value: contactLinks.linkedin, href: contactLinks.linkedin, external: true },
-  { label: "GitHub", value: contactLinks.github, href: contactLinks.github, external: true },
+  { label: "LinkedIn", value: displayUrl(contactLinks.linkedin), href: contactLinks.linkedin, external: true },
+  { label: "GitHub", value: displayUrl(contactLinks.github), href: contactLinks.github, external: true },
 ];
 
 function LinkRow({ label, value, href, external }: ReachRow) {
   return (
     <a
       href={href}
-      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`group flex items-center gap-4 py-3 px-1 text-left ${PRESSABLE}`}
+      {...(external
+        ? {
+            target: "_blank",
+            rel: "noopener noreferrer",
+            "aria-label": `${label}, ${value} (opens in a new tab)`,
+          }
+        : {})}
+      className={`group flex items-start justify-between gap-3 py-3 px-1 text-left ${PRESSABLE}`}
     >
-      <MetaLabel className="shrink-0 w-20 justify-start">{label}</MetaLabel>
-      <span className="flex-1 min-w-0 font-mono text-sm text-text truncate">
-        {value}
-        {/* Hairline underline grows on hover (transform-only, monochrome).
-            Gated behind a fine pointer so a touch tap doesn't strand it open;
-            collapses under the global reduced-motion safety net. */}
-        <span
-          aria-hidden
-          className="block h-px origin-left scale-x-0 bg-text/40 transition-transform
-                     duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]
-                     [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-100
-                     motion-reduce:transition-none"
-        />
+      <span className="flex min-w-0 flex-col gap-1">
+        <MetaLabel>{label}</MetaLabel>
+        <span className="font-mono text-sm text-text [overflow-wrap:anywhere]">{value}</span>
       </span>
-      <MetaLabel className={`shrink-0 justify-end ${HOVER_NUDGE}`} aria-hidden>
-        ↗
-      </MetaLabel>
+      {external && (
+        <span aria-hidden className="shrink-0 pt-0.5 font-mono text-sm text-text-secondary">
+          ↗
+        </span>
+      )}
     </a>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Identity masthead - serif name, mono spec-line, editorial availability chip,
-// hairline-divided reach-me rows.
-// ---------------------------------------------------------------------------
-
-function IdentityMasthead({ reduced }: { reduced: boolean | null }) {
+function ReachAside() {
   const mono = useIsMono();
-
   return (
-    <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <h1 className="editorial-head font-display text-text leading-tight">
-          {identity.name}
-        </h1>
-
-        {/* Mono spec-line: MetaLabel cells separated by middots. */}
-        <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
-          {SPEC_LINE.map((cell, i) => (
-            <React.Fragment key={cell}>
-              {i > 0 && (
-                <span aria-hidden className="font-mono-meta opacity-50">
-                  &middot;
-                </span>
-              )}
-              <MetaLabel>{cell}</MetaLabel>
-            </React.Fragment>
-          ))}
-        </p>
-      </div>
-
-      {/* Availability - editorial chip: hairline border, filled square, no
-          pulse. In Fun the square + label may carry hue; in mono it is tone
-          and weight only. */}
-      <span
-        className={`inline-flex w-fit items-center gap-2 border px-2.5 py-1
-                    ${mono ? "border-border" : "border-green-500/30"}`}
-      >
-        <span aria-hidden className={`h-2 w-2 ${mono ? "bg-text" : "bg-green-500"}`} />
-        <MetaLabel className={mono ? undefined : "text-green-600 dark:text-green-400"}>
-          Open to opportunities
-        </MetaLabel>
-      </span>
-
-      {/* Reach-me rows - hairline-divided link list, About-Me register. */}
-      <div className="flex flex-col mt-1">
+    <aside aria-labelledby="contact-reach-heading" className="contact-aside flex flex-col gap-4">
+      <h2 id="contact-reach-heading" className="text-sm font-medium text-text">
+        Or reach me directly
+      </h2>
+      <div className="flex flex-col">
         <Hairline />
         {REACH_ROWS.map((row) => (
           <React.Fragment key={row.label}>
@@ -166,60 +197,70 @@ function IdentityMasthead({ reduced }: { reduced: boolean | null }) {
           </React.Fragment>
         ))}
       </div>
-    </motion.header>
+      {/* Availability chip: hairline border, filled square, no pulse. In Fun
+          the square and label carry hue; in mono it is tone only. */}
+      <span
+        className={`inline-flex w-fit items-center gap-2 border px-2.5 py-1
+                    ${mono ? "border-border" : "border-green-500/30"}`}
+      >
+        <span aria-hidden className={`h-2 w-2 ${mono ? "bg-text" : "bg-green-500"}`} />
+        <span className={`text-sm ${mono ? "text-text" : "text-green-700 dark:text-green-400"}`}>
+          {identity.availabilityShort}
+        </span>
+      </span>
+    </aside>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Editorial field - mono uppercase MetaLabel, hairline-underline input,
-// mono-toned error copy (no colored chips).
+// Field: mono label, hairline-underline input, sentence-case error tied to
+// the input by id.
 // ---------------------------------------------------------------------------
+
+const errorId = (id: string) => `contact-${id}-error`;
 
 function Field({
   id,
   label,
-  required,
+  optional,
   error,
   children,
 }: {
   id: string;
   label: string;
-  required?: boolean;
+  optional?: boolean;
   error?: string;
   children: React.ReactNode;
 }) {
   const mono = useIsMono();
-  // In mono the asterisk + error copy carry meaning via tone + weight, not
-  // hue; in Fun the original red returns.
-  const markerCls = mono ? "text-text" : "text-red-400";
-  const errorCls = mono ? "text-text font-medium" : "text-red-400";
+  // Mono: tone + weight. Fun: red, darker on light so it stays above 4.5:1.
+  const errorCls = mono ? "text-text font-medium" : "text-red-700 dark:text-red-400";
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="block">
-        <MetaLabel>
-          {label}
-          {required && (
-            <span aria-hidden className={`${markerCls} ml-0.5`}>
-              *
-            </span>
-          )}
-        </MetaLabel>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={`contact-${id}`} className="block">
+        <MetaLabel>{label}</MetaLabel>
+        {optional && <span className="ml-1.5 text-sm text-text-secondary">(optional)</span>}
       </label>
       {children}
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {error && (
           <motion.p
+            id={errorId(id)}
             // Transform string (not the `y` shorthand) so the slide is
             // GPU-composited; ease-out enter, snappier exit (Kowalski).
             initial={{ opacity: 0, transform: "translateY(-4px)" }}
             animate={{ opacity: 1, transform: "translateY(0px)" }}
             exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_OUT } }}
             transition={{ duration: 0.18, ease: EASE_OUT }}
-            // Error copy is deliberately a notch smaller than the mono-meta ramp;
-            // clamp keeps it window-dynamic instead of pinned at a fixed 10px.
-            className={`font-mono-meta text-[clamp(0.6rem,1.25cqi,0.625rem)] normal-case tracking-normal ${errorCls}`}
+            className={`flex items-center gap-2 font-sans text-[0.8125rem] leading-snug ${errorCls}`}
           >
+            <span
+              aria-hidden
+              className="inline-grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border border-current text-[0.625rem] font-semibold leading-none"
+            >
+              !
+            </span>
             {error}
           </motion.p>
         )}
@@ -228,58 +269,142 @@ function Field({
   );
 }
 
-// Hairline-underline input. No filled box, no ring; the bottom border thickens
-// to graphite on focus and on error. Strictly monochrome in mono.
+// Hairline-underline input. No filled box; the bottom border thickens on
+// focus and goes 2px on error. 16px text (text-base) so iOS never zooms.
 const inputCls = (hasError?: boolean) =>
-  `w-full bg-transparent px-0 py-2 text-sm text-text outline-none
-   placeholder:text-text-secondary/40
-   border-0 border-b transition-colors duration-150
+  `w-full bg-transparent px-0 py-2.5 text-base text-text outline-none
+   placeholder:text-text-tertiary
+   border-0 transition-colors duration-150
    ${hasError
-     ? "border-text/60"
-     : "border-border focus:border-text/70 hover:border-text/40"}`;
+     ? "border-b-2 border-text"
+     : "border-b border-border focus:border-text/70 hover:border-text/40"}`;
 
 // ---------------------------------------------------------------------------
-// Success state - mono glyph + serif line + restrained reset, no color, no
-// scale-pop card.
+// Success state: focused heading, a plain reply line, two ways forward.
 // ---------------------------------------------------------------------------
 
-function SuccessView({ onReset, reduced }: { onReset: () => void; reduced: boolean | null }) {
+function SuccessView({
+  name,
+  email,
+  onReset,
+  onAbout,
+  reduced,
+}: {
+  name: string;
+  email: string;
+  onReset: () => void;
+  onAbout: () => void;
+  reduced: boolean | null;
+}) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+  const firstName = name.trim().split(/\s+/)[0];
+
   return (
     <motion.div
+      role="status"
       variants={reveal.container(reduced)}
       initial="hidden"
       animate="show"
       className="flex flex-col items-start gap-5"
     >
-      <motion.div variants={reveal.item(reduced)} className="flex items-center gap-3">
-        <span aria-hidden className="font-mono-meta text-text text-base leading-none">
-          ✓
-        </span>
-        <MetaLabel>Message sent</MetaLabel>
-      </motion.div>
-
-      <motion.h2 variants={reveal.item(reduced)} className="editorial-head font-display text-text leading-tight">
-        Thanks for reaching out.
+      <motion.h2
+        ref={headingRef}
+        tabIndex={-1}
+        variants={reveal.item(reduced)}
+        className="font-display text-[clamp(1.75rem,5cqi,2.5rem)] leading-tight text-text [text-wrap:balance] outline-none"
+      >
+        {firstName ? `Thanks, ${firstName}. Your message is in my inbox.` : "Thanks. Your message is in my inbox."}
       </motion.h2>
 
-      <motion.p variants={reveal.item(reduced)} className="text-sm text-text-secondary max-w-[48ch] leading-relaxed">
-        {"I read every message and reply faster than a hot reload. Promise."}
-      </motion.p>
+      {email && (
+        <motion.p variants={reveal.item(reduced)} className="text-sm text-text-secondary max-w-[48ch] leading-relaxed">
+          I&apos;ll reply to <span className="text-text [overflow-wrap:anywhere]">{email}</span>.
+        </motion.p>
+      )}
 
-      <motion.div variants={reveal.item(reduced)} className="flex flex-col w-full max-w-xs">
-        <Hairline />
-        <button
-          type="button"
-          onClick={onReset}
-          className={`group flex items-center justify-between py-3 px-1 text-left ${PRESSABLE}`}
-        >
-          <MetaLabel>Send another</MetaLabel>
-          <span aria-hidden className={`font-mono-meta text-text-secondary ${HOVER_NUDGE}`}>
-            →
-          </span>
+      <motion.div variants={reveal.item(reduced)} className="flex flex-wrap gap-3">
+        <button type="button" onClick={onReset} className={PRIMARY_BTN}>
+          Write another message
         </button>
-        <Hairline />
+        <button type="button" onClick={onAbout} className={SECONDARY_BTN}>
+          Back to About Me
+        </button>
       </motion.div>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Failure banner: sits directly above the submit row.
+// ---------------------------------------------------------------------------
+
+function FailBanner({
+  kind,
+  mailtoHref,
+  onRetry,
+}: {
+  kind: FailKind;
+  mailtoHref: string;
+  onRetry: () => void;
+}) {
+  const mono = useIsMono();
+  const ref = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+
+  useEffect(() => {
+    ref.current?.focus();
+  }, [kind]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(contactLinks.email);
+      setCopied("done");
+    } catch {
+      setCopied("failed");
+    }
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      role="alert"
+      tabIndex={-1}
+      data-testid="contact-fail"
+      initial={{ opacity: 0, transform: "translateY(-6px)" }}
+      animate={{ opacity: 1, transform: "translateY(0px)" }}
+      transition={{ duration: 0.2, ease: EASE_OUT }}
+      className="flex flex-col gap-3 border-l-2 border-text py-1 pl-4 outline-none"
+    >
+      <p className={`text-sm leading-relaxed ${mono ? "text-text" : "text-red-700 dark:text-red-400"}`}>
+        {FAIL_COPY[kind]}{" "}
+        <a
+          href={mailtoHref}
+          className="font-medium text-text underline underline-offset-4 [overflow-wrap:anywhere]"
+        >
+          {contactLinks.email}
+        </a>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {kind !== "offline" && (
+          <button type="button" onClick={onRetry} className={SECONDARY_BTN}>
+            Try again
+          </button>
+        )}
+        <button type="button" onClick={copy} className={SECONDARY_BTN}>
+          {copied === "done" ? "Email copied" : "Copy email"}
+        </button>
+        {kind === "offline" && (
+          <a href={mailtoHref} className={SECONDARY_BTN}>
+            Open mail app
+          </a>
+        )}
+      </div>
+      {copied === "failed" && (
+        <p className="text-sm text-text-secondary">Copy is blocked here. Select the address above instead.</p>
+      )}
     </motion.div>
   );
 }
@@ -288,68 +413,107 @@ function SuccessView({ onReset, reduced }: { onReset: () => void; reduced: boole
 // Main
 // ---------------------------------------------------------------------------
 
-// The `variant` prop is accepted for registry compatibility (mobile passes
-// variant="mobile"); desktop and mobile share this one editorial layout, so it
-// is intentionally not branched on.
-export default function ContactApp(_props: ContactAppProps = {}) {
-  void _props;
+export default function ContactApp({ variant = "desktop" }: ContactAppProps = {}) {
   const reduced = useReducedMotion();
-  const mono = useIsMono();
-  const [formData, setFormData] = useState<FormData>({
-    name: "", email: "", company: "", subject: "", message: "",
-  });
-  const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [errorSummary, setErrorSummary] = useState("");
   const [status, setStatus] = useState<Status>("idle");
+  const [failKind, setFailKind] = useState<FailKind>("failed");
+  const [sent, setSent] = useState<{ name: string; email: string }>({ name: "", email: "" });
+  const submittingRef = useRef(false);
 
-  const validate = (key: keyof FormData, value: string): string | null => {
-    switch (key) {
-      case "name":    return value.length < 2 ? "At least 2 characters" : null;
-      case "email":   return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? "Enter a valid email" : null;
-      case "subject": return value.length < 5 ? "At least 5 characters" : null;
-      case "message": return value.length < 20 ? "At least 20 characters" : null;
-      default:        return null;
-    }
-  };
-
-  const handleChange = (key: keyof FormData, value: string) => {
+  const handleChange = (key: FieldKey, value: string) => {
     setFormData((p) => ({ ...p, [key]: value }));
     if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors: Partial<FormData> = {};
-    (["name", "email", "subject", "message"] as const).forEach((f) => {
-      if (!formData[f].trim()) newErrors[f] = "Required";
-      else {
-        const err = validate(f, formData[f]);
-        if (err) newErrors[f] = err;
-      }
-    });
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+  const submit = useCallback(async () => {
+    if (submittingRef.current) return;
+
+    const newErrors: Partial<Record<FieldKey, string>> = {};
+    for (const key of REQUIRED) {
+      const err = validateField(key, formData[key]);
+      if (err) newErrors[key] = err;
+    }
+    const invalid = REQUIRED.filter((k) => newErrors[k]);
+    setErrors(newErrors);
+    if (invalid.length > 0) {
+      const names = invalid.map((k) => FIELD_LABEL[k]).join(", ");
+      setErrorSummary(
+        invalid.length === 1 ? `${names} needs attention.` : `${invalid.length} fields need attention: ${names}.`,
+      );
+      document.getElementById(`contact-${invalid[0]}`)?.focus();
       return;
     }
+    setErrorSummary("");
+
+    submittingRef.current = true;
     setStatus("submitting");
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          company: formData.company.trim(),
+          subject: formData.subject.trim(),
+          message: formData.message.trim(),
+        }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        setFailKind(failKindFor(res.status));
+        setStatus("error");
+        return;
+      }
+      setSent({ name: formData.name, email: formData.email.trim() });
       setStatus("success");
-      setFormData({ name: "", email: "", company: "", subject: "", message: "" });
+      setFormData(EMPTY_FORM);
     } catch {
+      setFailKind(failKindFor(null));
       setStatus("error");
+    } finally {
+      submittingRef.current = false;
     }
+  }, [formData]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submit();
+  };
+
+  const openAbout = () => {
+    if (variant === "mobile") useMobileStore.getState().openApp("about-me");
+    else useOSStore.getState().openWindow("about-me");
   };
 
   const submitting = status === "submitting";
 
+  // The mailto fallback carries whatever the visitor already typed.
+  const mailtoHref = (() => {
+    const params = new URLSearchParams();
+    if (formData.subject.trim()) params.set("subject", formData.subject.trim());
+    if (formData.message.trim()) params.set("body", formData.message.trim());
+    const q = params.toString().replace(/\+/g, "%20");
+    return `mailto:${contactLinks.email}${q ? `?${q}` : ""}`;
+  })();
+
+  // Shared props for every input: id, name, value, error wiring, max length.
+  const fieldProps = (key: FieldKey) => ({
+    id: `contact-${key}`,
+    name: key,
+    value: formData[key],
+    maxLength: MAX_LEN[key],
+    "aria-invalid": errors[key] ? true : undefined,
+    "aria-describedby": errors[key] ? errorId(key) : undefined,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      handleChange(key, e.target.value),
+  });
+
   return (
-    <div className="h-full overflow-y-auto bg-bg">
-      <div className="mx-auto max-w-2xl px-6 py-8 sm:px-10 sm:py-10 flex flex-col gap-10">
+    <div className="contact-app h-full overflow-y-auto bg-bg">
+      <div className="contact-doc mx-auto flex w-full max-w-5xl flex-col">
         <AnimatePresence mode="wait">
           {status === "success" ? (
             <motion.div
@@ -359,7 +523,13 @@ export default function ContactApp(_props: ContactAppProps = {}) {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.22, ease: EASE_OUT }}
             >
-              <SuccessView onReset={() => setStatus("idle")} reduced={reduced} />
+              <SuccessView
+                name={sent.name}
+                email={sent.email}
+                onReset={() => setStatus("idle")}
+                onAbout={openAbout}
+                reduced={reduced}
+              />
             </motion.div>
           ) : (
             <motion.div
@@ -368,161 +538,117 @@ export default function ContactApp(_props: ContactAppProps = {}) {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0, transition: { duration: 0.15, ease: EASE_OUT } }}
-              className="flex flex-col gap-10"
+              className="contact-layout"
             >
-              <IdentityMasthead reduced={reduced} />
+              <motion.section variants={reveal.item(reduced)} aria-labelledby="contact-heading" className="flex min-w-0 flex-col gap-5">
+                <header className="flex flex-col gap-2">
+                  <h1 id="contact-heading" className="font-display text-[clamp(1.75rem,5cqi,2.25rem)] leading-tight text-text">
+                    Send a message
+                  </h1>
+                  <p className="text-sm text-text-secondary leading-relaxed max-w-[56ch]">
+                    Hiring for a role or have a project in mind? Send a note. It goes straight to my inbox.
+                    All fields are required unless marked optional.
+                  </p>
+                </header>
 
-              <motion.div variants={reveal.item(reduced)}>
-                <EditorialSection number="01" eyebrow="Get in touch" title="Drop me a line">
-                  <div className="flex flex-col gap-6">
-                    <p className="text-sm text-text-secondary leading-relaxed max-w-[56ch]">
-                      Have a role, a project, or just want to say hi? Send it over and
-                      it lands straight in my inbox.
-                    </p>
+                {/* Screen-reader summary of what failed validation. */}
+                <p role="alert" className="sr-only">
+                  {errorSummary}
+                </p>
 
-                    {status === "error" && (
-                      <motion.div
-                        // GPU transform string + ease-out; <300ms (Kowalski).
-                        initial={{ opacity: 0, transform: "translateY(-6px)" }}
-                        animate={{ opacity: 1, transform: "translateY(0px)" }}
-                        transition={{ duration: 0.2, ease: EASE_OUT }}
-                        className="flex flex-col"
-                      >
-                        <Hairline />
-                        <div className="flex items-center justify-between gap-3 py-3 px-1">
-                          <span className="flex items-center gap-3">
-                            <span
-                              aria-hidden
-                              className={`font-mono-meta text-base leading-none ${
-                                mono ? "text-text" : "text-red-400"
-                              }`}
-                            >
-                              !
-                            </span>
-                            <span
-                              className={`text-sm ${
-                                mono ? "text-text font-medium" : "text-red-400"
-                              }`}
-                            >
-                              Something broke on my end.
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setStatus("idle")}
-                            className="font-mono-meta text-text-secondary
-                                       transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                                       hover:text-text active:scale-[0.97] active:duration-100
-                                       motion-reduce:active:scale-100
-                                       focus-visible:text-text"
-                          >
-                            Retry
-                          </button>
-                        </div>
-                        <Hairline />
-                      </motion.div>
-                    )}
+                {/* noValidate: the JS validation is the single source of truth,
+                    so type="email" keeps the phone's email keyboard without the
+                    native bubble pre-empting the inline errors. */}
+                <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+                  <div className="contact-fields">
+                    <Field id="name" label="Name" error={errors.name}>
+                      <input
+                        {...fieldProps("name")}
+                        autoComplete="name"
+                        enterKeyHint="next"
+                        required
+                        aria-required
+                        className={inputCls(!!errors.name)}
+                      />
+                    </Field>
 
-                    {/* noValidate: custom JS validation is the single source of
-                        truth, so type="email" keeps the mobile email keyboard
-                        without the native bubble pre-empting our editorial errors. */}
-                    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
-                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <Field id="name" label="Name" required error={errors.name}>
-                          <input
-                            id="name"
-                            placeholder="Your name"
-                            value={formData.name}
-                            onChange={(e) => handleChange("name", e.target.value)}
-                            className={inputCls(!!errors.name)}
-                          />
-                        </Field>
+                    <Field id="email" label="Email" error={errors.email}>
+                      <input
+                        {...fieldProps("email")}
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        enterKeyHint="next"
+                        placeholder="name@company.com"
+                        required
+                        aria-required
+                        className={inputCls(!!errors.email)}
+                      />
+                    </Field>
 
-                        <Field id="email" label="Email" required error={errors.email}>
-                          <input
-                            id="email"
-                            type="email"
-                            placeholder="you@company.com"
-                            value={formData.email}
-                            onChange={(e) => handleChange("email", e.target.value)}
-                            className={inputCls(!!errors.email)}
-                          />
-                        </Field>
-                      </div>
+                    <Field id="company" label="Company" optional>
+                      <input
+                        {...fieldProps("company")}
+                        autoComplete="organization"
+                        enterKeyHint="next"
+                        className={inputCls(false)}
+                      />
+                    </Field>
 
-                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <Field id="company" label="Company">
-                          <input
-                            id="company"
-                            placeholder="Optional"
-                            value={formData.company}
-                            onChange={(e) => handleChange("company", e.target.value)}
-                            className={inputCls(false)}
-                          />
-                        </Field>
-
-                        <Field id="subject" label="Subject" required error={errors.subject}>
-                          <input
-                            id="subject"
-                            placeholder="What's on your mind?"
-                            value={formData.subject}
-                            onChange={(e) => handleChange("subject", e.target.value)}
-                            className={inputCls(!!errors.subject)}
-                          />
-                        </Field>
-                      </div>
-
-                      <Field id="message" label="Message" required error={errors.message}>
-                        <textarea
-                          id="message"
-                          placeholder="Tell me about the opportunity, project, or just say hey..."
-                          value={formData.message}
-                          onChange={(e) => handleChange("message", e.target.value)}
-                          rows={5}
-                          className={`${inputCls(!!errors.message)} resize-none`}
-                        />
-                      </Field>
-
-                      {/* Submit - restrained monochrome row: serif-adjacent mono
-                          label + glyph above a hairline, never a filled accent
-                          block. The glyph spins under load (collapses under
-                          reduced motion). */}
-                      <div className="flex flex-col">
-                        <Hairline />
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          aria-busy={submitting}
-                          className={`group flex items-center justify-between py-3 px-1 text-left
-                                     disabled:cursor-not-allowed disabled:opacity-60
-                                     disabled:active:scale-100 ${PRESSABLE}`}
-                        >
-                          {/* Label crossfade is masked with a touch of blur so the
-                              two words blend into one state change instead of a
-                              hard text swap (Kowalski's blur-mask trick). */}
-                          <MetaLabel
-                            className={`transition-[filter,opacity] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                                        ${submitting ? "motion-safe:blur-[1px] opacity-80" : "blur-0 opacity-100"}`}
-                          >
-                            {submitting ? "Sending" : "Send message"}
-                          </MetaLabel>
-                          <span
-                            aria-hidden
-                            className={`font-mono-meta text-text-secondary
-                                        ${submitting
-                                          ? "motion-safe:animate-spin"
-                                          : `transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                                             [@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5
-                                             motion-reduce:transform-none`}`}
-                          >
-                            {submitting ? "◴" : "→"}
-                          </span>
-                        </button>
-                        <Hairline />
-                      </div>
-                    </form>
+                    <Field id="subject" label="Subject" error={errors.subject}>
+                      <input
+                        {...fieldProps("subject")}
+                        autoComplete="off"
+                        enterKeyHint="next"
+                        placeholder="e.g. Software Engineer role at Acme"
+                        required
+                        aria-required
+                        className={inputCls(!!errors.subject)}
+                      />
+                    </Field>
                   </div>
-                </EditorialSection>
+
+                  <Field id="message" label="Message" error={errors.message}>
+                    <textarea
+                      {...fieldProps("message")}
+                      placeholder="What's the role or project, and how can I help?"
+                      rows={4}
+                      required
+                      aria-required
+                      className={`${inputCls(!!errors.message)} resize-none`}
+                    />
+                  </Field>
+
+                  {status === "error" && (
+                    <FailBanner kind={failKind} mailtoHref={mailtoHref} onRetry={() => void submit()} />
+                  )}
+
+                  {/* Submit: aria-disabled (not disabled) while sending, so focus
+                      stays on the button instead of dropping to <body>. */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="submit"
+                      aria-disabled={submitting}
+                      aria-busy={submitting}
+                      className={`${PRIMARY_BTN} ${submitting ? "cursor-progress opacity-70" : ""}`}
+                    >
+                      {submitting ? "Sending" : "Send message"}
+                      <span
+                        aria-hidden
+                        className={submitting ? "motion-safe:animate-spin" : ""}
+                      >
+                        {submitting ? "◴" : "→"}
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              </motion.section>
+
+              <motion.div variants={reveal.item(reduced)} className="min-w-0">
+                <ReachAside />
               </motion.div>
             </motion.div>
           )}
