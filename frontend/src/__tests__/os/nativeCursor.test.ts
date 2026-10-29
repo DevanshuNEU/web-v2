@@ -13,6 +13,10 @@ import path from 'node:path';
 const SRC = path.resolve(__dirname, '../..');
 const read = (rel: string) => readFileSync(path.join(SRC, rel), 'utf8');
 
+// Built at runtime: Tailwind scans src/ for class names, and the literal here
+// would make it emit an unused utility for that class into the CSS bundle.
+const HIDE_CLASS = ['cursor', 'none'].join('-');
+
 describe('native cursor', () => {
   it('has no Cursor component file', () => {
     expect(existsSync(path.join(SRC, 'components/os/Cursor.tsx'))).toBe(false);
@@ -25,7 +29,7 @@ describe('native cursor', () => {
   it('does not hide the system cursor in globals.css', () => {
     const css = read('app/globals.css');
     expect(css).not.toContain('cursor: none');
-    expect(css).not.toContain('cursor-none');
+    expect(css).not.toContain(HIDE_CLASS);
   });
 
   it('has no spring.cursor token', () => {
