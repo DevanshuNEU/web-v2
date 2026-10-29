@@ -1,84 +1,99 @@
 'use client';
 
 /**
- * DesktopWidgets — rotating dev quotes card, top-right corner of the desktop.
+ * DesktopWidgets: the owner card, top-right of the desktop.
  *
- * Positioning notes:
- *   - The menu bar is 28px tall (h-7).
- *   - NotificationCenter renders at top-9 (36px). A typical notification card
- *     is ~90px tall, ending at ~126px from the top.
- *   - This widget starts at top-[130px] so notifications have clear space above
- *     it and never overlap on initial page load.
+ * Says whose desktop this is and gives the two things a recruiter came for,
+ * the resume and a way to get in touch. Every line comes from the data files
+ * (data/aboutMe.ts, data/projectMeta.ts, data/portfolio.json): nothing here
+ * is written twice.
  *
- * Clock note:
- *   - The menu bar already shows the full date + time in the system tray.
- *   - This widget therefore skips the clock and focuses on the quotes rotator,
- *     which is the part that adds personality and isn't duplicated elsewhere.
+ * Positioning: the menu bar is 28px, notification toasts start at 36px and
+ * end near 126px, so the card starts below them. It lives under windows (macOS
+ * layering) and fades out while a window overlaps it, so it never shows as a
+ * half-clipped sliver beside a window.
  */
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from '@/store/themeStore';
+import { useEffect, useRef, useState } from 'react';
+import { FileText, Mail, MessageSquare } from 'lucide-react';
+import { useOSStore } from '@/store/osStore';
+import { useLaunchpadStore } from '@/store/launchpadStore';
+import { identity, mastheadSpecLine, contactLinks } from '@/data/aboutMe';
+import { projectMeta } from '@/data/projectMeta';
+import { MENUBAR_H, DOCK_H } from '@/lib/windowSnap';
 
-const QUOTES = [
-  { text: 'Any fool can write code a computer understands. Good programmers write code humans understand.', author: 'Martin Fowler' },
-  { text: 'First, solve the problem. Then, write the code.', author: 'John Johnson' },
-  { text: 'Make it work, make it right, make it fast.', author: 'Kent Beck' },
-  { text: 'Code is like humor. When you have to explain it, it\'s bad.', author: 'Cory House' },
-  { text: 'Programs must be written for people to read, and only incidentally for machines to execute.', author: 'Harold Abelson' },
-  { text: 'Premature optimization is the root of all evil.', author: 'Donald Knuth' },
-  { text: 'Simplicity is the soul of efficiency.', author: 'Austin Freeman' },
-  { text: 'The best code is no code at all.', author: 'Jeff Atwood' },
-  { text: 'Deleted code is debugged code.', author: 'Jeff Sickel' },
-  { text: "It's not a bug, it's an undocumented feature.", author: 'Anonymous' },
-  { text: 'One of the best programming skills you can have is knowing when to walk away for a while.', author: 'Oscar Godson' },
-  { text: 'Walking on water and developing software from a spec are easy if both are frozen.', author: 'Edward V. Berard' },
-];
+const NOW_BUILDING = Object.values(projectMeta).find(p => p.displayName === 'OpenCodeIntel');
+
+type Box = { left: number; top: number; right: number; bottom: number };
 
 export function DesktopWidgets() {
-  const [quoteIdx, setQuoteIdx] = useState(0);
-  const { mode } = useTheme();
+  const windows = useOSStore(s => s.windows);
+  const openWindow = useOSStore(s => s.openWindow);
+  const launchpadOpen = useLaunchpadStore(s => s.isOpen);
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<Box | null>(null);
 
-  const isDark = mode === 'dark';
-
-  // Rotate quotes every 18 seconds
   useEffect(() => {
-    const t = setInterval(() => setQuoteIdx(i => (i + 1) % QUOTES.length), 18_000);
-    return () => clearInterval(t);
+    const measure = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setBox({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
   }, []);
 
-  const quote = QUOTES[quoteIdx];
+  const covered = !!box && windows.some(w => {
+    if (!w.isOpen || w.isMinimized) return false;
+    const b = w.isMaximized
+      ? { x: 0, y: MENUBAR_H, width: window.innerWidth, height: window.innerHeight - MENUBAR_H - DOCK_H }
+      : { ...w.position, ...w.size };
+    return b.x < box.right && b.x + b.width > box.left && b.y < box.bottom && b.y + b.height > box.top;
+  });
 
-  // Theme-aware frosted glass card
-  const card        = isDark ? 'bg-black/25 border-white/10'    : 'bg-white/40 border-black/8';
-  const quoteColor  = isDark ? 'text-white/40'                  : 'text-gray-700/60';
-  const authorColor = isDark ? 'text-white/25'                  : 'text-gray-500/55';
+  const btn =
+    'inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] font-medium ' +
+    'text-text hover:bg-text/[0.08] transition-colors';
 
   return (
-    /*
-     * top-[130px] — clears the menu bar (28px) + a full notification card (~90px)
-     *               so the welcome notification never overlaps this widget.
-     * pointer-events-none / select-none — widget is decorative; clicks pass through
-     *   to windows underneath.
-     */
-    <div className="absolute right-5 top-[130px] pointer-events-none select-none z-[1]">
-      <div className={`rounded-2xl border backdrop-blur-md px-5 py-4 text-right max-w-[240px] ${card}`}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={quoteIdx}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            className="space-y-1.5"
-          >
-            <p className={`text-[10px] leading-relaxed italic ${quoteColor}`}>
-              &ldquo;{quote.text}&rdquo;
-            </p>
-            <p className={`text-[9px] ${authorColor}`}>· {quote.author}</p>
-          </motion.div>
-        </AnimatePresence>
+    <aside
+      ref={ref}
+      aria-label={`About ${identity.name}`}
+      aria-hidden={covered || undefined}
+      className={`absolute right-5 top-[140px] z-[1] w-[272px] select-none transition-opacity duration-200 ${
+        covered ? 'pointer-events-none opacity-0' : 'opacity-100'
+      } ${launchpadOpen ? 'invisible' : ''}`}
+    >
+      <div className="rounded-2xl border border-border/70 bg-surface/75 px-5 py-4 shadow-lg backdrop-blur-xl">
+        <p className="font-serif text-[22px] leading-tight text-text">{identity.name}</p>
+        <p className="mt-1 flex flex-wrap gap-x-3 text-[13px] text-text-secondary">
+          {mastheadSpecLine.map(part => <span key={part}>{part}</span>)}
+        </p>
+
+        <p className="mt-3 flex items-center gap-2 text-[13px] text-text">
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 bg-text" />
+          {identity.availabilityShort}
+        </p>
+
+        {NOW_BUILDING && (
+          <p className="mt-2 text-[13px] leading-snug text-text-secondary">
+            <span className="text-text">Now building {NOW_BUILDING.displayName}:</span>{' '}
+            {NOW_BUILDING.tagline.charAt(0).toLowerCase() + NOW_BUILDING.tagline.slice(1)}.
+          </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" tabIndex={covered ? -1 : 0} onClick={() => openWindow('resume')} className={btn}>
+            <FileText size={13} aria-hidden /> Resume
+          </button>
+          <button type="button" tabIndex={covered ? -1 : 0} onClick={() => openWindow('contact')} className={btn}>
+            <MessageSquare size={13} aria-hidden /> Contact
+          </button>
+          <a href={`mailto:${contactLinks.email}`} tabIndex={covered ? -1 : 0} className={btn}>
+            <Mail size={13} aria-hidden /> Email
+          </a>
+        </div>
       </div>
-    </div>
+    </aside>
   );
 }

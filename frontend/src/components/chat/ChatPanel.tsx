@@ -27,8 +27,8 @@ import { TypingDots, StreamCaret } from '@/components/os/TypingDots';
 const STARTERS = [
   'What do you build?',
   'How is your RAG different?',
-  'Are you good at systems?',
-  'What are you looking for?',
+  'What have you shipped to production?',
+  'What roles are you open to?',
 ] as const;
 
 type Err = null | 'offline' | 'rate_limited' | 'error';
@@ -151,6 +151,9 @@ export default function ChatPanel({
   const busy = status !== 'idle';
   const empty = messages.length === 0;
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  // Screen readers hear the finished answer once, not every streamed chunk.
+  const lastAssistant = busy ? undefined : [...messages].reverse().find((m) => m.role === 'assistant');
+  const announcement = lastAssistant ? sanitizeVoice(lastAssistant.content) : '';
 
   return (
     // `container-type: size` makes the panel its own query container so the
@@ -166,11 +169,11 @@ export default function ChatPanel({
               <span className="text-[15px] font-semibold tracking-[-0.01em] text-text leading-none">
                 Devanshu
               </span>
-              <span className="text-[9.5px] font-medium uppercase tracking-[0.14em] text-text-secondary border border-border rounded-[5px] px-1.5 py-1 leading-none">
+              <span className="text-[11px] font-medium text-text-secondary border border-border rounded-[5px] px-1.5 py-1 leading-none">
                 AI
               </span>
             </div>
-            <div className="text-[11.5px] text-text-secondary mt-1.5 leading-none transition-colors">
+            <div className="text-[12px] text-text-secondary mt-1.5 leading-none transition-colors">
               {busy ? 'thinking…' : 'Trained on my work, answering as me'}
             </div>
           </div>
@@ -178,7 +181,7 @@ export default function ChatPanel({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Close chat"
               className="grid place-items-center w-7 h-7 -mr-1 rounded-full text-text-secondary hover:text-text hover:bg-border/50 transition-colors flex-shrink-0"
             >
               <X size={16} strokeWidth={2.25} />
@@ -186,6 +189,8 @@ export default function ChatPanel({
           )}
         </header>
       )}
+
+      <div className="sr-only" aria-live="polite">{announcement}</div>
 
       {/* Thread */}
       <div className="flex-1 min-h-0 overflow-auto">
@@ -197,7 +202,7 @@ export default function ChatPanel({
               if (m.role === 'user') {
                 return (
                   <div key={i} className="space-y-1.5">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-text-secondary/70">
+                    <div className="text-[12px] font-medium text-text-secondary">
                       You
                     </div>
                     <p className="text-[15px] leading-relaxed text-text-secondary whitespace-pre-wrap">
@@ -213,7 +218,7 @@ export default function ChatPanel({
               return (
                 <div key={i} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-text-secondary/70">
+                    <span className="text-[12px] font-medium text-text-secondary">
                       Devanshu
                     </span>
                   </div>
@@ -250,9 +255,9 @@ export default function ChatPanel({
         {error && (
           <div className="flex items-center gap-3 px-1 pb-2 text-[12px] text-text-secondary">
             <span>
-              {error === 'offline' && 'Chat is offline right now.'}
+              {error === 'offline' && 'Chat is offline right now. Ping Me still works.'}
               {error === 'rate_limited' && 'A lot of questions are coming in. Give it a minute.'}
-              {error === 'error' && 'Something went wrong.'}
+              {error === 'error' && "Couldn't get an answer."}
             </span>
             {lastUser && (
               <button
@@ -278,7 +283,7 @@ export default function ChatPanel({
             spellCheck={false}
             data-no-focus-ring
             // 16px min so iOS Safari never pinch-zooms on focus.
-            className="flex-1 bg-transparent resize-none outline-none text-[16px] text-text placeholder:text-text-secondary/60 leading-relaxed py-1.5 max-h-32"
+            className="flex-1 bg-transparent resize-none outline-none text-[16px] text-text placeholder:text-text-secondary leading-relaxed py-1.5 max-h-32"
           />
           <button
             type="submit"
@@ -310,7 +315,7 @@ function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string)
       // from the top (off-centre reads as a real surface, not a cramped sheet),
       // with rhythm that opens up on the full-screen app and tightens in the orb
       // via cqh — the panel is its own size container.
-      className="flex min-h-full flex-col justify-start px-6 pt-[clamp(2rem,14cqh,6rem)] pb-8 gap-[clamp(1.25rem,4cqh,2rem)]"
+      className="flex min-h-full flex-col justify-start px-6 pt-[clamp(1rem,6cqh,3rem)] pb-6 gap-[clamp(1rem,3cqh,1.5rem)]"
     >
       <div className="space-y-[clamp(0.5rem,1.5cqh,0.75rem)]">
         <motion.p
@@ -327,8 +332,7 @@ function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string)
           transition={{ duration: 0.28, delay: reduced ? 0 : 0.09, ease }}
           className="text-[13px] leading-relaxed text-text-secondary max-w-[42ch]"
         >
-          An AI trained on my work, answering in the first person as me. Pick a
-          thread to start, or just type below.
+          Pick a question or type your own.
         </motion.p>
       </div>
 

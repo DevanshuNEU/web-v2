@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function Error({
   error,
   reset,
@@ -8,19 +10,38 @@ export default function Error({
   reset: () => void;
 }) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-red-600 to-orange-600">
-      <div className="text-white text-center max-w-md px-6">
-        <h2 className="text-3xl font-bold mb-4">Oops! Something went wrong</h2>
-        <p className="text-white/80 mb-6">
-          The Portfolio OS encountered an unexpected error.
+    <main className="min-h-screen w-full bg-bg text-text flex items-center px-6 py-16">
+      <div className="mx-auto w-full max-w-xl">
+        <p className="font-mono text-[12px] text-text-secondary">Error</p>
+        <h1 className="mt-3 font-serif text-[clamp(2.25rem,7vw,3.5rem)] leading-[1.05] tracking-[-0.01em]">
+          Something broke.
+        </h1>
+        <p className="mt-4 text-[16px] leading-relaxed text-text-secondary">
+          devOS hit an error. Try again, or go back to the desktop.
         </p>
-        <button
-          onClick={() => reset()}
-          className="px-6 py-3 bg-white text-red-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
-        >
-          Try again
-        </button>
+
+        <div className="mt-8 h-px bg-border" />
+
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-[15px]">
+          <button
+            type="button"
+            onClick={() => reset()}
+            className="rounded-md bg-text px-4 py-2 font-medium text-bg transition-opacity hover:opacity-90"
+          >
+            Try again
+          </button>
+          <Link
+            href="/"
+            className="text-text underline decoration-border underline-offset-4 transition-colors hover:decoration-text"
+          >
+            Go to the desktop
+          </Link>
+        </div>
+
+        {error.digest && (
+          <p className="mt-8 font-mono text-[12px] text-text-secondary">Reference: {error.digest}</p>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

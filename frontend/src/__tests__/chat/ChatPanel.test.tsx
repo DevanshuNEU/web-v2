@@ -64,10 +64,12 @@ describe('ChatPanel', () => {
     render(<ChatPanel />);
     fireEvent.click(screen.getByText('What do you build?'));
 
-    // The streamed assistant reply appears in the thread.
+    // The streamed assistant reply appears in the thread, and once it is
+    // finished the polite live region carries it for screen readers.
     await waitFor(() =>
-      expect(screen.getByText(/I build AI dev tools at the MCP layer\./)).toBeInTheDocument(),
+      expect(screen.getAllByText(/I build AI dev tools at the MCP layer\./)).toHaveLength(2),
     );
+    expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('I build AI dev tools at the MCP layer.');
 
     // It posted a multi-turn messages payload, not a one-shot {query}.
     expect(fetchMock).toHaveBeenCalledWith('/api/concierge', expect.any(Object));
@@ -80,7 +82,7 @@ describe('ChatPanel', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
 
     render(<ChatPanel />);
-    fireEvent.click(screen.getByText('What are you looking for?'));
+    fireEvent.click(screen.getByText('What roles are you open to?'));
 
     await waitFor(() => expect(screen.getByText(/offline/i)).toBeInTheDocument());
   });

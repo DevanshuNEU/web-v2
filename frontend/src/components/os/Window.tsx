@@ -19,6 +19,13 @@ interface WindowProps {
 
 // Invisible resize hit areas: 6px edges and 12px corners that straddle the
 // window border, like macOS. Corners come last so they sit above the edges.
+// Traffic lights in macOS order. `fun` / `funGlyph` are the Fun palette colors.
+const TRAFFIC_LIGHTS = [
+  { kind: 'close', Icon: X, size: 8, fun: 'bg-red-500 group-hover/btn:bg-red-600', funGlyph: 'text-red-900' },
+  { kind: 'minimize', Icon: Minus, size: 8, fun: 'bg-yellow-400 group-hover/btn:bg-yellow-500', funGlyph: 'text-yellow-900' },
+  { kind: 'maximize', Icon: Square, size: 6, fun: 'bg-green-500 group-hover/btn:bg-green-600', funGlyph: 'text-green-900' },
+] as const;
+
 const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
   { dir: 'n', className: '-top-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
   { dir: 's', className: '-bottom-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
@@ -51,6 +58,7 @@ export default function Window({ window, children }: WindowProps) {
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
   const mono = useIsMono();
+  const titleId = React.useId();
 
   // Drive open / drag scale through the same controls the genie minimize uses,
   // so there is one animation owner per window.
@@ -233,6 +241,9 @@ export default function Window({ window, children }: WindowProps) {
       )}
     <motion.div
       ref={elRef}
+      data-window
+      role="region"
+      aria-labelledby={titleId}
       layout
       initial={reduced ? false : { opacity: 0, scale: 0.92, y: 30 }}
       animate={controls}
@@ -282,78 +293,58 @@ export default function Window({ window, children }: WindowProps) {
           maximizeWindow(window.id);
         }}
       >
-        {/* Traffic-light controls */}
-        <div className="group flex items-center gap-1.5">
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              closeWindow(window.id);
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/45 hover:bg-black/65 dark:bg-white/35 dark:hover:bg-white/55'
-                : 'bg-red-500 hover:bg-red-600'
-            }`}
-            title="Close"
-          >
-            <X
-              size={7}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-red-900'
-              }`}
-            />
-          </button>
-
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMinimize();
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/30 hover:bg-black/50 dark:bg-white/25 dark:hover:bg-white/45'
-                : 'bg-yellow-400 hover:bg-yellow-500'
-            }`}
-            title="Minimize"
-          >
-            <Minus
-              size={7}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-yellow-900'
-              }`}
-            />
-          </button>
-
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              maximizeWindow(window.id);
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/20 hover:bg-black/40 dark:bg-white/15 dark:hover:bg-white/35'
-                : 'bg-green-500 hover:bg-green-600'
-            }`}
-            title="Maximize"
-          >
-            <Square
-              size={6}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-green-900'
-              }`}
-            />
-          </button>
+        {/* Traffic-light controls. 12px dots inside 20px hit areas. In mono
+            the three dots share one shade that passes 3:1 and always show
+            their glyph, since color can't tell them apart; in Fun the glyphs
+            appear on hover or keyboard focus like macOS. */}
+        <div className="group/lights -ml-1 flex items-center">
+          {TRAFFIC_LIGHTS.map(({ kind, Icon, size, fun, funGlyph }) => {
+            const label = kind === 'close'
+              ? 'Close'
+              : kind === 'minimize'
+                ? 'Minimize'
+                : window.isMaximized ? 'Restore' : 'Maximize';
+            return (
+              <button
+                key={kind}
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (kind === 'close') closeWindow(window.id);
+                  else if (kind === 'minimize') handleMinimize();
+                  else maximizeWindow(window.id);
+                }}
+                title={label}
+                aria-label={`${label} ${window.title}`}
+                className="group/btn grid h-5 w-5 place-items-center rounded-full"
+              >
+                <span
+                  aria-hidden
+                  className={`grid h-3 w-3 place-items-center rounded-full transition-colors ${
+                    mono
+                      ? 'bg-black/45 group-hover/btn:bg-black/60 dark:bg-white/55 dark:group-hover/btn:bg-white/70'
+                      : fun
+                  }`}
+                >
+                  <Icon
+                    size={size}
+                    strokeWidth={2.5}
+                    className={`transition-opacity ${
+                      mono
+                        ? 'text-white opacity-70 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100 dark:text-black'
+                        : `${funGlyph} opacity-0 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100`
+                    }`}
+                  />
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Centered title */}
         <div className="absolute left-1/2 -translate-x-1/2">
-          <span className="text-sm font-medium text-text">
+          <span id={titleId} className="text-sm font-medium text-text">
             {window.title}
           </span>
         </div>

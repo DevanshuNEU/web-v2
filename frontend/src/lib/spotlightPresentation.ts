@@ -25,11 +25,14 @@ export const GLYPH: Record<SpotlightCategory, string> = {
 /** Category render order — search results group under headers in this order. */
 export const CATEGORY_ORDER: SpotlightCategory[] = ['app', 'project', 'skill', 'command'];
 
-/** Curated idle suggestions, looked up from the live index by id. */
+/**
+ * Curated idle suggestions, looked up from the live index by id. Recruiter
+ * first: who he is, the work, the resume, how to reach him.
+ */
 export const SUGGESTED_IDS = [
   'app:about-me',
   'app:projects',
-  'app:skills-dashboard',
+  'app:resume',
+  'app:contact',
   'cmd:hire devanshu',
-  'app:terminal',
 ];

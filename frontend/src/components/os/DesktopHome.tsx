@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import Desktop from '@/components/os/Desktop';
 import WindowManager from '@/components/os/WindowManager';
-import StageManager from '@/components/os/StageManager';
 import BootSequence from '@/components/os/BootSequence';
 import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
@@ -44,7 +44,7 @@ export default function DesktopHome() {
     check();
     window.addEventListener('resize', check);
 
-    // A refresh in the same tab skips the boot; only a new visit replays it.
+    // The boot plays once per browser (lib/bootSession.ts), not once per tab.
     if (hasBootedThisSession()) setBooted();
 
     setMounted(true);
@@ -88,20 +88,27 @@ export default function DesktopHome() {
 
   return (
     <>
-      {!isBooted && <BootSequence />}
+      {/* The intro dissolves over the desktop once it has mounted */}
+      <AnimatePresence>{!isBooted && <BootSequence key="boot" />}</AnimatePresence>
 
       {isBooted && (
-        <Desktop>
-          <StageManager />
+        <Desktop
+          overlays={
+            <>
+              <NotificationCenter />
+              {/* Spotlight search: Cmd+K, /, the menu bar button or the right-click menu */}
+              <Spotlight />
+              {/* App switcher: Option+Tab / Option+Shift+Tab cycles open windows */}
+              <AppSwitcher />
+              {/* Floating assistant: orb that expands into a chat panel */}
+              <AssistantBubble />
+            </>
+          }
+        >
+          {/* Stage Manager is gone: it covered the desktop icons and repeated
+              the dock's running-app dots. The dock and Option+Tab cover it. */}
           <WindowManager />
-          <NotificationCenter />
           <DesktopWidgets />
-          {/* Spotlight search — self-contained, listens for Cmd+K globally */}
-          <Spotlight />
-          {/* App switcher — Alt+Tab / Alt+Shift+Tab cycles open windows */}
-          <AppSwitcher />
-          {/* Floating assistant — orb that expands into a chat panel */}
-          <AssistantBubble />
         </Desktop>
       )}
     </>

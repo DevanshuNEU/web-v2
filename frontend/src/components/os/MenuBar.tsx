@@ -1,30 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useTheme } from '@/store/themeStore';
+import { useSpotlightStore } from '@/store/spotlightStore';
+import { identity } from '@/data/aboutMe';
+import { Z } from '@/lib/zLayers';
 import { useOSStore } from '@/store/osStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { getAppLabel } from '@/lib/appRegistry';
 import { isSoundEnabled, setSoundEnabled } from '@/hooks/useSoundEffects';
-import { Sun, Moon, Volume2, VolumeX } from 'lucide-react';
+import { Sun, Moon, Volume2, VolumeX, Search } from 'lucide-react';
 import { WifiTray, BatteryTray } from './TrayMenus';
-
-// Rotates when the desktop is idle (no focused window)
-const DEV_STATUSES = [
-  'devOS',
-  'probably debugging prod',
-  'shipping. always shipping.',
-  'coffee → code → repeat',
-  'forward deployed, always',
-  'RAG pipeline. not a salad.',
-  'open to SWE, AI and FDE roles',
-  'git push --force-with-feelings',
-  'null pointer? never heard of her.',
-  'localhost:3000 is home',
-  'building in public',
-  'cloud, AI, fullstack. pick all three.',
-];
 
 export default function MenuBar() {
   const { mode, toggleMode } = useTheme();
@@ -48,26 +35,17 @@ export default function MenuBar() {
     setSoundOn(next);
   };
 
-  const activeWindow = windows.find(w => w.id === activeWindowId && w.isOpen);
+  const openSpotlight = useSpotlightStore(s => s.open);
+  const reduced = useReducedMotion();
+  const [isMac, setIsMac] = useState(true);
+  useEffect(() => {
+    setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
+  }, []);
+
+  const activeWindow = windows.find(w => w.id === activeWindowId && w.isOpen && !w.isMinimized);
   const activeAppLabel = activeWindow
     ? getAppLabel(activeWindow.appType).windowTitle
     : null;
-
-  // Rotating status — only shown when no app is focused
-  const [statusIdx, setStatusIdx] = useState(0);
-  const [statusKey, setStatusKey] = useState(0);
-  const rotateRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (activeAppLabel) return; // stop rotating when an app is focused
-    rotateRef.current = setInterval(() => {
-      setStatusIdx(i => (i + 1) % DEV_STATUSES.length);
-      setStatusKey(k => k + 1);
-    }, 3800);
-    return () => { if (rotateRef.current) clearInterval(rotateRef.current); };
-  }, [activeAppLabel]);
-
-  const displayLabel = activeAppLabel ?? DEV_STATUSES[statusIdx];
 
   const handleThemeToggle = () => {
     const next = mode === 'dark' ? 'light' : 'dark';
@@ -85,8 +63,9 @@ export default function MenuBar() {
     <div
       role="banner"
       aria-label="System menu bar"
-      className="fixed top-0 inset-x-0 z-[999] h-7 flex items-center justify-between px-3 select-none"
+      className="fixed top-0 inset-x-0 h-7 flex items-center justify-between gap-4 px-3 select-none"
       style={{
+        zIndex: Z.menuBar,
         background: isDark ? 'rgba(20, 20, 20, 0.72)' : 'rgba(248, 248, 248, 0.72)',
         backdropFilter: 'blur(40px) saturate(180%)',
         WebkitBackdropFilter: 'blur(40px) saturate(180%)',
@@ -95,30 +74,45 @@ export default function MenuBar() {
           : '1px solid rgba(0,0,0,0.08)',
       }}
     >
-      {/* Left — active app name or rotating dev status */}
-      <div className="flex items-center overflow-hidden" style={{ minWidth: 0, maxWidth: 320 }}>
+      {/* Left: the owner's name, always, then the focused app like macOS */}
+      <div className="flex min-w-0 items-center gap-3 overflow-hidden">
+        <span className="whitespace-nowrap text-[13px] font-semibold tracking-[-0.01em] text-text">
+          {identity.name}
+        </span>
         <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={activeAppLabel ? `app-${activeAppLabel}` : `status-${statusKey}`}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="text-[13px] font-semibold tracking-[-0.01em] whitespace-nowrap"
-            style={{
-              color: activeAppLabel
-                ? (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.80)')
-                : (isDark ? 'rgba(255,255,255,0.52)' : 'rgba(0,0,0,0.42)'),
-              fontStyle: activeAppLabel ? 'normal' : 'italic',
-            }}
-          >
-            {displayLabel}
-          </motion.span>
+          {activeAppLabel && (
+            <motion.span
+              key={activeAppLabel}
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="truncate text-[13px] text-text-secondary"
+            >
+              {activeAppLabel}
+            </motion.span>
+          )}
         </AnimatePresence>
       </div>
 
-      {/* Right — system tray */}
+      {/* Right: system tray */}
       <div className="flex items-center gap-0.5">
+        {/* Visible way into Spotlight: most visitors never guess Cmd+K */}
+        <button
+          type="button"
+          onClick={openSpotlight}
+          aria-label={`Search devOS (${isMac ? 'Command' : 'Control'} K)`}
+          aria-haspopup="dialog"
+          className="mr-1 flex h-6 items-center gap-1.5 rounded-md px-2 text-[12px] text-text
+                     hover:bg-text/10 transition-colors duration-100 cursor-pointer"
+        >
+          <Search size={13} strokeWidth={2} aria-hidden />
+          <span>Search</span>
+          <kbd className="rounded border border-text/20 px-1 font-sans text-[11px] leading-[16px] text-text-secondary">
+            {isMac ? '⌘K' : 'Ctrl K'}
+          </kbd>
+        </button>
+
         {/* Wi-Fi and battery: tray menus with easter eggs (TrayMenus.tsx) */}
         <WifiTray isDark={isDark} />
         <BatteryTray isDark={isDark} />
@@ -127,7 +121,7 @@ export default function MenuBar() {
         <button
           onClick={handleSoundToggle}
           className="flex items-center justify-center w-7 h-6 rounded-md cursor-pointer
-                     hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100"
+                     hover:bg-text/10 transition-colors duration-100"
           title={soundOn ? 'Mute sounds' : 'Unmute sounds'}
           aria-label={soundOn ? 'Mute sounds' : 'Unmute sounds'}
           aria-pressed={soundOn}
@@ -148,8 +142,8 @@ export default function MenuBar() {
         <button
           onClick={handleThemeToggle}
           className="flex items-center justify-center w-7 h-6 rounded-md
-                     hover:bg-white/10 dark:hover:bg-white/8 transition-colors duration-100 cursor-pointer"
-          title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+                     hover:bg-text/10 transition-colors duration-100 cursor-pointer"
+          title={isDark ? 'Light mode' : 'Dark mode'}
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark

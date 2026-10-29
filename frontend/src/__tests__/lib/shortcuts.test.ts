@@ -6,6 +6,7 @@ import {
   isCloseWindowShortcut,
   appShortcutDigit,
   isTypingTarget,
+  allowsOptionShortcut,
 } from '@/lib/shortcuts';
 
 const key = (over: Partial<KeyboardEvent>) => ({
@@ -57,5 +58,17 @@ describe('typing targets', () => {
     expect(isTypingTarget({ tagName: 'DIV', isContentEditable: true } as unknown as EventTarget)).toBe(true);
     expect(isTypingTarget({ tagName: 'DIV', isContentEditable: false } as unknown as EventTarget)).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+});
+
+describe('Option shortcuts inside text fields', () => {
+  it('fire from the page and from single-line inputs', () => {
+    expect(allowsOptionShortcut(null)).toBe(true);
+    expect(allowsOptionShortcut({ tagName: 'DIV', isContentEditable: false } as unknown as EventTarget)).toBe(true);
+    expect(allowsOptionShortcut({ tagName: 'INPUT', isContentEditable: false } as unknown as EventTarget)).toBe(true);
+  });
+  it('leave multi-line text alone so Option characters still type', () => {
+    expect(allowsOptionShortcut({ tagName: 'TEXTAREA', isContentEditable: false } as unknown as EventTarget)).toBe(false);
+    expect(allowsOptionShortcut({ tagName: 'DIV', isContentEditable: true } as unknown as EventTarget)).toBe(false);
   });
 });
