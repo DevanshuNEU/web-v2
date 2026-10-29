@@ -65,7 +65,7 @@ describe('osStore.openWindow sizing', () => {
     useOSStore.getState().openWindow('about-me');
     const win = useOSStore.getState().windows[0];
     expect(win.size).toEqual({ width: 1040, height: 720 });
-    expect(win.position).toEqual({ x: 200, y: 74 });
+    expect(win.position).toEqual({ x: 200, y: 67 });
   });
 
   it('shrinks every default window to fit a 1280x720 screen', () => {

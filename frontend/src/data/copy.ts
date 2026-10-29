@@ -114,8 +114,8 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     description: 'Things I shipped',
   },
   'skills-dashboard': {
-    title: 'Skill Tree',
-    windowTitle: 'Skill Tree.app',
+    title: 'Skills',
+    windowTitle: 'Skills.app',
     description: 'What I build with, and how deep it goes',
   },
   'analytics': {
@@ -124,7 +124,7 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     description: "What you did here. Transparent, I promise.",
   },
   'contact': {
-    title: 'Ping Me',
+    title: 'Contact',
     windowTitle: 'Contact.app',
     description: "Let's talk",
   },
@@ -192,7 +192,7 @@ export const bsodCopy = {
 };
 
 // ---------------------------------------------------------------------------
-// Skill Tree Quips
+// Skills Quips
 // ---------------------------------------------------------------------------
 
 export const skillQuips: Record<string, string> = {

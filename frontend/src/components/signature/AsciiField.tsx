@@ -57,7 +57,6 @@ export default function AsciiField({
 
     const grid = imageToLumGrid(source, cols ?? 80);
     if (grid) setText(asciiFromGrid(grid, ramp).join('\n'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mono, source, ramp, cols, paletteKey]);
 
   const common = {

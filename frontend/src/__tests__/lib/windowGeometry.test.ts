@@ -1,27 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { fitWindow, resizeBounds, DEFAULT_MIN_SIZE } from '@/lib/windowGeometry';
 
-// Reference viewport: 1440x900 → desktop band top=28, bottom=840, bandH=812.
+// Reference viewport: 1440x900 → desktop band top=28, bottom=826 (74px dock), bandH=798.
 const VW = 1440;
 const VH = 900;
 
 describe('fitWindow', () => {
   it('keeps a size that fits and centers it in the desktop band', () => {
     expect(fitWindow({ width: 1040, height: 720 }, 'center', VW, VH)).toEqual({
-      x: 200, y: 74, width: 1040, height: 720,
+      x: 200, y: 67, width: 1040, height: 720,
     });
   });
 
   it('shrinks a large window to the viewport minus the margin on a small screen', () => {
-    // 1280x720: width cap 1280 - 48 = 1232, height cap 720 - 88 - 24 = 608.
+    // 1280x720: width cap 1280 - 48 = 1232, height cap 720 - 102 - 24 = 594.
     expect(fitWindow({ width: 1300, height: 720 }, 'center', 1280, 720)).toEqual({
-      x: 24, y: 40, width: 1232, height: 608,
+      x: 24, y: 40, width: 1232, height: 594,
     });
   });
 
   it('pushes a fixed position back inside the band', () => {
     expect(fitWindow({ width: 800, height: 600 }, { x: 900, y: 400 }, VW, VH)).toEqual({
-      x: 640, y: 240, width: 800, height: 600,
+      x: 640, y: 226, width: 800, height: 600,
     });
     expect(fitWindow({ width: 800, height: 600 }, { x: -50, y: 0 }, VW, VH)).toMatchObject({ x: 0, y: 28 });
   });
@@ -62,6 +62,6 @@ describe('resizeBounds', () => {
     expect(resizeBounds(start, 'e', 5000, 0, VW, VH).width).toBe(VW - 200);
     expect(resizeBounds(start, 'w', -5000, 0, VW, VH)).toMatchObject({ x: 0, width: 1000 });
     expect(resizeBounds(start, 'n', 0, -5000, VW, VH)).toMatchObject({ y: 28, height: 672 });
-    expect(resizeBounds(start, 's', 0, 5000, VW, VH).height).toBe(VH - 60 - 100);
+    expect(resizeBounds(start, 's', 0, 5000, VW, VH).height).toBe(VH - 74 - 100);
   });
 });

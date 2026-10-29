@@ -20,8 +20,8 @@ import type { EnrichedRepo } from '@/app/api/github/repos/route';
  *   - live GitHub data (stars + language) flowing from /api/github/repos into
  *     the mono spec line (never hardcoded);
  *   - quiet editorial links carry the right href / target / rel;
- *   - the persona guarantee for Finder's own wording: no student / graduation /
- *     degree / visa words.
+ *   - the persona guarantee for everything Finder renders, project taglines
+ *     included: no student / graduation / degree / visa words.
  */
 
 const PERSONA_BANNED =
@@ -248,14 +248,11 @@ describe('FileExplorerApp resilience + persona', () => {
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
   });
 
-  it("never renders student / graduation / degree / visa wording in Finder's own text", () => {
+  it('never renders student / graduation / degree / visa wording', () => {
     mockReposOk();
     const { container } = render(<FileExplorerApp />);
-    // Project rows carry projectMeta text (owned by the Projects data); check
-    // Finder's chrome around them.
-    const chrome = container.cloneNode(true) as HTMLElement;
-    chrome.querySelectorAll('[data-testid="finder-file-row"]').forEach((n) => n.remove());
-    expect(chrome.textContent ?? '').not.toMatch(PERSONA_BANNED);
+    // The whole rendered Finder, project rows (projectMeta taglines) included.
+    expect(container.textContent ?? '').not.toMatch(PERSONA_BANNED);
   });
 });
 

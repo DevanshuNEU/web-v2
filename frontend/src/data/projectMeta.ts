@@ -280,12 +280,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'campus-resources': {
     slug: 'campus-resources',
     displayName: 'Campus Resources',
-    tagline: 'Helping students find what they actually need',
+    tagline: 'Find the campus service you actually need',
     featured: false,
     category: 'personal',
     status: 'completed',
     story: [
-      "A clean, searchable directory of campus resources built to help students navigate the overwhelming maze of university services, tools, and support systems.",
+      "A clean, searchable directory of campus resources that cuts through the maze of services, tools, and support systems on campus.",
       "Deployed at campus-resources.vercel.app.",
     ],
     achievements: [],

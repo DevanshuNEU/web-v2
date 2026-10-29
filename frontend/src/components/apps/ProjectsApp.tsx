@@ -124,12 +124,10 @@ function buildStaticProjects(): Project[] {
 
 /**
  * True when an API row came from GitHub, not from the route's projectMeta
- * fallback. GitHub timestamps are whole seconds ("...:29Z"); the fallback
- * stamps `new Date().toISOString()` (milliseconds), which would read as
- * "updated today" for code that is not public.
+ * fallback, which sends `updatedAt: null` for code that is not public.
  */
 function isGitHubRow(r: EnrichedRepo): boolean {
-  return Boolean(r.htmlUrl) && /:\d\dZ$/.test(r.updatedAt);
+  return r.updatedAt !== null;
 }
 
 function mergeLive(projects: Project[], rows: EnrichedRepo[]): Project[] {

@@ -487,11 +487,6 @@ body:has([data-os-root]) {
   }
 }
 
-@keyframes wiggle {
-  0%   { transform: rotate(-1.5deg); }
-  100% { transform: rotate(1.5deg);  }
-}
-
 @keyframes loading {
   0% {
     transform: translateX(-100%);
@@ -666,7 +661,8 @@ body:has([data-os-root]) {
   row-gap: 0.15em;
   margin-left: -1.4em;
 }
-.about-seplist > ul > li { display: flex; min-width: 0; }
+/* Lines break between items, never inside one ("Boston, / MA"). */
+.about-seplist > ul > li { display: flex; min-width: 0; white-space: nowrap; }
 .about-seplist > ul > li::before {
   content: "\00B7";
   flex: none;
@@ -794,9 +790,9 @@ body:has([data-os-root]) {
   }
 }
 
-/* === C: Ping Me, Help, Terminal, DevAI === */
+/* === C: Contact, Help, Terminal, DevAI === */
 
-/* Ping Me: its own query container (named `contact`), so the layout keys off
+/* Contact: its own query container (named `contact`), so the layout keys off
    the window on desktop and off the screen in the phone shell. Narrow is the
    default; @container rules widen it. */
 .contact-app {
@@ -899,7 +895,7 @@ body:has([data-os-root]) {
   }
 }
 
-/* === D: Skill Tree, Activity, Analytics, Changelog === */
+/* === D: Skills, Activity, Analytics, Changelog === */
 
 /* Shared frame for the four data apps. The app root (.dapp) is its own query
    container (named `dapp`), so layout keys off the window on desktop and off
@@ -980,7 +976,7 @@ body:has([data-os-root]) {
   .dapp-button { min-height: 2.75rem; }
 }
 
-/* Skill Tree: a sticky filter bar. One scrollable line by default (narrow
+/* Skills: a sticky filter bar. One scrollable line by default (narrow
    windows and phones); it wraps once the window has room. */
 .skills-bar {
   position: sticky;

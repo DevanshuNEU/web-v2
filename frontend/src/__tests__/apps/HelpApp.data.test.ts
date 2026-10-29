@@ -5,6 +5,7 @@ import {
   APPS_IN_HELP,
   SHORTCUTS,
   SHORTCUTS_MOBILE,
+  OPTION_SHORTCUT_NOTE,
   OPTION_DIGIT_APPS,
 } from '../../components/apps/HelpApp';
 import { appRegistry, getAppLabel } from '../../lib/appRegistry';
@@ -85,6 +86,7 @@ describe('Help copy matches the real UI', () => {
     ...TOUR_STEPS_MOBILE.flatMap((s) => [s.title, s.body]),
     ...SHORTCUTS.map((r) => r.description),
     ...SHORTCUTS_MOBILE.map((r) => r.description),
+    OPTION_SHORTCUT_NOTE,
   ];
 
   it('uses no " / " as a dash and no em or en dashes', () => {

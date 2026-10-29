@@ -8,7 +8,7 @@ import ContactApp, { failKindFor, validateField } from "@/components/apps/Contac
 import { contactLinks } from "@/data/aboutMe";
 
 /**
- * ContactApp ("Ping Me").
+ * ContactApp ("Contact").
  *
  * Covers what the form must guarantee: it leads with the form, errors are
  * tied to their fields and focus moves to the first invalid one, the real

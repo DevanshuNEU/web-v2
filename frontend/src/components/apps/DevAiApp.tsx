@@ -19,11 +19,10 @@ import ChatPanel from '@/components/chat/ChatPanel';
 export default function DevAiApp(
   { variant }: { variant?: 'desktop' | 'mobile' } = {},
 ) {
-  void variant;
   return (
     <div className="h-full w-full bg-surface">
       <div className="mx-auto h-full w-full max-w-[48rem]">
-        <ChatPanel showHeader autoFocusComposer={false} />
+        <ChatPanel showHeader autoFocusComposer={false} variant={variant} />
       </div>
     </div>
   );

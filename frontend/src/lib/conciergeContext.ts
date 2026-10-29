@@ -124,7 +124,7 @@ export const CONCIERGE_COPY = {
   /** Empty-state lede. */
   lede: 'An AI that answers in the first person from my resume, project notes and About Me. It can get things wrong, so email me for anything important.',
   /** Errors. Offline and rate-limited point to a human. */
-  offline: `The AI chat is offline. Email me at ${contactLinks.email} or send a message in Ping Me.`,
+  offline: `The AI chat is offline. Email me at ${contactLinks.email} or send a message in Contact.`,
   rateLimited: 'Too many questions right now. Try again in 30 seconds.',
   error: "That answer didn't come through.",
   /** Screen-reader label for the composer. */

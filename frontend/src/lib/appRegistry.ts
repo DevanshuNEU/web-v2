@@ -157,7 +157,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     iconColor: 'red',
     defaultSize: { width: 720, height: 600 },
     defaultPosition: { x: 350, y: 100 },
-    pinnedToDock: true,
+    // Reached from the right-click menu and the Launchpad; the dock stays for content.
+    pinnedToDock: false,
     launchpad: true,
   },
   'file-explorer': {
@@ -219,12 +220,12 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['dev-ai'],
     icon: MessageSquare,
     iconColor: 'indigo',
-    defaultSize: { width: 420, height: 620 },
-    defaultPosition: { x: 320, y: 120 },
-    // Mobile-only surface: opened through the mobile AppView, never the
-    // desktop dock or Launchpad (the desktop assistant orb stays the desktop path).
+    defaultSize: { width: 560, height: 640 },
+    defaultPosition: { x: 320, y: 100 },
+    // A phone app and a desktop window. On desktop the assistant orb is the
+    // quick path; the Launchpad tile opens the same chat as a full window.
     pinnedToDock: false,
-    launchpad: false,
+    launchpad: true,
   },
 };
 

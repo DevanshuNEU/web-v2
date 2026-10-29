@@ -8,7 +8,6 @@ import WindowManager from '@/components/os/WindowManager';
 import BootSequence from '@/components/os/BootSequence';
 import NotificationCenter from '@/components/os/NotificationCenter';
 import { DesktopWidgets } from '@/components/widgets/DesktopWidgets';
-import MobileFallback from '@/components/os/MobileFallback';
 import PhoneShell from '@/components/mobile/PhoneShell';
 import Spotlight from '@/components/os/Spotlight';
 import AppSwitcher from '@/components/os/AppSwitcher';
@@ -23,7 +22,7 @@ import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
 const FIRST_VISIT_KEY = 'devos-first-visit';
 
 /**
- * Screen width below which we show the mobile fallback instead of the
+ * Screen width below which we show the phone shell instead of the
  * full macOS desktop simulation. 768px matches Tailwind's `md` breakpoint.
  * The desktop sim relies on hover/drag interactions that don't work on touch.
  */
@@ -76,15 +75,9 @@ export default function DesktopHome() {
   // Avoid hydration mismatch — render nothing until client mounts
   if (!mounted) return null;
 
-  // Mobile users get the iOS-style PhoneShell — a parallel devOS that mirrors
-  // the macOS shell on phones. The old static fallback is preserved behind
-  // ?legacy-mobile=1 as an escape hatch during build-out.
-  if (isMobile) {
-    const useLegacy =
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).has('legacy-mobile');
-    return useLegacy ? <MobileFallback /> : <PhoneShell />;
-  }
+  // Mobile users get the iOS-style PhoneShell, a parallel devOS that mirrors
+  // the macOS shell on phones.
+  if (isMobile) return <PhoneShell />;
 
   return (
     <>

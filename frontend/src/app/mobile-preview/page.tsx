@@ -438,10 +438,10 @@ export default function MobilePreviewPage() {
       </Group>
 
       {/* MobileActionRow */}
-      <Group title="MobileActionRow — primary CTAs (Ping Me pattern)">
+      <Group title="MobileActionRow: primary CTAs (Contact pattern)">
         <PhoneFrame theme={theme}>
           <div className="px-4 py-6 flex flex-col gap-3">
-            <h1 className="text-[28px] font-bold text-text px-1">Ping Me</h1>
+            <h1 className="text-[28px] font-bold text-text px-1">Contact</h1>
             <p className="text-[15px] text-text-secondary px-1 mb-2">
               Reach out — I usually reply within a day.
             </p>

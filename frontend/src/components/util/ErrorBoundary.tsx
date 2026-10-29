@@ -53,7 +53,6 @@ export default class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
       console.error(
         `[ErrorBoundary${this.props.label ? ` · ${this.props.label}` : ''}]`,
         error,

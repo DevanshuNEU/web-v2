@@ -162,7 +162,13 @@ export const SHORTCUTS_DESKTOP: Shortcut[] = [
   { keys: ['⌥ T'], description: `Quick tour of ${label('about-me')}, ${label('projects')} and ${label('resume')}. Esc stops it` },
   { keys: ['⌥ 1-4'], description: `Open ${OPTION_DIGIT_APPS.map(label).join(', ')}` },
   { keys: ['⌥ W'], description: 'Close the focused window' },
+  { keys: ['⌥ Tab'], description: 'Switch between open windows. Add Shift to go back' },
+  { keys: ['⌃ `'], description: 'Switch windows on Windows and Linux, where the OS keeps Alt+Tab' },
 ];
+
+/** Where the Option shortcuts fire (lib/shortcuts.ts allowsOptionShortcut). */
+export const OPTION_SHORTCUT_NOTE =
+  'The ⌥ shortcuts also work while you type in a one-line field, such as the Terminal prompt or a search box. In a multi-line field, such as the contact message or the chat box, ⌥ types its character instead.';
 
 export const SHORTCUTS_MOBILE: Shortcut[] = [
   { keys: ['swipe ←'], description: 'Move between home pages and to the App Library', gesture: true },
@@ -460,6 +466,9 @@ function ShortcutsBody({ variant }: { variant: 'desktop' | 'mobile' }) {
           </React.Fragment>
         ))}
       </dl>
+      {variant === 'desktop' && (
+        <p className="mt-4 text-sm leading-relaxed text-text-secondary">{OPTION_SHORTCUT_NOTE}</p>
+      )}
     </div>
   );
 }

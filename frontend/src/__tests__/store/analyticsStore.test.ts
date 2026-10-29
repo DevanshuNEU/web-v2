@@ -88,7 +88,7 @@ describe('analytics labels and device', () => {
   it('logs app titles, not internal ids', async () => {
     const { useAnalyticsStore } = await freshStore();
     useAnalyticsStore.getState().trackAppOpen('skills-dashboard');
-    expect(useAnalyticsStore.getState().events.at(-1)?.label).toBe('Opened Skill Tree');
+    expect(useAnalyticsStore.getState().events.at(-1)?.label).toBe('Opened Skills');
   });
 
   it.each([

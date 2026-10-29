@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ContactApp - "Ping Me".
+ * ContactApp - "Contact".
  *
  * Leads with the form. A short heading and one sentence sit above it; the
  * reach-me links (email, LinkedIn, GitHub) and the availability chip sit in a
@@ -36,6 +36,7 @@ import { reveal } from "@/lib/motion";
 import { identity, contactLinks } from "@/data/aboutMe";
 import { useOSStore } from "@/store/osStore";
 import { useMobileStore } from "@/store/mobileStore";
+import { CONTACT_MAX_LEN } from "@/lib/contactLimits";
 
 // Strong ease-out for UI enter/exit (Kowalski). Never ease-in on UI; keep <300ms.
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -82,14 +83,8 @@ const FIELD_LABEL: Record<FieldKey, string> = {
   message: "Message",
 };
 
-// Client caps. Generous, but they stop a pasted novel.
-const MAX_LEN: Record<FieldKey, number> = {
-  name: 100,
-  email: 254,
-  company: 100,
-  subject: 150,
-  message: 5000,
-};
+// Length caps, shared with /api/contact so both sides agree.
+const MAX_LEN: Record<FieldKey, number> = CONTACT_MAX_LEN;
 
 const EMPTY_FORM: FormData = { name: "", email: "", company: "", subject: "", message: "" };
 

@@ -69,6 +69,7 @@ const SCOPED_CSS = `
 
 [data-resume-doc] { container: rsdoc / inline-size; }
 [data-resume-page] { padding: 1.75rem 1.25rem 3rem; }
+[data-resume-compact] [data-resume-page] { padding-top: 1.25rem; }
 [data-resume-root] h2.editorial-head {
   font-size: clamp(1.5rem, 4cqi, 2rem);
   overflow-wrap: normal;
@@ -98,7 +99,7 @@ const SCOPED_CSS = `
 // Contacts - plain words in one run, no separators to dangle when they wrap.
 // ---------------------------------------------------------------------------
 
-function ContactRow() {
+function ContactRow({ compact = false }: { compact?: boolean }) {
   const { email, github, linkedin } = RESUME.contact;
   const contacts = [
     { label: email, href: `mailto:${email}` },
@@ -106,7 +107,7 @@ function ContactRow() {
     { label: 'LinkedIn', href: `https://${linkedin}` },
   ];
   return (
-    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px]">
+    <p className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${compact ? 'text-[13px]' : 'text-[14px]'}`}>
       {contacts.map(c => (
         <a
           key={c.label}
@@ -490,11 +491,11 @@ function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>, mode: V
 // Document - the sections, shared by desktop (own scroller) and phone.
 // ---------------------------------------------------------------------------
 
-function Intro({ where }: { where?: 'toolbar' | 'doc' }) {
+function Intro({ where, compact = false }: { where?: 'toolbar' | 'doc'; compact?: boolean }) {
   return (
-    <div data-resume-intro={where} className="flex flex-col gap-1.5">
-      <p className="text-[14px] leading-snug text-text-secondary">{RESUME.tagline}</p>
-      <ContactRow />
+    <div data-resume-intro={where} className={`flex flex-col ${compact ? 'gap-1' : 'gap-1.5'}`}>
+      <p className={`${compact ? 'text-[13px]' : 'text-[14px]'} leading-snug text-text-secondary`}>{RESUME.tagline}</p>
+      <ContactRow compact={compact} />
     </div>
   );
 }
@@ -527,15 +528,17 @@ function DocumentSections({ reduced, intro = false }: { reduced: boolean | null;
 function ResumeMobile() {
   const reduced = useReducedMotion();
   return (
-    <div data-resume-root className="flex h-full flex-col overflow-hidden bg-bg">
+    <div data-resume-root data-resume-compact className="flex h-full flex-col overflow-hidden bg-bg">
       <style>{SCOPED_CSS}</style>
       <div data-resume-doc className="flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg/95 px-[var(--sp-hero-pad)] backdrop-blur">
-          <h1 className="min-w-0 truncate text-[16px] font-medium text-text">{RESUME.name}</h1>
+        {/* Compact header: the nav bar already says Resume, so one slim
+            sticky row (name + Open PDF) and a two-line intro, then content. */}
+        <div className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border bg-bg/95 px-[var(--sp-hero-pad)] backdrop-blur">
+          <h1 className="min-w-0 truncate text-[15px] font-medium text-text">{RESUME.name}</h1>
           <DownloadButton label="Open PDF" open />
         </div>
-        <div className="px-[var(--sp-hero-pad)] pt-5">
-          <Intro />
+        <div className="px-[var(--sp-hero-pad)] pt-3">
+          <Intro compact />
         </div>
         <DocumentSections reduced={reduced} />
       </div>

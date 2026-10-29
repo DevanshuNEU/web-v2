@@ -28,8 +28,6 @@ export interface MobileAppRegistration {
 const MOBILE_LABEL_OVERRIDES: Partial<Record<AppType, string>> = {
   'display-options': 'Settings',
   'github-activity': 'Activity',
-  // "Ping Me" is the desktop persona; on a phone the iOS word is Contact.
-  contact: 'Contact',
 };
 
 /**

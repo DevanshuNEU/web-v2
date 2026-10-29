@@ -457,7 +457,7 @@ function PrivacyView() {
     toast.success(
       next
         ? 'Analytics on. Anonymous usage only.'
-        : 'Analytics off. Nothing leaves this tab.',
+        : 'Analytics off. PostHog stops recording. Vercel still counts anonymous page views.',
     );
   };
 
@@ -466,7 +466,7 @@ function PrivacyView() {
       <MobileSection
         inset
         header="Usage Analytics"
-        footer="Anonymous, session-only. No accounts, no personal data, no cross-site tracking. Turn it off to keep everything in this tab."
+        footer="Anonymous, session-only. No accounts, no personal data, no cross-site tracking. Turn it off to stop PostHog. Vercel still counts anonymous page views."
       >
         <MobileListRow
           title="Usage Analytics"

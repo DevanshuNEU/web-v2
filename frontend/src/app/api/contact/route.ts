@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createRateLimiter, clientIp, escapeHtml } from '@/lib/rateLimit';
+import { CONTACT_MAX_LEN, type ContactField } from '@/lib/contactLimits';
 
 const TO_EMAIL = 'chicholikar.d@northeastern.edu';
 const FROM_EMAIL = 'devOS <onboarding@resend.dev>'; // Use verified domain in production
@@ -22,10 +23,24 @@ export async function POST(req: NextRequest) {
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const body = await req.json();
-    const { name, email, company, subject, message } = body;
+    const { name, email, company, subject, message } = body ?? {};
 
-    // Basic server-side validation
-    if (!name?.trim() || !email?.trim() || !subject?.trim() || !message?.trim()) {
+    // Basic server-side validation. Every field must be a string (company may
+    // be absent) and within the same caps the form enforces.
+    const fields: Record<ContactField, unknown> = { name, email, company: company ?? '', subject, message };
+    for (const key of Object.keys(CONTACT_MAX_LEN) as ContactField[]) {
+      const value = fields[key];
+      if (typeof value !== 'string') {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      }
+      if (value.length > CONTACT_MAX_LEN[key]) {
+        return NextResponse.json(
+          { error: `${key[0].toUpperCase()}${key.slice(1)} is too long (max ${CONTACT_MAX_LEN[key]} characters)` },
+          { status: 400 },
+        );
+      }
+    }
+    if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

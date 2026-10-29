@@ -154,7 +154,7 @@ function applyToPostHog(optedOut: boolean): void {
   }
 }
 
-/** Visitor-facing app name ("Skill Tree", not "skills-dashboard"). */
+/** Visitor-facing app name ("Skills", not "skills-dashboard"). */
 export function appTitle(appType: AppType): string {
   return appLabels[appType]?.title ?? appType;
 }

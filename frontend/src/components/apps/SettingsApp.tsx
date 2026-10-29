@@ -722,7 +722,7 @@ function PrivacyBody({ reduced }: { reduced: boolean | null }) {
     toast.success(
       next
         ? 'Analytics on. Anonymous usage only.'
-        : 'Analytics off. Nothing leaves this tab.',
+        : 'Analytics off. PostHog stops recording. Vercel still counts anonymous page views.',
     );
   };
 
@@ -739,7 +739,7 @@ function PrivacyBody({ reduced }: { reduced: boolean | null }) {
           hint={
             analyticsOn
               ? 'Anonymous, this session only. Shows me which apps people open.'
-              : 'Opted out. Nothing leaves this tab.'
+              : 'Opted out. PostHog stops recording. Vercel still counts anonymous page views.'
           }
           reduced={reduced}
           pulse={pinged === 'analytics'}
