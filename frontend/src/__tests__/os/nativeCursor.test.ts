@@ -28,7 +28,7 @@ describe('native cursor', () => {
 
   it('does not hide the system cursor in globals.css', () => {
     const css = read('app/globals.css');
-    expect(css).not.toContain('cursor: none');
+    expect(css).not.toMatch(/cursor\s*:\s*none/);
     expect(css).not.toContain(HIDE_CLASS);
   });
 

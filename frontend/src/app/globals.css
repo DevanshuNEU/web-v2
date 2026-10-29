@@ -527,8 +527,8 @@ body {
    MAGNETIC FLAT BUTTONS
    useMagneticField() writes --mag-x / --mag-y on hovered [data-magnetic="button"]
    elements; this rule applies the translate and a spring-like settle. Scoped to
-   the ="button" value only, so dock app icons (bare [data-magnetic], which run
-   their own magnification scale transform) are never translated. Vars default to
+   the ="button" value only, so dock app icons (bare [data-magnetic], now inert, which
+   run their own magnification scale transform) are never translated. Vars default to
    0px, so the rule rests at no offset under reduced motion / coarse pointer.
    ============================================ */
 [data-magnetic='button'] {

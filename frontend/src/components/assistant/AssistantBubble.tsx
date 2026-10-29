@@ -11,8 +11,7 @@
  * at rest and only earns its magnetic pull from the global magnetic driver via
  * the data-magnetic attribute. Reduced-motion collapses the entrance.
  *
- * Z-index 8500 sits above resting windows / Spotlight backdrop but below the
- * custom cursor (10000).
+ * Z-index 8500 sits above resting windows / Spotlight backdrop.
  */
 
 import { useEffect, useRef } from 'react';
