@@ -10,7 +10,6 @@ import { ParallaxProvider } from './ParallaxProvider';
 import MenuBar from './MenuBar';
 import Taskbar from './Taskbar';
 import DesktopIcons from './DesktopIcons';
-import Cursor from './Cursor';
 
 interface DesktopProps {
   /** Windows, widgets: everything that lives under the dock and menu bar. */
@@ -44,7 +43,6 @@ export default function Desktop({ children, overlays }: DesktopProps) {
     <ParallaxProvider>
       <DesktopContextMenu>
         <div className="min-h-screen w-full relative overflow-hidden">
-          <Cursor />
           <AnimatedBackground />
 
           {/* Menu bar at top */}

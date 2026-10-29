@@ -35,6 +35,4 @@ export const Z = {
   switcher: 9500,
   /** Boot overlay. */
   boot: 9999,
-  /** Custom cursor. */
-  cursor: 10000,
 } as const;
