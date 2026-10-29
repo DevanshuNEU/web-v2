@@ -26,7 +26,7 @@
 - Any leftover reference to `Cursor`, `cursor-none` or `spring.cursor` after deletion: build break or silent dead CSS. Pinned by the guard test in Task 1.
 - Text fields: the I-beam and caret must come from the browser, with no `!important` override left. Pinned by the guard test and the manual check in Task 3.
 - Iframes (Browser app, Resume PDF) and window edges: the native cursor must show, with no second cursor. Manual check in Task 3.
-- Reduced motion: the press scale must be off. Pinned by the `buttonVariants` test in Task 2.
+- Reduced motion: the press scale must be off. Moot: Task 2 was dropped.
 
 ---
 
@@ -67,7 +67,9 @@
 
 ---
 
-### Task 2: Press feedback on the shared Button
+### Task 2: Press feedback on the shared Button (DROPPED during execution)
+
+> **Dropped:** the shared `Button` is imported only by `ui/sidebar.tsx`, which nothing imports, so this change reached no real control (the site uses about 100 hand-built `<button>` elements). It was removed instead of shipped as dead code. A press state for those buttons would need a global CSS rule and is an owner decision.
 
 **Files:**
 - Modify: `frontend/src/components/ui/button.tsx` (the base class string inside `buttonVariants`)
