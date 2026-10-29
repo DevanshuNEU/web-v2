@@ -7,7 +7,9 @@ import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { spring, INSTANT } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
-import { computeSnap, type SnapBounds } from '@/lib/windowSnap';
+import { computeSnap, MENUBAR_H, DOCK_H, type SnapBounds } from '@/lib/windowSnap';
+import { resizeBounds, DEFAULT_MIN_SIZE, type ResizeDir, type WindowBounds } from '@/lib/windowGeometry';
+import { appRegistry } from '@/lib/appRegistry';
 import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
@@ -15,12 +17,26 @@ interface WindowProps {
   children: React.ReactNode;
 }
 
+// Invisible resize hit areas: 6px edges and 12px corners that straddle the
+// window border, like macOS. Corners come last so they sit above the edges.
+const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
+  { dir: 'n', className: '-top-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
+  { dir: 's', className: '-bottom-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
+  { dir: 'e', className: '-right-[3px] top-3 bottom-3 w-1.5 cursor-ew-resize' },
+  { dir: 'w', className: '-left-[3px] top-3 bottom-3 w-1.5 cursor-ew-resize' },
+  { dir: 'nw', className: '-top-1 -left-1 w-3 h-3 cursor-nwse-resize' },
+  { dir: 'ne', className: '-top-1 -right-1 w-3 h-3 cursor-nesw-resize' },
+  { dir: 'sw', className: '-bottom-1 -left-1 w-3 h-3 cursor-nesw-resize' },
+  { dir: 'se', className: '-bottom-1 -right-1 w-3 h-3 cursor-nwse-resize' },
+];
+
 export default function Window({ window, children }: WindowProps) {
   const closeWindow = useOSStore(state => state.closeWindow);
   const focusWindow = useOSStore(state => state.focusWindow);
   const minimizeWindow = useOSStore(state => state.minimizeWindow);
   const maximizeWindow = useOSStore(state => state.maximizeWindow);
   const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
+  const updateWindowSize = useOSStore(state => state.updateWindowSize);
   const snapWindow = useOSStore(state => state.snapWindow);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
   const isDragging = React.useRef(false);
@@ -28,6 +44,9 @@ export default function Window({ window, children }: WindowProps) {
   const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
   const snapPreviewRef = React.useRef<SnapBounds | null>(null);
   const dragOffset = React.useRef({ x: 0, y: 0 });
+  const resizeStart = React.useRef<{ dir: ResizeDir; px: number; py: number; bounds: WindowBounds } | null>(null);
+  const [isResizing, setIsResizing] = React.useState(false);
+  const minSize = appRegistry[window.appType]?.minSize ?? DEFAULT_MIN_SIZE;
   const reduced = useReducedMotion();
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
@@ -104,7 +123,7 @@ export default function Window({ window, children }: WindowProps) {
           e.clientX - dragOffset.current.x
         ));
         const newY = Math.max(28, Math.min(
-          viewportHeight - window.size.height - 80,
+          viewportHeight - window.size.height - DOCK_H,
           e.clientY - dragOffset.current.y
         ));
 
@@ -139,9 +158,46 @@ export default function Window({ window, children }: WindowProps) {
     };
   }, [window.id, window.size, window.isMaximized, updateWindowPosition, snapWindow]);
 
-  // Menu bar is h-7 = 28px; dock area is ~60px; keep windows inside those bounds
-  const MENUBAR_H = 28;
-  const DOCK_H = 60;
+  // Resize from an edge or corner. Pointer capture keeps the move/up events on
+  // the handle even when the pointer races ahead of the window edge.
+  const handleResizeStart = (dir: ResizeDir) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || window.isMaximized) return;
+    e.preventDefault();
+    e.stopPropagation();
+    focusWindow(window.id);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeStart.current = {
+      dir,
+      px: e.clientX,
+      py: e.clientY,
+      bounds: { ...window.position, ...window.size },
+    };
+    setIsResizing(true);
+  };
+
+  const handleResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    const next = resizeBounds(
+      start.bounds,
+      start.dir,
+      e.clientX - start.px,
+      e.clientY - start.py,
+      document.documentElement.clientWidth,
+      document.documentElement.clientHeight,
+      minSize
+    );
+    updateWindowSize(window.id, { width: next.width, height: next.height });
+    // Left and top edges move the origin so the opposite edge stays put.
+    if (start.dir.includes('n') || start.dir.includes('w')) {
+      updateWindowPosition(window.id, { x: next.x, y: next.y });
+    }
+  };
+
+  const handleResizeEnd = () => {
+    resizeStart.current = null;
+    setIsResizing(false);
+  };
 
   const windowStyle = window.isMaximized
     ? {
@@ -190,7 +246,8 @@ export default function Window({ window, children }: WindowProps) {
               transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
             }
       }
-      transition={{ layout: reduced ? INSTANT : spring.windowLayout }}
+      // No layout spring while resizing: the box tracks the pointer 1:1.
+      transition={{ layout: reduced || isResizing ? INSTANT : spring.windowLayout }}
       className={`
         absolute
         flex flex-col
@@ -220,6 +277,10 @@ export default function Window({ window, children }: WindowProps) {
           ${isActive ? 'opacity-100' : 'opacity-60'}
         `}
         onMouseDown={handleMouseDown}
+        onDoubleClick={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          maximizeWindow(window.id);
+        }}
       >
         {/* Traffic-light controls */}
         <div className="group flex items-center gap-1.5">
@@ -303,9 +364,27 @@ export default function Window({ window, children }: WindowProps) {
 
       {/* Content — app-content makes every window a query container so app
           typography scales with window width (see globals.css → in-window type) */}
-      <div className="flex-1 overflow-auto bg-surface/25 app-content" style={{ minHeight: 0 }}>
+      <div
+        className={`flex-1 overflow-auto bg-surface/25 app-content ${isResizing ? 'pointer-events-none select-none' : ''}`}
+        style={{ minHeight: 0 }}
+      >
         {children}
       </div>
+
+      {/* Resize handles: hidden while maximized */}
+      {!window.isMaximized && RESIZE_HANDLES.map(({ dir, className }) => (
+        <div
+          key={dir}
+          aria-hidden
+          data-resize={dir}
+          className={`absolute z-10 touch-none ${className}`}
+          onPointerDown={handleResizeStart(dir)}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onLostPointerCapture={handleResizeEnd}
+        />
+      ))}
     </motion.div>
     </>
   );
