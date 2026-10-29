@@ -1,16 +1,18 @@
 /**
  * Resume data - single source of truth.
  *
- * Consumed by ResumeApp.tsx only.
+ * Consumed by ResumeApp.tsx and the /resume page.
  * Personal contact info is imported from portfolio.json so there's one
  * place to update name, email, location, etc.
  *
- * Content mirrors the one-page AI Engineer resume (ATS-certified, facts.md
- * verified). To update the resume copy: edit this file. To update the
- * downloadable PDF: replace public/resume.pdf.
+ * Content follows the one-page resume PDF (public/resume.pdf): same roles,
+ * numbers and section order (Projects, Skills, Experience, Education), plus a
+ * summary on top. One difference: Saar is listed here but not on the PDF.
+ * To update the resume copy: edit this file. To update the downloadable PDF:
+ * replace public/resume.pdf.
  *
- * Note: ProjectsBody renders links as `https://${link}`, so project links are
- * stored bare (no protocol).
+ * Note: project links are stored bare (no protocol) and rendered as
+ * `https://${link}`. A project with no public page has no link.
  */
 
 import portfolioData from './portfolio.json';
@@ -44,10 +46,13 @@ export interface SkillGroup {
 
 export interface ProjectEntry {
   name: string;
+  /** Role as the PDF states it ("Creator & Maintainer"). Omitted where the PDF gives none. */
+  role?: string;
   tech: string;
   period: string;
   desc: string;
-  link: string;
+  /** Public page, bare (no protocol). Omitted when there is none. */
+  link?: string;
 }
 
 export interface ResumeData {
@@ -172,13 +177,15 @@ export const RESUME: ResumeData = {
   projects: [
     {
       name:   'OpenCodeIntel',
+      role:   'Creator & Maintainer',
       tech:   'Python · FastAPI · FastMCP · tree-sitter · Pinecone · Redis · React · TypeScript',
       period: 'Nov 2025 - Present',
-      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from reranking (Voyage rerank-2) isolated via a 98-run ablation. Public playground search: p50 641ms cold, 242ms cached.',
+      desc:   'Code-search platform for AI coding agents: a web app, a REST API and an MCP server exposing 12 tools (semantic code search, dependency graph, impact analysis, context assembly) over stdio and streamable HTTP. Benchmarked retrieval to 94% average Hit@1 across 14 OSS codebases (665-query research eval), +8.4 points from reranking (Voyage rerank-2) isolated via a 98-run ablation. Public playground search: p50 641ms cold, 242ms cached. 700+ commits and 450+ tests, solo.',
       link:   'opencodeintel.com',
     },
     {
       name:   'Overhear',
+      role:   'Creator',
       tech:   'TypeScript · Next.js · Retell · Claude API · Postgres · Drizzle · Vitest',
       period: 'Sep 2026',
       desc:   'AI QA analyst for voice agents: grades every call a Retell scheduling agent takes on a 7-dimension rubric. 3 dimensions (50% of the score) are decided in code from the call\'s action log; an LLM-as-a-judge checks what the agent said against the real open slots and scores the rest. Caught 23 of 23 planted failures on a 39-call golden dataset, macro-F1 0.89, 0.99 self-consistency across 3 runs.',
@@ -186,6 +193,7 @@ export const RESUME: ResumeData = {
     },
     {
       name:   'CallBudget',
+      role:   'Creator',
       tech:   'Python · FastMCP · scikit-learn · Optuna · Pipecat · Deepgram · DuckDB',
       period: '2026',
       desc:   'Agentic pharmacy-stock search: a FastMCP server (predict / plan / eval / converse) over a learned stock-probability ranker cuts expected calls-to-find from 4.3 to 2.3 (47%) on a 19-pharmacy simulation. An abstention layer on the stock extractor (self-consistency voting) drives false "in stock" answers from 10% to 0% under a deliberately unreliable extractor; a Claude-driven voice agent, tested against a simulated pharmacist, handles the calls.',
@@ -203,7 +211,6 @@ export const RESUME: ResumeData = {
       tech:   'AWS · Terraform · Packer · Docker · Lambda · RDS · KMS · CloudWatch',
       period: '2025',
       desc:   'Multi-AZ AWS infrastructure (VPC, ALB, ASG, RDS, S3 with KMS) as modular Terraform with IAM least-privilege security, cutting provisioning from 2 hours to 10 minutes and cloud spend 30% at 99.9% uptime.',
-      link:   'github.com/DevanshuNEU',
     },
   ],
 };

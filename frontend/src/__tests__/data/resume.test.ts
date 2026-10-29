@@ -132,7 +132,13 @@ describe('RESUME.projects', () => {
       expect(proj.tech.trim(),   `tech empty for ${proj.name}`).not.toBe('');
       expect(proj.period.trim(), `period empty for ${proj.name}`).not.toBe('');
       expect(proj.desc.trim(),   `desc empty for ${proj.name}`).not.toBe('');
-      expect(proj.link.trim(),   `link empty for ${proj.name}`).not.toBe('');
+      if (proj.link !== undefined) expect(proj.link.trim(), `link empty for ${proj.name}`).not.toBe('');
+    }
+  });
+
+  it('never links a project with no public page to the GitHub profile', () => {
+    for (const proj of RESUME.projects) {
+      expect(proj.link, `${proj.name} links the profile, not the project`).not.toBe('github.com/DevanshuNEU');
     }
   });
 

@@ -1,65 +1,43 @@
 'use client';
 
 /**
- * ProjectsApp - the flagship, recruiter-facing repo browser, art-directed.
+ * ProjectsApp - the recruiter-facing project browser.
  *
- * Composition (design-taste-frontend, variance ~9 / motion ~7 / density ~4,
- * strictly monochrome): a numbered editorial INDEX on the left and a poster-
- * scale DETAIL stage on the right. Project names are set in huge Newsreader
- * serif; everything else is tiny uppercase mono metadata and hairlines. Status
- * is a mono uppercase word (never a colored badge); language is a grayscale dot
- * plus label; stars are mono numerals from the LIVE GitHub API. Each project
- * carries a deterministic B&W "fingerprint" - a seeded pen-plotter mark
- * (Plotter + strokeSet) derived from its repo name - which is hard-gated on the
- * mono palette and on reduced motion by the primitive itself.
+ * An index of projects on the left and a detail stage on the right. The
+ * stage leads with what a recruiter scans for: role and status, the name,
+ * the tagline, then the headline numbers and the links (live site, source,
+ * research data). The long write-up (overview, how it works, stack) follows.
  *
- * Window-dynamic: the app lives inside `.app-content` (container-type:
- * inline-size). Type scales off the WINDOW via the cqi-aware editorial/text
- * utilities; LAYOUT re-proportions off the WINDOW via the scoped @container
- * rules in the inline <style> below. Small window = a single focused column,
- * tight and quiet. Maximized = a dramatic asymmetric two-column stage with
- * generous negative space and large kinetic serif. The index rail widens, the
- * fingerprint appears, and the metadata opens up only when the window is wide.
+ * Data: the list is projectMeta, and only projectMeta (the curated set). It
+ * renders at once from the bundled data; /api/github/repos only adds live
+ * GitHub numbers (stars, forks, language, last update) to those entries when
+ * it resolves. Raw GitHub repos with no metadata are never listed, so no repo
+ * gets a status it did not earn; "More on GitHub" links to the rest.
  *
- * Motion (emil-design-eng): the index staggers in ONCE on mount (never on
- * scroll - a windowed inner scroll container makes in-view triggers unreliable).
- * Selecting a project cross-fades the detail stage with a small ease-out
- * transform (transform + opacity only). Hover is a graphite tint; pressable
- * elements scale to 0.98 on :active. Everything collapses to instant under
- * reduced motion.
+ * Window-dynamic: layout keys off the WINDOW through container queries (the
+ * scoped <style> below), never the viewport. Under a 640px window the index
+ * becomes a one-line scrolling strip above a full-width stage. The stage is
+ * its own query container (`pjstage`), so the project name is sized against
+ * the column it sits in and never breaks mid-word.
  *
- * PRESERVED behavior: All/Featured/Personal/Org filtering, the list -> detail
- * interaction, live data fetch with loading + fallback states, every piece of
- * repo metadata (language, stars, forks, updated, topics, tech, description,
- * story, achievements, status, org) and all links, plus the mobile push view.
+ * Motion: the index staggers in once on mount; selecting a project
+ * cross-fades the stage (transform + opacity only). Instant under reduced
+ * motion.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import {
-  Github,
-  ExternalLink,
-  Star,
-  GitFork,
-  Loader2,
-  Code,
-  ChevronRight,
-  FolderOpen,
-  Link2,
-} from 'lucide-react';
+import { Github, ExternalLink, Star, GitFork, ChevronRight, FileText, Database } from 'lucide-react';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
-import { projectMeta, featuredRank } from '@/data/projectMeta';
+import { projectMeta, getAllProjectKeys, type Achievement, type ProjectMeta } from '@/data/projectMeta';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
-import IconTile from '@/components/mobile/ui/IconTile';
 import MobileSection from '@/components/mobile/ui/MobileSection';
 import { useIsMono } from '@/hooks/usePalette';
 import { Hairline, MetaLabel } from '@/components/editorial';
-import { Plotter } from '@/components/signature';
-import { strokeSet } from '@/lib/signature/plotter';
 import { reveal, withReduced, INSTANT } from '@/lib/motion';
 
-// Neutral graphite used for language dots / icon tiles in mono. The language
-// NAME and status WORD carry meaning, so hue is decorative here.
+// Neutral graphite used for language dots in mono. The language NAME carries
+// the meaning, so hue is decorative here.
 const MONO_LANG = '#8b8b8b';
 
 const LANG_COLORS: Record<string, string> = {
@@ -73,382 +51,602 @@ const LANG_COLORS: Record<string, string> = {
   Shell: '#89e051',
 };
 
-type Filter = 'all' | 'featured' | 'personal' | 'org';
+const GITHUB_REPOS_URL = 'https://github.com/DevanshuNEU?tab=repositories';
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'featured', label: 'Featured' },
-  { key: 'personal', label: 'Personal' },
-  { key: 'org', label: 'Org' },
-  { key: 'all', label: 'All' },
-];
+/** How many results lead the stage, right under the tagline. */
+const HEADLINE_RESULTS = 3;
 
-function applyFilter(repos: EnrichedRepo[], filter: Filter): EnrichedRepo[] {
-  return repos.filter(r => {
-    if (filter === 'featured') return r.featured;
-    if (filter === 'personal') return r.category === 'personal' || r.category === 'meta';
-    if (filter === 'org') return r.category === 'org';
+// ---------------------------------------------------------------------------
+// Data - projectMeta first, live GitHub numbers merged in when they arrive.
+// ---------------------------------------------------------------------------
+
+interface Project {
+  /** projectMeta key; also the GitHub repo name. */
+  name: string;
+  slug: string;
+  displayName: string;
+  tagline: string;
+  description: string | null;
+  role?: string;
+  status: ProjectMeta['status'];
+  featured: boolean;
+  story: string[];
+  achievements: Achievement[];
+  tech: string[];
+  repoUrl: string | null;
+  liveUrl: string | null;
+  liveLabel?: string;
+  researchUrl?: string;
+  language: string | null;
+  stars: number;
+  forks: number;
+  /** Last GitHub update. Null until GitHub says so (and always for private code). */
+  updatedAt: string | null;
+}
+
+/** Case-insensitive dedupe that keeps the first spelling. */
+function dedupe(items: string[]): string[] {
+  const seen = new Set<string>();
+  return items.filter(t => {
+    const k = t.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
     return true;
   });
 }
 
-/** Stable 32-bit seed from a repo name, so each project's fingerprint is its own. */
-function seedFromName(name: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < name.length; i++) {
-    h ^= name.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+function buildStaticProjects(): Project[] {
+  return getAllProjectKeys().map(name => {
+    const meta = projectMeta[name];
+    return {
+      name,
+      slug: meta.slug,
+      displayName: meta.displayName,
+      tagline: meta.tagline,
+      description: meta.descriptionOverride ?? null,
+      role: meta.role,
+      status: meta.status,
+      featured: meta.featured,
+      story: meta.story,
+      achievements: meta.achievements,
+      tech: dedupe(meta.extraTech ?? []),
+      repoUrl: meta.repoUrl ?? null,
+      liveUrl: meta.liveUrl ?? null,
+      liveLabel: meta.liveLabel,
+      researchUrl: meta.researchUrl,
+      language: null,
+      stars: 0,
+      forks: 0,
+      updatedAt: null,
+    };
+  });
+}
+
+/**
+ * True when an API row came from GitHub, not from the route's projectMeta
+ * fallback. GitHub timestamps are whole seconds ("...:29Z"); the fallback
+ * stamps `new Date().toISOString()` (milliseconds), which would read as
+ * "updated today" for code that is not public.
+ */
+function isGitHubRow(r: EnrichedRepo): boolean {
+  return Boolean(r.htmlUrl) && /:\d\dZ$/.test(r.updatedAt);
+}
+
+function mergeLive(projects: Project[], rows: EnrichedRepo[]): Project[] {
+  const byName = new Map(rows.filter(isGitHubRow).map(r => [r.name.toLowerCase(), r]));
+  return projects.map(p => {
+    const live = byName.get(p.name.toLowerCase());
+    if (!live) return p;
+    return {
+      ...p,
+      description: p.description ?? live.description,
+      repoUrl: p.repoUrl ?? live.htmlUrl,
+      liveUrl: live.homepage ?? p.liveUrl,
+      liveLabel: live.homepage ? live.liveLabel : p.liveLabel,
+      language: live.language,
+      stars: live.stars,
+      forks: live.forks,
+      updatedAt: live.updatedAt,
+    };
+  });
+}
+
+type Filter = 'featured' | 'all';
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'featured', label: 'Featured' },
+  { key: 'all', label: 'All' },
+];
+
+function applyFilter(projects: Project[], filter: Filter): Project[] {
+  return filter === 'featured' ? projects.filter(p => p.featured) : projects;
+}
+
+/** Short label for the index: "Live", "PyPI", "Walkthrough"; null when nothing is live. */
+function liveMarker(p: Project): string | null {
+  if (!p.liveUrl) return null;
+  return p.liveLabel ?? 'Live';
 }
 
 // ---------------------------------------------------------------------------
 // Scoped, window-dynamic layout CSS.
 //
-// I can only edit this file, so the @container rules that re-proportion the
-// LAYOUT off the WINDOW (not the viewport) live here, scoped under a root data
-// attribute so they never leak. The parent `.app-content` is the query
-// container (container-type: inline-size), exactly the mechanism About Me uses
-// in globals.css. Type scaling is handled by the cqi-aware .editorial-hero /
-// .editorial-head / .text-* / .font-mono-meta utilities; these rules handle
-// rail width, the asymmetric column split, the fingerprint visibility, and the
-// negative space that opens up only when the window is wide.
+// `.app-content` (the window body) is the nearest query container for the
+// root and the index, so unnamed @container rules key off the WINDOW. The
+// stage scroller is a named container (`pjstage`) so the stage can size its
+// name, stats and padding against its own column.
 // ---------------------------------------------------------------------------
 
 const SCOPED_CSS = `
-[data-projects-root] {
-  /* defaults = NARROW window: one quiet, focused column */
-  --pj-rail-w: 13rem;
-  --pj-stage-pad: 1.5rem;
-  --pj-stage-gap: 1.25rem;
+[data-projects-root] { display: flex; flex-direction: column; }
+[data-projects-root] [data-projects-index] {
+  width: 100%;
+  border-bottom: 1px solid rgb(var(--color-border));
 }
-[data-projects-index] {
-  width: var(--pj-rail-w);
-}
-[data-projects-stage] {
-  padding: var(--pj-stage-pad);
-}
-[data-projects-stage-head] {
+[data-pj-list] {
   display: flex;
-  flex-direction: column;
-  gap: var(--pj-stage-gap);
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
 }
-/* Fingerprint is a wide-window indulgence: hidden when the window is narrow so
-   the content column stays focused and legible. */
-[data-projects-fingerprint] { display: none; }
+[data-pj-list]::-webkit-scrollbar { display: none; }
+[data-pj-list] > * { flex: 0 0 auto; scroll-snap-align: start; }
+[data-pj-name] { white-space: nowrap; }
+[data-pj-tagline], [data-pj-row-extra], [data-pj-row-rule], [data-pj-more] { display: none; }
 
-/* MID window: rail relaxes, stage breathes a little. */
-@container (min-width: 680px) {
-  [data-projects-root] {
-    --pj-rail-w: 15rem;
-    --pj-stage-pad: 2.25rem;
-    --pj-stage-gap: 1.75rem;
+[data-projects-stage-scroll] { container: pjstage / inline-size; }
+[data-projects-stage] { padding: 1.25rem 1.25rem 2.5rem; }
+/* Narrow stage: one result per row, number left. Wider: a row of columns. */
+[data-pj-stats] { display: flex; flex-direction: column; }
+[data-pj-stat] {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  column-gap: 1rem;
+  row-gap: 0.25rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid rgb(var(--color-border));
+}
+[data-pj-stat] > :first-child { grid-row: span 2; font-size: 1.5rem; }
+
+@container (min-width: 640px) {
+  [data-projects-root] { flex-direction: row; }
+  [data-projects-root] [data-projects-index] {
+    width: 15rem;
+    height: 100%;
+    border-bottom: 0;
+    border-right: 1px solid rgb(var(--color-border));
   }
+  [data-pj-list] {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: none;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  [data-pj-list] > * { flex: 0 0 auto; }
+  [data-pj-name] { white-space: normal; }
+  [data-pj-tagline], [data-pj-row-rule], [data-pj-more] { display: block; }
+  [data-pj-row-extra] { display: flex; }
 }
-
-/* WIDE / maximized window: a dramatic asymmetric stage. The serif goes large
-   (via .editorial-hero cqi), the metadata column splits off to the right, the
-   fingerprint appears, and negative space opens up. */
 @container (min-width: 920px) {
-  [data-projects-root] {
-    --pj-rail-w: 18rem;
-    --pj-stage-pad: 3.5rem 4rem;
-    --pj-stage-gap: 2.5rem;
-  }
-  /* Asymmetric two-column header: oversized serif name left, mono meta right. */
-  [data-projects-stage-head] {
+  [data-projects-root] [data-projects-index] { width: 18rem; }
+}
+
+@container pjstage (min-width: 520px) {
+  [data-pj-stats] {
     display: grid;
-    grid-template-columns: minmax(0, 1.85fr) minmax(13rem, 0.85fr);
-    gap: 3rem;
-    align-items: end;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1.25rem 1.5rem;
   }
-  [data-projects-fingerprint] {
-    display: block;
-  }
+  [data-pj-stat] { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0 0; }
+  [data-pj-stat] > :first-child { font-size: clamp(1.6rem, 4.5cqi, 2.25rem); }
+}
+@container pjstage (min-width: 560px) {
+  [data-projects-stage] { padding: 2rem 2.25rem 3rem; }
+}
+@container pjstage (min-width: 820px) {
+  [data-projects-stage] { padding: 3rem 3.5rem 4rem; }
 }
 `;
 
 // ---------------------------------------------------------------------------
-// Status - mono uppercase word (no colored badge).
+// Status - a word in a hairline box. In the color palette the whole label
+// takes the tint (dot and word), in both light and dark.
 // ---------------------------------------------------------------------------
 
-function StatusLabel({ status }: { status: string }) {
+function StatusLabel({ status }: { status: Project['status'] }) {
   const mono = useIsMono();
-  const label =
-    { active: 'Active', completed: 'Completed', experimental: 'Experimental' }[status] ?? status;
-
-  // Mono register: the WORD carries the state, framed by a hairline box, no hue.
-  // Color register keeps a faint tinted box for legibility parity.
+  const label = { active: 'Active', completed: 'Completed', experimental: 'Experimental' }[status];
   const tint = mono
-    ? ''
-    : { active: 'text-green-600 dark:text-green-400', completed: 'text-blue-600 dark:text-blue-400', experimental: 'text-amber-600 dark:text-amber-400' }[status] ?? '';
+    ? 'text-text-secondary'
+    : {
+        active: 'text-green-700 dark:text-green-400',
+        completed: 'text-blue-700 dark:text-blue-400',
+        experimental: 'text-amber-700 dark:text-amber-400',
+      }[status];
 
   return (
-    <span className="inline-flex items-center gap-2 border border-border px-2 py-0.5">
-      <span aria-hidden className={`h-1.5 w-1.5 ${mono ? 'bg-text' : 'bg-current'} ${tint}`} />
-      <MetaLabel className={tint || undefined}>{label}</MetaLabel>
+    <span className={`inline-flex items-center gap-2 border border-border px-2 py-0.5 ${tint}`}>
+      <span aria-hidden className={`h-1.5 w-1.5 ${mono ? 'bg-text' : 'bg-current'}`} />
+      <MetaLabel className="[color:inherit]">{label}</MetaLabel>
     </span>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Language - grayscale dot + label (mono) / hued dot (color).
-// ---------------------------------------------------------------------------
 
 function LangLabel({ lang }: { lang: string }) {
   const mono = useIsMono();
   const color = mono ? MONO_LANG : (LANG_COLORS[lang] ?? MONO_LANG);
   return (
     <span className="inline-flex items-center gap-2">
-      <span
-        aria-hidden
-        className="h-2 w-2 rounded-full flex-shrink-0"
-        style={{ backgroundColor: color }}
-      />
-      <MetaLabel>{lang}</MetaLabel>
+      <span aria-hidden className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+      <span className="font-mono text-[13px] text-text">{lang}</span>
     </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Index row - numbered editorial entry. The signature interaction lives here:
-// a sliding graphite marker (shared layoutId) glides to the active row, hover
-// is a graphite tint, the row presses on :active. Mono numerals for the star
-// count come straight from the live API.
+// Index row. A sliding graphite bar marks the active row; hover is a graphite
+// tint. In the narrow strip only the name shows.
 // ---------------------------------------------------------------------------
 
 const INDEX_MARKER_ID = 'projects-index-active';
 
 function IndexEntry({
-  number,
-  repo,
+  project,
   active,
   reduced,
   onSelect,
 }: {
-  number: string;
-  repo: EnrichedRepo;
+  project: Project;
   active: boolean;
   reduced: boolean | null;
   onSelect: () => void;
 }) {
+  const live = liveMarker(project);
   return (
     <button
       type="button"
       onClick={onSelect}
       data-testid="index-row"
       aria-current={active ? 'true' : undefined}
-      className={`group relative flex w-full items-baseline gap-3 px-3 py-3 text-left
+      className={`group relative flex w-full flex-col px-4 py-3 text-left
                   transition-[transform,background-color] duration-150 ease-out
                   hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
-                  active:scale-[0.985]
-                  ${active ? 'bg-black/[0.045] dark:bg-white/[0.06]' : ''}`}
+                  active:scale-[0.985] focus-visible:-outline-offset-2
+                  ${active ? 'bg-black/[0.05] dark:bg-white/[0.07]' : ''}`}
     >
-      {/* Sliding active marker - a thin graphite bar that glides between rows. */}
       {active && (
         <motion.span
           layoutId={INDEX_MARKER_ID}
           aria-hidden
-          className="absolute left-0 top-1/2 h-[1.4em] w-[2px] -translate-y-1/2 bg-text"
+          className="absolute left-0 top-3 h-[1.3em] w-[2px] bg-text"
           transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 40, mass: 0.6 }}
         />
       )}
 
-      <MetaLabel
-        className={`shrink-0 w-7 justify-start tabular-nums transition-opacity
-                    ${active ? 'opacity-100' : 'opacity-45 group-hover:opacity-75'}`}
+      <span
+        data-pj-name
+        className={`block font-display leading-tight [overflow-wrap:normal] text-[clamp(1rem,2cqi,1.25rem)]
+                    transition-colors
+                    ${active ? 'text-text' : 'text-text-secondary group-hover:text-text'}`}
       >
-        {number}
-      </MetaLabel>
-
-      <span className="flex-1 min-w-0">
-        <span
-          className={`block font-display leading-tight truncate text-[clamp(1.05rem,2.6cqi,1.5rem)]
-                      transition-colors
-                      ${active ? 'text-text' : 'text-text-secondary group-hover:text-text'}`}
-        >
-          {repo.displayName}
-        </span>
-        {repo.tagline && (
-          <span className="mt-1 block truncate text-text-secondary text-[clamp(0.66rem,1.3cqi,0.78rem)] leading-tight">
-            {repo.tagline}
-          </span>
-        )}
+        {project.displayName}
       </span>
-
-      {repo.stars > 0 && (
-        <span className="shrink-0 self-center inline-flex items-center gap-1 font-mono-meta text-text-secondary tabular-nums">
-          <Star size={9} className="opacity-70" /> {repo.stars}
+      {project.tagline && (
+        <span data-pj-tagline className="mt-1 line-clamp-2 text-[13px] leading-snug text-text-secondary">
+          {project.tagline}
+        </span>
+      )}
+      {(live || project.stars > 0) && (
+        <span data-pj-row-extra className="mt-1.5 items-center gap-3 text-[12px] leading-none">
+          {live && <span className="font-medium text-text">{live}</span>}
+          {project.stars > 0 && (
+            <span className="inline-flex items-center gap-1 font-mono text-text-secondary tabular-nums">
+              <Star size={10} aria-hidden /> {project.stars}
+              <span className="sr-only"> GitHub stars</span>
+            </span>
+          )}
         </span>
       )}
     </button>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Index column - filter tabs (mono uppercase) + numbered, ruled list.
-// ---------------------------------------------------------------------------
+function FilterTabs({
+  filter,
+  onFilter,
+  size = 'desktop',
+}: {
+  filter: Filter;
+  onFilter: (f: Filter) => void;
+  size?: 'desktop' | 'mobile';
+}) {
+  const pad = size === 'mobile' ? 'min-h-[44px] px-1 text-[15px]' : 'py-1.5 text-[13px]';
+  return (
+    <div role="group" aria-label="Filter projects" className="flex items-center gap-5">
+      {FILTERS.map(f => {
+        const on = filter === f.key;
+        return (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => onFilter(f.key)}
+            aria-pressed={on}
+            className={`group relative inline-flex items-center font-medium transition-colors active:scale-[0.97] ${pad}
+                        ${on ? 'text-text' : 'text-text-secondary hover:text-text'}`}
+          >
+            {f.label}
+            <span
+              aria-hidden
+              className={`absolute bottom-0.5 left-0 right-0 h-px bg-text origin-left transition-transform duration-200 ease-out
+                          ${on ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50'}`}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function IndexColumn({
-  repos,
+  projects,
   filter,
-  setFilter,
+  onFilter,
   selected,
   onSelect,
   reduced,
 }: {
-  repos: EnrichedRepo[];
+  projects: Project[];
   filter: Filter;
-  setFilter: (f: Filter) => void;
+  onFilter: (f: Filter) => void;
   selected: string | null;
   onSelect: (name: string) => void;
   reduced: boolean | null;
 }) {
-  const filtered = applyFilter(repos, filter);
+  const filtered = applyFilter(projects, filter);
 
   return (
     <nav
       data-projects-index
-      aria-label="Projects index"
-      className="shrink-0 flex flex-col h-full border-r border-border app-sidebar overflow-hidden"
+      aria-label="Projects"
+      className="shrink-0 flex flex-col overflow-hidden bg-black/[0.025] dark:bg-white/[0.03]"
     >
-      {/* Masthead + filter tabs */}
-      <div className="px-3 pt-4 pb-3 flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <MetaLabel as="p">Index</MetaLabel>
-          <MetaLabel className="text-text-secondary/60 tabular-nums">
-            {String(filtered.length).padStart(2, '0')}
-          </MetaLabel>
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className="group relative font-mono-meta transition-opacity active:scale-[0.97]"
-              aria-pressed={filter === f.key}
-            >
-              <span className={filter === f.key ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>
-                {f.label}
-              </span>
-              {/* Active underline - a hairline that snaps under the live tab. */}
-              <span
-                aria-hidden
-                className={`absolute -bottom-1 left-0 right-0 h-px bg-text origin-left transition-transform duration-200 ease-out
-                            ${filter === f.key ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50'}`}
-              />
-            </button>
-          ))}
-        </div>
+      <div className="px-4 pt-2.5 pb-1.5">
+        <FilterTabs filter={filter} onFilter={onFilter} />
       </div>
 
-      <Hairline />
-
-      {/* Numbered, ruled list. Reveals once on mount with a stagger (never on
-          scroll - windowed scroll container). */}
-      <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center">
-            <MetaLabel className="text-text-secondary/60">No projects in this filter</MetaLabel>
-          </div>
-        ) : (
-          <motion.div
-            key={filter}
-            variants={reveal.container(reduced)}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col"
-          >
-            {filtered.map((repo, i) => (
-              <motion.div key={repo.name} variants={reveal.item(reduced)}>
-                <IndexEntry
-                  number={String(i + 1).padStart(2, '0')}
-                  repo={repo}
-                  active={selected === repo.name}
-                  reduced={reduced}
-                  onSelect={() => onSelect(repo.name)}
-                />
-                <Hairline />
-              </motion.div>
-            ))}
+      <motion.div
+        key={filter}
+        data-pj-list
+        variants={reveal.container(reduced)}
+        initial="hidden"
+        animate="show"
+      >
+        {filtered.map(p => (
+          <motion.div key={p.name} variants={reveal.item(reduced)}>
+            <IndexEntry
+              project={p}
+              active={selected === p.name}
+              reduced={reduced}
+              onSelect={() => onSelect(p.name)}
+            />
+            <div data-pj-row-rule><Hairline /></div>
           </motion.div>
-        )}
-      </div>
+        ))}
+        <a
+          data-pj-more
+          href={GITHUB_REPOS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-4 text-[13px] text-text-secondary underline underline-offset-4 hover:text-text focus-visible:-outline-offset-2"
+        >
+          More on GitHub
+        </a>
+      </motion.div>
     </nav>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Link buttons - shared by detail + mobile. Pressable, transform-only motion.
+// Links - live site first (filled), then source, research data, page.
 // ---------------------------------------------------------------------------
 
-function ProjectLinks({ repo, size = 'desktop' }: { repo: EnrichedRepo; size?: 'desktop' | 'mobile' }) {
-  const pad = size === 'mobile' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-[clamp(0.72rem,1.4cqi,0.8rem)]';
-  if (!repo.htmlUrl && !repo.homepage && !repo.slug) return null;
+function ProjectLinks({ project, size = 'desktop' }: { project: Project; size?: 'desktop' | 'mobile' }) {
+  const pad = size === 'mobile' ? 'min-h-[44px] px-4 text-[15px]' : 'min-h-[36px] px-3 text-[14px]';
+  const outline = `inline-flex items-center gap-2 border border-border text-text font-medium
+                   transition-[transform,border-color] duration-150 ease-out
+                   hover:border-text/40 active:scale-[0.98] ${pad}`;
   return (
-    <div className="flex flex-wrap gap-2">
-      {repo.htmlUrl && (
+    <div className="flex flex-wrap items-center gap-2">
+      {project.liveUrl && (
         <a
-          href={repo.htmlUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`inline-flex items-center gap-2 border border-border text-text font-medium
-                      transition-[transform,border-color] duration-150 ease-out
-                      hover:border-text/40 active:scale-[0.98] ${pad}`}
-        >
-          <Github size={13} /> GitHub
-        </a>
-      )}
-      {repo.homepage && (
-        <a
-          href={repo.homepage}
+          href={project.liveUrl}
           target="_blank"
           rel="noopener noreferrer"
           className={`inline-flex items-center gap-2 bg-text text-bg font-medium
                       transition-transform duration-150 ease-out active:scale-[0.98] ${pad}`}
         >
-          <ExternalLink size={13} /> {repo.liveLabel ?? 'Live Demo'}
+          <ExternalLink size={14} aria-hidden /> {project.liveLabel ?? 'Live site'}
         </a>
       )}
-      {repo.slug && (
-        <a
-          href={`/projects/${repo.slug}`}
-          target="_blank"
-          rel="noopener"
-          className={`inline-flex items-center gap-2 border border-border text-text font-medium
-                      transition-[transform,border-color] duration-150 ease-out
-                      hover:border-text/40 active:scale-[0.98] ${pad}`}
-        >
-          <Link2 size={13} /> Permalink
+      {project.repoUrl && (
+        <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className={outline}>
+          <Github size={14} aria-hidden /> GitHub
         </a>
       )}
+      {project.researchUrl && (
+        <a href={project.researchUrl} target="_blank" rel="noopener noreferrer" className={outline}>
+          <Database size={14} aria-hidden /> Research data
+        </a>
+      )}
+      <a href={`/projects/${project.slug}`} target="_blank" rel="noopener" className={outline}>
+        <FileText size={14} aria-hidden /> Open as page
+      </a>
+      {!project.repoUrl && <span className="px-1 text-[14px] text-text-secondary">Code not public</span>}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Detail stage - the poster. Oversized serif name, mono metadata, per-project
-// plotter fingerprint, then the editorial body (description, story, tech,
-// results). Cross-fades on selection with a small ease-out transform.
+// Detail content - shared by the desktop stage and the phone push view.
 // ---------------------------------------------------------------------------
 
-function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: string; reduced: boolean | null }) {
-  const allTech = useMemo(
-    () => Array.from(new Set([...repo.extraTech, ...repo.topics])),
-    [repo.extraTech, repo.topics],
+function SectionHead({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-[15px] font-medium leading-snug text-text">{children}</h3>
+      <Hairline />
+    </div>
   );
-  const seed = useMemo(() => seedFromName(repo.name), [repo.name]);
-  const orgLabel = repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel' : '@DevanshuNEU';
-  const updated = new Date(repo.updatedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function StatRow({ results }: { results: Achievement[] }) {
+  return (
+    <ul data-pj-stats aria-label="Key results">
+      {results.map(a => (
+        <li key={a.label} data-pj-stat>
+          <span className="font-display text-text leading-[1.05] tabular-nums">{a.metric}</span>
+          <span className="text-[14px] font-medium leading-snug text-text text-balance">{a.label}</span>
+          <span className="text-[13px] leading-snug text-text-secondary text-pretty">{a.detail}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ProjectDetail({ project, size = 'desktop' }: { project: Project; size?: 'desktop' | 'mobile' }) {
+  const headline = project.achievements.slice(0, HEADLINE_RESULTS);
+  const more = project.achievements.slice(HEADLINE_RESULTS);
+  const updated = project.updatedAt
+    ? new Date(project.updatedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    : null;
+  const hasSpecs = Boolean(project.language || project.stars > 0 || project.forks > 0 || updated);
 
   return (
+    <div data-projects-stage>
+      <header className="flex flex-col gap-4 max-w-[60rem]">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {project.role && <span className="text-[14px] font-medium text-text">{project.role}</span>}
+          <StatusLabel status={project.status} />
+        </p>
+
+        <h2
+          className="font-display font-normal text-text leading-[1.02] tracking-[-0.01em]
+                     [overflow-wrap:normal] [hyphens:none] text-balance text-[clamp(1.75rem,8.5cqi,4.5rem)]"
+        >
+          {project.displayName}
+        </h2>
+
+        {project.tagline && (
+          <p className="text-text-secondary leading-snug text-pretty text-[clamp(1.0625rem,2.6cqi,1.35rem)] max-w-[46ch]">
+            {project.tagline}
+          </p>
+        )}
+
+        {headline.length > 0 && (
+          <div className="mt-2">
+            <StatRow results={headline} />
+          </div>
+        )}
+
+        <div className="mt-2">
+          <ProjectLinks project={project} size={size} />
+        </div>
+
+        {hasSpecs && (
+          <dl className="mt-1 flex flex-wrap gap-x-8 gap-y-3">
+            {project.language && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] text-text-secondary">Language</dt>
+                <dd><LangLabel lang={project.language} /></dd>
+              </div>
+            )}
+            {project.stars > 0 && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] text-text-secondary">GitHub stars</dt>
+                <dd className="inline-flex items-center gap-1.5 font-mono text-[13px] text-text tabular-nums">
+                  <Star size={12} aria-hidden /> {project.stars}
+                </dd>
+              </div>
+            )}
+            {project.forks > 0 && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] text-text-secondary">Forks</dt>
+                <dd className="inline-flex items-center gap-1.5 font-mono text-[13px] text-text tabular-nums">
+                  <GitFork size={12} aria-hidden /> {project.forks}
+                </dd>
+              </div>
+            )}
+            {updated && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-[13px] text-text-secondary">Updated</dt>
+                <dd className="font-mono text-[13px] text-text tabular-nums">{updated}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </header>
+
+      <div className="mt-12 flex flex-col gap-10 max-w-[68ch]">
+        {more.length > 0 && (
+          <section className="flex flex-col gap-4">
+            <SectionHead>More results</SectionHead>
+            <ul className="flex flex-col">
+              {more.map((a, i) => (
+                <li key={a.label} className={`flex items-baseline gap-x-5 py-3 ${i > 0 ? 'border-t border-border' : ''}`}>
+                  <span className="shrink-0 w-[6.5rem] font-display text-text leading-[1.05] tabular-nums text-[clamp(1.35rem,3.4cqi,1.75rem)]">
+                    {a.metric}
+                  </span>
+                  <span className="flex-1 min-w-0 flex flex-col gap-1">
+                    <span className="text-[15px] font-medium leading-snug text-text">{a.label}</span>
+                    <span className="text-[14px] leading-snug text-text-secondary text-pretty">{a.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {project.description && (
+          <section className="flex flex-col gap-4">
+            <SectionHead>Overview</SectionHead>
+            <p className="text-text-secondary leading-relaxed text-pretty text-[16px]">{project.description}</p>
+          </section>
+        )}
+
+        {project.story.length > 0 && (
+          <section className="flex flex-col gap-4">
+            <SectionHead>How it works</SectionHead>
+            <div className="flex flex-col gap-4 text-text-secondary leading-relaxed text-pretty text-[16px]">
+              {project.story.map((para, i) => <p key={i}>{para}</p>)}
+            </div>
+          </section>
+        )}
+
+        {project.tech.length > 0 && (
+          <section className="flex flex-col gap-4">
+            <SectionHead>Stack</SectionHead>
+            <ul className="flex flex-wrap gap-x-5 gap-y-2">
+              {project.tech.map(t => (
+                <li key={t} className="font-mono text-[13px] text-text">{t}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetailStage({ project, reduced }: { project: Project; reduced: boolean | null }) {
+  return (
     <motion.div
-      key={repo.name}
-      // Selecting a project is list-navigation frequency, so the cross-fade
-      // stays snappy and under the 300ms UI ceiling. Full transform strings keep
-      // this on the GPU so it never drops frames while the new repo's data and
-      // fingerprint paint. Per-state transitions make the exit snappier than the
-      // enter (asymmetric: fast where the system responds).
+      key={project.name}
+      // List-navigation frequency: snappy, under the 300ms UI ceiling, and the
+      // exit is faster than the enter.
       initial={reduced ? false : { opacity: 0, transform: 'translateY(8px)' }}
       animate={{
         opacity: 1,
@@ -460,469 +658,155 @@ function DetailStage({ repo, number, reduced }: { repo: EnrichedRepo; number: st
           ? { opacity: 0, transition: INSTANT }
           : { opacity: 0, transform: 'translateY(-5px)', transition: { duration: 0.16, ease: [0.23, 1, 0.32, 1] } }
       }
-      className="flex-1 overflow-y-auto"
+      data-projects-stage-scroll
+      className="flex-1 min-h-0 min-w-0 overflow-y-auto"
     >
-      <div data-projects-stage>
-        {/* ── Poster header ── asymmetric grid (wide) / stacked (narrow) ── */}
-        <header data-projects-stage-head>
-          {/* Left: kicker + oversized serif name + tagline */}
-          <div className="flex flex-col gap-4 min-w-0">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <MetaLabel className="text-text-secondary/60 tabular-nums">{number}</MetaLabel>
-              <StatusLabel status={repo.status} />
-              <MetaLabel className="text-text-secondary/70">{orgLabel}</MetaLabel>
-            </div>
-
-            <h2 className="editorial-hero project-hero text-text break-words text-balance">
-              {repo.displayName}
-            </h2>
-
-            {repo.tagline && (
-              <p className="text-text-secondary leading-snug text-pretty text-[clamp(1rem,2.4cqi,1.35rem)] max-w-[42ch]">
-                {repo.tagline}
-              </p>
-            )}
-          </div>
-
-          {/* Right: fingerprint (wide only) + mono spec stack */}
-          <div className="flex flex-col gap-4">
-            <div
-              data-projects-fingerprint
-              aria-hidden
-              className="aspect-square w-full border border-border"
-            >
-              {/* Deterministic per-repo plotter mark; mono + reduced-motion gated
-                  inside the primitive. animate draws the strokes on once. */}
-              <Plotter
-                generator={(s) => strokeSet(s, 7)}
-                seed={seed}
-                strokeWidth={1.1}
-                animate
-                className="opacity-90"
-              />
-            </div>
-
-            <dl className="flex flex-col">
-              <Hairline />
-              {repo.language && (
-                <>
-                  <div className="flex items-center justify-between gap-3 py-2">
-                    <MetaLabel className="text-text-secondary/55">Language</MetaLabel>
-                    <LangLabel lang={repo.language} />
-                  </div>
-                  <Hairline />
-                </>
-              )}
-              {repo.stars > 0 && (
-                <>
-                  <div className="flex items-center justify-between gap-3 py-2">
-                    <MetaLabel className="text-text-secondary/55">Stars</MetaLabel>
-                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
-                      <Star size={11} className="opacity-70" /> {repo.stars}
-                    </span>
-                  </div>
-                  <Hairline />
-                </>
-              )}
-              {repo.forks > 0 && (
-                <>
-                  <div className="flex items-center justify-between gap-3 py-2">
-                    <MetaLabel className="text-text-secondary/55">Forks</MetaLabel>
-                    <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
-                      <GitFork size={11} className="opacity-70" /> {repo.forks}
-                    </span>
-                  </div>
-                  <Hairline />
-                </>
-              )}
-              <div className="flex items-center justify-between gap-3 py-2">
-                <MetaLabel className="text-text-secondary/55">Updated</MetaLabel>
-                <MetaLabel className="text-text tabular-nums">{updated}</MetaLabel>
-              </div>
-              <Hairline />
-            </dl>
-          </div>
-        </header>
-
-        {/* Links sit on the editorial baseline below the header. */}
-        <div className="mt-8">
-          <ProjectLinks repo={repo} />
-        </div>
-
-        {/* ── Body ── ruled editorial blocks, generous spacing, no cards ── */}
-        <div className="mt-12 flex flex-col gap-12 max-w-[68ch]">
-          {repo.description && (
-            <section className="flex flex-col gap-4">
-              <MetaLabel as="p" className="text-text-secondary/55">Overview</MetaLabel>
-              <Hairline />
-              <p className="text-text-secondary leading-relaxed text-pretty text-base">
-                {repo.description}
-              </p>
-            </section>
-          )}
-
-          {repo.story.length > 0 && (
-            <section className="flex flex-col gap-4">
-              <MetaLabel as="p" className="text-text-secondary/55">The Story</MetaLabel>
-              <Hairline />
-              <div className="flex flex-col gap-4 text-text-secondary leading-relaxed text-pretty text-base">
-                {repo.story.map((para, i) => <p key={i}>{para}</p>)}
-              </div>
-            </section>
-          )}
-
-          {allTech.length > 0 && (
-            <section className="flex flex-col gap-4">
-              <MetaLabel as="p" className="text-text-secondary/55">Built With</MetaLabel>
-              <Hairline />
-              <ul className="flex flex-wrap gap-x-5 gap-y-2">
-                {allTech.map(tech => (
-                  <li key={tech}>
-                    <MetaLabel className="text-text">{tech}</MetaLabel>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {repo.achievements.length > 0 && (
-            <section className="flex flex-col gap-4">
-              <MetaLabel as="p" className="text-text-secondary/55">Key Results</MetaLabel>
-              <Hairline />
-              <dl className="flex flex-col">
-                {repo.achievements.map((a, i) => (
-                  <div key={i}>
-                    <div className="flex items-start gap-x-6 py-4">
-                      <dd className="shrink-0 w-[clamp(4.5rem,15cqi,8.5rem)] font-display text-text leading-[1.05] tabular-nums break-words [hyphens:none] text-[clamp(1.35rem,3.4cqi,2rem)]">
-                        {a.metric}
-                      </dd>
-                      <div className="flex-1 min-w-0 flex flex-col gap-1 pt-0.5">
-                        <dt className="text-text font-medium text-sm leading-snug text-balance">{a.label}</dt>
-                        <p className="text-text-secondary text-pretty text-[clamp(0.74rem,1.5cqi,0.85rem)] leading-snug">{a.detail}</p>
-                      </div>
-                    </div>
-                    {i < repo.achievements.length - 1 && <Hairline />}
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
-        </div>
-      </div>
+      <ProjectDetail project={project} />
     </motion.div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Empty state - composed, editorial.
-// ---------------------------------------------------------------------------
-
 function EmptyStage() {
   return (
     <div className="flex-1 flex items-center justify-center p-10">
-      <div className="flex flex-col items-center gap-3 text-center max-w-xs">
-        <FolderOpen size={28} className="text-text-secondary/40" />
-        <p className="editorial-head text-text text-[clamp(1.25rem,4cqi,1.75rem)] leading-tight">
-          Pick a project
-        </p>
-        <MetaLabel className="text-text-secondary/60">
-          They are all my favorites
-        </MetaLabel>
-      </div>
+      <p className="text-[15px] text-text-secondary">Pick a project from the list.</p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Static fallback from projectMeta (always works, no API needed).
+// Phone - list root view and the pushed detail.
 // ---------------------------------------------------------------------------
 
-function buildStaticRepos(): EnrichedRepo[] {
-  const repos = Object.entries(projectMeta).map(([name, meta]) => ({
-    name,
-    displayName: meta.displayName,
-    tagline: meta.tagline,
-    description: meta.descriptionOverride ?? meta.tagline,
-    htmlUrl: meta.repoUrl ?? '',
-    homepage: meta.liveUrl ?? null,
-    language: meta.extraTech?.[0] ?? null,
-    stars: 0,
-    forks: 0,
-    topics: meta.extraTech ?? [],
-    updatedAt: new Date().toISOString(),
-    featured: meta.featured,
-    category: meta.category,
-    status: meta.status,
-    story: meta.story,
-    achievements: meta.achievements,
-    extraTech: meta.extraTech ?? [],
-    org: (meta.category === 'org' ? 'OpenCodeIntel' : 'DevanshuNEU') as 'DevanshuNEU' | 'OpenCodeIntel',
-    slug: meta.slug,
-    liveLabel: meta.liveLabel,
-  }));
-  return repos.sort((a, b) => featuredRank(a.name) - featuredRank(b.name));
-}
-
-// ---------------------------------------------------------------------------
-// Mobile - project detail content (no motion wrapper, lives inside push view).
-// ---------------------------------------------------------------------------
-
-function ProjectDetailMobile({ repo }: { repo: EnrichedRepo }) {
-  const allTech = Array.from(new Set([...repo.extraTech, ...repo.topics]));
-  const updated = new Date(repo.updatedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
+function ProjectDetailMobile({ project }: { project: Project }) {
   return (
-    <div className="overflow-y-auto pb-6">
-      {/* Poster header */}
-      <div className="px-5 pt-5 pb-5 border-b border-border flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <StatusLabel status={repo.status} />
-          <MetaLabel className="text-text-secondary/70">
-            {repo.org === 'OpenCodeIntel' ? 'OpenCodeIntel' : '@DevanshuNEU'}
-          </MetaLabel>
-        </div>
-        <h2 className="editorial-head text-text text-[2rem] leading-tight break-words text-balance">{repo.displayName}</h2>
-        {repo.tagline && <p className="text-text-secondary text-sm leading-snug text-pretty">{repo.tagline}</p>}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
-          {repo.language && <LangLabel lang={repo.language} />}
-          {repo.stars > 0 && (
-            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
-              <Star size={11} className="opacity-70" /> {repo.stars}
-            </span>
-          )}
-          {repo.forks > 0 && (
-            <span className="inline-flex items-center gap-1.5 font-mono-meta text-text tabular-nums">
-              <GitFork size={11} className="opacity-70" /> {repo.forks}
-            </span>
-          )}
-          <MetaLabel className="text-text-secondary/70 tabular-nums">{updated}</MetaLabel>
-        </div>
-        <div className="mt-2">
-          <ProjectLinks repo={repo} size="mobile" />
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="p-5 flex flex-col gap-9">
-        {repo.description && (
-          <section className="flex flex-col gap-3">
-            <MetaLabel as="p" className="text-text-secondary/55">Overview</MetaLabel>
-            <Hairline />
-            <p className="text-text-secondary text-sm leading-relaxed text-pretty">{repo.description}</p>
-          </section>
-        )}
-        {repo.story.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <MetaLabel as="p" className="text-text-secondary/55">The Story</MetaLabel>
-            <Hairline />
-            <div className="flex flex-col gap-3 text-text-secondary text-sm leading-relaxed text-pretty">
-              {repo.story.map((para, i) => <p key={i}>{para}</p>)}
-            </div>
-          </section>
-        )}
-        {allTech.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <MetaLabel as="p" className="text-text-secondary/55">Built With</MetaLabel>
-            <Hairline />
-            <ul className="flex flex-wrap gap-x-4 gap-y-2">
-              {allTech.map(tech => (
-                <li key={tech}><MetaLabel className="text-text">{tech}</MetaLabel></li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {repo.achievements.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <MetaLabel as="p" className="text-text-secondary/55">Key Results</MetaLabel>
-            <Hairline />
-            <dl className="flex flex-col">
-              {repo.achievements.map((a, i) => (
-                <div key={i}>
-                  <div className="flex items-baseline gap-4 py-3">
-                    <dd className="shrink-0 w-20 font-display text-text leading-none tabular-nums text-2xl">{a.metric}</dd>
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <dt className="text-text font-medium text-[13px] leading-snug text-balance">{a.label}</dt>
-                      <p className="text-text-secondary text-[11px] leading-snug text-pretty">{a.detail}</p>
-                    </div>
-                  </div>
-                  {i < repo.achievements.length - 1 && <Hairline />}
-                </div>
-              ))}
-            </dl>
-          </section>
-        )}
-      </div>
+    <div data-projects-stage-scroll className="h-full overflow-y-auto pb-6">
+      <ProjectDetail project={project} size="mobile" />
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Mobile - project list root view.
-// ---------------------------------------------------------------------------
-
-function ProjectListMobile({ repos }: { repos: EnrichedRepo[] }) {
+function ProjectListMobile({ projects }: { projects: Project[] }) {
   const nav = useMobileNavigation();
   const mono = useIsMono();
   const [filter, setFilter] = useState<Filter>('featured');
+  const filtered = applyFilter(projects, filter);
 
-  const filtered = applyFilter(repos, filter);
-
-  const openDetail = (repo: EnrichedRepo) => {
-    nav.push({
-      id: repo.name,
-      title: repo.displayName,
-      element: <ProjectDetailMobile repo={repo} />,
-    });
+  const openDetail = (p: Project) => {
+    nav.push({ id: p.name, title: p.displayName, element: <ProjectDetailMobile project={p} /> });
   };
 
   return (
     <div className="h-full overflow-y-auto pb-4">
-      {/* Filter tabs - mono uppercase, underline marker. */}
-      <div className="px-4 pt-3 pb-3 flex items-center gap-5 overflow-x-auto hide-scrollbar">
-        {FILTERS.map(f => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className="group relative flex-shrink-0 font-mono-meta active:scale-[0.97]"
-            aria-pressed={filter === f.key}
-          >
-            <span className={filter === f.key ? 'text-text' : 'text-text-secondary/55'}>{f.label}</span>
-            <span
-              aria-hidden
-              className={`absolute -bottom-1 left-0 right-0 h-px bg-text origin-left transition-transform duration-200 ease-out
-                          ${filter === f.key ? 'scale-x-100' : 'scale-x-0'}`}
-            />
-          </button>
-        ))}
+      <div className="px-4 pt-1 pb-1">
+        <FilterTabs filter={filter} onFilter={setFilter} size="mobile" />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-2">
-          <FolderOpen size={28} className="text-text-secondary/40" />
-          <MetaLabel className="text-text-secondary/60">No projects in this filter</MetaLabel>
-        </div>
-      ) : (
-        <MobileSection inset>
-          {filtered.map((repo, i) => {
-            const langColor = mono ? MONO_LANG : (repo.language ? (LANG_COLORS[repo.language] ?? MONO_LANG) : MONO_LANG);
-            return (
-              <button
-                key={repo.name}
-                onClick={() => openDetail(repo)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
-                            ${mono ? 'active:bg-text/[0.06]' : 'active:bg-accent/10'}`}
-              >
-                <span className="font-mono-meta text-text-secondary/50 w-6 shrink-0 tabular-nums">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <IconTile color={langColor} icon={<Code size={14} />} />
-                <span className="flex-1 min-w-0">
-                  <span className="block font-display text-text text-[17px] leading-tight truncate">{repo.displayName}</span>
-                  <span className="block text-text-secondary text-[13px] leading-tight truncate mt-0.5">{repo.tagline}</span>
-                </span>
-                {repo.stars > 0 && (
-                  <span className="inline-flex items-center gap-0.5 font-mono-meta text-text-secondary shrink-0 tabular-nums">
-                    <Star size={11} className="opacity-70" /> {repo.stars}
+      <MobileSection>
+        {filtered.map(p => {
+          const live = liveMarker(p);
+          return (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => openDetail(p)}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
+                          ${mono ? 'active:bg-text/[0.06]' : 'active:bg-accent/10'}`}
+            >
+              <span className="flex-1 min-w-0">
+                <span className="block font-display text-text text-[18px] leading-tight">{p.displayName}</span>
+                <span className="mt-0.5 line-clamp-2 text-text-secondary text-[14px] leading-snug">{p.tagline}</span>
+                {(live || p.stars > 0) && (
+                  <span className="mt-1.5 flex items-center gap-3 text-[12px] leading-none">
+                    {live && <span className="font-medium text-text">{live}</span>}
+                    {p.stars > 0 && (
+                      <span className="inline-flex items-center gap-1 font-mono text-text-secondary tabular-nums">
+                        <Star size={10} aria-hidden /> {p.stars}
+                        <span className="sr-only"> GitHub stars</span>
+                      </span>
+                    )}
                   </span>
                 )}
-                <ChevronRight size={18} strokeWidth={2.2} className="text-text-secondary/40 flex-shrink-0" />
-              </button>
-            );
-          })}
-        </MobileSection>
-      )}
+              </span>
+              <ChevronRight size={18} strokeWidth={2.2} aria-hidden className="text-text-tertiary flex-shrink-0" />
+            </button>
+          );
+        })}
+      </MobileSection>
+
+      <p className="px-4 pt-4">
+        <a href={GITHUB_REPOS_URL} target="_blank" rel="noopener noreferrer" className="text-[14px] text-text-secondary underline underline-offset-4">
+          More on GitHub
+        </a>
+      </p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main Component
+// Main component
 // ---------------------------------------------------------------------------
 
 export default function ProjectsApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
-  const [repos, setRepos] = useState<EnrichedRepo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>(buildStaticProjects);
+  const [selected, setSelected] = useState<string | null>(() => projects.find(p => p.featured)?.name ?? null);
   const [filter, setFilter] = useState<Filter>('featured');
   const reduced = useReducedMotion();
 
   useEffect(() => {
+    let cancelled = false;
     fetch('/api/github/repos')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((data: EnrichedRepo[]) => {
-        const resolved = Array.isArray(data) && data.length > 0 ? data : buildStaticRepos();
-        setRepos(resolved);
-        const first = resolved.find(r => r.featured);
-        if (first) setSelected(first.name);
-        setLoading(false);
+      .then((rows: EnrichedRepo[]) => {
+        if (!cancelled && Array.isArray(rows)) setProjects(prev => mergeLive(prev, rows));
       })
-      .catch(() => {
-        const fallback = buildStaticRepos();
-        setRepos(fallback);
-        const first = fallback.find(r => r.featured);
-        if (first) setSelected(first.name);
-        setLoading(false);
-      });
+      // The bundled data is already on screen; live numbers are a bonus.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center gap-3 text-text-secondary">
-        <Loader2 size={16} className="animate-spin" />
-        <MetaLabel>Fetching repos from GitHub</MetaLabel>
-      </div>
-    );
-  }
+  // Keep the stage in step with the list: a filter that hides the selected
+  // project selects the first one it shows.
+  const changeFilter = (next: Filter) => {
+    setFilter(next);
+    const list = applyFilter(projects, next);
+    if (!list.some(p => p.name === selected)) setSelected(list[0]?.name ?? null);
+  };
 
-  // Mobile - iOS push-navigation list -> detail
   if (variant === 'mobile') {
     return (
-      <MobilePushView
-        rootView={{
-          id: 'projects-list',
-          title: 'Projects',
-          element: <ProjectListMobile repos={repos} />,
-        }}
-      />
+      <>
+        <style>{SCOPED_CSS}</style>
+        <MobilePushView
+          rootView={{ id: 'projects-list', title: 'Projects', element: <ProjectListMobile projects={projects} /> }}
+        />
+      </>
     );
   }
 
-  // Desktop - editorial index + poster stage
-  const selectedRepo = repos.find(r => r.name === selected) ?? null;
-  // The detail kicker number reflects the project's position within the active
-  // filter view (matches the index numbering the recruiter just scanned). If the
-  // selection is no longer in the active filter (e.g. the filter changed while a
-  // detail was open), fall back to its position in the full list rather than
-  // mislabeling it with another row's ordinal.
-  const filteredView = applyFilter(repos, filter);
-  const selectedNumber = (() => {
-    if (!selectedRepo) return '00';
-    const inFilter = filteredView.findIndex(r => r.name === selectedRepo.name);
-    const idx = inFilter !== -1 ? inFilter : repos.findIndex(r => r.name === selectedRepo.name);
-    return String((idx === -1 ? 0 : idx) + 1).padStart(2, '0');
-  })();
+  const selectedProject = projects.find(p => p.name === selected) ?? null;
 
   return (
-    <div data-projects-root className="h-full flex overflow-hidden bg-surface/20">
-      {/* Scoped, window-dynamic layout CSS (see SCOPED_CSS notes). */}
+    <div data-projects-root className="h-full overflow-hidden bg-bg">
       <style>{SCOPED_CSS}</style>
 
       <IndexColumn
-        repos={repos}
+        projects={projects}
         filter={filter}
-        setFilter={setFilter}
+        onFilter={changeFilter}
         selected={selected}
         onSelect={setSelected}
         reduced={reduced}
       />
 
       <AnimatePresence mode="wait">
-        {selectedRepo ? (
-          <DetailStage key={selectedRepo.name} repo={selectedRepo} number={selectedNumber} reduced={reduced} />
+        {selectedProject ? (
+          <DetailStage key={selectedProject.name} project={selectedProject} reduced={reduced} />
         ) : (
           <EmptyStage key="empty" />
         )}
