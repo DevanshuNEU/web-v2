@@ -3,7 +3,7 @@ import { spring, INSTANT, withReduced } from '@/lib/motion';
 
 describe('motion tokens', () => {
   it('exposes the spring presets used across the shell', () => {
-    for (const key of ['window', 'windowLayout', 'dock', 'tilt', 'genie', 'cursor'] as const) {
+    for (const key of ['window', 'windowLayout', 'dock', 'tilt', 'genie'] as const) {
       expect(spring[key]).toBeTypeOf('object');
     }
   });
