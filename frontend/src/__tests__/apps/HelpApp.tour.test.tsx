@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
 import '../setup/dom';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import HelpApp, {
+  TOUR_SEEN_KEY,
   TOUR_STEPS_DESKTOP,
   TOUR_STEPS_MOBILE,
   SHORTCUTS_DESKTOP,
@@ -71,10 +72,53 @@ describe('tour render', () => {
 
   it('renders the desktop tour and shows the ⌘K chip on the command-palette step', async () => {
     render(<HelpApp variant="desktop" />);
-    expect(screen.getByText('Tour')).toBeInTheDocument();
+    expect(screen.getByText('Walkthrough')).toBeInTheDocument();
     // Welcome is step 1; the command-palette step (with the ⌘K chip) is step 2.
     await userEvent.click(screen.getByRole('button', { name: /next/i }));
     expect(screen.getByText('Command palette')).toBeInTheDocument();
     expect(screen.getByText('⌘ K')).toBeInTheDocument();
+  });
+});
+
+describe('walkthrough exits', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('Skip marks the walkthrough seen so it does not come back', async () => {
+    const { unmount } = render(<HelpApp variant="desktop" />);
+    await userEvent.click(screen.getByRole('button', { name: /^skip$/i }));
+    expect(localStorage.getItem(TOUR_SEEN_KEY)).toBe('1');
+    expect(screen.getByRole('heading', { level: 1, name: /new here/i })).toBeInTheDocument();
+    unmount();
+    render(<HelpApp variant="desktop" />);
+    expect(screen.queryByText('Walkthrough')).toBeNull();
+  });
+
+  it('Esc leaves the walkthrough without reaching the window-level Esc handler', () => {
+    const docEsc = vi.fn();
+    document.addEventListener('keydown', docEsc);
+    render(<HelpApp variant="desktop" />);
+    const heading = screen.getByRole('heading', { name: TOUR_STEPS_DESKTOP[0].title });
+    expect(document.activeElement).toBe(heading);
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(docEsc).not.toHaveBeenCalled();
+    expect(localStorage.getItem(TOUR_SEEN_KEY)).toBe('1');
+    expect(screen.queryByText('Walkthrough')).toBeNull();
+    document.removeEventListener('keydown', docEsc);
+  });
+
+  it('arrow keys step through and focus follows the step heading', () => {
+    render(<HelpApp variant="desktop" />);
+    const region = screen.getByRole('region', { name: /walkthrough, step 1 of/i });
+    fireEvent.keyDown(region, { key: 'ArrowRight' });
+    const h = screen.getByRole('heading', { name: TOUR_STEPS_DESKTOP[1].title });
+    expect(document.activeElement).toBe(h);
+    expect(screen.getByRole('region', { name: /step 2 of/i })).toBeInTheDocument();
+  });
+
+  it('hides Back on the first step', () => {
+    render(<HelpApp variant="desktop" />);
+    expect(screen.queryByRole('button', { name: /^back$/i })).toBeNull();
   });
 });

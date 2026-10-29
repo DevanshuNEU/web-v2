@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { posts, getAllPosts, getPostBySlug, getPostsForProject, readPostBody, formatPostDate } from '@/data/writing';
 import { projectMeta } from '@/data/projectMeta';
-import { parseMarkdown, parseInline, headingId, wordCount } from '@/lib/markdown';
+import { parseMarkdown, parseInline, headingId, wordCount, readingMinutes } from '@/lib/markdown';
 import { articleNode, PERSON_ID } from '@/lib/structuredData';
 import { buildLlmsTxt } from '@/lib/llmsTxt';
 import { SITE_URL } from '@/lib/site';
@@ -44,8 +44,8 @@ describe('posts', () => {
       const body = readPostBody(p.slug);
       expect(body.length).toBeGreaterThan(500);
       expect(body + p.title + p.description).not.toMatch(/[–—]/);
-      expect(body).not.toMatch(/^#(?!# )/m); // only ## headings; the page owns the h1
-      expect(body).not.toMatch(/\*\*|__|^\d+\. /m); // no bold or numbered lists, they would render literally
+      expect(body).not.toMatch(/^#(?!#{1,2} )/m); // only ## and ### headings; the page owns the h1
+      expect(body).not.toMatch(/__|^\* |^>/m); // no underscore bold, star bullets or quotes, they would render literally
       expect(body).not.toMatch(/\]\((?!https:\/\/)/); // links must be absolute https to be recognised
     }
   });
@@ -63,8 +63,31 @@ describe('markdown subset', () => {
     const blocks = parseMarkdown('Para one\nwraps.\n\n## About those labels\n\n- a `x`\n- b\n');
     expect(blocks).toEqual([
       { type: 'paragraph', content: [{ type: 'text', text: 'Para one wraps.' }] },
-      { type: 'heading', id: 'about-those-labels', text: 'About those labels' },
-      { type: 'list', items: [[{ type: 'text', text: 'a ' }, { type: 'code', text: 'x' }], [{ type: 'text', text: 'b' }]] },
+      { type: 'heading', level: 2, id: 'about-those-labels', text: 'About those labels' },
+      { type: 'list', ordered: false, items: [[{ type: 'text', text: 'a ' }, { type: 'code', text: 'x' }], [{ type: 'text', text: 'b' }]] },
+    ]);
+  });
+
+  it('parses ### sub-heads, numbered lists and bold', () => {
+    expect(parseMarkdown('### Step one\n\n1. first\n2. **second**')).toEqual([
+      { type: 'heading', level: 3, id: 'step-one', text: 'Step one' },
+      {
+        type: 'list',
+        ordered: true,
+        items: [[{ type: 'text', text: 'first' }], [{ type: 'strong', text: 'second' }]],
+      },
+    ]);
+  });
+
+  it('keeps fenced code blocks whole, blank lines included', () => {
+    const md = 'Before.\n\n```python\ndef f():\n\n    return 1\n```\n\nAfter.';
+    expect(parseMarkdown(md)).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'Before.' }] },
+      { type: 'code', lang: 'python', text: 'def f():\n\n    return 1' },
+      { type: 'paragraph', content: [{ type: 'text', text: 'After.' }] },
+    ]);
+    expect(parseMarkdown('```\nraw `x` **y**\n```')).toEqual([
+      { type: 'code', lang: null, text: 'raw `x` **y**' },
     ]);
   });
 
@@ -86,6 +109,9 @@ describe('markdown subset', () => {
 
   it('counts words without markup or link targets', () => {
     expect(wordCount('## Two words\n\n- one [link text](https://x.com/y) `code`')).toBe(6);
+    expect(wordCount('### Sub\n\n1. **bold** item\n\n```ts\nconst a\n```')).toBe(5);
+    expect(readingMinutes('word '.repeat(1000))).toBe(5);
+    expect(readingMinutes('short')).toBe(1);
   });
 
   it('renders the reranker post into the expected sections', () => {

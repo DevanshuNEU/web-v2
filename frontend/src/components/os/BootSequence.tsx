@@ -1,147 +1,99 @@
 'use client';
 
 /**
- * BootSequence — "Words in the Dark"
+ * BootSequence: a short intro, once per browser (lib/bootSession.ts).
  *
- * Inspired by Apple's "Think Different" brand ads. Three statements appear
- * one at a time in ultra-thin Geist type on black, each a facet of who
- * Devanshu is. Then the devOS brand materializes. Then the world opens.
+ * One beat: the name, then the role under it, then the overlay dissolves
+ * over the already-mounted desktop. About 1.5s in total. Any key, click,
+ * tap or wheel skips straight to the desktop, and there is a visible Skip
+ * button. Under prefers-reduced-motion the intro never shows.
  *
- * Phases:
- *   word-1  (0–700ms)    "Devanshu."
- *   word-2  (700–1300ms) "Engineer."
- *   word-3  (1300–1900ms)"Builder."
- *   brand   (1900–2500ms) devOS + hairline rule + v2.0
- *   reveal  (2500–3000ms) dissolve to desktop
+ * DesktopHome wraps this in AnimatePresence, so the exit fade below plays
+ * after setBooted() has already mounted the desktop underneath.
  */
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useState, useEffect, useLayoutEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
+import { identity, mastheadSpecLine } from '@/data/aboutMe';
+import { Z } from '@/lib/zLayers';
 
-type Phase = 'word-1' | 'word-2' | 'word-3' | 'brand' | 'reveal';
+/** ms the name holds before the role line joins it. */
+const ROLE_AT = 450;
+/** ms from mount until the overlay starts dissolving. */
+const REVEAL_AT = 1150;
 
-const WORDS = ['Devanshu.', 'Engineer.', 'Builder.'];
-const PHASE_ORDER: Phase[] = ['word-1', 'word-2', 'word-3', 'brand', 'reveal'];
-const PHASE_DURATIONS: Record<Phase, number> = {
-  'word-1': 1300,   // "Devanshu." — name, let it land
-  'word-2': 1100,   // "Engineer."
-  'word-3': 1100,   // "Builder."
-  'brand':  1400,   // devOS — breathe before the reveal
-  'reveal': 700,    // dissolve to desktop
-};
-
-const wordVariants = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' as const } },
-  exit:    { opacity: 0, y: -6, transition: { duration: 0.35, ease: 'easeIn' as const } },
-};
+// useLayoutEffect warns during SSR; this component only renders on the client.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export default function BootSequence() {
   const setBooted = useOSStore(state => state.setBooted);
-  const reduced = useReducedMotion();
-  const [phase, setPhase] = useState<Phase>('word-1');
+  const [showRole, setShowRole] = useState(false);
+
+  // Reduced motion: no intro at all. Layout effect, so it never paints.
+  useIsoLayoutEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) setBooted();
+  }, [setBooted]);
 
   useEffect(() => {
-    // Reduced motion: skip the cinematic word reveal, land on the brand
-    // briefly, then boot. No drawn-out sequence, no per-word translate.
-    if (reduced) {
-      setPhase('brand');
-      const t = setTimeout(() => setBooted(), 600);
-      return () => clearTimeout(t);
-    }
-
-    let elapsed = 0;
-    const timers: NodeJS.Timeout[] = [];
-
-    PHASE_ORDER.forEach((p) => {
-      timers.push(
-        setTimeout(() => setPhase(p), elapsed)
-      );
-      elapsed += PHASE_DURATIONS[p];
-    });
-
-    // Complete boot after all phases
-    timers.push(setTimeout(() => setBooted(), elapsed + 200));
-
-    return () => timers.forEach(clearTimeout);
-  }, [setBooted, reduced]);
-
-  const currentWord = phase === 'word-1' ? WORDS[0]
-    : phase === 'word-2' ? WORDS[1]
-    : phase === 'word-3' ? WORDS[2]
-    : null;
-
-  const showBrand = phase === 'brand' || phase === 'reveal';
-  const showOverlay = phase !== 'reveal';
+    const timers = [
+      setTimeout(() => setShowRole(true), ROLE_AT),
+      setTimeout(() => setBooted(), REVEAL_AT),
+    ];
+    // Anything the visitor does skips the intro.
+    const skip = () => setBooted();
+    const opts = { once: true, passive: true } as const;
+    window.addEventListener('pointerdown', skip, opts);
+    window.addEventListener('keydown', skip, opts);
+    window.addEventListener('wheel', skip, opts);
+    window.addEventListener('touchstart', skip, opts);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('pointerdown', skip);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('wheel', skip);
+      window.removeEventListener('touchstart', skip);
+    };
+  }, [setBooted]);
 
   return (
-    <AnimatePresence>
-      {showOverlay && (
-        <motion.div
-          key="boot"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.8, ease: 'easeOut' } }}
-          className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center"
-        >
-          {/* Word phases */}
-          <AnimatePresence mode="wait">
-            {currentWord && (
-              <motion.p
-                key={phase}
-                variants={wordVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="text-6xl text-white/90 tracking-[0.2em] select-none"
-                style={{ fontWeight: 100 }}
-              >
-                {currentWord}
-              </motion.p>
-            )}
-          </AnimatePresence>
+    <motion.div
+      key="boot"
+      role="status"
+      aria-label={`Loading ${identity.name}'s desktop`}
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.4, ease: 'easeOut' } }}
+      className="fixed inset-0 bg-black flex flex-col items-center justify-center px-6"
+      style={{ zIndex: Z.boot }}
+    >
+      <motion.p
+        aria-hidden
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="font-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-none text-white text-center select-none"
+      >
+        {identity.name}
+      </motion.p>
 
-          {/* Brand phase */}
-          <AnimatePresence>
-            {showBrand && (
-              <motion.div
-                key="brand"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-                className="flex flex-col items-center gap-3"
-              >
-                {/* devOS wordmark */}
-                <p
-                  className="text-3xl text-white tracking-[0.5em] select-none"
-                  style={{ fontWeight: 400 }}
-                >
-                  devOS
-                </p>
+      <motion.p
+        aria-hidden
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showRole ? 1 : 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+        className="mt-4 text-[15px] tracking-[0.02em] text-white/75 text-center select-none"
+      >
+        {mastheadSpecLine[0]}
+      </motion.p>
 
-                {/* Hairline rule — draws outward from center */}
-                <motion.div
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
-                  className="w-24 h-px bg-white/20"
-                  style={{ transformOrigin: 'center' }}
-                />
-
-                {/* Version */}
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.3 }}
-                  className="text-xs text-white/25 font-mono tracking-widest"
-                >
-                  v2.0
-                </motion.p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      <button
+        type="button"
+        onClick={() => setBooted()}
+        className="absolute bottom-6 right-6 rounded-md px-3 py-1.5 text-[12px] text-white/70
+                   hover:text-white hover:bg-white/10 transition-colors"
+      >
+        Skip
+      </button>
+    </motion.div>
   );
 }

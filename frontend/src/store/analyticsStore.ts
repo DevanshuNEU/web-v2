@@ -1,14 +1,20 @@
 /**
  * Analytics Store
- * 
+ *
  * Manages session-level analytics data for the current visitor.
  * Tracks app usage, interactions, and provides data for the Analytics app.
- * 
- * This store handles CLIENT-SIDE tracking only. Aggregate data comes from PostHog.
+ *
+ * It also owns the visitor's tracking choice. `setOptOut` is the one switch
+ * every toggle calls (the Analytics app, Preferences on desktop and phone):
+ * it stops or restarts PostHog, clears the local log, and saves the choice in
+ * localStorage so the next visit honors it before PostHog loads at all
+ * (`startPostHog` skips init for an opted-out visitor).
  */
 
 import { create } from 'zustand';
 import { useMemo } from 'react';
+import posthog from 'posthog-js';
+import { appLabels } from '@/data/copy';
 import type { AppType } from '../../../shared/types';
 
 // ============================================================================
@@ -78,6 +84,82 @@ interface AnalyticsState {
 }
 
 // ============================================================================
+// Tracking choice + PostHog lifecycle
+// ============================================================================
+
+/** localStorage key for the opt-out. "1" = opted out; absent = sharing. */
+export const OPT_OUT_KEY = 'devos-analytics-optout';
+
+/** The saved choice. False on the server and when storage is unavailable. */
+export function readOptOut(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(OPT_OUT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeOptOut(optedOut: boolean): void {
+  try {
+    if (optedOut) window.localStorage.setItem(OPT_OUT_KEY, '1');
+    else window.localStorage.removeItem(OPT_OUT_KEY);
+  } catch {
+    // Private mode or storage disabled: the choice still holds for this visit.
+  }
+}
+
+let posthogStarted = false;
+
+/**
+ * Initialize PostHog, unless the visitor opted out or no key is configured.
+ * Called once by PostHogProvider on mount, and again when an opted-out
+ * visitor turns sharing back on. An opted-out visitor never loads PostHog,
+ * so no pageview or autocapture event can leave before the choice applies.
+ */
+export function startPostHog(): void {
+  if (typeof window === 'undefined' || posthogStarted || readOptOut()) return;
+  // NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = set by the Vercel PostHog integration (production)
+  // NEXT_PUBLIC_POSTHOG_KEY           = legacy name used in .env.local (local dev)
+  const key = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
+           || process.env.NEXT_PUBLIC_POSTHOG_KEY
+           || '';
+  if (!key) return;
+  posthogStarted = true;
+  posthog.init(key, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+    person_profiles: 'identified_only',
+    capture_pageview: true,
+    capture_pageleave: true,
+    respect_dnt: true,
+    opt_out_capturing_by_default: false,
+    loaded: (ph) => {
+      if (process.env.NODE_ENV === 'development') ph.debug();
+    },
+  });
+}
+
+/** Apply the choice to PostHog: stop it, resume it, or load it for the first time. */
+function applyToPostHog(optedOut: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (posthog.__loaded) {
+      if (optedOut) posthog.opt_out_capturing();
+      else posthog.opt_in_capturing();
+    } else if (!optedOut) {
+      startPostHog();
+    }
+  } catch (err) {
+    console.error('PostHog opt-out update failed:', err);
+  }
+}
+
+/** Visitor-facing app name ("Skills", not "skills-dashboard"). */
+export function appTitle(appType: AppType): string {
+  return appLabels[appType]?.title ?? appType;
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -96,24 +178,29 @@ const detectDevice = (): DeviceInfo => {
   
   // Detect device type
   let type: DeviceInfo['type'] = 'desktop';
-  if (/Mobi|Android/i.test(ua)) {
-    type = /Tablet|iPad/i.test(ua) ? 'tablet' : 'mobile';
+  if (/iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobi/i.test(ua))) {
+    type = 'tablet';
+  } else if (/Mobi|Android|iPhone/i.test(ua)) {
+    type = 'mobile';
   }
   
-  // Detect browser (simplified)
+  // Detect browser (simplified). Edge and iOS Chrome/Firefox carry other
+  // browsers' tokens too, so check them first.
   let browser = 'Other';
-  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
-  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
-  else if (ua.includes('Firefox')) browser = 'Firefox';
-  else if (ua.includes('Edg')) browser = 'Edge';
+  if (ua.includes('Edg')) browser = 'Edge';
+  else if (/Firefox|FxiOS/.test(ua)) browser = 'Firefox';
+  else if (/Chrome|CriOS/.test(ua)) browser = 'Chrome';
+  else if (ua.includes('Safari')) browser = 'Safari';
   
-  // Detect OS (simplified)
+  // Detect OS (simplified). Phones first: an iPhone UA contains "like Mac OS X"
+  // and an Android UA contains "Linux".
   let os = 'Other';
-  if (ua.includes('Mac')) os = 'macOS';
-  else if (ua.includes('Windows')) os = 'Windows';
-  else if (ua.includes('Linux')) os = 'Linux';
-  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
   else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('Mac')) os = 'macOS';
+  else if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('CrOS')) os = 'ChromeOS';
+  else if (ua.includes('Linux')) os = 'Linux';
   
   return { type, browser, os };
 };
@@ -146,7 +233,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   // Initial state
   sessionId: generateId(),
   sessionStartTime: Date.now(),
-  isOptedOut: false,
+  isOptedOut: readOptOut(),
   device: detectDevice(),
   events: [],
   appUsage: Object.fromEntries(
@@ -188,7 +275,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       const event: AnalyticsEvent = {
         id: generateId(),
         type: 'app_open',
-        label: `Opened ${appType}`,
+        label: `Opened ${appTitle(appType)}`,
         timestamp: Date.now(),
       };
       const currentUsage = state.appUsage[appType] ?? createAppUsageRecord(appType);
@@ -219,7 +306,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       const event: AnalyticsEvent = {
         id: generateId(),
         type: 'app_close',
-        label: `Closed ${appType}`,
+        label: `Closed ${appTitle(appType)}`,
         timestamp: Date.now(),
       };
       const currentUsage = state.appUsage[appType] ?? createAppUsageRecord(appType);
@@ -255,7 +342,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       const event: AnalyticsEvent = {
         id: generateId(),
         type: 'app_focus',
-        label: `Focused ${appType}`,
+        label: `Focused ${appTitle(appType)}`,
         timestamp: Date.now(),
       };
       return { events: [...state.events, event].slice(-100) };
@@ -267,12 +354,10 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   // -------------------------------------------------------------------------
 
   setOptOut: (optedOut) => {
-    set({ isOptedOut: optedOut });
-    
-    // Clear events if opting out
-    if (optedOut) {
-      set({ events: [] });
-    }
+    writeOptOut(optedOut);
+    applyToPostHog(optedOut);
+    // Opting out also clears what this visit already logged.
+    set(optedOut ? { isOptedOut: true, events: [] } : { isOptedOut: false });
   },
 
   // -------------------------------------------------------------------------

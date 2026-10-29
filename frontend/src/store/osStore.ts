@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
+import { fitWindow } from '@/lib/windowGeometry';
 import type { WindowState, AppType } from '../../../shared/types';
 
 interface OSStore {
@@ -55,17 +56,29 @@ export const useOSStore = create<OSStore>()(
     const windowId = `${appType}-${get().windowCounter}`;
     const currentZIndex = get().nextZIndex;
 
+    // Fit the requested size and position to the screen the window opens on,
+    // so large defaults shrink on small screens and nothing opens off-screen.
+    const size = customProps.size ?? reg?.defaultSize ?? { width: 600, height: 400 };
+    const position = customProps.position ?? reg?.defaultPosition ?? { x: 100, y: 100 };
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 0;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+    const fit = vw > 0 && vh > 0
+      ? fitWindow(size, position, vw, vh, reg?.minSize)
+      : null;
+
     const newWindow: WindowState = {
       id: windowId,
       title: label.windowTitle,
       isOpen: true,
       isMinimized: false,
       isMaximized: false,
-      position: reg?.defaultPosition ?? { x: 100, y: 100 },
-      size: reg?.defaultSize ?? { width: 600, height: 400 },
       zIndex: currentZIndex,
       appType,
       ...customProps,
+      position: fit
+        ? { x: fit.x, y: fit.y }
+        : position === 'center' ? { x: 100, y: 100 } : position,
+      size: fit ? { width: fit.width, height: fit.height } : size,
     };
 
     set(state => ({

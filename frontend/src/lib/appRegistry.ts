@@ -48,10 +48,12 @@ export interface AppRegistration {
   icon: React.ElementType;
   /** Tailwind color name for icon tint (e.g. 'blue', 'orange') */
   iconColor: string;
-  /** Default window size */
+  /** Default window size; shrunk to fit smaller screens when the window opens */
   defaultSize: { width: number; height: number };
-  /** Default window position */
-  defaultPosition: { x: number; y: number };
+  /** Default window position, or 'center' to center it in the desktop area */
+  defaultPosition: { x: number; y: number } | 'center';
+  /** Smallest size the user can resize to (defaults to DEFAULT_MIN_SIZE, 380x300) */
+  minSize?: { width: number; height: number };
   /** Pin to the dock (always visible even when not running) */
   pinnedToDock: boolean;
   /** Show in the Launchpad */
@@ -89,8 +91,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['about-me'],
     icon: AboutMeIcon,
     iconColor: 'blue',
-    defaultSize: { width: 600, height: 500 },
-    defaultPosition: { x: 100, y: 100 },
+    defaultSize: { width: 1040, height: 720 },
+    defaultPosition: 'center',
     pinnedToDock: true,
     launchpad: true,
   },
@@ -98,8 +100,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['projects'],
     icon: ProjectsIcon,
     iconColor: 'orange',
-    defaultSize: { width: 800, height: 600 },
-    defaultPosition: { x: 150, y: 120 },
+    defaultSize: { width: 1000, height: 700 },
+    defaultPosition: { x: 150, y: 70 },
     pinnedToDock: true,
     launchpad: true,
   },
@@ -107,8 +109,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['skills-dashboard'],
     icon: Activity,
     iconColor: 'purple',
-    defaultSize: { width: 700, height: 550 },
-    defaultPosition: { x: 200, y: 140 },
+    defaultSize: { width: 880, height: 640 },
+    defaultPosition: { x: 200, y: 90 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -116,17 +118,17 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['analytics'],
     icon: BarChart3,
     iconColor: 'teal',
-    defaultSize: { width: 900, height: 650 },
-    defaultPosition: { x: 250, y: 160 },
+    defaultSize: { width: 960, height: 680 },
+    defaultPosition: { x: 240, y: 80 },
     pinnedToDock: false,
-    launchpad: true,
+    launchpad: false,
   },
   'contact': {
     component: components['contact'],
     icon: Mail,
     iconColor: 'pink',
-    defaultSize: { width: 500, height: 400 },
-    defaultPosition: { x: 300, y: 180 },
+    defaultSize: { width: 600, height: 560 },
+    defaultPosition: { x: 300, y: 110 },
     pinnedToDock: true,
     launchpad: true,
   },
@@ -134,8 +136,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['terminal'],
     icon: Terminal,
     iconColor: 'slate',
-    defaultSize: { width: 700, height: 450 },
-    defaultPosition: { x: 180, y: 200 },
+    defaultSize: { width: 760, height: 480 },
+    defaultPosition: { x: 180, y: 140 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -143,8 +145,9 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['games'],
     icon: Gamepad2,
     iconColor: 'green',
-    defaultSize: { width: 620, height: 580 },
-    defaultPosition: { x: 220, y: 160 },
+    defaultSize: { width: 680, height: 640 },
+    defaultPosition: { x: 220, y: 90 },
+    minSize: { width: 420, height: 460 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -152,17 +155,18 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['display-options'],
     icon: Settings,
     iconColor: 'red',
-    defaultSize: { width: 650, height: 550 },
-    defaultPosition: { x: 350, y: 150 },
-    pinnedToDock: true,
+    defaultSize: { width: 720, height: 600 },
+    defaultPosition: { x: 350, y: 100 },
+    // Reached from the right-click menu and the Launchpad; the dock stays for content.
+    pinnedToDock: false,
     launchpad: true,
   },
   'file-explorer': {
     component: components['file-explorer'],
     icon: HardDrive,
     iconColor: 'sky',
-    defaultSize: { width: 750, height: 550 },
-    defaultPosition: { x: 180, y: 120 },
+    defaultSize: { width: 900, height: 620 },
+    defaultPosition: { x: 180, y: 90 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -170,8 +174,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['resume'],
     icon: ResumeIcon,
     iconColor: 'amber',
-    defaultSize: { width: 650, height: 550 },
-    defaultPosition: { x: 200, y: 130 },
+    defaultSize: { width: 880, height: 720 },
+    defaultPosition: { x: 200, y: 60 },
     pinnedToDock: true,
     launchpad: true,
   },
@@ -179,8 +183,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['changelog'],
     icon: ScrollText,
     iconColor: 'indigo',
-    defaultSize: { width: 600, height: 500 },
-    defaultPosition: { x: 250, y: 150 },
+    defaultSize: { width: 720, height: 620 },
+    defaultPosition: { x: 250, y: 100 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -188,8 +192,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['github-activity'],
     icon: Github,
     iconColor: 'green',
-    defaultSize: { width: 720, height: 600 },
-    defaultPosition: { x: 180, y: 110 },
+    defaultSize: { width: 880, height: 660 },
+    defaultPosition: { x: 180, y: 80 },
     pinnedToDock: true,
     launchpad: true,
   },
@@ -198,7 +202,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     icon: Compass,
     iconColor: 'sky',
     defaultSize: { width: 1040, height: 720 },
-    defaultPosition: { x: 160, y: 90 },
+    defaultPosition: { x: 160, y: 60 },
+    minSize: { width: 480, height: 360 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -206,8 +211,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['help'],
     icon: LifeBuoy,
     iconColor: 'amber',
-    defaultSize: { width: 760, height: 580 },
-    defaultPosition: { x: 200, y: 100 },
+    defaultSize: { width: 860, height: 640 },
+    defaultPosition: { x: 200, y: 80 },
     pinnedToDock: false,
     launchpad: true,
   },
@@ -215,12 +220,12 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     component: components['dev-ai'],
     icon: MessageSquare,
     iconColor: 'indigo',
-    defaultSize: { width: 420, height: 620 },
-    defaultPosition: { x: 320, y: 120 },
-    // Mobile-only surface: opened through the mobile AppView, never the
-    // desktop dock or Launchpad (the desktop assistant orb stays the desktop path).
+    defaultSize: { width: 560, height: 640 },
+    defaultPosition: { x: 320, y: 100 },
+    // A phone app and a desktop window. On desktop the assistant orb is the
+    // quick path; the Launchpad tile opens the same chat as a full window.
     pinnedToDock: false,
-    launchpad: false,
+    launchpad: true,
   },
 };
 

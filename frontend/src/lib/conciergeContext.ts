@@ -109,6 +109,30 @@ export function buildConciergeSystem(): string {
   return `${buildRules()}\n\n${buildExamples()}\n\n--- CONTEXT ---\n\n${buildGrounding()}`;
 }
 
+/**
+ * Visitor-facing copy that describes the concierge accurately. It is not
+ * trained or fine-tuned on anything: each request sends a system prompt built
+ * from the site's own data (buildGrounding: About Me, resume, project notes)
+ * to a general model. Chat surfaces (ChatPanel, DevAI) should use these
+ * strings so the claim stays true in one place.
+ */
+export const CONCIERGE_COPY = {
+  /** Header subtitle under "Devanshu  AI". */
+  subtitle: 'Answers from my resume and project notes',
+  /** Header subtitle while a reply is on its way. */
+  busy: 'Writing a reply',
+  /** Empty-state lede. */
+  lede: 'An AI that answers in the first person from my resume, project notes and About Me. It can get things wrong, so email me for anything important.',
+  /** Errors. Offline and rate-limited point to a human. */
+  offline: `The AI chat is offline. Email me at ${contactLinks.email} or send a message in Contact.`,
+  rateLimited: 'Too many questions right now. Try again in 30 seconds.',
+  error: "That answer didn't come through.",
+  /** Screen-reader label for the composer. */
+  composerLabel: "Message to Devanshu's AI",
+  /** Announced while waiting for the first token. */
+  thinking: 'Devanshu is writing a reply',
+} as const;
+
 /** Max characters accepted for a user question (cheap abuse guard). */
 export const MAX_QUERY_LENGTH = 500;
 

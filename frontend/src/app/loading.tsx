@@ -1,14 +1,12 @@
+/**
+ * Route loading state: a plain black screen with a hairline progress bar, so
+ * nothing flashes before the boot intro or the desktop paints.
+ */
 export default function Loading() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-600">
-      <div className="text-center">
-        <div className="text-white text-2xl font-bold mb-4 animate-pulse">
-          Loading Portfolio OS...
-        </div>
-        <div className="w-48 h-1 bg-white/20 rounded-full overflow-hidden mx-auto">
-          <div className="h-full bg-white/60 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" 
-               style={{ width: '40%' }} />
-        </div>
+    <div role="status" aria-label="Loading" className="fixed inset-0 bg-black">
+      <div className="absolute inset-x-0 top-0 h-px overflow-hidden">
+        <div className="h-full w-1/3 bg-white/40 animate-[loading_1.5s_ease-in-out_infinite]" />
       </div>
     </div>
   );

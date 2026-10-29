@@ -42,13 +42,13 @@ export default function ProjectsPage() {
           breadcrumbNode([{ name: 'Home', path: '/' }, { name: 'Projects', path: '/projects' }]),
         )}
       />
-      <h1 className="editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">Projects</h1>
+      <h1 className="font-display font-normal leading-[1.02] tracking-[-0.01em] text-text text-[clamp(2.5rem,8vw,4.5rem)]">Projects</h1>
       <p className="mt-4 text-[18px] text-text-secondary">What I shipped, with the numbers and the caveats.</p>
 
       <ol className="mt-12 flex flex-col">
         {keys.map(key => {
           const meta = projectMeta[key];
-          const top = meta.achievements.slice(0, 2);
+          const top = meta.achievements.slice(0, 3);
           return (
             <li key={key} className="py-8 border-t border-border flex flex-col gap-3">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -57,20 +57,35 @@ export default function ProjectsPage() {
                     {meta.displayName}
                   </Link>
                 </h2>
-                <MetaLabel className="text-text-secondary">{STATUS_LABEL[meta.status]}</MetaLabel>
+                <p className="flex flex-wrap items-baseline gap-x-3 text-[14px] text-text-secondary">
+                  {meta.role && <span className="text-text">{meta.role}</span>}
+                  <MetaLabel className="text-text-secondary">{STATUS_LABEL[meta.status]}</MetaLabel>
+                </p>
               </div>
               <p className="text-[16px]">{meta.tagline}</p>
-              <p className="text-[15px] leading-relaxed text-text-secondary">{projectDescription(meta, 320)}</p>
               {top.length > 0 && (
-                <ul className="flex flex-wrap gap-x-8 gap-y-2 text-[14px]">
+                <ul aria-label="Key results" className="flex flex-wrap gap-x-8 gap-y-2 text-[14px]">
                   {top.map(a => (
                     <li key={a.label}>
-                      <span className="font-medium">{a.metric}</span>{' '}
+                      <span className="font-medium tabular-nums">{a.metric}</span>{' '}
                       <span className="text-text-secondary">{a.label}</span>
                     </li>
                   ))}
                 </ul>
               )}
+              <p className="text-[15px] leading-relaxed text-text-secondary">{projectDescription(meta, 320)}</p>
+              <p className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px]">
+                {meta.liveUrl && (
+                  <a href={meta.liveUrl} className="font-medium underline underline-offset-4">
+                    {meta.liveLabel ?? 'Live site'}
+                  </a>
+                )}
+                {meta.repoUrl ? (
+                  <a href={meta.repoUrl} className="underline underline-offset-4">Source</a>
+                ) : (
+                  <span className="text-text-secondary">Code not public</span>
+                )}
+              </p>
             </li>
           );
         })}

@@ -11,6 +11,9 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <>
+      {/* Server-rendered marker: globals.css locks body scrolling only when it
+          is present, so the OS fills the screen and plain routes scroll. */}
+      <div data-os-root hidden />
       <JsonLd data={graph(websiteNode(), profilePageNode('/'))} />
       <DesktopHome />
       <HomeSummary />

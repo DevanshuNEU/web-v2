@@ -432,16 +432,16 @@ export default function MobilePreviewPage() {
           </div>
         </PhoneFrame>
         <p className="text-[12px] text-text-secondary mt-1 leading-relaxed px-1">
-          Badge variants: number (12, 3), capped (123 → "99+"), boolean dot
+          Badge variants: number (12, 3), capped (123 → &ldquo;99+&rdquo;), boolean dot
           (Music), none.
         </p>
       </Group>
 
       {/* MobileActionRow */}
-      <Group title="MobileActionRow — primary CTAs (Ping Me pattern)">
+      <Group title="MobileActionRow: primary CTAs (Contact pattern)">
         <PhoneFrame theme={theme}>
           <div className="px-4 py-6 flex flex-col gap-3">
-            <h1 className="text-[28px] font-bold text-text px-1">Ping Me</h1>
+            <h1 className="text-[28px] font-bold text-text px-1">Contact</h1>
             <p className="text-[15px] text-text-secondary px-1 mb-2">
               Reach out — I usually reply within a day.
             </p>

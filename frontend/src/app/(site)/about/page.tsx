@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import Section from '@/components/site/Section';
 import { identity, quickIntro, whatImAbout, opinions, specs, contactLinks } from '@/data/aboutMe';
 import { RESUME } from '@/data/resume';
@@ -20,40 +21,75 @@ export const metadata: Metadata = {
   openGraph: { type: 'profile', url: '/about', title: `About ${PERSON_NAME}`, description: DESCRIPTION },
 };
 
+// The one-click actions a recruiter landing from search came for. Same order
+// and wording as the OS About masthead.
+const LINKS = [
+  { href: '/resume.pdf', label: 'Resume (PDF)' },
+  { href: `mailto:${contactLinks.email}`, label: 'Email' },
+  { href: contactLinks.github, label: 'GitHub' },
+  { href: contactLinks.linkedin, label: 'LinkedIn' },
+];
+
 export default function AboutPage() {
   const featured = getFeaturedProjects().slice(0, 4);
   const writing = getAllPosts().slice(0, 3);
 
   return (
-    <article>
+    // 34rem keeps 17px body text near 66 characters a line (it ran 81).
+    <article className="max-w-[34rem]">
       <JsonLd data={graph(profilePageNode('/about'), breadcrumbNode([{ name: 'Home', path: '/' }, { name: 'About', path: '/about' }]))} />
-      <h1 className="editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">{PERSON_NAME}</h1>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-6">
+        <Image
+          src={identity.photo}
+          alt={PERSON_NAME}
+          width={96}
+          height={96}
+          priority
+          className="h-24 w-24 shrink-0 border border-border object-cover grayscale"
+        />
+        <div className="min-w-0">
+          <h1 className="editorial-hero text-text text-[clamp(2.5rem,4vw+1rem,4rem)] text-balance">{PERSON_NAME}</h1>
+        </div>
+      </div>
       <p className="mt-4 text-[18px] text-text-secondary">{identity.title}</p>
       <p className="mt-1 text-[15px] text-text-secondary">
-        {identity.location} · {identity.availability}
+        {identity.location}. {identity.availability}.
       </p>
+
+      <ul className="mt-6 flex flex-wrap gap-2" aria-label="Resume and contact">
+        {LINKS.map(l => (
+          <li key={l.label}>
+            <a
+              href={l.href}
+              className="inline-flex min-h-[44px] items-center border border-border px-4 text-[15px] text-text transition-colors hover:border-text"
+            >
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
 
       <div className="mt-10 flex flex-col gap-5 text-[17px] leading-relaxed">
         {quickIntro.map(p => <p key={p}>{p}</p>)}
       </div>
 
       <Section label="How I work">
-        <div className="flex flex-col gap-4 text-[16px] leading-relaxed text-text-secondary">
+        <div className="flex flex-col gap-4 text-[17px] leading-relaxed text-text">
           {whatImAbout.map(p => <p key={p}>{p}</p>)}
         </div>
       </Section>
 
       <Section label="Things I'll argue about">
-        <ul className="flex flex-col gap-3 text-[16px] leading-relaxed">
+        <ul className="flex flex-col gap-3 text-[17px] leading-relaxed">
           {opinions.map(o => <li key={o}>{o}</li>)}
         </ul>
       </Section>
 
-      <Section label="Spec sheet">
-        <dl className="grid grid-cols-[8rem_1fr] gap-x-6 gap-y-2 text-[15px]">
+      <Section label="At a glance">
+        <dl className="grid grid-cols-1 gap-y-1 text-[15px] sm:grid-cols-[8rem_1fr] sm:gap-x-6 sm:gap-y-2">
           {specs.map(s => (
             <div key={s.key} className="contents">
-              <dt className="text-text-secondary">{s.key}</dt>
+              <dt className="text-text-secondary max-sm:mt-2">{s.key}</dt>
               <dd className="font-mono">{s.value}</dd>
             </div>
           ))}
@@ -97,7 +133,12 @@ export default function AboutPage() {
           {RESUME.experience.map(e => (
             <li key={e.company + e.period}>
               <p className="font-medium">{e.role}</p>
-              <p className="text-text-secondary">{e.company} · {e.period} · {e.location}</p>
+              {/* Separate spans, no middots: a wrapped line never starts with a stray dot. */}
+              <p className="flex flex-wrap gap-x-4 text-text-secondary">
+                <span>{e.company}</span>
+                <span>{e.period}</span>
+                <span>{e.location}</span>
+              </p>
             </li>
           ))}
         </ul>
@@ -109,19 +150,17 @@ export default function AboutPage() {
           {RESUME.education.map(e => (
             <li key={e.institution}>
               <p className="font-medium">{e.degree}</p>
-              <p className="text-text-secondary">{e.institution} · {e.period}</p>
+              <p className="flex flex-wrap gap-x-4 text-text-secondary">
+                <span>{e.institution}</span>
+                <span>{e.period}</span>
+              </p>
             </li>
           ))}
         </ul>
       </Section>
 
-      <Section label="Contact">
-        <p className="text-[16px] leading-relaxed">
-          Email <a href={`mailto:${contactLinks.email}`} className="underline underline-offset-4">{contactLinks.email}</a>,
-          or find me on <a href={contactLinks.linkedin} className="underline underline-offset-4">LinkedIn</a> and{' '}
-          <a href={contactLinks.github} className="underline underline-offset-4">GitHub</a>.
-        </p>
-      </Section>
+      {/* No Contact section: the link row above and the site footer carry
+          email, GitHub and LinkedIn, so a third copy only repeated them. */}
     </article>
   );
 }

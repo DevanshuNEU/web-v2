@@ -16,13 +16,14 @@
 
 import { useEffect, useLayoutEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { useMobileStore } from '@/store/mobileStore';
+import { useMobileStore, isPhoneHistoryState, syncPhoneHistory } from '@/store/mobileStore';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
 import LockScreen from './LockScreen';
 import HomeScreen from './HomeScreen';
 import AppView from './AppView';
 import AssistantSheet from './AssistantSheet';
+import { useWallpaperTone } from './useWallpaperTone';
 import type { AppType } from '../../../../shared/types';
 
 const FIRST_VISIT_KEY = 'devos-first-visit';
@@ -33,6 +34,7 @@ export default function PhoneShell() {
   const syncLockWithSession = useMobileStore((s) => s.syncLockWithSession);
   const { wallpaper, mode } = useTheme();
   const mono = useIsMono();
+  const tone = useWallpaperTone();
 
   // The store's initial lock is read once at module load. If this tab booted
   // on the desktop and was then resized to mobile, skip the lock screen.
@@ -52,12 +54,16 @@ export default function PhoneShell() {
     }
   }, [locked, openApp]);
 
-  // System back (Android gesture/button, browser back) closes the open app
-  // instead of leaving the page. Pairs with the history.pushState wired up
-  // inside mobileStore.openApp / closeApp.
+  // System back (Android gesture/button, browser back, Safari's edge swipe)
+  // steps back one level instead of leaving the page. Landing on one of our
+  // entries means a drill-in was popped (MobilePushView handles that), so the
+  // app stays open; landing anywhere else closes it. Pairs with the
+  // history.pushState calls in mobileStore and MobilePushView.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
+      syncPhoneHistory(e.state);
+      if (isPhoneHistoryState(e.state)) return;
       const { openAppType, closeAppFromPopstate } = useMobileStore.getState();
       if (openAppType) closeAppFromPopstate();
     };
@@ -69,7 +75,7 @@ export default function PhoneShell() {
 
   return (
     <div
-      className={`fixed inset-0 overflow-hidden ${mode === 'dark' ? 'dark' : ''}`}
+      className={`fixed inset-0 overflow-hidden overscroll-none ${mode === 'dark' ? 'dark' : ''}`}
       style={{ height: '100dvh' }}
     >
       {/* Wallpaper layer — its own element so mono can grayscale it without
@@ -82,8 +88,11 @@ export default function PhoneShell() {
         }}
       />
 
-      {/* Subtle darkening overlay so icons/labels remain legible across wallpapers */}
-      <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+      {/* Subtle scrim so labels stay legible: darkens dark wallpapers under
+          white labels, lightens light ones under dark labels. */}
+      <div
+        className={`absolute inset-0 pointer-events-none ${tone === 'light' ? 'bg-white/20' : 'bg-black/15'}`}
+      />
 
       <HomeScreen onOpenApp={handleOpen} />
 

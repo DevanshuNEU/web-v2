@@ -29,3 +29,48 @@ export function registerDockIcon(appType: AppType, getter: RectGetter): () => vo
 export function getDockIconRect(appType: AppType): DOMRect | null {
   return registry.get(appType)?.() ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Launchpad (grid) button rect: the first-visit hint anchors to it.
+// ---------------------------------------------------------------------------
+
+let launchpadGetter: RectGetter | null = null;
+
+/** Register the dock's Launchpad button. Returns an unregister cleanup. */
+export function registerLaunchpadButton(getter: RectGetter): () => void {
+  launchpadGetter = getter;
+  return () => {
+    if (launchpadGetter === getter) launchpadGetter = null;
+  };
+}
+
+/** Current bounding rect of the Launchpad button, or null before the dock mounts. */
+export function getLaunchpadButtonRect(): DOMRect | null {
+  return launchpadGetter?.() ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Dock order: recruiter first. Pinned apps not listed keep registry order
+// after these.
+// ---------------------------------------------------------------------------
+
+export const DOCK_ORDER: AppType[] = [
+  'about-me',
+  'projects',
+  'resume',
+  'contact',
+  'github-activity',
+  'display-options',
+];
+
+/** Sort pinned apps into DOCK_ORDER without dropping any. */
+export function sortDockApps(apps: AppType[]): AppType[] {
+  const rank = (a: AppType) => {
+    const i = DOCK_ORDER.indexOf(a);
+    return i === -1 ? DOCK_ORDER.length : i;
+  };
+  return apps
+    .map((a, i) => ({ a, i }))
+    .sort((x, y) => rank(x.a) - rank(y.a) || x.i - y.i)
+    .map(({ a }) => a);
+}

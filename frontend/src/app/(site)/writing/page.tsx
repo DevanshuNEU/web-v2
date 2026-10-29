@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getAllPosts, formatPostDate } from '@/data/writing';
+import { getAllPosts, formatPostDate, readPostBody } from '@/data/writing';
+import { readingMinutes } from '@/lib/markdown';
 import { writingPath } from '@/lib/seoContent';
-import MetaLabel from '@/components/editorial/MetaLabel';
 import { PERSON_NAME, absoluteUrl } from '@/lib/site';
 import JsonLd from '@/components/seo/JsonLd';
 import { graph, breadcrumbNode, personRef } from '@/lib/structuredData';
@@ -21,7 +21,7 @@ export default function WritingPage() {
   const all = getAllPosts();
 
   return (
-    <article>
+    <article className="max-w-[34rem]">
       <JsonLd
         data={graph(
           {
@@ -48,15 +48,16 @@ export default function WritingPage() {
       <ol className="mt-12 flex flex-col">
         {all.map(post => (
           <li key={post.slug} className="py-8 border-t border-border flex flex-col gap-3">
-            <MetaLabel className="text-text-secondary">
+            <p className="flex flex-wrap gap-x-4 text-[14px] text-text-secondary">
               <time dateTime={post.datePublished}>{formatPostDate(post.datePublished)}</time>
-            </MetaLabel>
-            <h2 className="font-display text-[28px] leading-tight">
-              <Link href={writingPath(post.slug)} className="hover:underline underline-offset-4">
+              <span>{readingMinutes(readPostBody(post.slug))} min read</span>
+            </p>
+            <h2 className="font-display text-[clamp(1.5rem,1.1rem+1vw,1.75rem)] leading-tight text-balance">
+              <Link href={writingPath(post.slug)} className="underline decoration-transparent underline-offset-4 transition-colors hover:decoration-text">
                 {post.title}
               </Link>
             </h2>
-            <p className="text-[15px] leading-relaxed text-text-secondary">{post.description}</p>
+            <p className="text-[17px] leading-relaxed text-text-secondary">{post.description}</p>
           </li>
         ))}
       </ol>

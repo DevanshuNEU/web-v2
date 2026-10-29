@@ -16,10 +16,19 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  ContextMenuLabel,
 } from '@/components/ui/context-menu';
 import { useOSStore } from '@/store/osStore';
+import { useSpotlightStore } from '@/store/spotlightStore';
+import type { AppType } from '../../../../shared/types';
 import { useIsMono } from '@/hooks/usePalette';
+
+/** Each line says what it does, in the shell voice. */
+const ITEMS: { app: AppType; label: string }[] = [
+  { app: 'about-me', label: 'open About Me' },
+  { app: 'projects', label: 'open Projects' },
+  { app: 'resume', label: 'open Resume' },
+  { app: 'terminal', label: 'open Terminal' },
+];
 
 interface DesktopContextMenuProps {
   children: React.ReactNode;
@@ -27,14 +36,15 @@ interface DesktopContextMenuProps {
 
 const ITEM_BASE =
   'group relative flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 ' +
-  'font-mono text-[12.5px] text-text-secondary outline-none transition-colors duration-100 ' +
+  'font-mono text-[13px] text-text-secondary outline-none transition-colors duration-100 ' +
   'focus:text-text data-[highlighted]:text-text';
 
 /** The shell-prompt glyph that leads every command; brightens (or accents) on highlight. */
 function Prompt({ mono }: { mono: boolean }) {
   return (
     <span
-      className={`font-mono text-[12px] text-text-secondary/40 transition-colors duration-100 ${
+      aria-hidden
+      className={`font-mono text-[12px] text-text-secondary transition-colors duration-100 ${
         mono ? 'group-data-[highlighted]:text-text/70' : 'group-data-[highlighted]:text-accent'
       }`}
     >
@@ -49,8 +59,8 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
   const mono = useIsMono();
   const ITEM_CLASS = `${ITEM_BASE} ${
     mono
-      ? 'focus:bg-text/[0.07] data-[highlighted]:bg-text/[0.07]'
-      : 'focus:bg-accent/10 data-[highlighted]:bg-accent/10'
+      ? 'focus:bg-text/[0.12] data-[highlighted]:bg-text/[0.12]'
+      : 'focus:bg-accent/15 data-[highlighted]:bg-accent/15'
   }`;
 
   return (
@@ -58,65 +68,29 @@ export function DesktopContextMenu({ children }: DesktopContextMenuProps) {
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
 
       <ContextMenuContent
-        className="w-64 rounded-xl border border-border/60 bg-surface/80 p-1.5 font-mono shadow-2xl
+        className="w-64 rounded-xl border border-border/60 bg-surface/90 p-1.5 font-mono shadow-2xl
                    backdrop-blur-2xl duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]"
       >
-        {/* Flavour header — a shell comment, not clickable */}
-        <ContextMenuLabel className="select-none px-2.5 py-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.16em] text-text-secondary/40">
-          # right-click as a service
-        </ContextMenuLabel>
-
-        <ContextMenuSeparator className="my-1 bg-text/10" />
-
-        {/* Spotlight search shortcut — triggers the Cmd+K overlay */}
-        <ContextMenuItem
-          onClick={() => {
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
-          }}
-          className={ITEM_CLASS}
-        >
+        <ContextMenuItem onClick={() => useSpotlightStore.getState().open()} className={ITEM_CLASS}>
           <Prompt mono={mono} />
           <span className="flex-1">search devOS</span>
-          <kbd className="font-mono text-[10px] text-text-secondary/40">⌘K</kbd>
+          <kbd className="font-mono text-[11px] text-text-secondary">⌘K</kbd>
         </ContextMenuItem>
 
         <ContextMenuSeparator className="my-1 bg-text/10" />
 
-        <ContextMenuItem onClick={() => openWindow('about-me')} className={ITEM_CLASS}>
-          <Prompt mono={mono} />
-          <span>open ./about-me</span>
-        </ContextMenuItem>
-
-        <ContextMenuItem onClick={() => openWindow('file-explorer')} className={ITEM_CLASS}>
-          <Prompt mono={mono} />
-          <span>ls -la ~/projects</span>
-        </ContextMenuItem>
-
-        <ContextMenuItem onClick={() => openWindow('terminal')} className={ITEM_CLASS}>
-          <Prompt mono={mono} />
-          <span>open Terminal.app</span>
-        </ContextMenuItem>
+        {ITEMS.map(({ app, label }) => (
+          <ContextMenuItem key={app} onClick={() => openWindow(app)} className={ITEM_CLASS}>
+            <Prompt mono={mono} />
+            <span>{label}</span>
+          </ContextMenuItem>
+        ))}
 
         <ContextMenuSeparator className="my-1 bg-text/10" />
 
         <ContextMenuItem onClick={() => openWindow('display-options')} className={ITEM_CLASS}>
           <Prompt mono={mono} />
-          <span>theme --customize</span>
-        </ContextMenuItem>
-
-        <ContextMenuSeparator className="my-1 bg-text/10" />
-
-        <ContextMenuItem onClick={() => window.location.reload()} className={ITEM_CLASS}>
-          <Prompt mono={mono} />
-          <span>git pull .</span>
-        </ContextMenuItem>
-
-        <ContextMenuItem
-          disabled
-          className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-mono text-[12px] italic text-text-secondary/35 opacity-70 focus:bg-transparent data-[highlighted]:bg-transparent"
-        >
-          <span className="font-mono text-[12px] text-text-secondary/25">$</span>
-          <span>brew install good-vibes</span>
+          <span>change theme and wallpaper</span>
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

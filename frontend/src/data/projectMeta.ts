@@ -5,6 +5,7 @@
  * that can't be derived from the API alone. Keyed by repo name.
  */
 
+/** A measured result. `metric` is always a number or a count, never a word. */
 export interface Achievement {
   metric: string;
   label: string;
@@ -33,6 +34,11 @@ export interface ProjectMeta {
   liveLabel?: string;
   /** Public repo with the data behind the headline numbers (query sets, raw results). */
   researchUrl?: string;
+  /**
+   * Devanshu's role, as the resume PDF (public/resume.pdf) states it. Only set
+   * where the PDF says it; never guessed.
+   */
+  role?: string;
 }
 
 export const projectMeta: Record<string, ProjectMeta> = {
@@ -45,7 +51,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
     category: 'org',
     status: 'active',
     story: [
-      "OpenCodeIntel is a code-search platform for AI coding agents: a web app, a REST API and a 12-tool MCP server that give an agent real context on a codebase instead of letting it guess.",
       "Indexing parses each repo with tree-sitter into function-level chunks (Python and JavaScript grammars; TypeScript files go through the JavaScript one), embeds them and stores them in Pinecone. On the API and MCP search path, a query pulls the top 50 chunks by vector search, scores them with BM25, fuses the two rankings with reciprocal rank fusion and reranks the top 20 with Cohere rerank-v3.5. The research eval used a full BM25 index and Voyage rerank-2 instead. The public playground runs a lighter path: vector search with keyword and code-graph boosts, no model reranking. The MCP server speaks stdio for local agents and streamable HTTP for hosted Claude.ai connectors.",
       "On a 665-query research eval across 14 open-source codebases, retrieval hit 94% Hit@1, and a 98-run ablation isolated the reranker at +8.4 points. On the public playground, a cold search takes 641ms at the median and a cached repeat 242ms. One result went against me: rerankers trained on web text made code search worse. It stays in the research log.",
     ],
@@ -59,6 +64,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     repoUrl: 'https://github.com/OpenCodeIntel/opencodeintel',
     liveUrl: 'https://opencodeintel.com',
     researchUrl: 'https://github.com/OpenCodeIntel/retrieval-research',
+    role: 'Creator & maintainer, solo',
   },
 
   'overhear': {
@@ -82,6 +88,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
     ],
     extraTech: ['Next.js', 'TypeScript', 'Retell', 'Claude API', 'Postgres', 'Drizzle', 'PGlite', 'Vitest', 'Railway'],
     repoUrl: 'https://github.com/DevanshuNEU/overhear',
+    role: 'Creator',
   },
 
   'callbudget': {
@@ -101,12 +108,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '47%', label: 'Fewer calls to find, simulated', detail: '4.3 to 2.3 expected calls vs a shuffled baseline' },
       { metric: '10% to 0%', label: "False 'in stock' answers, simulated", detail: 'Self-consistency voting under a 25%-unreliable extractor' },
       { metric: '4', label: 'MCP tools', detail: 'predict, plan, eval and converse over FastMCP' },
-      { metric: 'Zero PHI', label: 'Real public inputs', detail: 'NPPES, RxNorm and FDA shortage data; synthetic outcomes' },
     ],
     extraTech: ['Python', 'scikit-learn', 'FastMCP', 'Pipecat', 'Deepgram', 'Cartesia', 'Optuna', 'DuckDB', 'Claude API'],
     repoUrl: 'https://github.com/DevanshuNEU/callbudget',
     liveUrl: 'https://www.loom.com/share/0231954a438c4b3ab011fd21f4f41bf2',
     liveLabel: 'Walkthrough',
+    role: 'Creator',
   },
 
   'lco': {
@@ -124,7 +131,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
     ],
     achievements: [
       { metric: '1,808', label: 'Vitest tests', detail: '63 files, 2.1s suite, plus Playwright e2e' },
-      { metric: 'Published', label: 'Chrome Web Store', detail: 'Chrome MV3, getsaar.com' },
       { metric: '0', label: 'Backend servers', detail: 'Usage data never leaves the browser' },
       { metric: '3', label: 'Extension contexts', detail: 'Page script, content script, service worker' },
     ],
@@ -148,7 +154,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
     achievements: [
       { metric: '20+', label: 'Releases on PyPI', detail: 'since February 2026' },
       { metric: '3', label: 'Context formats', detail: 'AGENTS.md, CLAUDE.md, .cursorrules' },
-      { metric: 'Python', label: 'Static analysis', detail: 'Stack, patterns and conventions from the code' },
     ],
     extraTech: ['Python', 'Static analysis', 'CLI', 'PyPI'],
     repoUrl: 'https://github.com/OpenCodeIntel/saar',
@@ -159,28 +164,25 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'web-v2': {
     slug: 'portfolio-os',
     displayName: 'Portfolio OS',
-    tagline: "You're looking at it right now",
+    tagline: 'This site: a desktop OS in a browser tab',
     descriptionOverride: "A desktop operating system in a browser tab: window manager, terminal and dock, built from scratch.",
     featured: true,
     category: 'meta',
     status: 'active',
     story: [
-      "This portfolio itself. A desktop OS in a browser tab, built with Next.js 15, React 19, Framer Motion and Zustand. Because a static page felt boring.",
+      "This portfolio itself. A desktop OS in a browser tab, built with Next.js 15, React 19, Framer Motion and Zustand.",
       "Boot sequence, draggable windows, a real terminal, dock magnification and an iOS-style phone shell on mobile, plus this very Projects app you're reading through.",
     ],
-    achievements: [
-      { metric: 'From scratch', label: 'Window manager', detail: 'Windows, terminal, dock and apps' },
-      { metric: 'Mobile', label: 'Phone shell', detail: 'iOS-style home screen and app library' },
-      { metric: 'Next.js 15', label: 'React 19', detail: 'TypeScript and Zustand throughout' },
-    ],
+    achievements: [],
     extraTech: ['Next.js 15', 'React 19', 'TypeScript', 'Framer Motion', 'Zustand', 'Tailwind CSS'],
     repoUrl: 'https://github.com/DevanshuNEU/web-v2',
+    liveUrl: 'https://www.devanshuchicholikar.com',
   },
 
   'financial-copilot': {
     slug: 'financial-copilot',
     displayName: 'Financial Copilot',
-    tagline: 'Because manual bookkeeping is so 2019',
+    tagline: 'AI expense tracker with category budgets and a daily safe-to-spend figure',
     descriptionOverride: "AI expense tracker with automatic categorization, category budgets, spending insights and a daily safe-to-spend figure.",
     featured: true,
     category: 'personal',
@@ -190,12 +192,7 @@ export const projectMeta: Record<string, ProjectMeta> = {
       "It also works out a daily safe-to-spend figure and compares each week with the last, so a bad week shows up before the month is gone.",
       "React 18 and TypeScript with Recharts on the front end; Supabase Edge Functions (Deno), Postgres and Supabase Auth behind it; deployed on Vercel.",
     ],
-    achievements: [
-      { metric: 'Auto', label: 'Expense categorization', detail: 'No manual tagging' },
-      { metric: 'Daily', label: 'Safe-to-spend figure', detail: 'Budgets tracked per category' },
-      { metric: 'AI', label: 'Spending insights', detail: 'Plus week-over-week comparisons' },
-      { metric: 'Edge', label: 'Serverless backend', detail: 'Supabase Edge Functions on Deno' },
-    ],
+    achievements: [],
     extraTech: ['React 18', 'TypeScript', 'Tailwind CSS', 'Recharts', 'Supabase', 'PostgreSQL', 'Vercel'],
     repoUrl: 'https://github.com/DevanshuNEU/financial-copilot',
   },
@@ -203,12 +200,12 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'SecureScale': {
     slug: 'securescale',
     displayName: 'SecureScale',
-    tagline: 'Infrastructure that actually stays up',
+    tagline: 'Multi-AZ AWS infrastructure as modular Terraform',
     featured: true,
     category: 'personal',
     status: 'completed',
     story: [
-      "You know what's harder than writing code? Making sure it stays running in production. SecureScale is a fully automated AWS infrastructure setup designed to not break at 3 AM.",
+      "SecureScale is a fully automated AWS infrastructure setup.",
       "The whole thing is Infrastructure as Code in modular Terraform: VPC, ALB, auto-scaling groups, RDS and S3 encrypted with KMS, across multiple availability zones, with least-privilege IAM, Packer-built AMIs, GitHub Actions and CloudWatch monitoring.",
       "Provisioning went from 2 hours to 10 minutes, cloud spend dropped 30%, and it held 99.9% uptime.",
     ],
@@ -216,7 +213,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
       { metric: '99.9%', label: 'Uptime', detail: 'Fault-tolerant multi-AZ design' },
       { metric: '2h to 10m', label: 'Environment provisioning', detail: 'Terraform, Packer and GitHub Actions' },
       { metric: '30%', label: 'Cloud spend cut', detail: 'Rightsizing and resource allocation' },
-      { metric: 'KMS + IAM', label: 'Defense in depth', detail: 'Least privilege, encryption, NAT isolation' },
     ],
     extraTech: ['AWS', 'Terraform', 'Packer', 'GitHub Actions', 'CloudWatch', 'Docker', 'PostgreSQL'],
   },
@@ -257,8 +253,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
     achievements: [
       { metric: '3', label: 'GCP services', detail: 'Cloud Run + Pub/Sub + Firestore' },
       { metric: '0', label: 'Servers managed', detail: 'Fully serverless architecture' },
-      { metric: 'PII', label: 'Automatic redaction', detail: 'Before anything is stored' },
-      { metric: 'Event-driven', label: 'Architecture', detail: 'Decoupled, resilient, scalable' },
     ],
     extraTech: ['Python', 'GCP Cloud Run', 'Pub/Sub', 'Firestore', 'Docker'],
     repoUrl: 'https://github.com/DevanshuNEU/mem-machines',
@@ -279,8 +273,6 @@ export const projectMeta: Record<string, ProjectMeta> = {
     achievements: [
       { metric: '4', label: 'Tools implemented', detail: 'list, get_spec, generate, upload with ToolResponse wrapping' },
       { metric: '13', label: 'Unit tests passing', detail: 'Schema validation, error handling, tool contracts' },
-      { metric: 'Hackathon', label: 'IBM ADK', detail: 'Built on IBM ADK and watsonx Orchestrate' },
-      { metric: 'Journey Success', label: 'Evaluation metric', detail: 'Tool-call + text-keyword matching' },
     ],
     extraTech: ['Python', 'IBM watsonx ADK', 'Pydantic', 'pytest', 'Groq/OpenAI LLMs'],
   },
@@ -288,18 +280,15 @@ export const projectMeta: Record<string, ProjectMeta> = {
   'campus-resources': {
     slug: 'campus-resources',
     displayName: 'Campus Resources',
-    tagline: 'Helping students find what they actually need',
+    tagline: 'Find the campus service you actually need',
     featured: false,
     category: 'personal',
     status: 'completed',
     story: [
-      "A clean, searchable directory of campus resources built to help students navigate the overwhelming maze of university services, tools, and support systems.",
+      "A clean, searchable directory of campus resources that cuts through the maze of services, tools, and support systems on campus.",
       "Deployed at campus-resources.vercel.app.",
     ],
-    achievements: [
-      { metric: 'Live', label: 'At campus-resources.vercel.app', detail: 'Deployed and accessible' },
-      { metric: 'Searchable', label: 'Resource directory', detail: 'Fast filtering and discovery' },
-    ],
+    achievements: [],
     extraTech: ['React', 'TypeScript', 'Tailwind CSS', 'Vite', 'Vercel'],
     repoUrl: 'https://github.com/DevanshuNEU/campus-resources',
     liveUrl: 'https://campus-resources.vercel.app',

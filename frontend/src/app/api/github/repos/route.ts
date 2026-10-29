@@ -15,7 +15,8 @@ export interface EnrichedRepo {
   stars: number;
   forks: number;
   topics: string[];
-  updatedAt: string;
+  /** Last GitHub update; null for projectMeta-only entries with no public repo. */
+  updatedAt: string | null;
   featured: boolean;
   category: 'personal' | 'org' | 'meta';
   status: 'active' | 'completed' | 'experimental';
@@ -98,7 +99,7 @@ export async function GET() {
           stars: 0,
           forks: 0,
           topics: meta.extraTech ?? [],
-          updatedAt: new Date().toISOString(),
+          updatedAt: null,
           featured: meta.featured,
           category: meta.category,
           status: meta.status,

@@ -58,7 +58,7 @@ export default function EditorialSection({
                 <span data-testid="editorial-section-number">{number}</span>
               )}
               {number !== undefined && eyebrow !== undefined && (
-                <span aria-hidden className="mx-2 opacity-50">
+                <span aria-hidden className="mx-2 text-text-tertiary">
                   /
                 </span>
               )}

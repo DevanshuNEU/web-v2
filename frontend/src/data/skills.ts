@@ -20,7 +20,11 @@ export interface Skill {
   level: 1 | 2 | 3 | 4 | 5;
   /** One-liner for the skill card */
   description: string;
-  /** IDs of skills that are prerequisites / closely related */
+  /**
+   * IDs of the skills this one is built on (React on TypeScript, Spring Boot
+   * on Java). Shown on the card as "Builds on ...". Leave empty when the link
+   * would only mean "used together".
+   */
   deps: string[];
 }
 
@@ -33,7 +37,7 @@ export const SKILLS: Skill[] = [
 
   // ── Frontend ─────────────────────────────────────────────────────────
   { id: 'react',      name: 'React / Next.js',  category: 'frontend', level: 5, description: 'App Router, RSC, Suspense, streaming. This portfolio runs on Next.js 15.', deps: ['ts'] },
-  { id: 'tailwind',   name: 'Tailwind CSS',     category: 'frontend', level: 5, description: 'Utility-first styling, custom design systems, dark mode.', deps: ['ts'] },
+  { id: 'tailwind',   name: 'Tailwind CSS',     category: 'frontend', level: 5, description: 'Utility-first styling, custom design systems, dark mode.', deps: [] },
   { id: 'framer',     name: 'Framer Motion',    category: 'frontend', level: 4, description: 'Spring physics, layout animations, gesture-driven UI.',  deps: ['react'] },
 
   // ── Backend ───────────────────────────────────────────────────────────
@@ -41,15 +45,15 @@ export const SKILLS: Skill[] = [
   { id: 'fastapi',    name: 'FastAPI',          category: 'backend',  level: 5, description: 'Async Python APIs. Primary backend for all AI/ML services. Pydantic schemas.', deps: ['python'] },
   { id: 'flask',      name: 'Flask',            category: 'backend',  level: 4, description: 'RESTful Python APIs, ML model serving, blueprint architecture.', deps: ['python'] },
   { id: 'postgres',   name: 'PostgreSQL',       category: 'backend',  level: 5, description: 'Schema design, indexing, full-text search, row-level security.', deps: ['sql'] },
-  { id: 'redis',      name: 'Redis',            category: 'backend',  level: 3, description: 'Caching layers, pub/sub messaging, session storage.',    deps: ['postgres'] },
+  { id: 'redis',      name: 'Redis',            category: 'backend',  level: 3, description: 'Caching layers, pub/sub messaging, session storage.',    deps: [] },
   { id: 'spring',     name: 'Spring Boot',      category: 'backend',  level: 4, description: 'Microservices, dependency injection, JPA/Hibernate.',    deps: ['java'] },
 
   // ── Cloud / DevOps ────────────────────────────────────────────────────
-  { id: 'aws',        name: 'AWS',              category: 'cloud',    level: 5, description: 'EC2, S3, Lambda, RDS, VPC, ALB, ASG, KMS, IAM. Production-grade multi-AZ architecture.', deps: ['node'] },
-  { id: 'gcp',        name: 'GCP',              category: 'cloud',    level: 4, description: 'Cloud Run, Pub/Sub, Firestore. Serverless, event-driven ingestion pipelines.', deps: ['python'] },
-  { id: 'docker',     name: 'Docker',           category: 'cloud',    level: 4, description: 'Multi-stage builds, Compose orchestration, optimised images.', deps: ['node'] },
+  { id: 'aws',        name: 'AWS',              category: 'cloud',    level: 5, description: 'EC2, S3, Lambda, RDS, VPC, ALB, ASG, KMS, IAM. Production-grade multi-AZ architecture.', deps: [] },
+  { id: 'gcp',        name: 'GCP',              category: 'cloud',    level: 4, description: 'Cloud Run, Pub/Sub, Firestore. Serverless, event-driven ingestion pipelines.', deps: [] },
+  { id: 'docker',     name: 'Docker',           category: 'cloud',    level: 4, description: 'Multi-stage builds, Compose orchestration, optimised images.', deps: [] },
   { id: 'k8s',        name: 'Kubernetes',       category: 'cloud',    level: 3, description: 'Deployments, services and rolling updates in coursework projects, plus occasional use at work.', deps: ['docker'] },
-  { id: 'terraform',  name: 'Terraform',        category: 'cloud',    level: 4, description: 'IaC for AWS. Modules, state management, remote backends. 99.9% uptime achieved.', deps: ['aws'] },
+  { id: 'terraform',  name: 'Terraform',        category: 'cloud',    level: 4, description: 'IaC for AWS: modules, remote state, reusable environments.', deps: ['aws'] },
   { id: 'cicd',       name: 'CI / CD',          category: 'cloud',    level: 4, description: 'GitHub Actions, automated testing, zero-downtime deploy pipelines.', deps: ['docker'] },
   { id: 'prometheus', name: 'Observability',    category: 'cloud',    level: 3, description: 'CloudWatch alarms and dashboards, Sentry error tracking.', deps: ['aws'] },
 
@@ -63,8 +67,8 @@ export const SKILLS: Skill[] = [
   { id: 'voice',      name: 'Voice Agents',     category: 'ai',       level: 4, description: 'Pipecat and Deepgram call agents (CallBudget) and Retell agents graded call by call (Overhear).', deps: ['python', 'llmeval'] },
 
   // ── Tools ─────────────────────────────────────────────────────────────
-  { id: 'git',        name: 'Git',              category: 'tool',     level: 5, description: 'Rebasing, bisect, worktrees, hooks. Git is muscle memory.', deps: ['ts'] },
-  { id: 'posthog',    name: 'PostHog',          category: 'tool',     level: 4, description: 'Product analytics, feature flags, session replay. Powers this portfolio.', deps: ['react'] },
+  { id: 'git',        name: 'Git',              category: 'tool',     level: 5, description: 'Rebase, bisect, worktrees, hooks.', deps: [] },
+  { id: 'posthog',    name: 'PostHog',          category: 'tool',     level: 4, description: 'Product analytics, feature flags, session replay. Powers this portfolio.', deps: [] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -85,7 +89,7 @@ export const CAT_LABEL: Record<SkillCategory, string> = {
   frontend: 'Frontend',
   backend:  'Backend',
   cloud:    'Cloud / DevOps',
-  ai:       'AI / ML Eng',
+  ai:       'AI / ML',
   tool:     'Tools',
 };
 

@@ -79,17 +79,23 @@ afterEach(() => {
 });
 
 describe('TerminalApp chrome', () => {
-  it('renders editorial chrome: a Terminal title label', () => {
+  it('has one intro line and no in-app header (the window title says Terminal)', () => {
     render(<TerminalApp />);
-    const labels = screen.getAllByTestId('meta-label');
-    expect(labels.some((el) => /terminal/i.test(el.textContent ?? ''))).toBe(true);
+    expect(screen.queryAllByTestId('meta-label')).toHaveLength(0);
+    expect(screen.queryByText(/devOS Terminal :: v2.0/)).toBeNull();
+  });
+
+  it('marks the output feed as a polite log', () => {
+    render(<TerminalApp />);
+    const log = screen.getByRole('log');
+    expect(log).toHaveAttribute('aria-live', 'polite');
   });
 
   it('renders the full boot greeting instantly under reduced motion', () => {
     mockReduced = true;
     render(<TerminalApp />);
     expect(
-      screen.getByText(/real terminal with a little soul/i),
+      screen.getByText(/type help to see commands/i),
     ).toBeInTheDocument();
   });
 
@@ -111,7 +117,7 @@ describe('TerminalApp command loop (must keep working)', () => {
       expect.stringContaining('help'),
       expect.objectContaining({ command: 'help' }),
     );
-    expect(screen.getByText(/devOS Terminal\s+:: help/)).toBeInTheDocument();
+    expect(screen.getByText(/^Commands$/)).toBeInTheDocument();
   });
 
   it('reports unknown commands without crashing the loop', () => {
@@ -119,18 +125,25 @@ describe('TerminalApp command loop (must keep working)', () => {
     type('definitely-not-a-command');
     enter();
     expect(
-      screen.getByText(/Command not found: definitely-not-a-command/),
+      screen.getByText(/definitely-not-a-command: command not found/),
     ).toBeInTheDocument();
+  });
+
+  it('suggests the closest command for a typo', () => {
+    render(<TerminalApp />);
+    type('abuot');
+    enter();
+    expect(screen.getByText(/abuot: command not found\. Did you mean about\?/)).toBeInTheDocument();
   });
 
   it('clear empties the feed', () => {
     render(<TerminalApp />);
     type('help');
     enter();
-    expect(screen.getByText(/devOS Terminal\s+:: help/)).toBeInTheDocument();
+    expect(screen.getByText(/^Commands$/)).toBeInTheDocument();
     type('clear');
     enter();
-    expect(screen.queryByText(/devOS Terminal\s+:: help/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Commands$/)).not.toBeInTheDocument();
   });
 
   it('open <app> dispatches openWindow on desktop', () => {
@@ -194,5 +207,64 @@ describe('TerminalApp easter egg + history', () => {
     expect(input().value).toBe('help');
     fireEvent.keyDown(input(), { key: 'ArrowDown' });
     expect(input().value).toBe('about');
+  });
+});
+
+describe('TerminalApp keyboard: no Tab trap (WCAG 2.1.2)', () => {
+  const tab = (shiftKey = false) => fireEvent.keyDown(input(), { key: 'Tab', shiftKey });
+
+  it('lets Tab through on an empty line', () => {
+    render(<TerminalApp />);
+    expect(tab()).toBe(true); // not default-prevented
+  });
+
+  it('never intercepts Shift+Tab', () => {
+    render(<TerminalApp />);
+    type('pro');
+    expect(tab(true)).toBe(true);
+  });
+
+  it('lets Tab through when there is nothing to complete', () => {
+    render(<TerminalApp />);
+    type('zzz');
+    expect(tab()).toBe(true);
+    type('projects');
+    expect(tab()).toBe(true);
+  });
+
+  it('completes a unique match and captures that Tab only', () => {
+    render(<TerminalApp />);
+    type('pro');
+    expect(tab()).toBe(false);
+    expect(input().value).toBe('projects');
+    expect(tab()).toBe(true);
+  });
+
+  it('on an ambiguous match shows the candidates instead of picking one', () => {
+    render(<TerminalApp />);
+    type('open s');
+    expect(tab()).toBe(false);
+    // "skills", "skill-tree", "settings" share only "s": cycling starts at
+    // the first and the candidate row stays up.
+    expect(input().value).toBe('open skills');
+    expect(screen.getByRole('button', { name: /settings/ })).toBeInTheDocument();
+    tab();
+    expect(input().value).toBe('open skill-tree');
+  });
+});
+
+describe('TerminalApp output', () => {
+  it('hides ASCII art from screen readers and reads a plain alt instead', () => {
+    render(<TerminalApp />);
+    type('cowsay hi');
+    enter();
+    expect(screen.getByText('A cow says: hi')).toHaveClass('sr-only');
+  });
+
+  it('open devai starts a chat instead of failing', () => {
+    render(<TerminalApp />);
+    type('open devai');
+    enter();
+    expect(openAssistant).toHaveBeenCalled();
   });
 });

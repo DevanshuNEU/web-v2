@@ -3,9 +3,11 @@
 /**
  * MobileNavBar — iOS-style top navigation bar.
  *
- * Three equal-basis regions: back button on the left, centered title,
- * optional right-action slot. Equal basis is what guarantees the title
- * stays optically centered even when back/right widths differ.
+ * Three regions: back button on the left, centered title, optional
+ * right-action slot. The side columns grow to their content and then share
+ * the leftover width equally, so the title stays centred when it fits and
+ * gets all the remaining width before it truncates (equal thirds cut
+ * "OpenCodeIntel" to "OpenCodeInt..." with free space beside it).
  *
  * Pure presentation: takes a title, a back callback, an optional right
  * slot. Owns no navigation state — the parent app drives the stack.
@@ -35,10 +37,10 @@ export default function MobileNavBar({
 }: MobileNavBarProps) {
   return (
     <header
-      className={`relative flex items-center h-11 px-2 select-none ${className}`}
+      className={`relative grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center h-11 px-2 select-none ${className}`}
     >
       {/* Left — back */}
-      <div className="flex-1 basis-0 flex items-center min-w-0">
+      <div className="flex items-center">
         {onBack && (
           <button
             type="button"
@@ -48,7 +50,7 @@ export default function MobileNavBar({
           >
             <ChevronLeft size={26} strokeWidth={2.2} />
             {backLabel && (
-              <span className="text-[16px] leading-none truncate max-w-[140px]">
+              <span className="text-[16px] leading-none truncate max-w-[96px]">
                 {backLabel}
               </span>
             )}
@@ -57,7 +59,7 @@ export default function MobileNavBar({
       </div>
 
       {/* Center — title (truncates before pushing the right slot) */}
-      <div className="flex-1 basis-0 flex items-center justify-center min-w-0 px-1">
+      <div className="flex items-center justify-center min-w-0 px-1">
         {typeof title === 'string' ? (
           <h1 className="text-[17px] font-semibold text-text truncate">
             {title}
@@ -68,7 +70,7 @@ export default function MobileNavBar({
       </div>
 
       {/* Right — action */}
-      <div className="flex-1 basis-0 flex items-center justify-end min-w-0">
+      <div className="flex items-center justify-end">
         {rightAction}
       </div>
     </header>

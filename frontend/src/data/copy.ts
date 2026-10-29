@@ -81,12 +81,12 @@ export const emptyStates = {
 
 export const notifications = {
   welcome: {
-    title: 'Welcome to devOS',
-    body: "Double-click an icon to get started. Or admire the wallpaper. Both are valid.",
+    title: "Welcome to Devanshu's desktop",
+    body: 'Click an icon on the left to start, or press ⌘K to search.',
   },
   idleNudge: {
-    title: 'Still here?',
-    body: 'Open the terminal. Type `hire devanshu`. See what happens.',
+    title: 'Short on time?',
+    body: 'Open Resume for the one-page version, or type hire devanshu in Terminal.',
   },
   terminalTip: {
     title: 'Psst.',
@@ -114,8 +114,8 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     description: 'Things I shipped',
   },
   'skills-dashboard': {
-    title: 'Skill Tree',
-    windowTitle: 'Skill Tree.app',
+    title: 'Skills',
+    windowTitle: 'Skills.app',
     description: 'What I build with, and how deep it goes',
   },
   'analytics': {
@@ -124,7 +124,7 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
     description: "What you did here. Transparent, I promise.",
   },
   'contact': {
-    title: 'Ping Me',
+    title: 'Contact',
     windowTitle: 'Contact.app',
     description: "Let's talk",
   },
@@ -181,19 +181,18 @@ export const appLabels: Record<string, { title: string; windowTitle: string; des
 };
 
 // ---------------------------------------------------------------------------
-// 404 / BSOD Copy
+// 404 Copy
 // ---------------------------------------------------------------------------
 
 export const bsodCopy = {
-  title: 'devOS has encountered a problem and needs to restart.',
-  errorCode: 'PORTFOLIO_PAGE_NOT_FOUND (0x00000404)',
-  description: 'The page you were looking for moved to a parallel universe.',
-  technicalInfo: 'If this keeps happening, try turning it off and on again. Or just go home.',
-  buttonText: 'Reboot to Desktop',
+  title: "This page doesn't exist.",
+  errorCode: '404',
+  description: 'The link may be old. Everything is still on the desktop.',
+  buttonText: 'Go to the desktop',
 };
 
 // ---------------------------------------------------------------------------
-// Skill Tree Quips
+// Skills Quips
 // ---------------------------------------------------------------------------
 
 export const skillQuips: Record<string, string> = {

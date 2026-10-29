@@ -9,11 +9,12 @@ import { useMobileStore } from '@/store/mobileStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
 import { useTerminalStore } from '@/store/terminalStore';
 import { useTheme } from '@/store/themeStore';
-import { useIsMono } from '@/hooks/usePalette';
-import { MetaLabel, Hairline } from '@/components/editorial';
+import { useIsMono, usePalette } from '@/hooks/usePalette';
 import {
   resolveCommand,
   getCompletions,
+  suggestCommand,
+  CONTACT,
   TERMINAL_SUGGESTIONS,
 } from '@/lib/terminalCommands';
 import { renderLine } from '@/lib/linkifyTerminal';
@@ -29,6 +30,8 @@ interface HistoryEntry {
   command?: string;       // undefined = welcome banner
   output: string[];
   special?: 'matrix' | 'hire';
+  /** ASCII-art output: lines are aria-hidden and this is read instead. */
+  alt?: string;
 }
 
 // Strong editorial ease-out, mirrored from STANDARDS.md / HireOutput's curve.
@@ -85,28 +88,25 @@ function HireOutput() {
 
   // In mono the whole hire payoff is white-on-black graphite: the check glyph
   // and "ACCESS GRANTED" still carry meaning by glyph + weight, not by green.
-  const cmd      = mono ? 'text-white/40'  : 'text-green-400/60';
+  // Every tier stays at or above 4.5:1 on black.
+  const cmd      = mono ? 'text-white/55'  : 'text-green-400/80';
   const check    = mono ? 'text-white'     : 'text-green-500';
-  const checkLbl = mono ? 'text-white/50'  : 'text-green-400/50';
+  const checkLbl = mono ? 'text-white/60'  : 'text-green-400/80';
   const checkVal = mono ? 'text-white/80'  : 'text-green-300/80';
   const cardBox  = mono ? 'border-white/20 bg-white/[0.04]' : 'border-green-500/30 bg-green-500/5';
   const grant    = mono ? 'text-white'     : 'text-green-400';
-  const sigil    = mono ? 'text-white/40'  : 'text-green-600/60';
+  const sigil    = mono ? 'text-white/55'  : 'text-green-500/80';
   const link     = mono ? 'text-white underline-offset-2' : 'text-blue-400';
-  const footer   = mono ? 'text-white/50'  : 'text-green-400/60';
+  const footer   = mono ? 'text-white/60'  : 'text-green-400/80';
 
   useEffect(() => {
-    // Reveal each check line 150ms apart
-    HIRE_CHECKS.forEach((_, i) => {
-      const t = setTimeout(() => setVisibleChecks(i + 1), i * 150);
-      return () => clearTimeout(t);
-    });
-    // Show contact block after all checks complete + a short pause
-    const contactTimer = setTimeout(
-      () => setShowContact(true),
-      HIRE_CHECKS.length * 150 + 300
+    // Reveal each check line 150ms apart, then the contact block after a
+    // short pause. Every timer is cleared on unmount.
+    const timers = HIRE_CHECKS.map((_, i) =>
+      setTimeout(() => setVisibleChecks(i + 1), i * 150)
     );
-    return () => clearTimeout(contactTimer);
+    timers.push(setTimeout(() => setShowContact(true), HIRE_CHECKS.length * 150 + 300));
+    return () => timers.forEach(clearTimeout);
   }, []);
 
   return (
@@ -145,32 +145,32 @@ function HireOutput() {
               <div>
                 <span className={`${sigil} mr-3 inline-block w-6`}>@</span>
                 <a
-                  href="mailto:chicholikar.d@northeastern.edu"
+                  href={`mailto:${CONTACT.email}`}
                   className={`${link} hover:underline`}
                 >
-                  chicholikar.d@northeastern.edu
+                  {CONTACT.email}
                 </a>
               </div>
               <div>
                 <span className={`${sigil} mr-3 inline-block w-6`}>in</span>
                 <a
-                  href="https://linkedin.com/in/devanshuchicholikar"
+                  href={`https://${CONTACT.linkedin}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${link} hover:underline`}
                 >
-                  linkedin.com/in/devanshuchicholikar
+                  {CONTACT.linkedin}
                 </a>
               </div>
               <div>
                 <span className={`${sigil} mr-3 inline-block w-6`}>{'{}'}</span>
                 <a
-                  href="https://github.com/DevanshuNEU"
+                  href={`https://${CONTACT.github}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${link} hover:underline`}
                 >
-                  github.com/DevanshuNEU
+                  {CONTACT.github}
                 </a>
               </div>
             </div>
@@ -195,9 +195,9 @@ function HireOutput() {
 // or the parser.
 // ---------------------------------------------------------------------------
 
-const BOOT_GREETING = "Welcome. You've reached a real terminal with a little soul.";
+const BOOT_GREETING = 'Type help to see commands. Try: hire devanshu';
 
-function BootGreeting({ reduced }: { reduced: boolean | null }) {
+function BootGreeting({ reduced, mono }: { reduced: boolean | null; mono: boolean }) {
   const [count, setCount] = useState(reduced ? BOOT_GREETING.length : 0);
 
   useEffect(() => {
@@ -217,8 +217,8 @@ function BootGreeting({ reduced }: { reduced: boolean | null }) {
   const typing = !reduced && count < BOOT_GREETING.length;
 
   return (
-    <p className="text-white/70 leading-snug mb-3">
-      <span aria-hidden className="text-white/40 mr-2">&#9656;</span>
+    <p className={`leading-snug mb-3 ${mono ? 'text-white/70' : 'text-green-400/80'}`}>
+      <span aria-hidden className={`mr-2 ${mono ? 'text-white/55' : 'text-green-500'}`}>&#9656;</span>
       {BOOT_GREETING.slice(0, count)}
       {typing && (
         <span aria-hidden className="terminal-caret inline-block">&#9608;</span>
@@ -248,15 +248,33 @@ function inkClass(line: string, mono: boolean): string {
   return 'text-white/70';
 }
 
-function OutputLine({ line, mono }: { line: string; mono: boolean }) {
-  const isBox = BOX_GLYPHS.test(line);
-  // Box-drawing lines scroll horizontally so they never reflow or clip on
-  // mobile; prose lines keep the default flow.
+/**
+ * Width (in characters) of a line's hanging indent: the leading spaces plus,
+ * for two-column rows ("  Languages     TypeScript ..."), the key column. A
+ * wrapped description then lines up under itself instead of column 0.
+ */
+export function hangingIndent(line: string): number {
+  const col = /^(\s*(?:->\s+)?\S+(?: \S+)*\s{2,})(?=\S)/.exec(line);
+  if (col) return col[1].length;
+  return /^\s*/.exec(line)?.[0].length ?? 0;
+}
+
+function OutputLine({ line, mono, art }: { line: string; mono: boolean; art?: boolean }) {
+  // Box-drawing and ASCII-art lines keep their exact spacing and scroll
+  // sideways on their own; everything else wraps with a hanging indent so a
+  // narrow window never scrolls the whole feed.
+  if (art || BOX_GLYPHS.test(line)) {
+    return (
+      <div className={`whitespace-pre leading-snug overflow-x-auto ${inkClass(line, mono)}`}>
+        {renderLine(line, mono)}
+      </div>
+    );
+  }
+  const indent = hangingIndent(line);
   return (
     <div
-      className={`whitespace-pre leading-snug ${inkClass(line, mono)} ${
-        isBox ? 'overflow-x-auto' : ''
-      }`}
+      className={`whitespace-pre-wrap break-words leading-snug ${inkClass(line, mono)}`}
+      style={indent ? { paddingLeft: `${indent}ch`, textIndent: `-${indent}ch` } : undefined}
     >
       {renderLine(line, mono)}
     </div>
@@ -333,7 +351,7 @@ function HistoryBlock({
           type="button"
           onClick={copy}
           aria-label="Copy output"
-          className="terminal-copy absolute right-0 top-0 z-10 hidden p-1 text-white/30 transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none"
+          className="terminal-copy absolute right-0 top-0 z-10 p-1 text-white/55 opacity-0 [@media(hover:none)]:hidden transition-[color,opacity] duration-150 hover:text-white/80 focus-visible:opacity-100 focus-visible:text-white/80"
         >
           {copied ? <Check size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
         </button>
@@ -342,11 +360,11 @@ function HistoryBlock({
       {entry.command !== undefined &&
         rowMotion(
           <div className="flex gap-2 mb-1">
-            <span aria-hidden className={mono ? 'text-white/35' : 'text-green-500/60'}>&#9656;</span>
+            <span aria-hidden className={mono ? 'text-white/55' : 'text-green-500'}>&#9656;</span>
             <span className={promptUser}>devanshu</span>
-            <span className="text-white/30">@</span>
+            <span className="text-white/55">@</span>
             <span className={promptHost}>devOS</span>
-            <span className="text-white/30">~$</span>
+            <span className="text-white/55">~$</span>
             <span className={`${promptCmd} ml-1`}>{entry.command}</span>
           </div>,
           'cmd'
@@ -356,9 +374,21 @@ function HistoryBlock({
       {entry.special === 'matrix' && <MatrixRain onDone={onMatrixDone} />}
       {entry.special === 'hire' && <HireOutput />}
 
-      {/* Plain text output, linkified + ink-ramped */}
-      {entry.output.map((line, i) =>
-        rowMotion(<OutputLine line={line} mono={mono} />, `out-${i}`)
+      {/* Plain text output, linkified + ink-ramped. ASCII art is hidden
+          from screen readers, which get the plain-text alt instead. */}
+      {entry.alt ? (
+        <>
+          <div aria-hidden>
+            {entry.output.map((line, i) =>
+              rowMotion(<OutputLine line={line} mono={mono} art />, `out-${i}`)
+            )}
+          </div>
+          <p className="sr-only">{entry.alt}</p>
+        </>
+      ) : (
+        entry.output.map((line, i) =>
+          rowMotion(<OutputLine line={line} mono={mono} />, `out-${i}`)
+        )
       )}
     </div>
   );
@@ -379,6 +409,12 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const setPendingCommand = useTerminalStore(s => s.setPendingCommand);
   const { mode, toggleMode } = useTheme();
   const mono = useIsMono();
+  const palette = usePalette();
+  // Whether this terminal's window is maximized: maximize / restore blurs the
+  // input, so focus is handed back when it changes.
+  const maximized = useOSStore(
+    (s) => s.windows?.some((w) => w.appType === 'terminal' && w.isOpen && w.isMaximized) ?? false,
+  );
   const reduced = useReducedMotion();
 
   // Fun keeps the colored shell prompt; mono is foreground-on-black graphite,
@@ -402,16 +438,8 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
     }
   }, [variant, openApp, openWindow]);
 
-  const [history, setHistory] = useState<HistoryEntry[]>([
-    {
-      id: nextId++,
-      output: [
-        'devOS Terminal :: v2.0',
-        "Type 'help' for available commands.",
-        '',
-      ],
-    },
-  ]);
+  // The boot greeting is the only intro; the feed starts empty.
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [input, setInput] = useState('');
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
@@ -422,8 +450,11 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tab-cycle cursor: -1 = not cycling; >=0 indexes into the candidate pool.
+  // Tab-cycle state: idx -1 = not cycling. While cycling, `pool` and `head`
+  // hold the candidates and the text before the token being completed, so
+  // each Tab steps through the same list even though `input` has changed.
   const tabIdx = useRef(-1);
+  const cycle = useRef<{ head: string; pool: string[] } | null>(null);
   // The id of the newest block, so only it animates its entrance.
   const latestId = useRef<number>(-1);
 
@@ -447,15 +478,22 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
   // lifecycle; reference it so the lint stays quiet without changing behavior.
   void matrixDone;
 
+  const resetCycle = () => {
+    tabIdx.current = -1;
+    cycle.current = null;
+  };
+
   const clearScreen = useCallback(() => {
     setHistory([]);
     setInput('');
     tabIdx.current = -1;
+    cycle.current = null;
   }, []);
 
   const handleCommand = useCallback((raw: string) => {
     const trimmed = raw.trim();
     tabIdx.current = -1;
+    cycle.current = null;
     if (!trimmed) return;
 
     trackEvent('terminal_command', `Terminal: ${trimmed}`, { command: trimmed.split(' ')[0] });
@@ -479,22 +517,28 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
         {
           id,
           command: trimmed,
-          output: [
-            `Command not found: ${trimmed.split(' ')[0]}`,
-            "Type 'help' for available commands.",
-            '',
-          ],
+          output: (() => {
+            const word = trimmed.split(/\s+/)[0];
+            const guess = suggestCommand(word);
+            return [
+              guess ? `${word}: command not found. Did you mean ${guess}?` : `${word}: command not found.`,
+              'Type help for the full list.',
+              '',
+            ];
+          })(),
         },
       ]);
       setInput('');
       return;
     }
 
-    const ctx = { openWindow: openWindowOrApp, toggleTheme: toggleMode, currentTheme: mode };
+    const ctx = { openWindow: openWindowOrApp, toggleTheme: toggleMode, currentTheme: mode, palette };
     const result = resolved.handler(resolved.args, ctx);
 
     if (Array.isArray(result)) {
       setHistory(prev => [...prev, { id, command: trimmed, output: result }]);
+    } else if (result.type === 'art') {
+      setHistory(prev => [...prev, { id, command: trimmed, output: result.lines, alt: result.alt }]);
     } else if (result.type === 'action') {
       if (result.action === 'openWindow') openWindowOrApp(result.payload as string);
       if (result.action === 'openAssistant') openAssistant(result.payload);
@@ -509,7 +553,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
     }
 
     setInput('');
-  }, [trackEvent, openWindowOrApp, openAssistant, toggleMode, mode]);
+  }, [trackEvent, openWindowOrApp, openAssistant, toggleMode, mode, palette]);
 
   // Consume a Spotlight / App Library "command" handoff: if a command was
   // stashed in terminalStore before this mount (e.g. "hire devanshu"), run it
@@ -556,6 +600,7 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
     if (!ghost) return;
     setInput((prev) => prev + ghost);
     tabIdx.current = -1;
+    cycle.current = null;
     markTyping();
     inputRef.current?.focus();
   }, [ghost, markTyping]);
@@ -580,10 +625,13 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
       return;
     }
 
-    if (e.key === 'Escape') {
+    // Esc clears a typed line. On an empty line it does nothing here (the
+    // window-level Esc ignores text fields).
+    if (e.key === 'Escape' && input !== '') {
       e.preventDefault();
+      e.stopPropagation();
       setInput('');
-      tabIdx.current = -1;
+      resetCycle();
       return;
     }
 
@@ -594,33 +642,55 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
       return;
     }
 
+    // Tab completes only when there is something to complete. Shift+Tab, Tab
+    // on an empty line, and Tab with nothing left to fill all fall through to
+    // the browser, so keyboard focus can always leave the terminal (no
+    // keyboard trap, WCAG 2.1.2).
     if (e.key === 'Tab') {
-      e.preventDefault();
-      // Accept the inline ghost first, unless we're already mid-cycle.
-      if (ghost && tabIdx.current < 0) {
+      if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || input.trim() === '') return;
+
+      // Mid-cycle: step through the same candidate list.
+      if (cycle.current && tabIdx.current >= 0) {
+        e.preventDefault();
+        const { head, pool } = cycle.current;
+        tabIdx.current = (tabIdx.current + 1) % pool.length;
+        setInput(head + pool[tabIdx.current]);
+        markTyping();
+        return;
+      }
+
+      const { candidates, commonPrefix } = completions;
+      const head = input.slice(0, input.length - currentToken.length);
+
+      // Ambiguous (bash-style): fill the common prefix first; if that adds
+      // nothing, start cycling. The candidate row shows the options.
+      if (candidates.length > 1) {
+        e.preventDefault();
+        if (commonPrefix.length > currentToken.length) {
+          setInput(head + commonPrefix);
+        } else {
+          cycle.current = { head, pool: candidates };
+          tabIdx.current = 0;
+          setInput(head + candidates[0]);
+        }
+        markTyping();
+        return;
+      }
+
+      // One answer: the inline ghost (history or registry) or the single
+      // candidate.
+      if (ghost) {
+        e.preventDefault();
         acceptGhost();
         return;
       }
-      const { candidates, commonPrefix } = completions;
-      if (candidates.length === 0) return;
-      // First Tab fills the common prefix when it extends the current token.
-      if (tabIdx.current < 0 && commonPrefix.length > currentToken.length) {
-        const head = input.slice(0, input.length - currentToken.length);
-        setInput(head + commonPrefix);
+      if (candidates.length === 1 && candidates[0] !== currentToken) {
+        e.preventDefault();
+        setInput(head + candidates[0]);
         markTyping();
         return;
       }
-      // Otherwise cycle through the candidate pool.
-      if (candidates.length > 1) {
-        tabIdx.current = (tabIdx.current + 1) % candidates.length;
-        const head = input.slice(0, input.length - currentToken.length);
-        setInput(head + candidates[tabIdx.current]);
-        markTyping();
-      } else if (candidates.length === 1) {
-        const head = input.slice(0, input.length - currentToken.length);
-        setInput(head + candidates[0]);
-        markTyping();
-      }
+      // Nothing to complete: let Tab move focus.
       return;
     }
 
@@ -629,28 +699,39 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
       const newIdx = Math.min(historyIdx + 1, cmdHistory.length - 1);
       setHistoryIdx(newIdx);
       setInput(cmdHistory[newIdx] ?? '');
-      tabIdx.current = -1;
+      resetCycle();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const newIdx = Math.max(historyIdx - 1, -1);
       setHistoryIdx(newIdx);
       setInput(newIdx === -1 ? '' : cmdHistory[newIdx] ?? '');
-      tabIdx.current = -1;
+      resetCycle();
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
-    tabIdx.current = -1;
+    resetCycle();
     markTyping();
   };
+
+  // Maximize / restore blurs the input (the click lands on the title bar), so
+  // hand focus back and the next keystroke is not lost.
+  const firstMaxRender = useRef(true);
+  useEffect(() => {
+    if (firstMaxRender.current) { firstMaxRender.current = false; return; }
+    const t = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
+    return () => clearTimeout(t);
+  }, [maximized]);
 
   // The block caret blinks only while focused and idle. It goes steady while
   // typing (so it doesn't strobe under fast input) and under reduced motion.
   const caretSteady = reduced || !focused || typing;
 
   // Candidate row only when there's a real ambiguity to disambiguate.
-  const showCandidates = input.trim() !== '' && completions.candidates.length > 1;
+  // While Tab-cycling, keep showing the pool being cycled through.
+  const candidateList = cycle.current?.pool ?? completions.candidates;
+  const showCandidates = input.trim() !== '' && candidateList.length > 1;
 
   return (
     <div
@@ -675,37 +756,16 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
           .terminal-caret { animation: none; opacity: 1; }
         }
         @media (hover: hover) and (pointer: fine) {
-          .group:hover .terminal-copy { display: inline-flex; }
+          .group:hover .terminal-copy { opacity: 1; }
         }
       `}</style>
 
-      {/* ── Window chrome (editorial register) ──────────────────────────────
-          A MetaLabel title with a status dot that brightens on focus, plus a
-          right-aligned version meta. The body below stays a true terminal. */}
-      <div className="flex items-center gap-3 px-5 pt-3.5 pb-3 shrink-0">
-        <MetaLabel
-          className="text-white"
-          glyph={
-            <span
-              aria-hidden
-              className={`block h-2 w-2 transition-opacity duration-[120ms] ${
-                focused ? 'bg-white' : 'bg-white/30'
-              }`}
-            />
-          }
-        >
-          Terminal
-        </MetaLabel>
-        <span aria-hidden className="font-mono-meta text-white/30">&middot;</span>
-        <MetaLabel className="text-white/45">type help</MetaLabel>
-        <MetaLabel className="ml-auto text-white/30">v2.0</MetaLabel>
-      </div>
-      <Hairline className="border-white/15 shrink-0" />
+      <div ref={scrollRef} className={`flex-1 overflow-y-auto overflow-x-hidden select-text p-5 space-y-4 ${feedText}`}>
+        {/* Typed boot greeting (chrome, mount-based, reduced-motion safe). */}
+        <BootGreeting reduced={reduced} mono={mono} />
 
-      <div ref={scrollRef} className={`flex-1 overflow-auto select-text p-5 space-y-4 ${feedText}`}>
-        {/* Warm typed boot greeting (chrome, mount-based, reduced-motion safe). */}
-        <BootGreeting reduced={reduced} />
-
+        {/* The feed is a log: new output is announced politely, once. */}
+        <div role="log" aria-live="polite" aria-relevant="additions" aria-label="Terminal output" className="space-y-4">
         {history.map((entry) => (
           <HistoryBlock
             key={entry.id}
@@ -719,17 +779,22 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
             promptCmd={promptCmd}
           />
         ))}
+        </div>
 
         {/* ── Live input line ──────────────────────────────────────────────
             ONE inline run: visible typed text + an inline block caret + an
             inline ghost SUFFIX, with a transparent content-width <input> on
             top driving state. No ch-math, no inset-0, no focus ring. */}
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-2">
-          <span aria-hidden className={mono ? 'text-white/60' : 'text-green-500/60'}>&#9656;</span>
+        <div
+          className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-2 transition-opacity duration-150 ${
+            focused ? '' : 'opacity-70'
+          }`}
+        >
+          <span aria-hidden className={mono ? 'text-white/60' : 'text-green-500'}>&#9656;</span>
           <span className={promptUser}>devanshu</span>
-          <span className="text-white/30">@</span>
+          <span className="text-white/55">@</span>
           <span className={promptHost}>devOS</span>
-          <span className="text-white/30">~$</span>
+          <span className="text-white/55">~$</span>
 
           <span
             className="relative inline-flex items-baseline ml-1 leading-none"
@@ -738,16 +803,27 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
             {/* Visible typed text (the source of truth is `input`). */}
             <span className={`whitespace-pre ${inputText.split(' ')[0]}`}>{input}</span>
 
-            {/* Inline block caret — sits right after the typed text, so it can
-                never collide with the ghost (which follows it). */}
-            <span
-              aria-hidden
-              className={`terminal-caret inline-block ${caretSteady ? 'is-steady' : ''} ${
-                mono ? 'text-white' : 'text-green-400'
-              }`}
-            >
-              &#9608;
-            </span>
+            {/* Inline block caret, right after the typed text so it never
+                collides with the ghost. Unfocused, it becomes a hollow outline
+                so you can tell typing will not land. */}
+            {focused ? (
+              <span
+                aria-hidden
+                className={`terminal-caret inline-block ${caretSteady ? 'is-steady' : ''} ${
+                  mono ? 'text-white' : 'text-green-400'
+                }`}
+              >
+                &#9608;
+              </span>
+            ) : (
+              <span
+                aria-hidden
+                data-testid="terminal-caret-blurred"
+                className={`inline-block h-[1.1em] w-[0.6em] translate-y-[0.15em] border ${
+                  mono ? 'border-white/70' : 'border-green-400/80'
+                }`}
+              />
+            )}
 
             {/* Inline ghost SUFFIX (completion remainder) OR the empty hint.
                 Tapping it accepts the completion (mobile-friendly). */}
@@ -755,13 +831,13 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
               <span
                 aria-hidden
                 onClick={acceptGhost}
-                className="whitespace-pre text-white/25 cursor-pointer"
+                className="whitespace-pre text-white/50 cursor-pointer"
               >
                 {ghost}
               </span>
             ) : (
               input === '' && (
-                <span aria-hidden className="whitespace-pre text-white/25">
+                <span aria-hidden className="whitespace-pre text-white/50">
                   {`try: ${emptyHintRef.current}`}
                 </span>
               )
@@ -793,8 +869,8 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
         {/* Candidate row — compact, borderless, monochrome. Each entry is
             tappable (mobile) and applies the completion on click. */}
         {showCandidates && (
-          <div className="flex flex-wrap gap-x-3 gap-y-1 -mt-2 pl-6 font-mono-meta">
-            {completions.candidates.map((cand) => {
+          <div className="flex flex-wrap gap-x-4 gap-y-1 -mt-2 pl-6 font-mono">
+            {candidateList.map((cand) => {
               const matched = cand.slice(0, currentToken.length);
               const rest = cand.slice(currentToken.length);
               return (
@@ -804,14 +880,14 @@ export default function TerminalApp({ variant }: { variant?: 'desktop' | 'mobile
                   onClick={() => {
                     const head = input.slice(0, input.length - currentToken.length);
                     setInput(head + cand);
-                    tabIdx.current = -1;
+                    resetCycle();
                     markTyping();
                     inputRef.current?.focus();
                   }}
                   className="whitespace-pre text-left transition-colors duration-150"
                 >
                   <span className="text-white/90">{matched}</span>
-                  <span className="text-white/50">{rest}</span>
+                  <span className="text-white/60">{rest}</span>
                 </button>
               );
             })}

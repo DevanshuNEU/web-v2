@@ -11,7 +11,7 @@
  *  - Can be a link (`href`) or a button (`onClick`)
  *
  * Use when the action is the *point* of the screen, not one option among
- * many. A column of these on Ping Me is the canonical example.
+ * many. A column of these on Contact is the canonical example.
  */
 
 import React from 'react';

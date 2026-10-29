@@ -4,19 +4,21 @@
  * AppSwitcher — macOS Cmd+Tab style window switcher overlay.
  *
  * Shortcut: Alt+Tab / Alt+Shift+Tab  (cycle forward / backward)
+ *           Ctrl+` / Ctrl+Shift+`    (same, for Windows/Linux where the OS owns Alt+Tab)
  *
  * Why Alt instead of Cmd?
  *   macOS intercepts Cmd+Tab at the OS level before the browser receives it.
  *   Alt+Tab (Option+Tab on Mac) is NOT intercepted by macOS, and Chrome on
  *   Mac has no default binding for it — so the browser always gets the event.
- *   On Windows, Alt+Tab IS intercepted by the OS; the switcher simply won't
- *   trigger there, which is acceptable (the portfolio targets Mac/desktop).
+ *   On Windows, Alt+Tab IS intercepted by the OS, so Ctrl+` opens it there.
  *
  * UX:
  *   - Pressing Alt+Tab while no apps are open: no-op.
  *   - With 1 app open: selects desktop (closes overlay, clears active window).
  *   - With 2+ apps: frosted glass pill shows app icons; cycling is instant.
- *   - Releasing Alt: overlay closes and focus moves to the selected app.
+ *   - Order is most recently used (window z-order), Desktop last, and the
+ *     selection starts on the previous window, like Cmd+Tab.
+ *   - Releasing the modifier: overlay closes and focus moves to the selected app.
  *   - Escape while open: closes overlay, no focus change.
  *
  * The switcher manages its own keydown/keyup listeners and is self-contained
@@ -27,6 +29,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
+import { useEscapeLayer } from '@/lib/escapeStack';
+import { Z } from '@/lib/zLayers';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
 import AppIcon from '@/components/os/AppIcon';
 import type { AppType } from '../../../../shared/types';
@@ -96,29 +100,42 @@ export default function AppSwitcher() {
   const [isOpen,   setIsOpen]   = useState(false);
   const [selIdx,   setSelIdx]   = useState(0);
   const entriesRef = useRef<SwitcherEntry[]>([]);
+  const heldKeyRef = useRef<'Alt' | 'Control'>('Alt');
 
-  // Build the list of switcher entries whenever windows change.
-  // Desktop is always first (index 0), then open non-minimized windows.
+  // Esc closes the switcher with no focus change, and nothing behind it.
+  useEscapeLayer(isOpen, () => { setIsOpen(false); setSelIdx(0); });
+
+  // Build the list of switcher entries whenever windows change. Windows come
+  // most recently used first: zIndex rises on every focus, so z-order is MRU
+  // order. Desktop goes last.
   const buildEntries = useCallback((): SwitcherEntry[] => {
-    const openWins = windows.filter(w => w.isOpen);
+    const openWins = windows
+      .filter(w => w.isOpen)
+      .sort((a, b) => {
+        // Minimized windows sit behind visible ones.
+        if (a.isMinimized !== b.isMinimized) return a.isMinimized ? 1 : -1;
+        return b.zIndex - a.zIndex;
+      });
     const desktop: SwitcherEntry = { windowId: null, appType: null, title: 'Desktop' };
     const winEntries: SwitcherEntry[] = openWins.map(w => ({
       windowId: w.id,
       appType:  w.appType,
       title:    w.title,
     }));
-    return [desktop, ...winEntries];
+    return [...winEntries, desktop];
   }, [windows]);
 
   // -- Keyboard handling --
 
   useEffect(() => {
-    let altHeld = false;
+    const isTrigger = (e: KeyboardEvent) =>
+      (e.key === 'Tab' && e.altKey && !e.ctrlKey && !e.metaKey) ||
+      (e.code === 'Backquote' && e.ctrlKey && !e.altKey && !e.metaKey);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !e.altKey) return;
+      if (!isTrigger(e)) return;
 
-      e.preventDefault(); // suppress browser tab-switching (Ctrl+Tab in Chrome)
+      e.preventDefault(); // keep the keystroke from the page and the browser
 
       const entries = buildEntries();
       entriesRef.current = entries;
@@ -126,12 +143,13 @@ export default function AppSwitcher() {
       if (entries.length <= 1) return; // no apps open, nothing to switch
 
       if (!isOpen) {
-        // Opening: start one step past the currently active window (or at 1)
-        altHeld = true;
-        const currentIdx = entries.findIndex(en => en.windowId === activeWindowId);
+        // Opening: the focused window is entry 0, so a quick tap lands on the
+        // previous one. With nothing focused, start on the most recent window.
+        heldKeyRef.current = e.altKey ? 'Alt' : 'Control';
+        const focusedFirst = entries[0]?.windowId === activeWindowId;
         const startIdx = e.shiftKey
-          ? (currentIdx <= 0 ? entries.length - 1 : currentIdx - 1)
-          : (currentIdx < 0 ? 1 : (currentIdx + 1) % entries.length);
+          ? entries.length - 1
+          : (focusedFirst ? 1 : 0);
         setSelIdx(startIdx);
         setIsOpen(true);
       } else {
@@ -146,16 +164,9 @@ export default function AppSwitcher() {
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        altHeld = false;
-        // Releasing Alt commits the selection
-        if (isOpen) {
-          commitSelection();
-        }
-      }
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-        setSelIdx(0);
+      // Releasing the modifier that opened the switcher commits the selection
+      if (e.key === heldKeyRef.current && isOpen) {
+        commitSelection();
       }
     };
 
@@ -179,15 +190,19 @@ export default function AppSwitcher() {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup',   onKeyUp);
     };
-  // Rebuilding on isOpen/activeWindowId/windows so the entries stay fresh
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activeWindowId, windows, focusWindow, buildEntries]);
 
   // -- Render --
 
   const entries = buildEntries();
+  const selected = entries[selIdx];
 
   return (
+    <>
+    {/* Announce the selection as it moves */}
+    <div className="sr-only" aria-live="polite">
+      {isOpen && selected ? `Switch to ${selected.title}` : ''}
+    </div>
     <AnimatePresence>
       {isOpen && entries.length > 1 && (
         <motion.div
@@ -196,7 +211,8 @@ export default function AppSwitcher() {
           animate={{ opacity: 1, scale: 1    }}
           exit={{ opacity: 0, scale: 0.92    }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
-          className="fixed z-[9500] inset-0 flex items-center justify-center pointer-events-none"
+          className="fixed inset-0 flex items-center justify-center pointer-events-none"
+          style={{ zIndex: Z.switcher }}
         >
           <div
             className="flex items-end gap-4 px-6 py-5 rounded-3xl
@@ -219,5 +235,6 @@ export default function AppSwitcher() {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }

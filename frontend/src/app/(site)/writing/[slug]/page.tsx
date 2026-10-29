@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { posts, getPostBySlug, readPostBody, formatPostDate } from '@/data/writing';
+import { ChevronLeft } from 'lucide-react';
+import { posts, getAllPosts, getPostBySlug, readPostBody, formatPostDate } from '@/data/writing';
 import { projectMeta } from '@/data/projectMeta';
 import { projectPath, writingPath } from '@/lib/seoContent';
-import { parseMarkdown, wordCount } from '@/lib/markdown';
+import { parseMarkdown, wordCount, readingMinutes } from '@/lib/markdown';
 import Prose from '@/components/site/Prose';
-import MetaLabel from '@/components/editorial/MetaLabel';
 import { PERSON_NAME } from '@/lib/site';
 import JsonLd from '@/components/seo/JsonLd';
 import { graph, articleNode, breadcrumbNode } from '@/lib/structuredData';
@@ -50,9 +50,14 @@ export default async function PostPage({ params }: { params: Promise<Params> }) 
 
   const body = readPostBody(slug);
   const project = post.project ? projectMeta[post.project] : undefined;
+  // Next in reading order: the next older post, wrapping to the newest.
+  const all = getAllPosts();
+  const next = all.length > 1 ? all[(all.findIndex(p => p.slug === slug) + 1) % all.length] : null;
+  const sourceIsGitHub = post.sourceUrl?.startsWith('https://github.com/') ?? false;
 
   return (
-    <article>
+    // 34rem keeps the 17px body near 66 characters a line (it ran 81).
+    <article className="max-w-[34rem]">
       <JsonLd
         data={graph(
           articleNode(post, wordCount(body), project),
@@ -63,34 +68,50 @@ export default async function PostPage({ params }: { params: Promise<Params> }) 
           ]),
         )}
       />
-      <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Link href="/writing"><MetaLabel className="text-text-secondary hover:text-text">Writing</MetaLabel></Link>
-        <MetaLabel className="text-text-secondary">
-          <time dateTime={post.datePublished}>{formatPostDate(post.datePublished)}</time>
-        </MetaLabel>
-      </p>
-      <h1 className="mt-4 editorial-hero text-text text-[clamp(2rem,6vw,3.25rem)] leading-[1.05]">{post.title}</h1>
-      <p className="mt-4 text-[15px] text-text-secondary">
-        By <Link href="/about" className="text-text underline underline-offset-4">{PERSON_NAME}</Link>
+      <Link
+        href="/writing"
+        className="-ml-1 inline-flex min-h-[44px] items-center gap-1 pr-2 text-[15px] text-text-secondary transition-colors hover:text-text"
+      >
+        <ChevronLeft size={18} strokeWidth={1.75} aria-hidden />
+        All writing
+      </Link>
+      <h1 className="mt-3 editorial-hero text-text text-[clamp(2rem,2.5vw+1rem,3.25rem)] leading-[1.08] text-balance">{post.title}</h1>
+      <p className="mt-4 flex flex-wrap gap-x-4 text-[15px] text-text-secondary">
+        <span>
+          By <Link href="/about" className="text-text underline underline-offset-4">{PERSON_NAME}</Link>
+        </span>
+        <time dateTime={post.datePublished}>{formatPostDate(post.datePublished)}</time>
+        <span>{readingMinutes(body)} min read</span>
       </p>
 
       <div className="mt-10">
         <Prose blocks={parseMarkdown(body)} />
       </div>
 
-      {(project || post.sourceUrl) && (
-        <footer className="mt-16 pt-6 border-t border-border flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
-          {project && (
-            <Link href={projectPath(project.slug)} className="underline underline-offset-4">
-              Project: {project.displayName}
-            </Link>
-          )}
-          {post.sourceUrl && (
-            <a href={post.sourceUrl} className="underline underline-offset-4">Data and code</a>
-          )}
-          <Link href="/writing" className="underline underline-offset-4">All writing</Link>
-        </footer>
-      )}
+      <footer className="mt-16 pt-6 border-t border-border flex flex-col gap-6 text-[15px]">
+        {(project || post.sourceUrl) && (
+          <p className="flex flex-wrap gap-x-6">
+            {project && (
+              <Link href={projectPath(project.slug)} className="inline-flex min-h-[44px] items-center underline underline-offset-4">
+                Project: {project.displayName}
+              </Link>
+            )}
+            {post.sourceUrl && (
+              <a href={post.sourceUrl} className="inline-flex min-h-[44px] items-center underline underline-offset-4">
+                {sourceIsGitHub ? 'Data and code on GitHub' : 'Data and code'}
+              </a>
+            )}
+          </p>
+        )}
+        {next && (
+          <Link href={writingPath(next.slug)} className="group flex flex-col gap-1">
+            <span className="text-[14px] text-text-secondary">Next</span>
+            <span className="font-display text-[22px] leading-snug text-text text-balance underline decoration-transparent underline-offset-4 transition-colors group-hover:decoration-text">
+              {next.title}
+            </span>
+          </Link>
+        )}
+      </footer>
     </article>
   );
 }

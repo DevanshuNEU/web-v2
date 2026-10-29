@@ -38,7 +38,7 @@ afterEach(() => {
 describe('AssistantBubble', () => {
   it('renders collapsed: orb present, panel hidden', () => {
     render(<AssistantBubble />);
-    const orb = screen.getByRole('button', { name: 'Ask Devanshu' });
+    const orb = screen.getByRole('button', { name: 'Ask Devanshu (AI)' });
     expect(orb).toBeInTheDocument();
     expect(orb).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Ask me anything about what I build.')).not.toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('AssistantBubble', () => {
 
   it('opens the panel on click and toggles aria-expanded', async () => {
     render(<AssistantBubble />);
-    const orb = screen.getByRole('button', { name: 'Ask Devanshu' });
+    const orb = screen.getByRole('button', { name: 'Ask Devanshu (AI)' });
 
     fireEvent.click(orb);
 
@@ -59,7 +59,7 @@ describe('AssistantBubble', () => {
 
   it('closes on Escape', async () => {
     render(<AssistantBubble />);
-    const orb = screen.getByRole('button', { name: 'Ask Devanshu' });
+    const orb = screen.getByRole('button', { name: 'Ask Devanshu (AI)' });
 
     fireEvent.click(orb);
     await waitFor(() =>

@@ -65,6 +65,24 @@ export const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
 
 export const RELEASES: Release[] = [
   {
+    version: '2.3.0',
+    date: 'Oct 2026',
+    codename: 'Fact Check',
+    summary:
+      'Every claim checked against the code, a writing section, and apps that respond to their window like real apps.',
+    highlight: true,
+    changes: [
+      { type: 'feature', text: 'Writing at /writing, with three posts: rerankers in code search, LLM judges versus code checks, and why I built OpenCodeIntel' },
+      { type: 'feature', text: 'Each app also has a plain web page on www that search engines can read, with one Person identity in the structured data' },
+      { type: 'feature', text: 'Windows resize from every edge and open sized to your screen; app layouts follow the window, not the browser' },
+      { type: 'feature', text: 'The boot animation plays once per visit and stays quiet on refresh' },
+      { type: 'fix', text: 'Project, resume and About text checked line by line against the code and the resume PDF' },
+      { type: 'fix', text: 'Activity leaves out forks and repos that are not portfolio work, and says so when GitHub is unavailable instead of showing zeros' },
+      { type: 'fix', text: 'Turning analytics off now stops PostHog too, and the choice is remembered' },
+      { type: 'fix', text: 'Cmd+K opens search reliably; shortcuts the browser reserves moved to Option' },
+    ],
+  },
+  {
     version: '2.2.0',
     date: 'May 2026',
     codename: 'Pocket',
@@ -93,7 +111,7 @@ export const RELEASES: Release[] = [
       { type: 'feature', text: 'RPG Skill Tree with SVG node graph, animated connections, and level indicators' },
       { type: 'feature', text: 'File Explorer with macOS Finder layout, project detail panels, and category filtering' },
       { type: 'feature', text: 'Resume app with section navigation, timeline experience view, and download link' },
-      { type: 'feature', text: "Changelog app. Meta. You're reading v2.1.0 in v2.1.0." },
+      { type: 'feature', text: 'Changelog app: the release history you are reading' },
       { type: 'refactor', text: 'All Zustand store subscriptions migrated to granular selectors for React 19 compatibility' },
       { type: 'fix', text: 'AnalyticsApp infinite render loop resolved with polling pattern via getState()' },
       { type: 'perf', text: 'WindowManager defers analytics tracking out of React commit phase via setTimeout' },

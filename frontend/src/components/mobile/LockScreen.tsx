@@ -3,13 +3,13 @@
 /**
  * LockScreen — iOS-style lock screen.
  *
- * Big time on top, date below, "swipe up to unlock" hint at the bottom.
- * Swiping up (or tapping the unlock pill) reveals the home screen.
+ * Big time on top, date below, "tap or swipe up" hint at the bottom.
+ * A tap anywhere or an upward swipe reveals the home screen.
  * Mirrors the dramatic feel of BootSequence — the user's first impression.
  */
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronUp, MapPin } from 'lucide-react';
 import { useMobileStore } from '@/store/mobileStore';
 import { useSwipe } from '@/hooks/useSwipe';
@@ -22,6 +22,7 @@ export default function LockScreen() {
   const unlock = useMobileStore((s) => s.unlock);
   const haptics = useHaptics();
   const mono = useIsMono();
+  const reduced = useReducedMotion();
 
   const [now, setNow] = useState(() => new Date());
 
@@ -54,7 +55,14 @@ export default function LockScreen() {
       exit={{ opacity: 0, scale: 1.03, transition: { duration: 0.25, ease: 'easeOut' } }}
       transition={{ duration: 0.2 }}
       {...handlers}
-      className="absolute inset-0 z-40 flex flex-col text-white touch-none"
+      // A tap anywhere unlocks too: desktop-trained visitors and switch users
+      // tap rather than swipe. The status-bar easter eggs stop propagation.
+      onClick={() => {
+        haptics('medium');
+        unlock();
+      }}
+      // pan-x + pinch-zoom: blocks the vertical pan the swipe needs, keeps zoom.
+      className="absolute inset-0 z-40 flex flex-col text-white touch-pan-x touch-pinch-zoom cursor-pointer"
       style={{
         background: mono
           ? 'radial-gradient(120% 80% at 50% 0%, #2a2a2c 0%, #161618 55%, #050505 100%)'
@@ -80,7 +88,7 @@ export default function LockScreen() {
           <p className="text-lg font-semibold text-white/90 tracking-tight">{identity.name}</p>
           <p className="text-sm text-white/55">{identity.title}</p>
           <div className="flex items-center gap-3 mt-1">
-            <span className="flex items-center gap-1 text-[12px] text-white/40">
+            <span className="flex items-center gap-1 text-[12px] text-white/60">
               <MapPin size={11} />{identity.location}
             </span>
             <span
@@ -91,33 +99,35 @@ export default function LockScreen() {
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                className={`w-1.5 h-1.5 rounded-full ${reduced ? '' : 'animate-pulse'} ${
                   mono ? 'bg-white/90' : 'bg-accent'
                 }`}
               />
-              Available
+              {identity.availabilityShort}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Unlock hint */}
-      <div className="pb-safe flex flex-col items-center pb-10 gap-2">
+      {/* Unlock hint. One inline padding: the old pb-safe + pb-10 pair
+          conflicted (pb-safe won and computed to 0), so the hint sat flush
+          against the bottom edge under the home indicator. The click bubbles
+          to the root handler, so Enter / Space on it unlock as well. */}
+      <div
+        className="flex flex-col items-center gap-2"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 40px)' }}
+      >
         <button
-          onClick={() => {
-            haptics('medium');
-            unlock();
-          }}
-          className="touch-target flex flex-col items-center gap-2 text-white/55 active:text-white transition-colors"
-          aria-label="Unlock"
+          type="button"
+          className="touch-target flex flex-col items-center justify-center gap-2 px-4 py-2 text-white/60 active:text-white transition-colors"
         >
           <motion.div
-            animate={{ y: [0, -6, 0] }}
+            animate={reduced ? undefined : { y: [0, -6, 0] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <ChevronUp size={26} strokeWidth={2} />
+            <ChevronUp size={26} strokeWidth={2} aria-hidden />
           </motion.div>
-          <span className="text-xs tracking-wide">Swipe up to open</span>
+          <span className="text-[13px] tracking-wide">Tap or swipe up to open</span>
         </button>
       </div>
     </motion.div>

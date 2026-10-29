@@ -2,15 +2,15 @@
 
 import '../../setup/dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 /**
  * MobileSettings — verifies the iOS Settings shell composes correctly,
  * the variant prop on SettingsApp routes to it, and the REAL sub-views
  * (Display & Brightness, Wallpaper, Sounds, About) wire to themeStore /
- * sound preferences. The decorative views (Wi-Fi, Bluetooth, placeholders)
- * only get a smoke test that they push without throwing.
+ * sound preferences. The fake rows (Airplane Mode, Wi-Fi, Bluetooth,
+ * Notifications) were removed; a test keeps them out.
  */
 
 // Sonner toasts call into a portal — stub out so tests don't depend on it.
@@ -60,15 +60,16 @@ describe('MobileSettings — structure', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the canonical iOS Settings rows on the root', () => {
+  it('shows only rows that do something real on the root', () => {
     render(<MobileSettings />);
-    expect(screen.getByText('Airplane Mode')).toBeInTheDocument();
-    expect(screen.getByText('Wi-Fi')).toBeInTheDocument();
-    expect(screen.getByText('Bluetooth')).toBeInTheDocument();
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Sounds & Haptics')).toBeInTheDocument();
     expect(screen.getByText('Display & Brightness')).toBeInTheDocument();
     expect(screen.getByText('Wallpaper')).toBeInTheDocument();
+    expect(screen.getByText('Privacy & Security')).toBeInTheDocument();
+    for (const fake of ['Airplane Mode', 'Wi-Fi', 'Bluetooth', 'Notifications', 'Accessibility']) {
+      expect(screen.queryByText(fake)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/demo-only/i)).not.toBeInTheDocument();
   });
 });
 
@@ -93,37 +94,15 @@ describe('MobileSettings — variant routing', () => {
 });
 
 describe('MobileSettings — drill-downs', () => {
-  it('tapping Wi-Fi pushes the Wi-Fi view', async () => {
-    render(<MobileSettings />);
-    await userEvent.click(screen.getByRole('button', { name: /^Wi-Fi/ }));
-    // Header reads "Wi-Fi" with a "Back to Settings" button.
-    expect(
-      screen.getByRole('button', { name: /back to settings/i })
-    ).toBeInTheDocument();
-    expect(screen.getByText('My Networks')).toBeInTheDocument();
-  });
-
-  it('tapping Bluetooth pushes the Bluetooth view', async () => {
-    render(<MobileSettings />);
-    await userEvent.click(screen.getByRole('button', { name: /^Bluetooth/ }));
-    expect(screen.getByText('My Devices')).toBeInTheDocument();
-  });
-
-  it('tapping Notifications pushes the placeholder', async () => {
-    render(<MobileSettings />);
-    await userEvent.click(screen.getByRole('button', { name: /^Notifications/ }));
-    // PlaceholderView renders the title as a heading + a description.
-    expect(
-      screen.getAllByText('Notifications').length
-    ).toBeGreaterThanOrEqual(2); // NavBar + body
-  });
-
   it('tapping the profile row pushes the About view', async () => {
     render(<MobileSettings />);
     await userEvent.click(
       screen.getByRole('button', { name: /devanshu chicholikar/i })
     );
-    expect(screen.getByText('Version 2.2.0 · Sprint 4')).toBeInTheDocument();
+    expect(screen.getByText('devOS 2.2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /back to settings/i })
+    ).toBeInTheDocument();
   });
 });
 
@@ -240,12 +219,12 @@ describe('MobileSettings — Wallpaper (REAL wiring)', () => {
 });
 
 describe('MobileSettings — Sounds & Haptics (REAL wiring)', () => {
-  it('opening Sounds shows the UI Sound Effects row', async () => {
+  it('opening Sounds shows the Sound effects row', async () => {
     render(<MobileSettings />);
     await userEvent.click(
       screen.getByRole('button', { name: /^Sounds & Haptics/ })
     );
-    expect(screen.getByText('UI Sound Effects')).toBeInTheDocument();
+    expect(screen.getByText('Sound effects')).toBeInTheDocument();
   });
 
   it('toggling the sound switch updates the global preference', async () => {
@@ -254,11 +233,7 @@ describe('MobileSettings — Sounds & Haptics (REAL wiring)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /^Sounds & Haptics/ })
     );
-    // Root view stays mounted under the pushed Sounds view — its Airplane
-    // Mode switch is still in the DOM. The Sounds switch is the last one
-    // rendered (z-index above), so query all and take the last.
-    const switches = screen.getAllByRole('switch');
-    const soundSwitch = switches[switches.length - 1];
+    const soundSwitch = screen.getByRole('switch', { name: 'Sound effects' });
     expect(soundSwitch).toHaveAttribute('aria-checked', 'false');
     await userEvent.click(soundSwitch);
     expect(soundSwitch).toHaveAttribute('aria-checked', 'true');
@@ -268,33 +243,13 @@ describe('MobileSettings — Sounds & Haptics (REAL wiring)', () => {
 describe('MobileSettings — back navigation', () => {
   it('Back button on a sub-view returns to the root', async () => {
     render(<MobileSettings />);
-    await userEvent.click(screen.getByRole('button', { name: /^Wi-Fi/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sounds & Haptics/ }));
+    expect(screen.getByText('Sound effects')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: /back to settings/i })
     );
     // Root markers visible again.
     expect(screen.getByText('Devanshu Chicholikar')).toBeInTheDocument();
-    expect(screen.queryByText('My Networks')).not.toBeInTheDocument();
-  });
-});
-
-describe('MobileSettings — airplane mode (decorative cross-effect)', () => {
-  it('toggling Airplane Mode changes the Wi-Fi row value to "Off"', async () => {
-    render(<MobileSettings />);
-    // Airplane Mode is a switch row.
-    const airplaneRow = screen
-      .getByText('Airplane Mode')
-      .closest('[data-testid="mobile-settings"]')!;
-    const sw = within(airplaneRow as HTMLElement).getAllByRole('switch')[0];
-    expect(sw).toHaveAttribute('aria-checked', 'false');
-
-    // The Wi-Fi row currently shows the SSID; after toggling airplane it
-    // should read "Off". (Bluetooth too.)
-    expect(screen.getByText('Devanshu-5G')).toBeInTheDocument();
-    await userEvent.click(sw);
-    expect(sw).toHaveAttribute('aria-checked', 'true');
-    expect(screen.queryByText('Devanshu-5G')).not.toBeInTheDocument();
-    // Both Wi-Fi and Bluetooth read "Off" — there are at least two.
-    expect(screen.getAllByText('Off').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('Sound effects')).not.toBeInTheDocument();
   });
 });

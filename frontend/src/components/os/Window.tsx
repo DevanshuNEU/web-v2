@@ -7,7 +7,9 @@ import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { spring, INSTANT } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
-import { computeSnap, type SnapBounds } from '@/lib/windowSnap';
+import { computeSnap, MENUBAR_H, DOCK_H, type SnapBounds } from '@/lib/windowSnap';
+import { resizeBounds, DEFAULT_MIN_SIZE, type ResizeDir, type WindowBounds } from '@/lib/windowGeometry';
+import { appRegistry } from '@/lib/appRegistry';
 import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
@@ -15,12 +17,33 @@ interface WindowProps {
   children: React.ReactNode;
 }
 
+// Invisible resize hit areas: 6px edges and 12px corners that straddle the
+// window border, like macOS. Corners come last so they sit above the edges.
+// Traffic lights in macOS order. `fun` / `funGlyph` are the Fun palette colors.
+const TRAFFIC_LIGHTS = [
+  { kind: 'close', Icon: X, size: 8, fun: 'bg-red-500 group-hover/btn:bg-red-600', funGlyph: 'text-red-900' },
+  { kind: 'minimize', Icon: Minus, size: 8, fun: 'bg-yellow-400 group-hover/btn:bg-yellow-500', funGlyph: 'text-yellow-900' },
+  { kind: 'maximize', Icon: Square, size: 6, fun: 'bg-green-500 group-hover/btn:bg-green-600', funGlyph: 'text-green-900' },
+] as const;
+
+const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
+  { dir: 'n', className: '-top-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
+  { dir: 's', className: '-bottom-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
+  { dir: 'e', className: '-right-[3px] top-3 bottom-3 w-1.5 cursor-ew-resize' },
+  { dir: 'w', className: '-left-[3px] top-3 bottom-3 w-1.5 cursor-ew-resize' },
+  { dir: 'nw', className: '-top-1 -left-1 w-3 h-3 cursor-nwse-resize' },
+  { dir: 'ne', className: '-top-1 -right-1 w-3 h-3 cursor-nesw-resize' },
+  { dir: 'sw', className: '-bottom-1 -left-1 w-3 h-3 cursor-nesw-resize' },
+  { dir: 'se', className: '-bottom-1 -right-1 w-3 h-3 cursor-nwse-resize' },
+];
+
 export default function Window({ window, children }: WindowProps) {
   const closeWindow = useOSStore(state => state.closeWindow);
   const focusWindow = useOSStore(state => state.focusWindow);
   const minimizeWindow = useOSStore(state => state.minimizeWindow);
   const maximizeWindow = useOSStore(state => state.maximizeWindow);
   const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
+  const updateWindowSize = useOSStore(state => state.updateWindowSize);
   const snapWindow = useOSStore(state => state.snapWindow);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
   const isDragging = React.useRef(false);
@@ -28,10 +51,14 @@ export default function Window({ window, children }: WindowProps) {
   const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
   const snapPreviewRef = React.useRef<SnapBounds | null>(null);
   const dragOffset = React.useRef({ x: 0, y: 0 });
+  const resizeStart = React.useRef<{ dir: ResizeDir; px: number; py: number; bounds: WindowBounds } | null>(null);
+  const [isResizing, setIsResizing] = React.useState(false);
+  const minSize = appRegistry[window.appType]?.minSize ?? DEFAULT_MIN_SIZE;
   const reduced = useReducedMotion();
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
   const mono = useIsMono();
+  const titleId = React.useId();
 
   // Drive open / drag scale through the same controls the genie minimize uses,
   // so there is one animation owner per window.
@@ -104,7 +131,7 @@ export default function Window({ window, children }: WindowProps) {
           e.clientX - dragOffset.current.x
         ));
         const newY = Math.max(28, Math.min(
-          viewportHeight - window.size.height - 80,
+          viewportHeight - window.size.height - DOCK_H,
           e.clientY - dragOffset.current.y
         ));
 
@@ -139,9 +166,46 @@ export default function Window({ window, children }: WindowProps) {
     };
   }, [window.id, window.size, window.isMaximized, updateWindowPosition, snapWindow]);
 
-  // Menu bar is h-7 = 28px; dock area is ~60px; keep windows inside those bounds
-  const MENUBAR_H = 28;
-  const DOCK_H = 60;
+  // Resize from an edge or corner. Pointer capture keeps the move/up events on
+  // the handle even when the pointer races ahead of the window edge.
+  const handleResizeStart = (dir: ResizeDir) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || window.isMaximized) return;
+    e.preventDefault();
+    e.stopPropagation();
+    focusWindow(window.id);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    resizeStart.current = {
+      dir,
+      px: e.clientX,
+      py: e.clientY,
+      bounds: { ...window.position, ...window.size },
+    };
+    setIsResizing(true);
+  };
+
+  const handleResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    const next = resizeBounds(
+      start.bounds,
+      start.dir,
+      e.clientX - start.px,
+      e.clientY - start.py,
+      document.documentElement.clientWidth,
+      document.documentElement.clientHeight,
+      minSize
+    );
+    updateWindowSize(window.id, { width: next.width, height: next.height });
+    // Left and top edges move the origin so the opposite edge stays put.
+    if (start.dir.includes('n') || start.dir.includes('w')) {
+      updateWindowPosition(window.id, { x: next.x, y: next.y });
+    }
+  };
+
+  const handleResizeEnd = () => {
+    resizeStart.current = null;
+    setIsResizing(false);
+  };
 
   const windowStyle = window.isMaximized
     ? {
@@ -177,6 +241,9 @@ export default function Window({ window, children }: WindowProps) {
       )}
     <motion.div
       ref={elRef}
+      data-window
+      role="region"
+      aria-labelledby={titleId}
       layout
       initial={reduced ? false : { opacity: 0, scale: 0.92, y: 30 }}
       animate={controls}
@@ -190,7 +257,8 @@ export default function Window({ window, children }: WindowProps) {
               transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
             }
       }
-      transition={{ layout: reduced ? INSTANT : spring.windowLayout }}
+      // No layout spring while resizing: the box tracks the pointer 1:1.
+      transition={{ layout: reduced || isResizing ? INSTANT : spring.windowLayout }}
       className={`
         absolute
         flex flex-col
@@ -220,79 +288,63 @@ export default function Window({ window, children }: WindowProps) {
           ${isActive ? 'opacity-100' : 'opacity-60'}
         `}
         onMouseDown={handleMouseDown}
+        onDoubleClick={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          maximizeWindow(window.id);
+        }}
       >
-        {/* Traffic-light controls */}
-        <div className="group flex items-center gap-1.5">
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              closeWindow(window.id);
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/45 hover:bg-black/65 dark:bg-white/35 dark:hover:bg-white/55'
-                : 'bg-red-500 hover:bg-red-600'
-            }`}
-            title="Close"
-          >
-            <X
-              size={7}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-red-900'
-              }`}
-            />
-          </button>
-
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMinimize();
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/30 hover:bg-black/50 dark:bg-white/25 dark:hover:bg-white/45'
-                : 'bg-yellow-400 hover:bg-yellow-500'
-            }`}
-            title="Minimize"
-          >
-            <Minus
-              size={7}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-yellow-900'
-              }`}
-            />
-          </button>
-
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              maximizeWindow(window.id);
-            }}
-            className={`w-3 h-3 rounded-full transition-colors flex items-center justify-center ${
-              mono
-                ? 'bg-black/20 hover:bg-black/40 dark:bg-white/15 dark:hover:bg-white/35'
-                : 'bg-green-500 hover:bg-green-600'
-            }`}
-            title="Maximize"
-          >
-            <Square
-              size={6}
-              strokeWidth={2.5}
-              className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                mono ? 'text-white dark:text-black' : 'text-green-900'
-              }`}
-            />
-          </button>
+        {/* Traffic-light controls. 12px dots inside 20px hit areas. In mono
+            the three dots share one shade that passes 3:1 and always show
+            their glyph, since color can't tell them apart; in Fun the glyphs
+            appear on hover or keyboard focus like macOS. */}
+        <div className="group/lights -ml-1 flex items-center">
+          {TRAFFIC_LIGHTS.map(({ kind, Icon, size, fun, funGlyph }) => {
+            const label = kind === 'close'
+              ? 'Close'
+              : kind === 'minimize'
+                ? 'Minimize'
+                : window.isMaximized ? 'Restore' : 'Maximize';
+            return (
+              <button
+                key={kind}
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (kind === 'close') closeWindow(window.id);
+                  else if (kind === 'minimize') handleMinimize();
+                  else maximizeWindow(window.id);
+                }}
+                title={label}
+                aria-label={`${label} ${window.title}`}
+                className="group/btn grid h-5 w-5 place-items-center rounded-full"
+              >
+                <span
+                  aria-hidden
+                  className={`grid h-3 w-3 place-items-center rounded-full transition-colors ${
+                    mono
+                      ? 'bg-black/45 group-hover/btn:bg-black/60 dark:bg-white/55 dark:group-hover/btn:bg-white/70'
+                      : fun
+                  }`}
+                >
+                  <Icon
+                    size={size}
+                    strokeWidth={2.5}
+                    className={`transition-opacity ${
+                      mono
+                        ? 'text-white opacity-70 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100 dark:text-black'
+                        : `${funGlyph} opacity-0 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100`
+                    }`}
+                  />
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Centered title */}
         <div className="absolute left-1/2 -translate-x-1/2">
-          <span className="text-sm font-medium text-text">
+          <span id={titleId} className="text-sm font-medium text-text">
             {window.title}
           </span>
         </div>
@@ -303,9 +355,27 @@ export default function Window({ window, children }: WindowProps) {
 
       {/* Content — app-content makes every window a query container so app
           typography scales with window width (see globals.css → in-window type) */}
-      <div className="flex-1 overflow-auto bg-surface/25 app-content" style={{ minHeight: 0 }}>
+      <div
+        className={`flex-1 overflow-auto bg-surface/25 app-content ${isResizing ? 'pointer-events-none select-none' : ''}`}
+        style={{ minHeight: 0 }}
+      >
         {children}
       </div>
+
+      {/* Resize handles: hidden while maximized */}
+      {!window.isMaximized && RESIZE_HANDLES.map(({ dir, className }) => (
+        <div
+          key={dir}
+          aria-hidden
+          data-resize={dir}
+          className={`absolute z-10 touch-none ${className}`}
+          onPointerDown={handleResizeStart(dir)}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onLostPointerCapture={handleResizeEnd}
+        />
+      ))}
     </motion.div>
     </>
   );
