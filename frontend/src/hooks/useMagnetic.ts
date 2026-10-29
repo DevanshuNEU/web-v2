@@ -12,8 +12,8 @@
  * per-element React spring.
  *
  * Scope note: the selector is `[data-magnetic="button"]`, NOT bare `[data-magnetic]`.
- * Dock app icons carry bare `data-magnetic` purely for the cursor-ring snap and run
- * their own magnification scale transform — translating them here would fight that.
+ * Dock app icons carry a bare `data-magnetic` and run their own magnification scale
+ * transform, so translating them here would fight that.
  * Flat buttons opt in explicitly with the ="button" value.
  *
  * Gating: no-op entirely under reduced motion OR a coarse/touch pointer (listeners

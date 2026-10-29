@@ -486,23 +486,6 @@ body {
 }
 
 /* ============================================
-   CUSTOM CURSOR
-   .cursor-none is added to <html> only when the custom Cursor is active
-   (fine pointer + motion allowed). Text fields keep a native caret for UX.
-   ============================================ */
-
-.cursor-none,
-.cursor-none * {
-  cursor: none !important;
-}
-
-.cursor-none input,
-.cursor-none textarea,
-.cursor-none [contenteditable='true'] {
-  cursor: text !important;
-}
-
-/* ============================================
    IN-WINDOW RESPONSIVE TYPOGRAPHY
    App content sizes its headings/body off the WINDOW width, not the
    viewport, so text stays proportionate whether a window is small or

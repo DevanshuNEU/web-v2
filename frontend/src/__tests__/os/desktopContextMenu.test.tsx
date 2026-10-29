@@ -18,7 +18,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // Heavy leaf children — render nothing so Desktop mounts fast. We keep the real
 // DesktopContextMenu and ParallaxProvider, which are what this test exercises.
 vi.mock('@/components/os/AnimatedBackground', () => ({ AnimatedBackground: () => null }));
-vi.mock('@/components/os/Cursor', () => ({ default: () => null }));
 vi.mock('@/components/os/Taskbar', () => ({ default: () => null }));
 vi.mock('@/components/os/MenuBar', () => ({ default: () => null }));
 vi.mock('@/components/os/DesktopIcons', () => ({ default: () => null }));

@@ -25,11 +25,9 @@ export const spring = {
   tilt: { stiffness: 300, damping: 25, mass: 0.5 },
   /** Genie minimize / restore toward the dock icon. */
   genie: { type: 'spring', damping: 26, stiffness: 210, mass: 0.9 },
-  /** Custom cursor follow. */
-  cursor: { damping: 28, stiffness: 420, mass: 0.4 },
   /** Magnetic hover pull + settle on flat buttons. */
   magnetic: { type: 'spring', damping: 15, stiffness: 260, mass: 0.3 },
-  /** Shared pointer-parallax depth drift (calmer than cursor). */
+  /** Shared pointer-parallax depth drift (calm, slow drift). */
   parallax: { damping: 30, stiffness: 350, mass: 0.5 },
   /** Assistant orb / panel entrance. */
   bubble: { type: 'spring', damping: 18, stiffness: 240, mass: 0.7 },
@@ -50,7 +48,7 @@ export function withReduced(t: Transition, reduced: boolean | null): Transition 
 
 /** Max px a magnetic element translates toward the cursor. Deliberately small. */
 export const MAGNETIC_MAX = 6;
-/** Fraction of the cursor offset applied (mirrors the cursor ring's 0.35). */
+/** Fraction of the pointer offset applied to a magnetic element. */
 export const MAGNETIC_PULL = 0.3;
 
 /** Base px drift of the deepest parallax layer (wallpaper). */
