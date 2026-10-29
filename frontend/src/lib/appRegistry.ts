@@ -121,7 +121,7 @@ export const appRegistry: Record<AppType, AppRegistration> = {
     defaultSize: { width: 960, height: 680 },
     defaultPosition: { x: 240, y: 80 },
     pinnedToDock: false,
-    launchpad: true,
+    launchpad: false,
   },
   'contact': {
     component: components['contact'],

@@ -1,65 +1,33 @@
 'use client';
 
 /**
- * GitHubActivityApp - the live activity surface in the monochrome editorial
- * register, backed by /api/github/activity.
+ * GitHubActivityApp - live GitHub activity, backed by /api/github/activity.
  *
- * Why this app exists: a portfolio that *says* "I ship a lot" is unconvincing.
- * The same portfolio rendering today's contribution graph + last week's commits
- * + currently-active repos is unfakeable, and is the single highest-credibility
- * surface a recruiter or founder sees on first visit. Everything here is live;
- * nothing is hardcoded.
+ * A recruiter sees, in this order: three headline numbers, the year of
+ * contributions as a calendar, the latest public work (PRs, pushes, releases)
+ * and the repos pushed to in the last 60 days. Everything is live.
  *
- * Redesign contract:
- *   - SIGNATURE (the heatmap): the year of contributions reads as a MONOCHROME
- *     DENSITY field. Each day is one dot in a real weeks x days DOM grid; commit
- *     intensity inks the dot through TWO reinforcing hue-free channels - dot SIZE
- *     and ink OPACITY both climb with the day's level. A busy day is a large,
- *     near-foreground dot; an empty day is a faint speck. This is the Halftone
- *     density principle (dark/dense = more), but kept as DOM so the precise grid,
- *     the per-day count tooltip, and the a11y label all survive. In the color
- *     ("Fun") palette the dots fall back to GitHub's official green ramp - the
- *     dual-palette contract, preserved.
- *   - HERO STATS: an editorial spec strip. Large serif numerals (contributions,
- *     streak, active repos, stars - all live) over tiny mono labels, hairline
- *     divided, scaling with the window via cqi (.editorial-hero inside
- *     .app-content is fluid on the container width).
- *   - ACTIVITY FEED: an AsciiField "log tape" CONSISTENT with AnalyticsApp - one
- *     selectable <pre>, fixed-width rows (clock stamp + glyph + summary + dot
- *     leaders + relative time), zero per-row motion (Emil's frequency rule: the
- *     feed updates, so it must not animate). The color palette gets a plain
- *     hairline editorial list fallback. Links preserved via an sr-only +
- *     paired anchor list.
- *   - ACTIVE REPOS: IndexRow-style hairline rows - serif repo name, mono meta
- *     (grayscale language dot, stars, pushed date), links preserved.
- *   - REGISTER: serif heads via EditorialSection, hairline dividers, generous
- *     space, no glass cards, no accent colors, no colored icons (mono).
+ * Honesty rules:
+ *   - The route answers 503 when GitHub gave it nothing. That renders as
+ *     "Activity is unavailable right now", never as zeros.
+ *   - When only some sources failed (`warnings`), the sections that loaded
+ *     show, the rest say they could not load, and a stat whose value is
+ *     unknown is hidden rather than shown as "--" or "0".
  *
- * Motion (Emil): the page reveals ONCE on mount via the shared staggered
- * container (never whileInView - a windowed inner scroll makes in-view triggers
- * unreliable). The high-frequency feed does NOT animate. Live numbers do NOT
- * re-animate per tick - they only fade in once with their section. Pressable
- * rows/links get a restrained :active scale, reduced-motion gated. transform +
- * opacity only.
+ * Layout keys off the window: the root is a query container (`.dapp`), stat
+ * tiles reflow by width, and the heatmap sizes its cells from its own column
+ * (`.gh-heat`), showing 26 weeks instead of 53 when the column is narrow.
  *
- * House rules: strictly three-tone, color branched only via useIsMono(); no em
- * dashes; no scroll listeners; no global listeners. Live /api/github/activity
- * fetch + loading + error/empty states preserved; the event parsing/filtering,
- * the calendar streak/count data, and the active-repos aggregation + links are
- * untouched. No hardcoded numbers anywhere.
+ * Palettes: mono inks the heatmap by dot size and opacity; Fun uses GitHub's
+ * green ramp and language colors. Color branches only through useIsMono().
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ExternalLink, AlertCircle } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { useTheme } from '@/store/themeStore';
 import { useIsMono } from '@/hooks/usePalette';
-import {
-  EditorialSection,
-  MetaLabel,
-  Hairline,
-} from '@/components/editorial';
-import AsciiField from '@/components/signature/AsciiField';
+import { Hairline } from '@/components/editorial';
 import { reveal } from '@/lib/motion';
 import type {
   ActivityEvent,
@@ -67,11 +35,11 @@ import type {
   ContributionDay,
 } from '@/lib/github';
 
-/* Strong ease-out (Emil): "starts fast, feels responsive". */
+/* Strong ease-out: starts fast, feels responsive. */
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
 /* ────────────────────────────────────────────────────────────────────
- * API client types - kept in sync with /api/github/activity payload
+ * API client types - kept in sync with /api/github/activity
  * ────────────────────────────────────────────────────────────────── */
 
 interface ActivePayload {
@@ -87,12 +55,20 @@ interface ActivePayload {
     pushedAt: string;
   }>;
   username: string;
+  /** Sources that failed, each prefixed "events", "calendar", "personal repos" or "org repos". */
+  warnings?: string[];
 }
 
 type ActiveRepo = ActivePayload['activeRepos'][number];
 
+const FALLBACK_USER = 'DevanshuNEU';
+
+function failed(data: ActivePayload, source: string): boolean {
+  return (data.warnings ?? []).some((w) => w.startsWith(source));
+}
+
 /* ────────────────────────────────────────────────────────────────────
- * Public entry - fetch + loading + error gate (preserved verbatim in shape)
+ * Public entry - fetch + loading + unavailable gate
  * ────────────────────────────────────────────────────────────────── */
 
 interface GitHubActivityAppProps {
@@ -101,7 +77,8 @@ interface GitHubActivityAppProps {
 
 export default function GitHubActivityApp({ variant = 'desktop' }: GitHubActivityAppProps = {}) {
   const [data, setData] = useState<ActivePayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,281 +90,321 @@ export default function GitHubActivityApp({ variant = 'desktop' }: GitHubActivit
       .then((payload: ActivePayload) => {
         if (!cancelled) setData(payload);
       })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : String(err) || 'Failed to load activity'
-          );
-        }
+      .catch(() => {
+        if (!cancelled) setError(true);
       });
     return () => {
       cancelled = true;
     };
+  }, [attempt]);
+
+  const retry = useCallback(() => {
+    setError(false);
+    setData(null);
+    setAttempt((n) => n + 1);
   }, []);
 
-  if (error) return <ErrorState message={error} />;
+  if (error) return <UnavailableState onRetry={retry} />;
   if (!data) return <LoadingState />;
 
-  // One responsive editorial column re-proportions to the window via @container,
-  // so both variants share a tree. The variant only tags the root testid that
-  // the harness keys on (mobile shell present / absent).
-  return <ActivityLayout data={data} variant={variant} />;
+  // One layout for both variants; the variant only tags the root testid.
+  return <ActivityLayout data={data} variant={variant} onRetry={retry} />;
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Layout - the single editorial column
+ * Layout
  * ────────────────────────────────────────────────────────────────── */
 
-/* ────────────────────────────────────────────────────────────────────
- * Scoped, window-dynamic layout CSS.
- *
- * Only this file is editable and the project is on Tailwind 3.4 with no
- * container-query plugin, so the @container rules that re-proportion the LAYOUT
- * off the WINDOW (not the viewport) live here, scoped under a root data
- * attribute so they never leak. The parent `.app-content` is the query
- * container (container-type: inline-size), the same mechanism About Me and
- * Projects use. Type scaling rides the cqi-aware .editorial-hero /
- * .editorial-head / .text-* / .font-mono-meta utilities; this block handles the
- * stat-strip column count (2-up narrow, 4-up wide) and opens up the column
- * padding/gap as the window grows.
- * ────────────────────────────────────────────────────────────────── */
-
-const SCOPED_CSS = `
-[data-gh-root] {
-  --gh-col-gap: 2.5rem;        /* gap between sections (narrow) */
-}
-/* Hero stat strip: two columns on a narrow window. */
-[data-gh-stats] {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 1.5rem;
-  row-gap: 2.5rem;
-}
-@container (min-width: 544px) {
-  /* WIDE window: the four live stats sit on one hairline-divided row. */
-  [data-gh-stats] {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-/* Heatmap dot: a restrained press-toward-foreground on hover. GPU-only
-   (transform + opacity), centered cell so it scales from its own position, and
-   gated on a fine pointer so a tap on touch never fires a stuck hover state.
-   The dot is sized in CSS already; this only adds the interaction layer. */
-[data-gh-cell] > span {
-  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
-              opacity 140ms cubic-bezier(0.23, 1, 0.32, 1);
-  will-change: transform;
-}
-@media (hover: hover) and (pointer: fine) {
-  [data-gh-cell]:hover > span {
-    transform: scale(1.6);
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Freeze the live/interaction motion; the dots stay legible, just static. */
-  [data-gh-cell] > span { transition: none; }
-  [data-gh-cell]:hover > span { transform: none; }
-}
-`;
-
-function ActivityLayout({ data, variant }: { data: ActivePayload; variant: 'desktop' | 'mobile' }) {
+function ActivityLayout({
+  data,
+  variant,
+  onRetry,
+}: {
+  data: ActivePayload;
+  variant: 'desktop' | 'mobile';
+  onRetry: () => void;
+}) {
   const reduced = useReducedMotion();
+  const user = data.username || FALLBACK_USER;
+  const profileUrl = `https://github.com/${user}`;
 
-  const events = data.events.slice(0, 10);
+  const events = useMemo(
+    () => [...data.events].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 10),
+    [data.events],
+  );
   const hasCalendar = data.calendar !== null && data.calendar.days.length > 0;
+  const eventsFailed = failed(data, 'events');
+  const reposFailed = failed(data, 'personal repos') && failed(data, 'org repos');
+  const partial = (data.warnings ?? []).length > 0;
 
   return (
     <div
-      className="h-full overflow-auto bg-transparent"
-      data-gh-root
+      className="dapp h-full overflow-auto bg-transparent"
       data-testid={variant === 'mobile' ? 'github-activity-mobile' : 'github-activity'}
     >
-      <style>{SCOPED_CSS}</style>
       <motion.div
         variants={reveal.container(reduced)}
         initial="hidden"
         animate="show"
-        className="mx-auto w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-14"
+        className="dapp-col flex flex-col gap-12"
       >
-        {/* ── Masthead ── */}
-        <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-4">
-          <MetaLabel as="p" className="text-text-secondary">
-            github.com/{data.username}
-          </MetaLabel>
-          <h1 className="editorial-hero font-display text-text leading-none">
-            Activity
-          </h1>
-          <p className="max-w-[60ch] text-text-secondary leading-relaxed">
-            Pulled live from the GitHub API on load. The graph, the log, and the
-            repository list below are real and current, not a snapshot.
+        <motion.header variants={reveal.item(reduced)} className="flex flex-col gap-3">
+          <h1 className="dapp-title">Activity</h1>
+          <p className="dapp-lede">
+            Live from GitHub: contributions over the last year, my latest public
+            work, and the repos I pushed to in the last 60 days.
           </p>
+          <a
+            href={profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="dapp-link inline-flex w-fit items-center gap-1.5 text-sm text-text"
+          >
+            github.com/{user}
+            <ExternalLink size={13} aria-hidden className="text-text-secondary" />
+          </a>
+          {partial && (
+            <p className="dapp-note flex flex-wrap items-center gap-x-3 gap-y-2" role="status">
+              <span>Some GitHub data did not load. Showing what did.</span>
+              <button type="button" onClick={onRetry} className="dapp-link text-text">
+                Try again
+              </button>
+            </p>
+          )}
         </motion.header>
 
-        {/* ── 01 Hero stats ── live serif numerals, hairline divided ── */}
         <motion.div variants={reveal.item(reduced)}>
-          <StatStrip data={data} />
+          <StatStrip data={data} reposFailed={reposFailed} />
         </motion.div>
 
-        {/* ── 02 Contributions ── the density-field signature ── */}
         {hasCalendar && (
           <motion.div variants={reveal.item(reduced)}>
-            <EditorialSection
-              number="02"
-              eyebrow="Last 12 months"
-              title="Contributions"
-            >
+            <Section title="Contributions" note="Last 12 months">
               <ContributionField calendar={data.calendar!} />
-            </EditorialSection>
+            </Section>
           </motion.div>
         )}
 
-        {/* ── 03 Activity ── the AsciiField log tape (mono) / list (color) ── */}
         <motion.div variants={reveal.item(reduced)}>
-          <EditorialSection number="03" eyebrow="Public events" title="Recent activity">
-            <ActivityFeed events={events} />
-          </EditorialSection>
+          <Section title="Recent activity" note="Public events, newest first">
+            {eventsFailed ? (
+              <EmptyNote
+                line="GitHub did not return recent events just now."
+                hint={<>Everything is on <a className="dapp-link text-text" href={profileUrl} target="_blank" rel="noopener noreferrer">my GitHub profile</a>.</>}
+              />
+            ) : (
+              <ActivityFeed events={events} reduced={reduced} />
+            )}
+          </Section>
         </motion.div>
 
-        {/* ── 04 Active repositories ── IndexRow-style hairline rows ── */}
         <motion.div variants={reveal.item(reduced)}>
-          <EditorialSection number="04" eyebrow="Pushed in the last 60 days" title="Active repositories">
-            {data.activeRepos.length === 0 ? (
+          <Section title="Active repositories" note="Pushed in the last 60 days">
+            {reposFailed ? (
+              <EmptyNote
+                line="GitHub did not return the repository list just now."
+                hint={<>Everything is on <a className="dapp-link text-text" href={profileUrl} target="_blank" rel="noopener noreferrer">my GitHub profile</a>.</>}
+              />
+            ) : data.activeRepos.length === 0 ? (
               <EmptyNote
                 line="No recently-pushed repositories."
                 hint="Public pushes from the last 60 days show up here."
               />
             ) : (
-              <div className="flex flex-col">
-                <Hairline />
-                {data.activeRepos.map((repo, i) => (
-                  <RepoRow
-                    key={repo.fullName}
-                    repo={repo}
-                    index={i + 1}
-                    reduced={reduced}
-                  />
+              <ul className="flex flex-col">
+                {data.activeRepos.map((repo) => (
+                  <li key={repo.fullName}>
+                    <RepoRow repo={repo} reduced={reduced} />
+                    <Hairline />
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-          </EditorialSection>
+          </Section>
         </motion.div>
       </motion.div>
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────
- * Hero stat strip - large serif numerals + tiny mono labels, hairline grid.
- *
- * Every value is derived live: contributions + streak come from the calendar
- * (rendered "--" when the calendar fetch failed so a visitor never misreads
- * "0 day streak" as "stopped shipping"); active-repo count and total stars are
- * aggregated from the live activeRepos list. No hardcoded numbers.
- * ────────────────────────────────────────────────────────────────── */
-
-function StatStrip({ data }: { data: ActivePayload }) {
-  const hasCalendar = data.calendar !== null;
-  const contributions = hasCalendar
-    ? data.calendar!.totalLastYear.toLocaleString()
-    : '--';
-  const streak = data.calendar?.currentStreak ?? 0;
-  const longestStreak = data.calendar?.longestStreak ?? 0;
-  const streakLabel = hasCalendar ? String(streak) : '--';
-  const streakSub = !hasCalendar
-    ? 'data unavailable'
-    : longestStreak > streak
-      ? `longest ${longestStreak}`
-      : 'current run';
-  const activeCount = data.activeRepos.length;
-  const totalStars = data.activeRepos.reduce((s, r) => s + r.stars, 0);
-
+/** Section: serif title with an optional qualifier, a hairline, then the body. */
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div data-gh-stats data-testid="activity-stats">
-      <Stat value={contributions} label="Contributions" sub="last 12 months" />
-      <Stat value={streakLabel} label="Day streak" sub={streakSub} />
-      <Stat value={String(activeCount)} label="Active repos" sub="pushed recently" />
-      <Stat value={totalStars.toLocaleString()} label="Stars" sub="across active repos" />
-    </div>
-  );
-}
-
-function Stat({ value, label, sub }: { value: string; label: string; sub: string }) {
-  return (
-    <div className="flex flex-col gap-2">
+    <section className="flex flex-col">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pb-4">
+        <h2 className="dapp-h2">{title}</h2>
+        {note && <p className="text-sm text-text-secondary">{note}</p>}
+      </header>
       <Hairline />
-      {/* Serif numeral scales with the window via .editorial-head + cqi. */}
-      <span className="editorial-head font-display text-text leading-none pt-3 tabular-nums">
-        {value}
-      </span>
-      <MetaLabel as="p" className="text-text">
-        {label}
-      </MetaLabel>
-      <span className="text-sm text-text-secondary leading-snug">{sub}</span>
+      <div className="pt-5">{children}</div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+ * Headline numbers. A tile whose source failed is left out, so a visitor
+ * never reads a missing value as "stopped shipping".
+ * ────────────────────────────────────────────────────────────────── */
+
+function StatStrip({ data, reposFailed }: { data: ActivePayload; reposFailed: boolean }) {
+  const cal = data.calendar;
+  const tiles: Array<{ value: string; label: string; sub: string }> = [];
+  if (cal) {
+    tiles.push({
+      value: cal.totalLastYear.toLocaleString(),
+      label: 'Contributions',
+      sub: 'in the last 12 months',
+    });
+    tiles.push(
+      cal.currentStreak > 0
+        ? {
+            value: String(cal.currentStreak),
+            label: 'Day streak',
+            sub: cal.longestStreak > cal.currentStreak ? `days in a row, longest ${cal.longestStreak}` : 'days in a row',
+          }
+        : { value: String(cal.longestStreak), label: 'Longest streak', sub: 'days in a row this year' },
+    );
+  }
+  if (!reposFailed) {
+    tiles.push({
+      value: String(data.activeRepos.length),
+      label: 'Active repos',
+      sub: 'pushed in the last 60 days',
+    });
+  }
+  if (tiles.length === 0) return null;
+
+  return (
+    <div className="gh-stats" data-testid="activity-stats">
+      {tiles.map((t) => (
+        <div key={t.label} className="flex flex-col gap-1.5">
+          <Hairline />
+          <p className="pt-3 font-display text-text leading-none text-[clamp(2rem,6cqi,3rem)]">{t.value}</p>
+          <p className="pt-1 text-sm font-medium text-text">{t.label}</p>
+          <p className="text-sm text-text-secondary leading-snug">{t.sub}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Contribution density field - the signature.
+ * Contribution calendar.
  *
- * A real weeks x days DOM grid (7 rows, Sun..Sat top to bottom, columns are
- * weeks). Each day's commit level (0..4) maps to a dot whose SIZE and ink
- * OPACITY both grow with intensity - two reinforcing hue-free channels, so
- * "more commits" reads as a bigger, denser dot without any color. The grid is
- * horizontally scrollable when the year does not fit; the dot scale tracks the
- * window via @container so the field re-proportions with the app size. Every
- * day keeps its `date / count contributions` tooltip and the whole field keeps
- * an aria-label of the yearly total. In the color palette the dots fall back to
- * GitHub's official green ramp (dual-palette contract).
+ * Week columns (Sunday on top), a month label above the first week of each
+ * month, and Mon / Wed / Fri row labels. A day's level (0..4) sets both the
+ * dot size and its ink, so it reads without color. Cell size comes from the
+ * heatmap's own width (.gh-heat in globals.css); a narrow column hides the
+ * older 27 weeks. If it ever overflows, it opens scrolled to the newest week.
  * ────────────────────────────────────────────────────────────────── */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+/** Weeks still shown when the column is narrow (see .gh-heat-week[data-old]). */
+const NARROW_WEEKS = 26;
 
 function ContributionField({ calendar }: { calendar: ContributionCalendar }) {
   const { mode } = useTheme();
   const mono = useIsMono();
+  const scroller = useRef<HTMLDivElement>(null);
 
   const days = calendar.days;
-  // Pad the head so the first real day sits on its true weekday row (GitHub
-  // shows Sunday as the top row: weekday 0..6 = Sun..Sat).
-  const firstWeekday = new Date(days[0].date).getUTCDay();
-  const padded: Array<ContributionDay | null> = useMemo(
-    () => [...Array(firstWeekday).fill(null), ...days],
-    [firstWeekday, days],
-  );
+  const weeks = useMemo(() => {
+    // Pad the head so the first real day sits on its weekday row.
+    const firstWeekday = new Date(days[0].date).getUTCDay();
+    const padded: Array<ContributionDay | null> = [...Array(firstWeekday).fill(null), ...days];
+    const out: Array<Array<ContributionDay | null>> = [];
+    for (let i = 0; i < padded.length; i += 7) out.push(padded.slice(i, i + 7));
+    return out;
+  }, [days]);
+
+  // Month label for the first week that contains the 1st of a month (or the
+  // first visible week of the narrow view, so it is never unlabeled).
+  const monthLabels = useMemo(() => {
+    const narrowStart = Math.max(0, weeks.length - NARROW_WEEKS);
+    return weeks.map((week, wi) => {
+      const firstOfMonth = week.find((d) => d && d.date.endsWith('-01'));
+      if (firstOfMonth) return { text: MONTHS[Number(firstOfMonth.date.slice(5, 7)) - 1], narrowOnly: false };
+      if (wi === 0 || wi === narrowStart) {
+        const d = week.find(Boolean);
+        // Skip if a labeled month starts within the next two weeks (no overlap).
+        const soon = weeks.slice(wi + 1, wi + 3).some((w) => w.some((x) => x && x.date.endsWith('-01')));
+        // The narrow view's first week is mid-year in the full view, where its
+        // label would collide with the month before, so it shows only when narrow.
+        if (d && !soon) return { text: MONTHS[Number(d.date.slice(5, 7)) - 1], narrowOnly: wi !== 0 };
+      }
+      return { text: '', narrowOnly: false };
+    });
+  }, [weeks]);
+
+  const summary = useMemo(() => {
+    const byMonth = new Map<string, number>();
+    for (const d of days) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) ?? 0) + d.count);
+    let best = '';
+    let bestCount = -1;
+    for (const [m, c] of byMonth) if (c > bestCount) { best = m; bestCount = c; }
+    const name = best ? `${MONTHS[Number(best.slice(5, 7)) - 1]} ${best.slice(0, 4)}` : '';
+    return `${calendar.totalLastYear} contributions in the last year${name ? `; busiest month ${name} with ${bestCount}` : ''}.`;
+  }, [days, calendar.totalLastYear]);
+
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [weeks]);
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        className="overflow-x-auto pb-1"
-        data-testid="contribution-heatmap"
-        role="img"
-        aria-label={`${calendar.totalLastYear} contributions in the last year`}
-      >
-        {/* Cell box scales with the window; the inked dot is centered inside it
-            and sized as a fraction of the box that climbs with the level. */}
+      <div className="gh-heat">
         <div
-          className="grid grid-rows-7 grid-flow-col w-fit
-                     gap-[clamp(1.5px,0.5cqi,3px)]
-                     [--cell:clamp(8px,2.1cqi,14px)]"
+          ref={scroller}
+          className="overflow-x-auto pb-1"
+          data-testid="contribution-heatmap"
+          role="img"
+          aria-label={summary}
         >
-          {padded.map((d, i) => (
-            <div
-              key={i}
-              className="grid place-items-center"
-              style={{ width: 'var(--cell)', height: 'var(--cell)' }}
-              title={d ? `${d.date} / ${d.count} contributions` : undefined}
-              data-level={d?.level}
-              data-gh-cell={d ? '' : undefined}
-            >
-              {d && (
-                <span
-                  className="block rounded-full"
-                  style={dotStyle(d.level, mode, mono)}
-                />
-              )}
+          <div className="gh-heat-grid" aria-hidden>
+            <div className="gh-heat-days">
+              <span className="gh-heat-month" />
+              {WEEKDAY_LABELS.map((l, i) => (
+                <span key={i} className="gh-heat-day">{l}</span>
+              ))}
             </div>
-          ))}
+            {weeks.map((week, wi) => (
+              <div
+                key={wi}
+                className="gh-heat-week"
+                data-old={wi < weeks.length - NARROW_WEEKS ? '' : undefined}
+              >
+                <span className="gh-heat-month">
+                  <span className={monthLabels[wi].narrowOnly ? 'gh-heat-month-narrow' : undefined}>
+                    {monthLabels[wi].text}
+                  </span>
+                </span>
+                {Array.from({ length: 7 }, (_, di) => {
+                  const d = week[di] ?? null;
+                  return (
+                    <span
+                      key={di}
+                      className="grid place-items-center"
+                      style={{ width: 'var(--cell)', height: 'var(--cell)' }}
+                      title={d ? `${d.date}: ${d.count} contributions` : undefined}
+                      data-level={d?.level}
+                    >
+                      {d && <span className="block rounded-full" style={dotStyle(d.level, mode, mono)} />}
+                    </span>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <FieldLegend mode={mode} mono={mono} />
@@ -396,92 +413,48 @@ function ContributionField({ calendar }: { calendar: ContributionCalendar }) {
 }
 
 /**
- * Dot geometry + ink for a given level.
- *   - size:    fraction of the cell box, 0.28 (faint) up to 1.0 (full), so a
- *              busy day reads as a large dot and an empty day as a speck.
- *   - opacity: climbs with the level so density reinforces size (mono only).
- * In color, the dot fills with GitHub's green ramp at full size for legibility.
+ * Dot geometry + ink for a level. Size and opacity both climb, so a busy day
+ * is a large, near-foreground dot and an empty day a faint speck. Level 1 sits
+ * above 3:1 against the window in both themes.
  */
-function dotStyle(
-  level: number,
-  mode: 'light' | 'dark',
-  mono: boolean,
-): React.CSSProperties {
+function dotStyle(level: number, mode: 'light' | 'dark', mono: boolean): React.CSSProperties {
   const idx = Math.max(0, Math.min(4, level));
-  // Size fraction of the cell box per level. Level 0 is a small flat speck so
-  // the grid still reads as a field; 1..4 grow toward filling the cell.
-  const sizeFrac = [0.3, 0.5, 0.66, 0.82, 1][idx];
+  const sizeFrac = [0.34, 0.55, 0.7, 0.85, 1][idx];
   const size = `calc(var(--cell) * ${sizeFrac})`;
 
   if (mono) {
-    // Graphite density ramp: a light->dark gray scale where empty days sit just
-    // above the background and the busiest day reads near the foreground.
-    // Direction follows the surface (light ink on dark, dark ink on light) so the
-    // hottest day is always the most "present". The opacity steps are spaced an
-    // even ~0.20 apart with a floor lifted off zero so each level stays a
-    // distinct graphite tone even on the small mobile cell (~8px), where the dot
-    // bottoms out at the clamp floor; the size channel reinforces the same ramp.
     const ink = mode === 'dark' ? '255,255,255' : '17,17,17';
-    const op = [0.1, 0.3, 0.5, 0.7, 0.92][idx];
+    const op = [0.14, 0.45, 0.62, 0.8, 0.95][idx];
     return { width: size, height: size, background: `rgba(${ink},${op})` };
   }
-  // Color (Fun) palette: GitHub's official greens, full-size dots.
-  const dark = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
-  const light = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
-  const color = (mode === 'dark' ? dark : light)[idx];
-  return { width: size, height: size, background: color };
+  // Fun palette: GitHub's greens. Level 0 stays a visible neutral speck.
+  const dark = ['#2d333b', '#0e4429', '#006d32', '#26a641', '#39d353'];
+  const light = ['#d8dce1', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+  return { width: size, height: size, background: (mode === 'dark' ? dark : light)[idx] };
 }
 
 function FieldLegend({ mode, mono }: { mode: 'light' | 'dark'; mono: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <MetaLabel className="text-text-secondary">Less</MetaLabel>
-      <span className="flex items-center gap-[clamp(2px,0.6cqi,4px)] [--cell:14px]">
+    <div className="flex items-center gap-2 text-xs text-text-secondary">
+      <span>Less</span>
+      <span className="flex items-center gap-1 [--cell:14px]" aria-hidden>
         {[0, 1, 2, 3, 4].map((lvl) => (
-          <span
-            key={lvl}
-            className="grid place-items-center"
-            style={{ width: 'var(--cell)', height: 'var(--cell)' }}
-          >
+          <span key={lvl} className="grid place-items-center" style={{ width: 'var(--cell)', height: 'var(--cell)' }}>
             <span className="block rounded-full" style={dotStyle(lvl, mode, mono)} />
           </span>
         ))}
       </span>
-      <MetaLabel className="text-text-secondary">More</MetaLabel>
+      <span>More</span>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Activity feed - AsciiField log tape (mono), hairline list (color).
- *
- * Consistent with AnalyticsApp: every event is one fixed-width row
- *   14:02:51  +  Pushed: refactor heatmap field ............... 3h ago
- * built into a single string handed to AsciiField as one selectable, no-redraw
- * <pre>. The tape is aria-hidden; a paired anchor list carries the same events
- * for assistive tech AND preserves the per-event links (the tape itself is a
- * read surface, the links live in the sr-list + the color fallback rows).
+ * Activity feed: one linked row per event, in every palette.
  * ────────────────────────────────────────────────────────────────── */
-
-const TAPE_WIDTH = 72; // monospace columns the tape is padded to
-
-/** Distinct ASCII glyph per event type - the shape disambiguates, not hue. */
-function eventGlyph(ev: ActivityEvent): string {
-  switch (ev.type) {
-    case 'PushEvent': return '+'; // commits pushed
-    case 'PullRequestEvent': return '>'; // a pull request
-    case 'CreateEvent': return '*'; // a branch / tag / repo created
-    case 'ReleaseEvent': return '^'; // a release shipped
-    case 'IssuesEvent': return '?'; // an issue
-    case 'WatchEvent': return '@'; // starred
-    case 'ForkEvent': return 'Y'; // forked
-    default: return '.';
-  }
-}
 
 interface FeedItem {
   id: string;
-  glyph: string;
   summary: string;
   repo: string;
   when: string;
@@ -493,21 +466,41 @@ function describeEvent(ev: ActivityEvent): { summary: string; link: string } {
     case 'PushEvent': {
       const commits = ev.commits ?? [];
       const last = commits[commits.length - 1];
-      const summary =
-        commits.length > 1
-          ? `Pushed ${commits.length} commits: ${truncate(last?.message ?? '', 48)}`
-          : `Pushed: ${truncate(last?.message ?? '', 60)}`;
-      return { summary, link: last?.url ?? ev.repoUrl };
-    }
-    case 'PullRequestEvent':
+      if (last) {
+        const summary =
+          commits.length > 1
+            ? `Pushed ${commits.length} commits: ${truncate(last.message, 72)}`
+            : `Pushed: ${truncate(last.message, 80)}`;
+        return { summary, link: last.url };
+      }
+      // GitHub's public feed no longer lists commits; name the branch instead.
       return {
-        summary: `${capitalize(ev.prAction ?? 'updated')} PR: ${truncate(ev.prTitle ?? '', 56)}`,
+        summary: ev.branch ? `Pushed to ${ev.branch}` : 'Pushed commits',
+        link: ev.headSha ? `${ev.repoUrl}/commit/${ev.headSha}` : ev.repoUrl,
+      };
+    }
+    case 'PullRequestEvent': {
+      const verb = capitalize(ev.prAction ?? 'updated');
+      const pr = ev.prNumber !== undefined ? `PR #${ev.prNumber}` : 'a PR';
+      const detail = ev.prTitle ?? ev.prBranch;
+      return {
+        summary: detail ? `${verb} ${pr}: ${truncate(detail, 80)}` : `${verb} ${pr}`,
         link: ev.prUrl ?? ev.repoUrl,
       };
+    }
     case 'CreateEvent':
-      return { summary: `Created ${ev.refType ?? 'item'}`, link: ev.repoUrl };
+      if (ev.refType === 'repository' || !ev.refName) {
+        return { summary: `Created ${ev.refType ?? 'repository'}`, link: ev.repoUrl };
+      }
+      return {
+        summary: `Created ${ev.refType} ${ev.refName}`,
+        link: ev.refType === 'tag' ? `${ev.repoUrl}/releases/tag/${ev.refName}` : `${ev.repoUrl}/tree/${ev.refName}`,
+      };
     case 'ReleaseEvent':
-      return { summary: `Released ${ev.releaseTag ?? ''}`.trim(), link: ev.repoUrl };
+      return {
+        summary: `Released ${ev.releaseTag ?? 'a new version'}`,
+        link: ev.releaseTag ? `${ev.repoUrl}/releases/tag/${ev.releaseTag}` : ev.repoUrl,
+      };
     case 'IssuesEvent':
       return { summary: 'Worked on an issue', link: ev.repoUrl };
     case 'WatchEvent':
@@ -524,7 +517,6 @@ function toFeedItems(events: ActivityEvent[]): FeedItem[] {
     const { summary, link } = describeEvent(ev);
     return {
       id: ev.id,
-      glyph: eventGlyph(ev),
       summary,
       repo: ev.repo.split('/').pop() ?? ev.repo,
       when: relativeTime(ev.createdAt),
@@ -533,87 +525,20 @@ function toFeedItems(events: ActivityEvent[]): FeedItem[] {
   });
 }
 
-/**
- * Build the fixed-width log tape string (one row per event).
- *
- * Each row opens with a left index rail (01, 02, ...) rather than a wall clock:
- * the events feed carries only a relative `when`, so a fabricated HH:MM:SS would
- * be dishonest. The index keeps the rows aligned like a printed log while the
- * real recency lives in the right-aligned relative time.
- */
-function buildLogTape(items: FeedItem[]): string {
-  return items
-    .map((it, i) => {
-      const rail = String(i + 1).padStart(2, '0');
-      const head = `${rail}  ${it.glyph}  `;
-      const tail = ` ${it.when}`;
-      const room = Math.max(1, TAPE_WIDTH - head.length - tail.length);
-      let label = `${it.summary}  [${it.repo}]`;
-      if (label.length > room - 2) {
-        label = label.slice(0, Math.max(1, room - 3)) + '…';
-      }
-      const leaderCount = Math.max(1, room - label.length - 1);
-      const leader = ' ' + '.'.repeat(leaderCount);
-      return `${head}${label}${leader}${tail}`;
-    })
-    .join('\n');
-}
-
-function ActivityFeed({ events }: { events: ActivityEvent[] }) {
-  const mono = useIsMono();
-  const reduced = useReducedMotion();
-
-  const items: FeedItem[] = useMemo(() => toFeedItems(events), [events]);
-
-  const tape = useMemo(() => buildLogTape(items), [items]);
+function ActivityFeed({ events, reduced }: { events: ActivityEvent[]; reduced: boolean | null }) {
+  const items = useMemo(() => toFeedItems(events), [events]);
 
   if (items.length === 0) {
     return (
       <EmptyNote
         line="No recent public events."
-        hint="Pushes, pull requests, and releases appear here as they happen."
+        hint="Most of my recent work is in the repositories below."
       />
     );
   }
 
-  if (mono) {
-    // Signature: one selectable <pre>, zero per-row motion. The visible tape is
-    // the read surface; a paired sr-only anchor list carries the same events for
-    // assistive tech and preserves the per-event links. Each anchor exposes its
-    // summary via aria-label (its accessible name) rather than visible text, so
-    // the human-readable string lives in exactly one place (the tape) while the
-    // links stay reachable by keyboard and screen reader.
-    return (
-      <div>
-        <div className="max-h-80 overflow-auto">
-          <AsciiField
-            source={tape}
-            paletteKey={`tape-${items.length}`}
-            className="text-text-secondary leading-[1.6]
-                       text-[clamp(10px,1.55cqi,12px)]"
-          />
-        </div>
-        <ul className="sr-only">
-          {items.map((it) => (
-            <li key={it.id}>
-              <a
-                href={it.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${it.summary} in ${it.repo}, ${it.when}`}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
-  // Color fallback: a plain hairline editorial list (glyph + summary + mono
-  // meta), links preserved on each row.
   return (
     <ul className="flex flex-col">
-      <Hairline />
       {items.map((it) => (
         <li key={it.id}>
           <FeedRow item={it} reduced={reduced} />
@@ -624,97 +549,75 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   );
 }
 
+const ROW_HOVER =
+  '[@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.03] dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.05]';
+
 function FeedRow({ item, reduced }: { item: FeedItem; reduced: boolean | null }) {
   return (
     <motion.a
       href={item.link}
       target="_blank"
       rel="noopener noreferrer"
-      whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
-      className="group flex items-baseline gap-3 py-3 transition-colors duration-150
-                 [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.02]
-                 dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]"
+      whileTap={reduced ? undefined : { transform: 'scale(0.98)', transition: { duration: 0.13, ease: EASE_OUT } }}
+      className={`dapp-row group flex items-start gap-3 px-1 py-3 transition-colors duration-150 ${ROW_HOVER}`}
     >
-      <span
-        aria-hidden
-        className="w-4 shrink-0 text-center font-[family-name:var(--font-geist-mono)] text-text-secondary"
-      >
-        {item.glyph}
-      </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-text">{item.summary}</span>
-        <span className="mt-0.5 flex items-center gap-2 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
-          <span className="truncate">{item.repo}</span>
-          <span aria-hidden className="opacity-40">/</span>
-          <span className="shrink-0">{item.when}</span>
+        <span className="block text-sm text-text leading-snug [overflow-wrap:anywhere]">{item.summary}</span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+          <span className="font-[family-name:var(--font-geist-mono)]">{item.repo}</span>
+          <span>{item.when}</span>
         </span>
       </span>
-      <ExternalLink size={13} className="shrink-0 self-center text-text-secondary opacity-40" />
+      <ExternalLink size={13} aria-hidden className="mt-1 shrink-0 text-text-secondary" />
     </motion.a>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Repo row - IndexRow-style hairline row, serif name + mono meta, link kept.
+ * Repo row
  * ────────────────────────────────────────────────────────────────── */
 
-function RepoRow({
-  repo,
-  index,
-  reduced,
-}: {
-  repo: ActiveRepo;
-  index: number;
-  reduced: boolean | null;
-}) {
+function RepoRow({ repo, reduced }: { repo: ActiveRepo; reduced: boolean | null }) {
   const mono = useIsMono();
   return (
-    <div className="flex flex-col">
-      <motion.a
-        href={repo.htmlUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
-        className="group flex items-baseline gap-4 py-4 transition-colors duration-150
-                   [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025]
-                   dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.05]"
-      >
-        <MetaLabel className="shrink-0 w-8 justify-start text-text-secondary">
-          {String(index).padStart(2, '0')}
-        </MetaLabel>
-        <span className="min-w-0 flex-1">
-          <span className="block editorial-head font-display text-text text-[clamp(1.15rem,4.5cqi,1.6rem)] leading-tight truncate">
-            {repo.name}
+    <motion.a
+      href={repo.htmlUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileTap={reduced ? undefined : { transform: 'scale(0.98)', transition: { duration: 0.13, ease: EASE_OUT } }}
+      className={`dapp-row group flex items-start gap-4 px-1 py-4 transition-colors duration-150 ${ROW_HOVER}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-text text-[1.25rem] leading-tight [overflow-wrap:anywhere]">
+          {repo.name}
+        </span>
+        {repo.description && (
+          <span className="mt-1 block max-w-[60ch] text-sm text-text-secondary leading-snug">
+            {repo.description}
           </span>
-          {repo.description && (
-            <span className="mt-1 block max-w-[60ch] text-sm text-text-secondary leading-snug line-clamp-2">
-              {repo.description}
+        )}
+        <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
+          {repo.language && (
+            <span className="inline-flex items-center gap-1.5">
+              {/* Mono drops the language hue; the name carries the meaning. */}
+              <span
+                aria-hidden
+                className={`inline-block h-2 w-2 rounded-full ${mono ? 'bg-text-secondary' : ''}`}
+                style={mono ? undefined : { background: languageColor(repo.language) }}
+              />
+              {repo.language}
             </span>
           )}
-          <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-[family-name:var(--font-geist-mono)] text-xs text-text-secondary">
-            {repo.language && (
-              <span className="inline-flex items-center gap-1.5">
-                {/* In mono the dot drops its language hue; the name to its right
-                    carries the distinction. */}
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${mono ? 'bg-text-secondary' : ''}`}
-                  style={mono ? undefined : { background: languageColor(repo.language) }}
-                />
-                {repo.language}
-              </span>
-            )}
-            {repo.stars > 0 && (
-              <span>
-                {repo.stars} {repo.stars === 1 ? 'star' : 'stars'}
-              </span>
-            )}
-            <span>pushed {relativeTime(repo.pushedAt)}</span>
-          </span>
+          {repo.stars > 0 && (
+            <span>
+              {repo.stars} {repo.stars === 1 ? 'star' : 'stars'}
+            </span>
+          )}
+          <span>pushed {relativeTime(repo.pushedAt)}</span>
         </span>
-        <ExternalLink size={13} className="shrink-0 self-center text-text-secondary opacity-40" />
-      </motion.a>
-      <Hairline />
-    </div>
+      </span>
+      <ExternalLink size={13} aria-hidden className="mt-1.5 shrink-0 text-text-secondary" />
+    </motion.a>
   );
 }
 
@@ -741,33 +644,29 @@ function languageColor(lang: string): string {
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Small presentational pieces + states
+ * States
  * ────────────────────────────────────────────────────────────────── */
 
-/** Empty state: hairline-bounded, editorial, no spinner, no icon theatrics. */
-function EmptyNote({ line, hint }: { line: string; hint: string }) {
+function EmptyNote({ line, hint }: { line: string; hint: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 py-2">
-      <Hairline />
-      <p className="pt-4 text-sm text-text">{line}</p>
+    <div className="flex flex-col gap-1.5">
+      <p className="text-sm text-text">{line}</p>
       <p className="text-sm text-text-secondary">{hint}</p>
     </div>
   );
 }
 
-/** Loading: skeleton matching the editorial column shape (no circular spinner). */
+/** Loading: a skeleton in the shape of the page. */
 function LoadingState() {
   return (
-    <div className="h-full overflow-auto bg-transparent" data-gh-root data-testid="activity-loading">
-      <style>{SCOPED_CSS}</style>
-      <div className="mx-auto w-full max-w-4xl px-6 py-10 sm:px-10 sm:py-12 flex flex-col gap-14">
-        <div className="flex flex-col gap-4">
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-16 w-48" />
+    <div className="dapp h-full overflow-auto bg-transparent" data-testid="activity-loading">
+      <div className="dapp-col flex flex-col gap-12" aria-busy="true" aria-label="Loading GitHub activity">
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-48" />
           <Skeleton className="h-4 w-full max-w-[40ch]" />
         </div>
-        <div data-gh-stats>
-          {[0, 1, 2, 3].map((i) => (
+        <div className="gh-stats">
+          {[0, 1, 2].map((i) => (
             <div key={i} className="flex flex-col gap-3">
               <Hairline />
               <Skeleton className="h-10 w-20" />
@@ -783,27 +682,40 @@ function LoadingState() {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`rounded bg-text-secondary/10 animate-pulse ${className ?? ''}`} />;
+  return <div className={`rounded bg-text-secondary/10 motion-safe:animate-pulse ${className ?? ''}`} />;
 }
 
-/** Error: editorial, centered, honest about the likely cause. */
-function ErrorState({ message }: { message: string }) {
+/** GitHub gave nothing (down or rate limited): say so, and offer a way forward. */
+function UnavailableState({ onRetry }: { onRetry: () => void }) {
+  const profileUrl = `https://github.com/${FALLBACK_USER}`;
   return (
-    <div
-      className="h-full flex flex-col items-center justify-center gap-3 text-center px-8"
-      data-testid="activity-error"
-    >
-      <AlertCircle size={26} className="text-text-secondary" />
-      <p className="font-display text-text text-xl">Couldn&apos;t load activity</p>
-      <p className="max-w-[40ch] text-sm text-text-secondary leading-relaxed">
-        {message}. GitHub or the contributions API may be rate limiting.
-      </p>
+    <div className="dapp h-full overflow-auto bg-transparent" data-testid="activity-error">
+      <div className="dapp-col dapp-col--read flex flex-col gap-4">
+        <h1 className="dapp-title">Activity</h1>
+        <div className="flex flex-col gap-2" role="status">
+          <p className="text-base text-text">Activity is unavailable right now.</p>
+          <p className="dapp-lede">
+            GitHub is not answering, usually because of its hourly rate limit. The
+            live data comes back on its own. Everything is on my GitHub profile in
+            the meantime.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="dapp-button">
+            Open github.com/{FALLBACK_USER}
+            <ExternalLink size={13} aria-hidden />
+          </a>
+          <button type="button" onClick={onRetry} className="dapp-button">
+            Try again
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────
- * Time + string helpers (preserved from the prior build)
+ * Time + string helpers
  * ────────────────────────────────────────────────────────────────── */
 
 export function relativeTime(iso: string): string {
@@ -826,8 +738,9 @@ export function relativeTime(iso: string): string {
 }
 
 function truncate(s: string, n: number): string {
-  if (s.length <= n) return s;
-  return s.slice(0, n - 1) + '…';
+  const line = s.split('\n')[0];
+  if (line.length <= n) return line;
+  return line.slice(0, n - 1) + '…';
 }
 
 function capitalize(s: string): string {

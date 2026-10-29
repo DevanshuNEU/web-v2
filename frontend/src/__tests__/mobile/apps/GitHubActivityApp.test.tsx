@@ -90,7 +90,23 @@ describe('GitHubActivityApp — render states', () => {
     await waitFor(() =>
       expect(screen.getByTestId('activity-error')).toBeInTheDocument()
     );
-    expect(screen.getByText(/Couldn't load activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Activity is unavailable right now/i)).toBeInTheDocument();
+    // A way forward: the profile link and a retry, never zero tiles.
+    expect(screen.getByRole('link', { name: /github\.com\/DevanshuNEU/i })).toHaveAttribute(
+      'href',
+      'https://github.com/DevanshuNEU',
+    );
+    expect(screen.getByRole('button', { name: /Try again/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('activity-stats')).not.toBeInTheDocument();
+  });
+
+  it('retries the fetch from the unavailable state', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503 });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => SAMPLE_PAYLOAD });
+    render(<GitHubActivityApp variant="mobile" />);
+    const retry = await screen.findByRole('button', { name: /Try again/i });
+    retry.click();
+    await waitFor(() => expect(screen.getByTestId('activity-stats')).toBeInTheDocument());
   });
 
   it('shows an error state when fetch rejects (network)', async () => {
@@ -124,15 +140,27 @@ describe('GitHubActivityApp — populated mobile render', () => {
     );
   });
 
-  it('renders all four stat cards', async () => {
+  it('renders the three stat tiles', async () => {
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() => screen.getByTestId('activity-stats'));
     const stats = screen.getByTestId('activity-stats');
-    // Contributions = 1234, streak = 7, active = 1, stars = 42
+    // Contributions = 1234, streak = 7 (longest 21), active repos = 1. No stars tile.
     expect(stats).toHaveTextContent('1,234');
-    expect(stats).toHaveTextContent('7');
-    expect(stats).toHaveTextContent('1');
-    expect(stats).toHaveTextContent('42');
+    expect(stats).toHaveTextContent('Day streak');
+    expect(stats).toHaveTextContent('longest 21');
+    expect(stats).toHaveTextContent('Active repos');
+    expect(stats).not.toHaveTextContent(/stars/i);
+  });
+
+  it('shows the longest streak instead of a current streak of 0', async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...SAMPLE_PAYLOAD, calendar: { ...SAMPLE_PAYLOAD.calendar, currentStreak: 0 } }),
+    });
+    render(<GitHubActivityApp variant="mobile" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    expect(screen.getByTestId('activity-stats')).toHaveTextContent('Longest streak');
   });
 
   it('renders the contribution heatmap when calendar is present', async () => {
@@ -172,20 +200,55 @@ describe('GitHubActivityApp — populated mobile render', () => {
     expect(screen.queryByTestId('contribution-heatmap')).not.toBeInTheDocument();
   });
 
-  it('stat strip shows "--" (not "0") when calendar fetch failed', async () => {
+  it('hides calendar tiles (no "--", no "0") and says so when the calendar failed', async () => {
     fetchMock.mockReset();
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ ...SAMPLE_PAYLOAD, calendar: null }),
+      json: async () => ({ ...SAMPLE_PAYLOAD, calendar: null, warnings: ['calendar: unavailable'] }),
     });
     render(<GitHubActivityApp variant="mobile" />);
     await waitFor(() => screen.getByTestId('activity-stats'));
     const stats = screen.getByTestId('activity-stats');
-    // Two stat cards (contributions, streak) should show the "--" placeholder,
-    // not zero. The other two (active repos, stars) derive from repos and stay numeric.
-    const placeholders = stats.textContent?.match(/--/g) ?? [];
-    expect(placeholders.length).toBeGreaterThanOrEqual(2);
-    expect(stats).toHaveTextContent(/data unavailable/);
+    expect(stats).not.toHaveTextContent('--');
+    expect(stats).not.toHaveTextContent('Contributions');
+    expect(stats).toHaveTextContent('Active repos');
+    expect(screen.getByText(/Some GitHub data did not load/i)).toBeInTheDocument();
+  });
+
+  it('says the feed failed instead of showing an empty feed', async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...SAMPLE_PAYLOAD, events: [], warnings: ['events: GitHub API error: 403'] }),
+    });
+    render(<GitHubActivityApp variant="mobile" />);
+    await waitFor(() => screen.getByTestId('activity-stats'));
+    expect(screen.getByText(/did not return recent events/i)).toBeInTheDocument();
+    expect(screen.queryByText(/No recent public events/i)).not.toBeInTheDocument();
+  });
+
+  it('labels a PR without a title by number and branch, never "PR: " alone', async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ...SAMPLE_PAYLOAD,
+        events: [{
+          id: 'evt-3',
+          type: 'PullRequestEvent',
+          repo: 'DevanshuNEU/overhear',
+          repoUrl: 'https://github.com/DevanshuNEU/overhear',
+          createdAt: new Date().toISOString(),
+          prAction: 'merged',
+          prNumber: 31,
+          prBranch: 'fix/clinic-service-guards',
+          prUrl: 'https://github.com/DevanshuNEU/overhear/pull/31',
+        }],
+      }),
+    });
+    render(<GitHubActivityApp variant="mobile" />);
+    const row = await screen.findByText('Merged PR #31: fix/clinic-service-guards');
+    expect(row.closest('a')).toHaveAttribute('href', 'https://github.com/DevanshuNEU/overhear/pull/31');
   });
 
   it('renders each event with a summary line', async () => {
