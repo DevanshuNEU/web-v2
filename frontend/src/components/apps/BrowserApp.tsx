@@ -6,56 +6,64 @@
  *
  * Single clean view (no tab strip): back / forward / reload, one hairline-
  * underline address field with a lock glyph, a thin monochrome progress line,
- * and a quiet editorial start page (hairline tiles: serif site name + mono URL)
- * over a very faint seeded Plotter linework backdrop.
+ * and a start page of hairline rows.
  *
- * Hybrid content: allow-listed sites (Devanshu's own) render live in a
- * sandboxed iframe; everything else gets a graceful "open in new tab" card,
- * laid over a faint dithered field, so a frame is never blank. The decision
- * lives in lib/browser.ts and is preserved here verbatim.
+ * What it shows in the window: pages from this site (/writing, /projects,
+ * /resume, /about) in a same-origin iframe, which the site's
+ * `X-Frame-Options: SAMEORIGIN` header allows. Other sites block framing, so
+ * their start rows are plain links that open a new tab, and an address typed
+ * for one gets an "opens in a new tab" card. The decision lives in
+ * lib/browser.ts.
  *
- * Register / house rules: strictly monochrome three-tone; the generative
- * signatures (Plotter, Dither) self-gate on useIsMono() + reduced-motion and
- * are additionally only mounted in the mono palette so the color ("Fun") look
- * stays clean. No accent. No scroll-triggered reveals: the start page staggers
- * in ONCE on mount. Back / forward / reload are high-frequency, so they never
- * animate an entrance - only a reduced-motion-gated :active press.
+ * Layout keys off the window (container queries on .app-content), never the
+ * viewport. On the phone (variant="mobile") the toolbar is dropped: the phone
+ * already has a browser, so every row opens a real tab.
  *
- * Motion (Emil):
- *   - Nav buttons (back/forward/reload) are used constantly -> NO entrance
- *     animation, instant; the only motion is a subtle :active scale(0.97),
- *     gated on reduced motion + a fine pointer.
- *   - Start-page tiles mount-stagger once via the shared reveal container;
- *     hover is a hairline underline that grows (transform-only, GPU).
- *   - The loading line is constant motion -> linear easing, calm, ink/opacity
- *     only (never accent), and collapses to a static indeterminate bar under
- *     reduced motion.
+ * Motion: back / forward / reload are high-frequency, so they never animate
+ * an entrance, only a reduced-motion-gated :active press. The start rows
+ * stagger in once on mount. The loading line is linear, ink only.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, RotateCw, Lock, Globe, ExternalLink, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMono } from '@/hooks/usePalette';
-import { MetaLabel, Hairline } from '@/components/editorial';
-import { Plotter, Dither } from '@/components/signature';
-import { strokeSet } from '@/lib/signature/plotter';
+import { Hairline } from '@/components/editorial';
+import { Dither } from '@/components/signature';
 import { reveal } from '@/lib/motion';
 import {
   START_URL,
-  START_LINKS,
+  SITE_LINKS,
+  EXTERNAL_LINKS,
   normalizeUrl,
   hostOf,
   isEmbeddableUrl,
   isSecure,
+  type StartLink,
 } from '@/lib/browser';
 
 /* Strong ease-out (Emil): "starts fast, feels responsive" for press feedback. */
 const EASE_OUT: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
-export default function BrowserApp() {
+/** History entry for input that is not a site address (a search phrase). */
+const INVALID_PREFIX = 'about:invalid#';
+
+function currentOrigin(): string | undefined {
+  return typeof window === 'undefined' ? undefined : window.location.origin;
+}
+
+/** What the address bar shows for an entry. */
+function displayUrl(url: string): string {
+  if (url === START_URL) return '';
+  if (url.startsWith(INVALID_PREFIX)) return decodeURIComponent(url.slice(INVALID_PREFIX.length));
+  return url;
+}
+
+export default function BrowserApp({ variant = 'desktop' }: { variant?: 'desktop' | 'mobile' } = {}) {
   const mono = useIsMono();
   const reduced = useReducedMotion();
+  const origin = currentOrigin();
 
   // History stack with a cursor, so back/forward are pure index moves.
   const [history, setHistory] = useState<string[]>([START_URL]);
@@ -63,65 +71,90 @@ export default function BrowserApp() {
   const [inputUrl, setInputUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const frameRef = useRef<HTMLIFrameElement>(null);
 
   const url = history[cursor];
   const canBack = cursor > 0;
   const canForward = cursor < history.length - 1;
   const onStart = url === START_URL;
-  const embeddable = !onStart && isEmbeddableUrl(url);
+  const invalid = url.startsWith(INVALID_PREFIX);
+  const embeddable = !onStart && !invalid && isEmbeddableUrl(url, origin);
 
   // Keep the address bar in sync with the active page (blank on the start page).
   useEffect(() => {
-    setInputUrl(onStart ? '' : url);
-  }, [url, onStart]);
+    setInputUrl(displayUrl(url));
+  }, [url]);
+
+  const willLoad = useCallback(
+    (target: string) => target !== START_URL && isEmbeddableUrl(target, currentOrigin()),
+    [],
+  );
 
   const go = useCallback((raw: string) => {
-    const next = normalizeUrl(raw);
-    setHistory((h) => [...h.slice(0, cursorRef.current + 1), next]);
-    setCursor((c) => c + 1);
-    setIsLoading(next !== START_URL && isEmbeddableUrl(next));
-  }, []);
-
-  // cursor in a ref so `go` can truncate forward history without a stale closure.
-  const cursorRef = useRef(cursor);
-  useEffect(() => { cursorRef.current = cursor; }, [cursor]);
+    const next = normalizeUrl(raw, currentOrigin()) ?? `${INVALID_PREFIX}${encodeURIComponent(raw.trim())}`;
+    setHistory((h) => [...h.slice(0, cursor + 1), next]);
+    setCursor(cursor + 1);
+    setIsLoading(willLoad(next));
+  }, [cursor, willLoad]);
 
   const back = useCallback(() => {
-    setCursor((c) => {
-      const n = Math.max(0, c - 1);
-      const target = history[n];
-      setIsLoading(target !== START_URL && isEmbeddableUrl(target));
-      return n;
-    });
-  }, [history]);
+    const n = Math.max(0, cursor - 1);
+    setCursor(n);
+    setIsLoading(willLoad(history[n]));
+  }, [cursor, history, willLoad]);
 
   const forward = useCallback(() => {
-    setCursor((c) => {
-      const n = Math.min(history.length - 1, c + 1);
-      const target = history[n];
-      setIsLoading(target !== START_URL && isEmbeddableUrl(target));
-      return n;
-    });
-  }, [history]);
+    const n = Math.min(history.length - 1, cursor + 1);
+    setCursor(n);
+    setIsLoading(willLoad(history[n]));
+  }, [cursor, history, willLoad]);
 
   const reload = useCallback(() => {
-    if (onStart) return;
+    if (!embeddable) return;
     setReloadKey((k) => k + 1);
-    if (embeddable) setIsLoading(true);
-  }, [onStart, embeddable]);
+    setIsLoading(true);
+  }, [embeddable]);
 
-  // Safety net: never let the loading line spin forever if onLoad never fires
-  // (some pages, or a cross-origin block, won't report load).
+  // Safety net: never let the loading line spin forever if onLoad never fires.
   useEffect(() => {
     if (!isLoading) return;
     const t = setTimeout(() => setIsLoading(false), 3500);
     return () => clearTimeout(t);
   }, [isLoading, url, reloadKey]);
 
+  // A link clicked inside the frame navigates the frame. Read where it went
+  // (same origin, so readable) and keep the address bar honest. A link back to
+  // the desktop ("/") would nest devOS in itself, so it returns to the start page.
+  const onFrameLoad = useCallback(() => {
+    setIsLoading(false);
+    let loc: Location | undefined;
+    try {
+      loc = frameRef.current?.contentWindow?.location;
+    } catch {
+      return;
+    }
+    if (!loc || loc.href === 'about:blank') return;
+    const here = loc.pathname === '/' ? START_URL : loc.href;
+    setHistory((h) => {
+      if (h[cursor] === here) return h;
+      const copy = [...h];
+      copy[cursor] = here;
+      return copy;
+    });
+  }, [cursor]);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputUrl.trim()) go(inputUrl);
   };
+
+  if (variant === 'mobile') {
+    return (
+      <div className="h-full w-full overflow-y-auto bg-bg">
+        <StartPage reduced={reduced} onOpen={go} openSiteInNewTab />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col bg-bg">
@@ -133,15 +166,17 @@ export default function BrowserApp() {
         <NavButton label="Forward" onClick={forward} disabled={!canForward} reduced={reduced}>
           <ArrowRight size={16} />
         </NavButton>
-        <NavButton label="Reload" onClick={reload} disabled={onStart} reduced={reduced}>
+        <NavButton label="Reload" onClick={reload} disabled={!embeddable} reduced={reduced}>
           <RotateCw size={15} />
         </NavButton>
 
-        {/* Address bar: a clean field on a single hairline underline, not a pill. */}
+        {/* Address bar: a clean field on a hairline underline that thickens on focus. */}
         <form onSubmit={submit} className="ml-1.5 min-w-0 flex-1">
-          <div className="flex items-center gap-2 border-b border-border px-1 py-1.5
-                          transition-colors focus-within:border-text">
-            {onStart ? (
+          <div
+            className="flex items-center gap-2 border-b border-border px-1 py-1.5 transition-[border-color,box-shadow]
+                       focus-within:border-text focus-within:shadow-[0_1px_0_0_rgb(var(--color-text))]"
+          >
+            {onStart || invalid ? (
               <Compass size={13} className="shrink-0 text-text-secondary" aria-hidden />
             ) : isSecure(url) ? (
               <Lock size={12} className="shrink-0 text-text-secondary" aria-hidden />
@@ -152,14 +187,12 @@ export default function BrowserApp() {
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
-              placeholder="Search or enter a site"
+              placeholder="Enter a site address"
               spellCheck={false}
               autoComplete="off"
               aria-label="Address"
-              // Window-dynamic: re-proportions with window width (cqi), max = original 12.5px.
-              style={{ fontSize: 'clamp(0.68rem, 1.5cqi, 0.78rem)' }}
-              className="min-w-0 flex-1 bg-transparent font-mono text-text
-                         outline-none placeholder:text-text-secondary/70"
+              className="min-w-0 flex-1 bg-transparent font-mono text-[0.8125rem] text-text
+                         outline-none placeholder:text-text-tertiary"
             />
           </div>
         </form>
@@ -170,11 +203,6 @@ export default function BrowserApp() {
         {isLoading && (
           <motion.div
             className="absolute inset-y-0 left-0 bg-text"
-            // Constant motion -> linear (Emil). Travel runs on the GPU: animate a
-            // full transform string (translateX in own-width %), never the `left`
-            // layout property (which forces layout/paint off the compositor).
-            // Reduced motion: a static indeterminate full-width bar at low
-            // opacity, no travel.
             style={reduced ? { left: 0, right: 0, opacity: 0.35 } : { width: '32%', opacity: 0.55 }}
             animate={reduced ? undefined : { transform: ['translateX(-100%)', 'translateX(312.5%)'] }}
             transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
@@ -183,19 +211,21 @@ export default function BrowserApp() {
       </div>
 
       {/* ── Content ── */}
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1" aria-busy={isLoading}>
         {onStart ? (
-          <StartPage mono={mono} reduced={reduced} onOpen={go} />
+          <div className="h-full w-full overflow-y-auto">
+            <StartPage reduced={reduced} onOpen={go} />
+          </div>
+        ) : invalid ? (
+          <NotAnAddressCard query={displayUrl(url)} reduced={reduced} />
         ) : embeddable ? (
           <iframe
+            ref={frameRef}
             key={`${url}#${reloadKey}`}
             src={url}
-            title={hostOf(url) ?? 'Browser'}
-            onLoad={() => setIsLoading(false)}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-            className="h-full w-full border-0 bg-white"
+            title={new URL(url).pathname.replace(/^\//, '') || 'Page'}
+            onLoad={onFrameLoad}
+            className="h-full w-full border-0 bg-bg"
           />
         ) : (
           <BlockedCard url={url} mono={mono} reduced={reduced} />
@@ -209,11 +239,6 @@ export default function BrowserApp() {
 /* Nav button - high-frequency action: instant, press-only feedback     */
 /* ─────────────────────────────────────────────────────────────────── */
 
-/**
- * Back / forward / reload are pressed constantly, so per Emil's frequency rule
- * they get NO entrance animation. The only motion is a restrained :active press
- * (scale 0.97), gated on reduced motion and a fine pointer via whileTap.
- */
 function NavButton({
   children, label, onClick, disabled, reduced,
 }: {
@@ -232,7 +257,7 @@ function NavButton({
       whileTap={reduced ? undefined : { scale: 0.97 }}
       transition={{ duration: 0.1, ease: EASE_OUT }}
       className="grid h-8 w-8 place-items-center text-text-secondary transition-colors
-                 hover:text-text disabled:opacity-25 disabled:hover:text-text-secondary"
+                 hover:text-text disabled:opacity-40 disabled:hover:text-text-secondary"
     >
       {children}
     </motion.button>
@@ -240,169 +265,156 @@ function NavButton({
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
-/* Start page - editorial tiles over a faint Plotter navigation texture */
+/* Start page - two hairline lists: pages shown here, sites in a new tab */
 /* ─────────────────────────────────────────────────────────────────── */
 
 function StartPage({
-  mono, reduced, onOpen,
+  reduced, onOpen, openSiteInNewTab = false,
 }: {
-  mono: boolean;
   reduced: boolean | null;
   onOpen: (url: string) => void;
+  /** Phone: the site pages open a real tab too (no in-app frame). */
+  openSiteInNewTab?: boolean;
 }) {
-  // Deterministic seeded linework. strokeSet draws abstract plotter marks in a
-  // 0..100 viewBox; kept extremely faint so it reads as quiet navigation
-  // texture, never decoration that fights the minimalism. Memoized so the
-  // generator runs once.
-  const lines = useMemo(() => (seed: number) => strokeSet(seed, 9), []);
-
   return (
-    <div className="relative h-full w-full overflow-auto">
-      {/* Backdrop: Plotter self-gates on mono + draws static (animate off by
-          default) and renders null in the color palette; we additionally only
-          mount it in mono so nothing ships in the Fun look. pointer-events-none
-          and very low opacity keep it a whisper behind the content. */}
-      {mono && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        >
-          <Plotter generator={lines} seed={7} strokeWidth={0.6} viewBox="0 0 100 100" />
-        </div>
-      )}
+    <motion.div
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+      className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-5 py-6 [@container(min-width:640px)]:px-8 [@container(min-width:640px)]:py-8"
+    >
+      <motion.p variants={reveal.item(reduced)} className="max-w-[60ch] text-sm leading-relaxed text-text-secondary">
+        {openSiteInNewTab
+          ? 'Pages from this site and my other sites. Each opens in a new tab.'
+          : 'Pages from this site open here. Other sites open in a new tab.'}
+      </motion.p>
 
-      <div className="relative grid h-full w-full place-items-center p-8">
-        <div className="w-full max-w-xl">
-          {/* Masthead: serif title + mono sub-line, hairline-anchored. The
-              start page is the most landing-like surface; restraint over a
-              hero. Staggers in once with the tiles. */}
-          <motion.div
-            variants={reveal.container(reduced)}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col"
-          >
-            <motion.h2
-              variants={reveal.item(reduced)}
-              className="font-display leading-none text-text"
-              // Window-dynamic masthead: scales with window width (cqi), max = original 30px.
-              style={{ fontSize: 'clamp(1.35rem, 4.6cqi, 1.875rem)' }}
-            >
-              Browser
-            </motion.h2>
-
-            <motion.div variants={reveal.item(reduced)} className="mt-2">
-              <MetaLabel className="text-text-secondary">
-                My work, live <span aria-hidden className="mx-1 opacity-40">/</span> anything else opens in a new tab
-              </MetaLabel>
-            </motion.div>
-
-            <motion.div variants={reveal.item(reduced)} className="mt-6">
-              <Hairline />
-            </motion.div>
-
-            {/* Tiles: hairline editorial rows, serif site name + mono URL. No
-                glass, no card fill. Index marker keeps the editorial register. */}
-            <div className="flex flex-col">
-              {START_LINKS.map((link, i) => (
-                <StartTile
-                  key={link.url}
-                  index={String(i + 1).padStart(2, '0')}
-                  label={link.label}
-                  note={link.note}
-                  url={link.url}
-                  reduced={reduced}
-                  onOpen={() => onOpen(link.url)}
-                />
-              ))}
-            </div>
-          </motion.div>
-        </div>
+      <div className="grid grid-cols-1 gap-8 [@container(min-width:820px)]:grid-cols-2 [@container(min-width:820px)]:gap-10">
+        <LinkGroup title="On this site" reduced={reduced}>
+          {SITE_LINKS.map((link) =>
+            openSiteInNewTab ? (
+              <ExternalRow key={link.url} link={link} reduced={reduced} />
+            ) : (
+              <SiteRow key={link.url} link={link} reduced={reduced} onOpen={() => onOpen(link.url)} />
+            ),
+          )}
+        </LinkGroup>
+        <LinkGroup title="Elsewhere" reduced={reduced}>
+          {EXTERNAL_LINKS.map((link) => (
+            <ExternalRow key={link.url} link={link} reduced={reduced} />
+          ))}
+        </LinkGroup>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-/**
- * StartTile - a single hairline navigation row.
- *
- * IndexRow-style read: mono index + serif site name, with the mono host below.
- * Hover is a hairline underline that grows under the name (transform-only, GPU,
- * gated to a fine pointer via the group). Press is a restrained scale(0.99),
- * gated on reduced motion. The trailing hairline rules the column.
- */
-function StartTile({
-  index, label, note, url, reduced, onOpen,
-}: {
-  index: string;
-  label: string;
-  note: string;
-  url: string;
-  reduced: boolean | null;
-  onOpen: () => void;
-}) {
-  const host = hostOf(url) ?? url;
+function LinkGroup({ title, reduced, children }: { title: string; reduced: boolean | null; children: React.ReactNode }) {
+  return (
+    <motion.section variants={reveal.item(reduced)} className="flex flex-col">
+      <h2 className="font-mono-meta pb-3 text-text-secondary">{title}</h2>
+      <Hairline />
+      <div className="flex flex-col">{children}</div>
+    </motion.section>
+  );
+}
+
+const ROW_CLASS =
+  'group flex min-h-[56px] w-full items-center gap-4 border-b border-border py-3.5 text-left transition-colors';
+
+/** Serif name with a hairline that grows on hover, over a one-line note. */
+function RowText({ link, reduced }: { link: StartLink; reduced: boolean | null }) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <span className="relative inline-block max-w-full self-start">
+        <span className="block truncate font-display text-lg leading-tight text-text">{link.label}</span>
+        <span
+          aria-hidden
+          className={cn(
+            'block h-px origin-left scale-x-0 bg-text/50 transition-transform duration-200',
+            reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-100',
+          )}
+        />
+      </span>
+      <span className="text-sm leading-snug text-text-secondary">{link.note}</span>
+    </span>
+  );
+}
+
+/** A page from this site: opens inside the Browser window. */
+function SiteRow({ link, reduced, onOpen }: { link: StartLink; reduced: boolean | null; onOpen: () => void }) {
   return (
     <motion.button
       type="button"
-      variants={reveal.item(reduced)}
       onClick={onOpen}
       whileTap={reduced ? undefined : { scale: 0.99 }}
       transition={{ duration: 0.12, ease: EASE_OUT }}
       data-testid="start-tile"
-      className="group flex w-full items-baseline gap-4 border-b border-border py-4 text-left"
+      className={ROW_CLASS}
     >
-      <MetaLabel className="w-8 shrink-0 justify-start text-text-secondary">{index}</MetaLabel>
-
-      <span className="min-w-0 flex-1">
-        <span className="relative inline-block max-w-full">
-          <span
-            className="block truncate font-display leading-tight text-text"
-            // Window-dynamic site name: scales with window width (cqi), max = original 18px.
-            style={{ fontSize: 'clamp(0.95rem, 2.8cqi, 1.125rem)' }}
-          >
-            {label}
-          </span>
-          {/* Hairline underline grows on hover (scaleX, transform-only). */}
-          <span
-            aria-hidden
-            className={cn(
-              'block h-px origin-left scale-x-0 bg-text/50 transition-transform duration-200',
-              // Gate hover motion to a fine pointer + real hover so a touch tap
-              // doesn't fire a false hover (Emil a11y rule).
-              reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-100',
-            )}
-          />
-        </span>
-        <span
-          className="mt-1 block truncate font-mono text-text-secondary"
-          // Window-dynamic host line: scales with window width (cqi), max = original 11.5px.
-          style={{ fontSize: 'clamp(0.62rem, 1.4cqi, 0.72rem)' }}
-        >
-          {host}
-        </span>
-      </span>
-
-      <span className="mt-1 hidden shrink-0 text-text-secondary/70 transition-colors group-hover:text-text sm:block">
-        <ExternalLink size={13} aria-hidden />
+      <RowText link={link} reduced={reduced} />
+      <span className="hidden shrink-0 font-mono text-xs text-text-secondary [@container(min-width:480px)]:block">
+        {link.url}
       </span>
     </motion.button>
   );
 }
 
+/** Another site: a real link that opens a new tab, labeled as such. */
+function ExternalRow({ link, reduced }: { link: StartLink; reduced: boolean | null }) {
+  const href = link.url;
+  const host = hostOf(href) ?? href.replace(/^\//, '');
+  return (
+    <motion.a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileTap={reduced ? undefined : { scale: 0.99 }}
+      transition={{ duration: 0.12, ease: EASE_OUT }}
+      data-testid="start-tile"
+      className={ROW_CLASS}
+    >
+      <RowText link={link} reduced={reduced} />
+      <span className="flex shrink-0 items-center gap-1.5 text-text-secondary transition-colors group-hover:text-text">
+        <span className="hidden font-mono text-xs [@container(min-width:480px)]:inline">{host}</span>
+        <ExternalLink size={13} aria-hidden />
+        <span className="sr-only">(opens in a new tab)</span>
+      </span>
+    </motion.a>
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────── */
-/* Blocked card - "open in new tab" over a faint dithered field         */
+/* Cards - an outside site (opens in a new tab) and input that is not    */
+/* a site address                                                        */
 /* ─────────────────────────────────────────────────────────────────── */
+
+function CardShell({ reduced, children }: { reduced: boolean | null; children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, transform: 'translateY(8px)' }}
+      animate={{ opacity: 1, transform: 'translateY(0px)' }}
+      transition={{ duration: 0.25, ease: EASE_OUT }}
+      className="relative w-full max-w-sm border border-border bg-bg/80 p-7 text-center backdrop-blur-sm"
+    >
+      <div className="mb-4 inline-grid h-11 w-11 place-items-center border border-border">
+        <Globe size={20} className="text-text-secondary" aria-hidden />
+      </div>
+      {children}
+    </motion.div>
+  );
+}
+
+const CARD_BUTTON =
+  'mt-5 inline-flex items-center gap-1.5 border border-text px-3.5 py-2 font-mono text-xs uppercase tracking-wider text-text ' +
+  'transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ' +
+  'hover:bg-text hover:text-bg motion-safe:active:scale-[0.97]';
 
 function BlockedCard({ url, mono, reduced }: { url: string; mono: boolean; reduced: boolean | null }) {
   const host = hostOf(url) ?? url;
   return (
     <div className="relative grid h-full w-full place-items-center overflow-hidden p-8">
-      {/* Faint dithered field instead of a flat background. Dither self-gates on
-          mono (plain img otherwise), so we only mount it in the mono palette to
-          keep the color look clean. Decorative, pointer-events-none, very low
-          opacity. There is no animation in Dither, so it is reduced-motion
-          neutral. */}
+      {/* Faint dithered field, mono palette only. Decorative, no animation. */}
       {mono && (
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.06]">
           <Dither
@@ -415,50 +427,36 @@ function BlockedCard({ url, mono, reduced }: { url: string; mono: boolean; reduc
         </div>
       )}
 
-      <motion.div
-        // This card mounts right when a cross-origin page is loading (main thread
-        // busy), so animate the full transform string instead of the `y` shorthand
-        // -> stays on the GPU and won't drop frames under load (Emil perf rule).
-        // Start from a visible offset + opacity, never from nothing. ease-out enter.
-        initial={reduced ? false : { opacity: 0, transform: 'translateY(8px)' }}
-        animate={{ opacity: 1, transform: 'translateY(0px)' }}
-        transition={{ duration: 0.25, ease: EASE_OUT }}
-        className="relative w-full max-w-sm border border-border bg-bg/80 p-7 text-center backdrop-blur-sm"
-      >
-        <div className="mb-4 inline-grid h-11 w-11 place-items-center border border-border">
-          <Globe size={20} className="text-text-secondary" aria-hidden />
-        </div>
-
-        <div
-          className="font-display text-text"
-          // Window-dynamic: scales with window width (cqi), max = original 17px.
-          style={{ fontSize: 'clamp(0.95rem, 2.6cqi, 1.0625rem)' }}
-        >
-          {host} can&apos;t be embedded
-        </div>
-
-        <p
-          className="mt-2 leading-relaxed text-text-secondary"
-          // Window-dynamic body: scales with window width (cqi), max = original 13px.
-          style={{ fontSize: 'clamp(0.72rem, 1.7cqi, 0.8125rem)' }}
-        >
-          Most sites block being shown inside another page. Open it in a real tab instead.
+      <CardShell reduced={reduced}>
+        <h2 className="font-display text-lg text-text [overflow-wrap:anywhere]">{host} opens in a new tab</h2>
+        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+          This site does not allow being shown inside another page.
         </p>
-
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          // Window-dynamic label: scales with window width (cqi), max = original 12px.
-          style={{ fontSize: 'clamp(0.68rem, 1.5cqi, 0.75rem)' }}
-          className="mt-5 inline-flex items-center gap-1.5 border border-text px-3.5 py-2 font-mono
-                     uppercase tracking-wider text-text transition-[transform,background-color,color]
-                     duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                     hover:bg-text hover:text-bg motion-safe:active:scale-[0.97]"
-        >
+        <a href={url} target="_blank" rel="noopener noreferrer" className={CARD_BUTTON}>
           Open in new tab <ExternalLink size={13} aria-hidden />
         </a>
-      </motion.div>
+      </CardShell>
+    </div>
+  );
+}
+
+function NotAnAddressCard({ query, reduced }: { query: string; reduced: boolean | null }) {
+  return (
+    <div className="relative grid h-full w-full place-items-center overflow-hidden p-8">
+      <CardShell reduced={reduced}>
+        <h2 className="font-display text-lg text-text">That is not a site address</h2>
+        <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+          Enter one like opencodeintel.com, or a page on this site like /writing.
+        </p>
+        <a
+          href={`https://duckduckgo.com/?q=${encodeURIComponent(query)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={CARD_BUTTON}
+        >
+          Search the web in a new tab <ExternalLink size={13} aria-hidden />
+        </a>
+      </CardShell>
     </div>
   );
 }

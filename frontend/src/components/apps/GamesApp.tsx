@@ -29,7 +29,7 @@
 
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, RotateCcw, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Pause, Play } from 'lucide-react';
 import { useIsMono } from '@/hooks/usePalette';
 import { useSwipe } from '@/hooks/useSwipe';
 import { Hairline, MetaLabel } from '@/components/editorial';
@@ -68,7 +68,7 @@ const CARDS = [
     title: 'Snake',
     subtitle: 'Nokia 3310 edition',
     genre: 'Arcade',
-    controls: '← → ↑ ↓ · Space pause',
+    controls: 'Arrow keys or WASD. Space pauses.',
     controlsMobile: 'Swipe or tap controls',
     hsKey: 'devos-snake-hs',
     hsLabel: 'pts',
@@ -78,7 +78,7 @@ const CARDS = [
     title: 'Tetris',
     subtitle: "The programmer's meditation",
     genre: 'Puzzle',
-    controls: '← → ↑ · Space drop · P pause',
+    controls: 'Arrows move and rotate. Space drops. P pauses.',
     controlsMobile: 'Tap controls',
     hsKey: 'devos-tetris-hs',
     hsLabel: 'pts',
@@ -88,7 +88,7 @@ const CARDS = [
     title: 'Type Racer',
     subtitle: 'Code faster than your linter',
     genre: 'Reflex',
-    controls: 'Start typing to begin',
+    controls: 'Type the snippet. The timer starts on your first key.',
     controlsMobile: 'Tap to type',
     hsKey: 'devos-typeracer-hs',
     hsLabel: 'WPM',
@@ -97,29 +97,59 @@ const CARDS = [
 
 function bestScore(key: string): number {
   if (typeof window === 'undefined') return 0;
-  return parseInt(localStorage.getItem(key) ?? '0', 10) || 0;
+  try {
+    return parseInt(localStorage.getItem(key) ?? '0', 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Fun palette button fills. White text on each passes 4.5:1 (the lighter
+// Tailwind 500 greens measured 2.3:1).
+const FUN = {
+  snake:  { fill: '#15803d', hover: '#166534' },
+  tetris: { fill: '#4f46e5', hover: '#4338ca' },
+  typer:  { fill: '#047857', hover: '#065f46' },
+} as const;
+
+// Keys a game handles while its root has focus. Space and Enter are left to a
+// focused button so they press it, the way they do everywhere else.
+function isButtonTarget(e: React.KeyboardEvent) {
+  const t = e.target as HTMLElement;
+  return t !== e.currentTarget && t.closest('button') !== null;
+}
+
+// Pause a game when focus leaves its root (title bar click, another window,
+// Tab out), so it never keeps running while its keys go somewhere else.
+function leftRoot(e: React.FocusEvent) {
+  const next = e.relatedTarget as Node | null;
+  return !next || !e.currentTarget.contains(next);
 }
 
 // One numbered, ruled index entry. Serif name, mono caption line, mono best on
 // the right. Hover is a graphite tint + tiny translate (transform/opacity only,
 // ease-out); the row presses to 0.985 on :active. No per-frame motion.
 function SelectorEntry({
-  number,
   card,
   reduced,
   isMobile,
+  autoFocus,
   onSelect,
 }: {
-  number: string;
   card: (typeof CARDS)[number];
   reduced: boolean | null;
   isMobile: boolean;
+  /** Focus this row on mount (the game the visitor just left). */
+  autoFocus: boolean;
   onSelect: () => void;
 }) {
   const best = bestScore(card.hsKey);
   const controls = isMobile ? card.controlsMobile : card.controls;
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (autoFocus) ref.current?.focus({ preventScroll: true }); }, [autoFocus]);
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onSelect}
       data-testid="index-row"
@@ -128,36 +158,29 @@ function SelectorEntry({
                   hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
                   active:scale-[0.985]`}
     >
-      <MetaLabel className="shrink-0 w-7 justify-start tabular-nums text-text-secondary/55 group-hover:text-text-secondary">
-        {number}
-      </MetaLabel>
-
       <span className="flex-1 min-w-0">
         <span
-          className={`block font-display leading-tight truncate text-text-secondary group-hover:text-text
-                      transition-[color,transform] duration-150 ease-out text-[clamp(1.15rem,3.4cqi,1.9rem)]
+          className={`block font-display leading-tight truncate text-text
+                      transition-transform duration-150 ease-out text-[clamp(1.25rem,3.4cqi,1.9rem)]
                       ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
         >
           {card.title}
         </span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-text-secondary/70">
-          <MetaLabel>{card.genre}</MetaLabel>
-          <span aria-hidden className="font-mono-meta opacity-40">·</span>
-          <MetaLabel className="truncate">{controls}</MetaLabel>
-        </span>
+        <span className="mt-1 block text-sm leading-snug text-text-secondary">{card.subtitle}</span>
+        <MetaLabel as="p" className="mt-1.5 text-text-tertiary">{controls}</MetaLabel>
       </span>
 
       {best > 0 && (
         <span className="shrink-0 self-center flex flex-col items-end gap-0.5">
           <MetaLabel className="text-text tabular-nums">{best}</MetaLabel>
-          <MetaLabel className="text-text-secondary/50">{`Best ${card.hsLabel}`}</MetaLabel>
+          <MetaLabel className="text-text-tertiary">{`Best ${card.hsLabel}`}</MetaLabel>
         </span>
       )}
     </button>
   );
 }
 
-function Launcher({ onSelect, isMobile }: { onSelect: (id: GameId) => void; isMobile: boolean }) {
+function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (id: GameId) => void; isMobile: boolean; lastGame: GameId | null }) {
   const reduced = useReducedMotion();
 
   return (
@@ -169,32 +192,30 @@ function Launcher({ onSelect, isMobile }: { onSelect: (id: GameId) => void; isMo
       </div>
 
       {/* ── Masthead ── serif title + mono spec line ── */}
-      <div className="relative z-10 px-5 pt-6 pb-4 flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <MetaLabel as="p">Arcade</MetaLabel>
-          <MetaLabel className="text-text-secondary/60 tabular-nums">{String(CARDS.length).padStart(2, '0')}</MetaLabel>
-        </div>
-        <h1 className="editorial-head text-text leading-[1.05]">Three classics, one window.</h1>
-        <MetaLabel className="text-text-secondary/70">Snake · Tetris · Type Racer</MetaLabel>
+      <div className="relative z-10 w-full max-w-3xl px-5 pt-6 pb-4 flex flex-col gap-3">
+        <MetaLabel as="p">Arcade</MetaLabel>
+        <h1 className="editorial-head text-text leading-[1.05] text-[clamp(1.75rem,7cqi,3.25rem)] [overflow-wrap:normal] [text-wrap:balance]">
+          {isMobile ? 'Three small games.' : 'Three classics, one window.'}
+        </h1>
       </div>
 
-      <Hairline className="relative z-10 mx-5" />
+      <Hairline className="relative z-10 mx-5 max-w-[calc(48rem-2.5rem)]" />
 
-      {/* ── Numbered index ── staggers in ONCE on mount (never on scroll) ── */}
+      {/* ── Index ── staggers in ONCE on mount (never on scroll) ── */}
       <div className="relative z-10 flex-1 overflow-y-auto px-2 py-1">
         <motion.div
           variants={reveal.container(reduced)}
           initial="hidden"
           animate="show"
-          className="flex flex-col"
+          className="flex w-full max-w-3xl flex-col"
         >
           {CARDS.map((card, i) => (
             <motion.div key={card.id} variants={reveal.item(reduced)}>
               <SelectorEntry
-                number={String(i + 1).padStart(2, '0')}
                 card={card}
                 reduced={reduced}
                 isMobile={isMobile}
+                autoFocus={lastGame === card.id}
                 onSelect={() => onSelect(card.id)}
               />
               {i < CARDS.length - 1 && <Hairline className="mx-1" />}
@@ -213,11 +234,11 @@ function Launcher({ onSelect, isMobile }: { onSelect: (id: GameId) => void; isMo
 // A single HUD stat: tiny mono uppercase label over a value. The value updates
 // live during play and is rendered plainly - NO entrance/score-pop animation,
 // because the HUD is a high-frequency surface (emil frequency rule).
-function HudStat({ label, value, emphatic = false }: { label: string; value: React.ReactNode; emphatic?: boolean }) {
+function HudStat({ label, value, narrowHidden = false }: { label: string; value: React.ReactNode; narrowHidden?: boolean }) {
   return (
-    <div className="flex flex-col items-end gap-0.5 text-right">
-      <MetaLabel className="text-text-secondary/55">{label}</MetaLabel>
-      <span className={`font-mono-meta tabular-nums leading-none text-[clamp(0.82rem,2cqi,1rem)] ${emphatic ? 'text-text' : 'text-text'}`}>
+    <div className={`flex-col items-end gap-0.5 text-right ${narrowHidden ? 'hidden [@container(min-width:480px)]:flex' : 'flex'}`}>
+      <MetaLabel className="text-text-tertiary">{label}</MetaLabel>
+      <span className="font-mono-meta tabular-nums leading-none text-text whitespace-nowrap text-[clamp(0.82rem,2cqi,1rem)]">
         {value}
       </span>
     </div>
@@ -225,11 +246,11 @@ function HudStat({ label, value, emphatic = false }: { label: string; value: Rea
 }
 
 function GameHeader({
-  title, score, best, scoreLabel = 'Score', bestLabel = 'Best',
+  title, score, best, scoreLabel = 'Score', bestLabel = 'Best', bestNarrowHidden = false,
   onBack, onReset, children,
 }: {
   title: string; score?: number | string; best?: number | string;
-  scoreLabel?: string; bestLabel?: string;
+  scoreLabel?: string; bestLabel?: string; bestNarrowHidden?: boolean;
   onBack: () => void; onReset: () => void; children?: React.ReactNode;
 }) {
   // Mono editorial HUD frame: a single hairline rule under a quiet bar.
@@ -241,12 +262,12 @@ function GameHeader({
         <button onClick={onBack} className={iconBtn} aria-label="Back to arcade">
           <ArrowLeft size={15} />
         </button>
-        <span className="font-display text-text leading-none text-[clamp(1rem,2.6cqi,1.3rem)]">{title}</span>
+        <span className="font-display text-text leading-none whitespace-nowrap text-[clamp(1rem,2.6cqi,1.3rem)]">{title}</span>
         <div className="flex-1" />
-        <div className="flex items-center gap-4 sm:gap-5">
+        <div className="flex items-center gap-4 [@container(min-width:640px)]:gap-5">
           {children}
           {score !== undefined && <HudStat label={scoreLabel} value={score} />}
-          {best !== undefined && <HudStat label={bestLabel} value={best} emphatic />}
+          {best !== undefined && <HudStat label={bestLabel} value={best} narrowHidden={bestNarrowHidden} />}
         </div>
         <button onClick={onReset} className={iconBtn} aria-label="Reset game">
           <RotateCcw size={14} />
@@ -271,15 +292,18 @@ const OVERLAY_EASE = [0.23, 1, 0.32, 1] as const;
 // 'ghost' = hairline outline. Mono palette keeps it monochrome; Fun keeps the
 // per-game accent passed in via `accent`/`accentHover`.
 function OverlayButton({
-  children, onClick, variant = 'primary', mono, accent, accentHover,
+  children, onClick, variant = 'primary', mono, accent, accentHover, size = 'lg',
 }: {
   children: React.ReactNode; onClick: () => void;
   variant?: 'primary' | 'ghost'; mono: boolean;
   accent?: string; accentHover?: string;
+  /** 'lg' for overlays, 'sm' for the 36px control bar. */
+  size?: 'lg' | 'sm';
 }) {
   if (variant === 'ghost') {
     return (
       <button
+        type="button"
         onClick={onClick}
         className="inline-flex items-center justify-center gap-2 border border-border px-5 py-2 text-text font-medium
                    transition-[transform,border-color] duration-150 ease-out hover:border-text/45 active:scale-[0.97]
@@ -295,9 +319,10 @@ function OverlayButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 font-semibold
+      type="button"
+      className={`inline-flex items-center justify-center gap-2 font-semibold
                   transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97]
-                  font-mono-meta ${colorCls}`}
+                  font-mono-meta ${size === 'sm' ? 'h-9 px-4' : 'px-6 py-2.5'} ${colorCls}`}
       style={mono ? undefined : { background: accent }}
       onMouseEnter={mono || !accentHover ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accentHover; }}
       onMouseLeave={mono || !accent ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accent; }}
@@ -308,9 +333,12 @@ function OverlayButton({
 }
 
 // Scrim + centered card that animates in once on (re)mount of the status.
+// The boards are always drawn black, so the overlay always uses the dark
+// tokens (the .dark class re-scopes the color variables), in light mode too.
+// Without it, light mode washed the board to a muddy gray.
 function GameOverlay({ reduced, children }: { reduced: boolean | null; children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-bg/70 backdrop-blur-[2px]">
+    <div className="dark absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-[2px]">
       <motion.div
         initial={reduced ? false : { opacity: 0, y: 8, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -328,15 +356,21 @@ function ControlsHint({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-shrink-0">
       <Hairline />
-      <div className="flex items-center justify-center py-2.5 bg-surface/10">
-        <MetaLabel className="text-text-secondary/60">{children}</MetaLabel>
+      <div className="flex items-center justify-center px-4 py-2.5 bg-surface/10 text-center">
+        <MetaLabel className="text-text-secondary">{children}</MetaLabel>
       </div>
     </div>
   );
 }
 
+// Announces game state changes (start, pause, game over) to screen readers.
+function GameStatus({ children }: { children: React.ReactNode }) {
+  return <p role="status" aria-live="polite" className="sr-only">{children}</p>;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// SNAKE - ref-based, window listener (no text inputs here so it's fine)
+// SNAKE - keys are handled on the focused game root only, so arrow keys and
+// Space keep working in every other window (they used to be captured globally).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SNAKE_GRID = 20;
@@ -347,7 +381,8 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
   const [cellSize, setCellSize] = useState(18);
   const [status, setStatus] = useState<'idle' | 'playing' | 'paused' | 'over'>('idle');
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(() => typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-snake-hs') ?? '0') : 0);
+  const [best, setBest] = useState(() => bestScore('devos-snake-hs'));
+  const rootRef      = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loopRef      = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -359,11 +394,21 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
 
   useEffect(() => { statusRef.current = status; }, [status]);
 
+  // Take focus on open so the keys work at once (and only here).
+  useEffect(() => { rootRef.current?.focus({ preventScroll: true }); }, []);
+  const refocus = useCallback(() => rootRef.current?.focus({ preventScroll: true }), []);
+
+  // Cell size from both dimensions of the board area, so the whole board
+  // always fits (it used to overflow short windows) and grows when maximized.
   useEffect(() => {
-    const obs = new ResizeObserver(() => {
-      if (containerRef.current) setCellSize(containerRef.current.clientHeight > 500 ? 22 : 18);
-    });
+    const update = () => {
+      const el = containerRef.current; if (!el) return;
+      const fit = Math.floor(Math.min(el.clientWidth - 32, el.clientHeight - 32) / SNAKE_GRID);
+      setCellSize(Math.max(10, Math.min(fit, 32)));
+    };
+    const obs = new ResizeObserver(update);
     if (containerRef.current) obs.observe(containerRef.current);
+    update();
     return () => obs.disconnect();
   }, []);
 
@@ -414,7 +459,9 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
     snakeRef.current = [{ x: 10, y: 10 }]; foodRef.current = randPos();
     scoreRef.current = 0; dirRef.current = 'RIGHT';
     setScore(0); setStatus('playing'); draw();
-  }, [draw]);
+    // The overlay button that started the game unmounts; keep focus in the game.
+    refocus();
+  }, [draw, refocus]);
 
   useEffect(() => {
     if (status === 'playing') { loopRef.current = setInterval(loop, 140); return () => clearInterval(loopRef.current); }
@@ -434,24 +481,29 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
     setStatus(s => { const next = s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s; statusRef.current = next; return next; });
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      const map: Record<string, 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'> = {
-        ArrowUp: 'UP', w: 'UP', W: 'UP', ArrowDown: 'DOWN', s: 'DOWN', S: 'DOWN',
-        ArrowLeft: 'LEFT', a: 'LEFT', A: 'LEFT', ArrowRight: 'RIGHT', d: 'RIGHT', D: 'RIGHT',
-      };
-      const d = map[e.key];
-      if (d) { e.preventDefault(); changeDir(d); }
-      if (e.key === ' ') {
-        e.preventDefault();
-        togglePause();
-      }
+  const resume = useCallback(() => {
+    statusRef.current = 'playing'; setStatus('playing'); refocus();
+  }, [refocus]);
+
+  // Space: start from idle / game over, otherwise pause or resume. On a
+  // focused button, Space and Enter press that button instead.
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const map: Record<string, 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'> = {
+      ArrowUp: 'UP', w: 'UP', W: 'UP', ArrowDown: 'DOWN', s: 'DOWN', S: 'DOWN',
+      ArrowLeft: 'LEFT', a: 'LEFT', A: 'LEFT', ArrowRight: 'RIGHT', d: 'RIGHT', D: 'RIGHT',
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [changeDir, togglePause]);
+    const d = map[e.key];
+    if (d) { e.preventDefault(); changeDir(d); return; }
+    if (e.key === ' ' && !isButtonTarget(e)) {
+      e.preventDefault();
+      if (statusRef.current === 'idle' || statusRef.current === 'over') startGame();
+      else togglePause();
+    }
+  }, [changeDir, togglePause, startGame]);
+
+  const handleBlur = useCallback((e: React.FocusEvent) => {
+    if (leftRoot(e) && statusRef.current === 'playing') togglePause();
+  }, [togglePause]);
 
   // Swipe input maps to the same guarded direction change.
   const swipe = useSwipe({ onSwipe: (dir) => changeDir(({ left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN' } as const)[dir]) });
@@ -461,25 +513,40 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
   // Shared button style for on-screen controls - mirrors Tetris exactly.
   const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none";
 
+  const announce =
+    status === 'playing' ? 'Snake started.' :
+    status === 'paused' ? 'Paused.' :
+    status === 'over' ? `Game over. ${score} ${score === 1 ? 'point' : 'points'}.` : '';
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div
+      ref={rootRef}
+      tabIndex={0}
+      aria-label="Snake"
+      onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
+      data-testid="snake-root"
+      className="h-full flex flex-col overflow-hidden focus-visible:[outline-offset:-2px]"
+    >
+      <GameStatus>{announce}</GameStatus>
       <GameHeader title="Snake" score={score} best={best} onBack={onBack} onReset={startGame} />
       <div ref={containerRef} {...swipe} className="flex-1 flex items-center justify-center p-4 bg-surface/20 overflow-hidden touch-none">
         <div className="relative">
-          <canvas ref={canvasRef} width={canvasSize} height={canvasSize} className="border border-border" />
+          <canvas ref={canvasRef} width={canvasSize} height={canvasSize} role="img" aria-label="Snake board" className="block border border-border" />
           {status !== 'playing' && (
             <GameOverlay reduced={reduced} key={status}>
               {status === 'idle' && (
                 <>
                   <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Snake</h2>
-                  <MetaLabel className="text-text-secondary/65">Eat · grow · don&apos;t bite yourself</MetaLabel>
-                  <OverlayButton onClick={startGame} mono={mono} accent="#22c55e" accentHover="#4ade80">Start</OverlayButton>
+                  <MetaLabel className="text-text-secondary">{isMobile ? 'Swipe to steer' : 'Press Space to start'}</MetaLabel>
+                  <OverlayButton onClick={startGame} mono={mono} accent={FUN.snake.fill} accentHover={FUN.snake.hover}>Start</OverlayButton>
                 </>
               )}
               {status === 'paused' && (
                 <>
                   <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Paused</h2>
-                  <OverlayButton onClick={() => setStatus('playing')} mono={mono} accent="#22c55e" accentHover="#4ade80">Resume</OverlayButton>
+                  {!isMobile && <MetaLabel className="text-text-secondary">Space to resume</MetaLabel>}
+                  <OverlayButton onClick={resume} mono={mono} accent={FUN.snake.fill} accentHover={FUN.snake.hover}>Resume</OverlayButton>
                 </>
               )}
               {status === 'over' && (
@@ -487,10 +554,10 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
                   <h2 className="font-display text-text leading-none text-[clamp(1.6rem,5cqi,2.5rem)]">Game Over</h2>
                   <div className="flex flex-col items-center gap-1">
                     <span className="font-mono-meta tabular-nums text-text text-[clamp(1.1rem,3cqi,1.5rem)]">{score}</span>
-                    <MetaLabel className="text-text-secondary/55">Points</MetaLabel>
+                    <MetaLabel className="text-text-secondary">Points</MetaLabel>
                   </div>
                   {score > 0 && score === best && <MetaLabel className="text-text">New best</MetaLabel>}
-                  <OverlayButton onClick={startGame} mono={mono} accent="#22c55e" accentHover="#4ade80">Play again</OverlayButton>
+                  <OverlayButton onClick={startGame} mono={mono} accent={FUN.snake.fill} accentHover={FUN.snake.hover}>Play again</OverlayButton>
                 </>
               )}
             </GameOverlay>
@@ -503,39 +570,38 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
         <Hairline />
         <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface/10">
           {/* D-pad */}
-          <button className={ctrlBtn} onClick={() => changeDir('UP')} title="Up (↑)" aria-label="Move up">
+          <button type="button" className={ctrlBtn} onClick={() => changeDir('UP')} title="Up (↑)" aria-label="Move up">
             <ChevronUp size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => changeDir('LEFT')} title="Left (←)" aria-label="Move left">
+          <button type="button" className={ctrlBtn} onClick={() => changeDir('LEFT')} title="Left (←)" aria-label="Move left">
             <ChevronLeft size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => changeDir('DOWN')} title="Down (↓)" aria-label="Move down">
+          <button type="button" className={ctrlBtn} onClick={() => changeDir('DOWN')} title="Down (↓)" aria-label="Move down">
             <ChevronDown size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => changeDir('RIGHT')} title="Right (→)" aria-label="Move right">
+          <button type="button" className={ctrlBtn} onClick={() => changeDir('RIGHT')} title="Right (→)" aria-label="Move right">
             <ChevronRight size={16} />
           </button>
 
           <div className="w-px h-5 bg-border mx-1" />
 
           {/* Action button - Start when idle/over, otherwise pause/resume */}
-          <button
-            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] ${
-              mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
-            }`}
-            style={mono ? undefined : { background: '#22c55e' }}
+          <OverlayButton
+            size="sm"
+            mono={mono}
+            accent={FUN.snake.fill}
+            accentHover={FUN.snake.hover}
             onClick={() => {
               if (status === 'idle' || status === 'over') startGame();
               else togglePause();
             }}
-            title="Start / Pause (Space)"
           >
             {status === 'idle' || status === 'over' ? 'Start' : status === 'paused' ? 'Resume' : 'Pause'}
-          </button>
+          </OverlayButton>
         </div>
       </div>
 
-      <ControlsHint>{isMobile ? 'Swipe or tap the controls' : 'Arrow keys / WASD · Space to pause'}</ControlsHint>
+      <ControlsHint>{isMobile ? 'Swipe or tap the controls' : 'Arrow keys or WASD to steer. Space to pause.'}</ControlsHint>
     </div>
   );
 }
@@ -713,7 +779,7 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
   const reduced = useReducedMotion();
   const [state, dispatch] = useReducer(
     tetrisReducer,
-    freshTetris(typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-tetris-hs') ?? '0') : 0)
+    freshTetris(bestScore('devos-tetris-hs'))
   );
 
   // Responsive cell size - recalculates whenever the game area resizes
@@ -725,7 +791,10 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
   const intervalRef  = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Auto-focus container so keyboard events are captured
-  useEffect(() => { containerRef.current?.focus(); }, []);
+  useEffect(() => { containerRef.current?.focus({ preventScroll: true }); }, []);
+  const refocus = useCallback(() => containerRef.current?.focus({ preventScroll: true }), []);
+  const start = useCallback(() => { dispatch({ type: 'START' }); refocus(); }, [refocus]);
+  const resume = useCallback(() => { dispatch({ type: 'TOGGLE_PAUSE' }); refocus(); }, [refocus]);
 
   // Responsive cell size
   useEffect(() => {
@@ -756,6 +825,8 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
 
   // Keyboard handler on the focused container div - fixes arrow key issue in small windows
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // On a focused button, Space and Enter press that button.
+    if ((e.key === ' ' || e.key === 'Enter') && isButtonTarget(e)) return;
     switch (e.key) {
       case 'ArrowLeft':  case 'a': case 'A': e.preventDefault(); dispatch({ type: 'MOVE', dx: -1 }); break;
       case 'ArrowRight': case 'd': case 'D': e.preventDefault(); dispatch({ type: 'MOVE', dx: 1 }); break;
@@ -770,6 +841,14 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
       case 'p': case 'P': e.preventDefault(); dispatch({ type: 'TOGGLE_PAUSE' }); break;
     }
   }, [state.status]);
+
+  // Leaving the game (title bar click, another window) pauses it, so the
+  // piece never keeps falling while the keys go somewhere else.
+  const statusRef = useRef(state.status);
+  useEffect(() => { statusRef.current = state.status; }, [state.status]);
+  const handleBlur = useCallback((e: React.FocusEvent) => {
+    if (leftRoot(e) && statusRef.current === 'playing') dispatch({ type: 'TOGGLE_PAUSE' });
+  }, []);
 
   // Draw main board
   useEffect(() => {
@@ -792,14 +871,7 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
       const col = tetrisCellColor(TETROMINOES[state.active.pieceIdx].color, mono);
       for (const [r, c] of getOccupied(state.active)) if (r >= 0) drawTetCell(ctx, c, r, col, cs, 1);
     }
-    if (state.status === 'paused') {
-      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = 'white'; ctx.font = `bold ${Math.round(cs * 0.8)}px system-ui`; ctx.textAlign = 'center';
-      ctx.fillText('PAUSED', W / 2, H / 2 - 6);
-      ctx.font = `${Math.round(cs * 0.55)}px system-ui`; ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.fillText(isMobile ? 'Tap pause to resume' : 'P or Space to resume', W / 2, H / 2 + cs);
-    }
-  }, [state, cs, mono, isMobile]);
+  }, [state, cs, mono]);
 
   // Draw next piece preview
   useEffect(() => {
@@ -824,11 +896,17 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
     <div
       ref={containerRef}
       tabIndex={0}
+      aria-label="Tetris"
       onKeyDown={handleKeyDown}
-      className="h-full flex flex-col overflow-hidden"
+      onBlur={handleBlur}
+      data-testid="tetris-root"
+      className="h-full flex flex-col overflow-hidden focus-visible:[outline-offset:-2px]"
     >
-      <GameHeader title="Tetris" score={state.score} best={state.best} onBack={onBack} onReset={() => dispatch({ type: 'RESET' })}>
-        <HudStat label="Lines" value={state.lines} />
+      <GameStatus>
+        {state.status === 'playing' ? 'Tetris started.' : state.status === 'paused' ? 'Paused.' : state.status === 'over' ? `Game over. ${state.score} points.` : ''}
+      </GameStatus>
+      <GameHeader title="Tetris" score={state.score} best={state.best} bestNarrowHidden onBack={onBack} onReset={() => dispatch({ type: 'RESET' })}>
+        <HudStat label="Lines" value={state.lines} narrowHidden />
         <HudStat label="Level" value={state.level} />
       </GameHeader>
 
@@ -839,25 +917,33 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
             ref={canvasRef}
             width={T_COLS * cs}
             height={T_ROWS * cs}
+            role="img"
+            aria-label="Tetris board"
             className="border border-border block"
           />
-          {(state.status === 'idle' || state.status === 'over') && (
+          {state.status !== 'playing' && (
             <GameOverlay reduced={reduced} key={state.status}>
               {state.status === 'idle' ? (
                 <>
                   <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Tetris</h2>
-                  <MetaLabel className="text-text-secondary/65">{isMobile ? 'Tap Start to begin' : 'Click Start or press Space'}</MetaLabel>
-                  <OverlayButton onClick={() => dispatch({ type: 'START' })} mono={mono} accent="#6366f1" accentHover="#818cf8">Start</OverlayButton>
+                  <MetaLabel className="text-text-secondary">{isMobile ? 'Tap Start to begin' : 'Press Space to start'}</MetaLabel>
+                  <OverlayButton onClick={start} mono={mono} accent={FUN.tetris.fill} accentHover={FUN.tetris.hover}>Start</OverlayButton>
+                </>
+              ) : state.status === 'paused' ? (
+                <>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Paused</h2>
+                  {!isMobile && <MetaLabel className="text-text-secondary">P or Space to resume</MetaLabel>}
+                  <OverlayButton onClick={resume} mono={mono} accent={FUN.tetris.fill} accentHover={FUN.tetris.hover}>Resume</OverlayButton>
                 </>
               ) : (
                 <>
                   <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Game Over</h2>
                   <div className="flex flex-col items-center gap-1">
                     <span className="font-mono-meta tabular-nums text-text text-[clamp(1.1rem,3cqi,1.5rem)]">{state.score.toLocaleString()}</span>
-                    <MetaLabel className="text-text-secondary/55">Points</MetaLabel>
+                    <MetaLabel className="text-text-secondary">Points</MetaLabel>
                   </div>
                   {state.score >= state.best && state.score > 0 && <MetaLabel className="text-text">New best</MetaLabel>}
-                  <OverlayButton onClick={() => dispatch({ type: 'START' })} mono={mono} accent="#6366f1" accentHover="#818cf8">Play again</OverlayButton>
+                  <OverlayButton onClick={start} mono={mono} accent={FUN.tetris.fill} accentHover={FUN.tetris.hover}>Play again</OverlayButton>
                 </>
               )}
             </GameOverlay>
@@ -867,7 +953,7 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
         {/* Side panel */}
         <div className="flex flex-col gap-3 flex-shrink-0">
           <div className="border border-border p-2 text-center">
-            <MetaLabel as="p" className="text-text-secondary/60 justify-center mb-1.5">Next</MetaLabel>
+            <MetaLabel as="p" className="text-text-secondary justify-center mb-1.5">Next</MetaLabel>
             <canvas ref={previewRef} width={previewSize} height={previewSize} style={{ width: previewSize, height: previewSize }} />
           </div>
         </div>
@@ -878,47 +964,50 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
         <Hairline />
         <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface/10">
           {/* D-pad */}
-          <button className={ctrlBtn} onClick={() => dispatch({ type: 'ROTATE' })} title="Rotate (↑)" aria-label="Rotate">
+          <button type="button" className={ctrlBtn} onClick={() => dispatch({ type: 'ROTATE' })} title="Rotate (↑)" aria-label="Rotate">
             <ChevronUp size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: -1 })} title="Left (←)" aria-label="Move left">
+          <button type="button" className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: -1 })} title="Left (←)" aria-label="Move left">
             <ChevronLeft size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => dispatch({ type: 'SOFT_DROP' })} title="Soft drop (↓)" aria-label="Soft drop">
+          <button type="button" className={ctrlBtn} onClick={() => dispatch({ type: 'SOFT_DROP' })} title="Soft drop (↓)" aria-label="Soft drop">
             <ChevronDown size={16} />
           </button>
-          <button className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: 1 })} title="Right (→)" aria-label="Move right">
+          <button type="button" className={ctrlBtn} onClick={() => dispatch({ type: 'MOVE', dx: 1 })} title="Right (→)" aria-label="Move right">
             <ChevronRight size={16} />
           </button>
 
           <div className="w-px h-5 bg-border mx-1" />
 
           {/* Action buttons */}
-          <button
-            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] ${
-              mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
-            }`}
-            style={mono ? undefined : { background: '#6366f1' }}
+          <OverlayButton
+            size="sm"
+            mono={mono}
+            accent={FUN.tetris.fill}
+            accentHover={FUN.tetris.hover}
             onClick={() => {
-              if (state.status === 'idle' || state.status === 'over') dispatch({ type: 'START' });
+              if (state.status === 'idle' || state.status === 'over') start();
               else dispatch({ type: 'HARD_DROP' });
             }}
-            title="Hard drop (Space)"
           >
             {state.status === 'idle' || state.status === 'over' ? 'Start' : 'Drop'}
-          </button>
+          </OverlayButton>
           <button
+            type="button"
             className={ctrlBtn}
-            onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })}
-            title="Pause (P)"
-            aria-label="Pause"
+            onClick={() => (state.status === 'paused' ? resume() : dispatch({ type: 'TOGGLE_PAUSE' }))}
+            title={state.status === 'paused' ? 'Resume (P)' : 'Pause (P)'}
+            aria-label={state.status === 'paused' ? 'Resume' : 'Pause'}
+            aria-pressed={state.status === 'paused'}
           >
-            {state.status === 'paused' ? '▶' : '⏸'}
+            {state.status === 'paused' ? <Play size={15} aria-hidden /> : <Pause size={15} aria-hidden />}
           </button>
         </div>
       </div>
 
-      {isMobile && <ControlsHint>Tap the controls below</ControlsHint>}
+      <ControlsHint>
+        {isMobile ? 'Tap the controls below' : 'Arrows move, ↑ rotates, ↓ drops faster. Space drops. P pauses.'}
+      </ControlsHint>
     </div>
   );
 }
@@ -960,7 +1049,7 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
   const [elapsed,    setElapsed]    = useState(0);
   const [finalWpm,   setFinalWpm]   = useState(0);
   const [accuracy,   setAccuracy]   = useState(100);
-  const [best,       setBest]       = useState(() => typeof window !== 'undefined' ? parseInt(localStorage.getItem('devos-typeracer-hs') ?? '0') : 0);
+  const [best,       setBest]       = useState(() => bestScore('devos-typeracer-hs'));
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const startRef = useRef<number | null>(null);
@@ -1010,7 +1099,7 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
         title="Type Racer"
         score={currentWpm > 0 ? `${currentWpm} WPM` : '--'}
         best={best > 0 ? `${best} WPM` : '--'}
-        scoreLabel="Current" bestLabel="Best"
+        scoreLabel="Current" bestLabel="Best" bestNarrowHidden
         onBack={onBack} onReset={reset}
       >
         {/* Accuracy keeps its color-not-only quality tiering (mono: opacity). */}
@@ -1024,20 +1113,21 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
             }>{accuracy}%</span>
           }
         />
-        <HudStat label="Time" value={`${elapsed.toFixed(1)}s`} />
+        <HudStat label="Time" value={`${elapsed.toFixed(1)}s`} narrowHidden />
       </GameHeader>
 
       <div className="flex-1 flex flex-col gap-4 p-5 bg-surface/20 overflow-auto">
         {/* Snippet selector - mono uppercase tabs with a hairline underline marker. */}
-        <div className="flex items-center gap-5 flex-wrap">
+        <div className="flex items-center gap-x-5 gap-y-3 flex-wrap" role="group" aria-label="Snippet">
           {CODE_SNIPPETS.map((s, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => setSnippetIdx(i)}
               aria-pressed={snippetIdx === i}
               className="group relative font-mono-meta transition-[opacity,transform] duration-150 ease-out active:scale-[0.97]"
             >
-              <span className={snippetIdx === i ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>
+              <span className={snippetIdx === i ? 'text-text font-semibold' : 'text-text-secondary group-hover:text-text'}>
                 {s.label}
               </span>
               <span
@@ -1055,11 +1145,11 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
         </div>
 
         {/* Snippet display */}
-        <div className="border border-border p-4 font-mono text-sm leading-loose select-none overflow-auto max-h-48 bg-bg/40">
+        <div className="border border-border p-4 font-mono text-sm leading-loose select-none overflow-auto max-h-48 bg-bg/40 whitespace-pre-wrap">
           {snippet.split('').map((char, i) => {
             const typedChar = typed[i];
             const isCursor = i === typed.length;
-            let cls = 'text-text-secondary/40';
+            let cls = 'text-text-secondary';
             if (typedChar !== undefined) {
               if (typedChar === char) {
                 // Correct: bright foreground in mono, emerald in Fun.
@@ -1068,7 +1158,7 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
                 // Wrong: in mono the underline + box + dim tone flag the error
                 // without hue (color-not-only); Fun keeps the red box.
                 cls = mono
-                  ? 'text-text/60 bg-white/15 rounded-sm underline decoration-2 underline-offset-2'
+                  ? 'text-text bg-text/15 rounded-sm underline decoration-2 underline-offset-2'
                   : 'text-red-400 bg-red-500/25 rounded-sm';
               }
             }
@@ -1085,8 +1175,9 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
           value={typed}
           onChange={handleChange}
           disabled={status === 'done'}
-          placeholder={status === 'idle' ? 'Start typing to begin the timer...' : ''}
-          className="w-full h-24 font-mono text-sm p-3 bg-bg/40 border border-border focus:border-text/40 focus:outline-none text-text resize-none placeholder:text-text-secondary/40 disabled:opacity-60 transition-colors"
+          placeholder={status === 'idle' ? 'Type the code above. The timer starts on your first key.' : ''}
+          aria-label="Type the snippet here"
+          className="w-full h-24 font-mono text-sm p-3 bg-bg/40 border border-border focus:border-text/40 focus:outline-none text-text resize-none placeholder:text-text-tertiary disabled:opacity-60 transition-colors"
           autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
         />
 
@@ -1106,14 +1197,14 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
                     <span className="font-display text-text text-base leading-none">
                       {finalWpm >= best && finalWpm > 0 ? 'New personal best' : 'Snippet complete'}
                     </span>
-                    <MetaLabel className="text-text-secondary/70">
+                    <MetaLabel className="text-text-secondary">
                       {elapsed.toFixed(1)}s · {accuracy}% accuracy · <span className={mono ? 'text-text' : 'text-emerald-400'}>{finalWpm} WPM</span>
                     </MetaLabel>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <OverlayButton onClick={reset} variant="ghost" mono={mono}>Retry</OverlayButton>
-                  <OverlayButton onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} mono={mono} accent="#10b981" accentHover="#34d399">Next snippet</OverlayButton>
+                  <OverlayButton onClick={() => setSnippetIdx(i => (i + 1) % CODE_SNIPPETS.length)} mono={mono} accent={FUN.typer.fill} accentHover={FUN.typer.hover}>Next snippet</OverlayButton>
                 </div>
               </div>
             </motion.div>
@@ -1121,7 +1212,7 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
         </AnimatePresence>
       </div>
 
-      <ControlsHint>{isMobile ? 'Tap the field and type' : 'Type exactly · capitalization and punctuation count'}</ControlsHint>
+      <ControlsHint>{isMobile ? 'Tap the field and type' : 'Type it exactly. Enter for ↵, spaces for indents.'}</ControlsHint>
     </div>
   );
 }
@@ -1132,6 +1223,9 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
 
 export default function GamesApp({ variant = 'desktop' }: { variant?: 'desktop' | 'mobile' }) {
   const [game, setGame] = useState<GameId>('launcher');
+  // The game the visitor just left, so Back returns focus to its row.
+  const [lastGame, setLastGame] = useState<GameId | null>(null);
+  const back = useCallback(() => { setLastGame(game); setGame('launcher'); }, [game]);
   const reduced = useReducedMotion();
   const isMobile = variant === 'mobile';
 
@@ -1146,10 +1240,10 @@ export default function GamesApp({ variant = 'desktop' }: { variant?: 'desktop' 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <AnimatePresence mode="wait">
-        {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} isMobile={isMobile} /></motion.div>}
-        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGameView  onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
-        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
-        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={() => setGame('launcher')} isMobile={isMobile} /></motion.div>}
+        {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} isMobile={isMobile} lastGame={lastGame} /></motion.div>}
+        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGameView  onBack={back} isMobile={isMobile} /></motion.div>}
+        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={back} isMobile={isMobile} /></motion.div>}
+        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={back} isMobile={isMobile} /></motion.div>}
       </AnimatePresence>
     </div>
   );

@@ -1,8 +1,8 @@
-import { Wallpaper } from '@/store/themeStore';
+import type { Wallpaper } from '@/store/themeStore';
 
 export const wallpapers: Wallpaper[] = [
   // -------------------------------------------------------------------------
-  // DARK — Static
+  // DARK, static
   // -------------------------------------------------------------------------
   {
     id: 'dark-mountain',
@@ -30,7 +30,8 @@ export const wallpapers: Wallpaper[] = [
   },
 
   // -------------------------------------------------------------------------
-  // DARK — Animated
+  // DARK, animated. previewUrl is a real still of the running wallpaper
+  // (public/wallpapers/previews), used for the Preferences thumbnail only.
   // -------------------------------------------------------------------------
   {
     id: 'dark-signal-grid',
@@ -38,6 +39,7 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'dark',
     thumbnail: 'linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)',
+    previewUrl: '/wallpapers/previews/dark-signal-grid.jpg',
     animatedConfig: { colors: ['#f97316', '#06b6d4', '#8b5cf6'], speed: 1, pattern: 'grid' },
   },
   {
@@ -46,6 +48,7 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'dark',
     thumbnail: 'linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 50%,#0a1a2a 100%)',
+    previewUrl: '/wallpapers/previews/dark-particles.jpg',
     animatedConfig: { colors: ['#4facfe', '#00f2fe'], speed: 1, pattern: 'particles' },
   },
   {
@@ -54,6 +57,7 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'dark',
     thumbnail: 'radial-gradient(circle at center,#1a1a3a 0%,#04040f 100%)',
+    previewUrl: '/wallpapers/previews/dark-starfield.jpg',
     animatedConfig: { colors: ['#ffffff', '#aaaaff'], speed: 2.5, pattern: 'starfield' },
   },
   {
@@ -62,11 +66,12 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'dark',
     thumbnail: 'linear-gradient(135deg,#0d1b2a 0%,#1b2838 30%,#0d2b1a 70%,#1a0d2b 100%)',
+    previewUrl: '/wallpapers/previews/dark-aurora.jpg',
     animatedConfig: { colors: ['#00d4aa', '#7b2ff7', '#0080ff'], speed: 8, pattern: 'mesh' },
   },
 
   // -------------------------------------------------------------------------
-  // LIGHT — Static
+  // LIGHT, static
   // -------------------------------------------------------------------------
   {
     id: 'light-desert',
@@ -94,7 +99,7 @@ export const wallpapers: Wallpaper[] = [
   },
 
   // -------------------------------------------------------------------------
-  // LIGHT — Animated
+  // LIGHT, animated
   // -------------------------------------------------------------------------
   {
     id: 'light-gradient',
@@ -102,6 +107,7 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'light',
     thumbnail: 'linear-gradient(135deg,#ffecd2 0%,#fcb69f 30%,#a1c4fd 70%,#c2e9fb 100%)',
+    previewUrl: '/wallpapers/previews/light-gradient.jpg',
     animatedConfig: { colors: ['#fcb69f', '#a1c4fd', '#ffecd2', '#c2e9fb'], speed: 5, pattern: 'mesh' },
   },
   {
@@ -110,6 +116,7 @@ export const wallpapers: Wallpaper[] = [
     type: 'animated',
     theme: 'light',
     thumbnail: 'linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%)',
+    previewUrl: '/wallpapers/previews/light-particles.jpg',
     animatedConfig: { colors: ['#007AFF'], speed: 1, pattern: 'particles' },
   },
 ];
@@ -118,6 +125,9 @@ export function getWallpapersForTheme(theme: 'light' | 'dark'): Wallpaper[] {
   return wallpapers.filter(w => w.theme === theme);
 }
 
+/** The wallpaper a theme shows until the visitor picks one (matches themeStore). */
+const DEFAULT_ID = { dark: 'dark-signal-grid', light: 'light-mountains' } as const;
+
 export function getDefaultWallpaper(theme: 'light' | 'dark'): Wallpaper {
-  return getWallpapersForTheme(theme)[0];
+  return wallpapers.find(w => w.id === DEFAULT_ID[theme]) ?? getWallpapersForTheme(theme)[0];
 }
