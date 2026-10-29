@@ -7,6 +7,8 @@ export interface Wallpaper {
   type: "static" | "gradient" | "animated";
   theme: "light" | "dark" | "both";
   thumbnail?: string;
+  /** A still of an animated wallpaper, used only for its Preferences thumbnail. */
+  previewUrl?: string;
   imageUrl?: string;
   gradientConfig?: {
     colors: string[];
@@ -27,6 +29,8 @@ interface ThemeStore {
   palette: Palette;
   accentColor: string;
   wallpaper: Wallpaper | null;
+  /** The wallpaper last picked for each theme, restored when the theme switches back. */
+  wallpaperByMode: Partial<Record<"light" | "dark", Wallpaper>>;
   wallpaperTint: string | null;
 
   // Actions
@@ -75,74 +79,75 @@ export const ACCENT_COLORS = {
   red: "#FF3B30",
 };
 
+/** The wallpaper each theme shows until the visitor picks one. */
+const DEFAULT_WALLPAPER_BY_MODE: Record<"light" | "dark", Wallpaper> = {
+  dark: {
+    id: "dark-signal-grid",
+    name: "Signal Grid",
+    type: "animated",
+    theme: "dark",
+    thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
+    previewUrl: "/wallpapers/previews/dark-signal-grid.jpg",
+    animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" },
+  },
+  light: {
+    id: "light-mountains",
+    name: "Mountain Vista",
+    type: "static",
+    theme: "light",
+    imageUrl: "/wallpapers/light-mountainVista.png",
+    thumbnail: "/wallpapers/light-mountainVista.png",
+  },
+};
+
+export function defaultWallpaperFor(mode: "light" | "dark"): Wallpaper {
+  return DEFAULT_WALLPAPER_BY_MODE[mode];
+}
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       mode: "dark",
       // Premium black & white is the default; "Fun" (color) is opt-in.
       palette: "mono",
       accentColor: ACCENT_COLORS.blue,
-      wallpaper: {
-        id: "dark-signal-grid",
-        name: "Signal Grid",
-        type: "animated",
-        theme: "dark",
-        thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
-        animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
-      },
+      wallpaper: DEFAULT_WALLPAPER_BY_MODE.dark,
+      wallpaperByMode: {},
       wallpaperTint: null,
 
       // Actions
-      toggleMode: () =>
-        set((state) => {
-          const newMode = state.mode === "light" ? "dark" : "light";
-          const defaultWallpaper =
-            newMode === "dark"
-              ? {
-                  id: "dark-signal-grid",
-                  name: "Signal Grid",
-                  type: "animated" as const,
-                  theme: "dark" as const,
-                  thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
-                  animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
-                }
-              : {
-                  id: "light-mountains",
-                  name: "Mountain Vista",
-                  type: "static" as const,
-                  theme: "light" as const,
-                  imageUrl: "/wallpapers/light-mountainVista.png",
-                };
-          return { mode: newMode, wallpaper: defaultWallpaper };
-        }),
+      toggleMode: () => get().setMode(get().mode === "light" ? "dark" : "light"),
 
-      setMode: (mode) => {
-        const defaultWallpaper =
-          mode === "dark"
-            ? {
-                id: "dark-signal-grid",
-                name: "Signal Grid",
-                type: "animated" as const,
-                theme: "dark" as const,
-                thumbnail: "linear-gradient(135deg,#07091a 0%,#1a0a2e 50%,#0a1a1f 100%)",
-                animatedConfig: { colors: ["#f97316", "#06b6d4", "#8b5cf6"], speed: 1, pattern: "grid" as const },
-              }
-            : {
-                id: "light-mountains",
-                name: "Mountain Vista",
-                type: "static" as const,
-                theme: "light" as const,
-                imageUrl: "/wallpapers/light-mountainVista.png",
-              };
-        set({ mode, wallpaper: defaultWallpaper });
-      },
+      // Switching theme restores the wallpaper the visitor last picked for
+      // that theme, and falls back to the theme default only if they never
+      // picked one. The outgoing wallpaper is remembered first, so visitors
+      // whose choice predates wallpaperByMode keep it too.
+      setMode: (mode) =>
+        set((state) => {
+          const remembered = { ...state.wallpaperByMode };
+          if (state.wallpaper && state.wallpaper.theme === state.mode) {
+            remembered[state.mode] = state.wallpaper;
+          }
+          return {
+            mode,
+            wallpaperByMode: remembered,
+            wallpaper: remembered[mode] ?? defaultWallpaperFor(mode),
+          };
+        }),
 
       setPalette: (palette) => set({ palette }),
 
       setAccent: (color) => set({ accentColor: color }),
 
-      setWallpaper: (wallpaper) => set({ wallpaper }),
+      setWallpaper: (wallpaper) =>
+        set((state) => ({
+          wallpaper,
+          wallpaperByMode:
+            wallpaper.theme === "light" || wallpaper.theme === "dark"
+              ? { ...state.wallpaperByMode, [wallpaper.theme]: wallpaper }
+              : state.wallpaperByMode,
+        })),
 
       setWallpaperTint: (color) => set({ wallpaperTint: color }),
     }),

@@ -11,7 +11,11 @@ import {
   lifeItems,
   portfolioTechStack,
   contactLinks,
+  displayUrl,
   mastheadSpecLine,
+  oneLiner,
+  building,
+  buildingIntro,
   specs,
 } from '../../data/aboutMe';
 
@@ -39,9 +43,41 @@ describe('mastheadSpecLine', () => {
     expect(new Set(mastheadSpecLine).size).toBe(mastheadSpecLine.length);
   });
 
-  it('signals identity from specifics (OCI / Saar / MCP)', () => {
-    const joined = mastheadSpecLine.join(' ');
-    expect(joined).toMatch(/OCI|Saar|MCP/i);
+  it('spells project names out (no "OCI" abbreviation)', () => {
+    expect(mastheadSpecLine.join(' ')).not.toMatch(/\bOCI\b/);
+  });
+
+  it('does not repeat the spec sheet values', () => {
+    const specValues = new Set(specs.map(s => s.value));
+    for (const cell of mastheadSpecLine) {
+      expect(specValues.has(cell), `"${cell}" repeats a spec value`).toBe(false);
+    }
+  });
+});
+
+describe('masthead one-liner + chip', () => {
+  it('one-liner signals identity from specifics (MCP / evals)', () => {
+    expect(oneLiner).toMatch(/MCP/);
+    expect(oneLiner).toMatch(/evals/);
+  });
+
+  it('chip has a short availability label', () => {
+    expect(identity.availabilityShort.trim()).not.toBe('');
+    expect(identity.availabilityShort.length).toBeLessThan(identity.availability.length);
+  });
+});
+
+describe('building', () => {
+  it('describes each shipped project exactly once', () => {
+    const names = building.map(b => b.name);
+    for (const project of ['OpenCodeIntel', 'Overhear', 'CallBudget', 'Saar']) {
+      expect(names.filter(n => n === project)).toHaveLength(1);
+    }
+  });
+
+  it('every entry and intro paragraph is non-empty', () => {
+    for (const item of building) expect(item.text.trim(), item.name).not.toBe('');
+    for (const para of buildingIntro) expect(para.trim()).not.toBe('');
   });
 });
 
@@ -156,6 +192,10 @@ describe('lookingFor', () => {
       expect(item.trim()).not.toBe('');
     }
   });
+
+  it('drops the paycheck line', () => {
+    expect(lookingFor.join(' ')).not.toMatch(/paycheck/i);
+  });
 });
 
 describe('currentlyMastering', () => {
@@ -222,6 +262,13 @@ describe('contactLinks', () => {
   it('github is a non-empty URL', () => {
     expect(contactLinks.github.trim()).not.toBe('');
     expect(contactLinks.github).toMatch(/^https?:\/\//);
+  });
+});
+
+describe('displayUrl', () => {
+  it('strips protocol, www and trailing slash for link text', () => {
+    expect(displayUrl('https://www.linkedin.com/in/devanshuchicholikar/')).toBe('linkedin.com/in/devanshuchicholikar');
+    expect(displayUrl('https://github.com/DevanshuNEU')).toBe('github.com/DevanshuNEU');
   });
 });
 

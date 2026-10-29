@@ -3,7 +3,8 @@
 /**
  * DesktopIcons — macOS-style shortcut icons on the desktop surface.
  *
- * Three curated shortcuts for first-time visitors: About Me, Resume, Projects.
+ * Four curated shortcuts, recruiter first: About Me, Projects, Resume, Contact.
+ * Help stays in the dock's Launchpad.
  *
  * Premium interactions:
  *   - 3D physics tilt via Framer Motion springs — icon tilts toward cursor like
@@ -15,6 +16,7 @@
 import React, { useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
+import { useLaunchpadStore } from '@/store/launchpadStore';
 import { spring, reveal, PARALLAX_DEPTH } from '@/lib/motion';
 import { useParallaxDepth } from '@/hooks/useParallaxDepth';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
@@ -25,7 +27,7 @@ import type { AppType } from '../../../../shared/types';
 // Curated desktop app list
 // ---------------------------------------------------------------------------
 
-const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'resume', 'projects', 'help'];
+const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'projects', 'resume', 'contact'];
 
 // ---------------------------------------------------------------------------
 // Single icon with 3D tilt
@@ -80,40 +82,44 @@ function DesktopIcon({ appType, icon, label, iconColor }: DesktopIconProps) {
       // Entrance is orchestrated by the grid container via the shared reveal
       // variants (tighter, premium stagger); collapses to instant when reduced.
       variants={reveal.item(reduced)}
-      // perspective container — must be on a separate div, not the motion element itself
-      style={{ perspective: 600 }}
-      className="flex flex-col items-center gap-1.5 w-[72px]"
+      className="w-[80px]"
     >
-      <motion.button
+      {/* One button holds the icon and its label: the visible label is the
+          accessible name, and clicking the label opens the app too. */}
+      <button
         ref={ref}
-        style={{
-          rotateX: springRotateX,
-          rotateY: springRotateY,
-          filter: brightnessStr,
-          transformStyle: 'preserve-3d',
-        }}
-        whileTap={{ scale: 0.92 }}
+        type="button"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={() => openWindow(appType)}
-        title={`Open ${label}`}
-        className="cursor-pointer"
+        className="group flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-lg"
       >
-        <AppIcon icon={icon} colorKey={iconColor} size={56} />
-      </motion.button>
+        {/* perspective container: must be separate from the tilting element */}
+        <span style={{ perspective: 600 }} className="block">
+          <motion.span
+            style={{
+              rotateX: springRotateX,
+              rotateY: springRotateY,
+              filter: brightnessStr,
+              transformStyle: 'preserve-3d',
+            }}
+            whileTap={{ scale: 0.92 }}
+            className="block"
+          >
+            <AppIcon icon={icon} colorKey={iconColor} size={56} />
+          </motion.span>
+        </span>
 
-      {/* Frosted pill label — macOS Sonoma desktop icon style */}
-      <span
-        className="px-2 py-0.5 rounded-md text-[11px] font-medium text-white text-center
-                   max-w-[72px] truncate border border-white/10 leading-tight"
-        style={{
-          background: 'rgba(0,0,0,0.28)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      >
-        {label}
-      </span>
+        {/* Frosted pill label, theme-aware so it passes 4.5:1 on any wallpaper */}
+        <span
+          className="max-w-[80px] truncate rounded-md border px-2 py-0.5 text-center text-[12px] font-medium leading-tight
+                     border-black/10 bg-white/80 text-[#1d1d1f]
+                     dark:border-white/10 dark:bg-black/55 dark:text-white"
+          style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+        >
+          {label}
+        </span>
+      </button>
     </motion.div>
   );
 }
@@ -124,6 +130,8 @@ function DesktopIcon({ appType, icon, label, iconColor }: DesktopIconProps) {
 
 export default function DesktopIcons() {
   const reduced = useReducedMotion();
+  // Launchpad is modal: hide the shortcuts behind it from Tab and clicks.
+  const launchpadOpen = useLaunchpadStore(s => s.isOpen);
   // Mid-depth parallax drift from the shared provider; rests at 0 under
   // reduced motion / coarse pointer. Per-icon 3D tilt is untouched.
   const { x, y } = useParallaxDepth(PARALLAX_DEPTH.mid);
@@ -134,7 +142,7 @@ export default function DesktopIcons() {
       variants={reveal.container(reduced)}
       initial="hidden"
       animate="show"
-      className="absolute top-9 left-5 flex flex-col gap-5 z-[1]"
+      className={`absolute top-9 left-4 flex flex-col gap-4 z-[1] ${launchpadOpen ? 'invisible' : ''}`}
     >
       {DESKTOP_APP_TYPES.map((appType) => {
         const reg = appRegistry[appType];

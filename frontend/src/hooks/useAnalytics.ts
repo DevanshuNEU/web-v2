@@ -11,7 +11,7 @@
 
 import { useCallback } from 'react';
 import { usePostHog } from 'posthog-js/react';
-import { useAnalyticsStore, type EventType } from '@/store/analyticsStore';
+import { useAnalyticsStore, appTitle, type EventType } from '@/store/analyticsStore';
 import type { AppType } from '../../../shared/types';
 
 // ============================================================================
@@ -117,15 +117,9 @@ export function useAnalytics() {
   // Privacy controls
   // -------------------------------------------------------------------------
 
-  const optOut = useCallback(() => {
-    storeSetOptOut(true);
-    posthog.opt_out_capturing();
-  }, [posthog, storeSetOptOut]);
-
-  const optIn = useCallback(() => {
-    storeSetOptOut(false);
-    posthog.opt_in_capturing();
-  }, [posthog, storeSetOptOut]);
+  // The store action stops or restarts PostHog and saves the choice.
+  const optOut = useCallback(() => storeSetOptOut(true), [storeSetOptOut]);
+  const optIn = useCallback(() => storeSetOptOut(false), [storeSetOptOut]);
 
   // -------------------------------------------------------------------------
   // Return interface
@@ -162,26 +156,9 @@ export function useAnalytics() {
 // Utilities
 // ============================================================================
 
-/** Convert app type slug to readable name */
+/** Convert app type slug to the visitor-facing name, from data/copy.ts. */
 function formatAppName(appType: AppType): string {
-  const names: Record<AppType, string> = {
-    'about-me': 'About Me',
-    'projects': 'Projects',
-    'skills-dashboard': 'Skill Tree',
-    'analytics': 'Analytics',
-    'contact': 'Ping Me',
-    'terminal': 'Terminal',
-    'games': 'Arcade',
-    'display-options': 'Preferences',
-    'file-explorer': 'Finder',
-    'resume': 'Resume',
-    'changelog': 'Changelog',
-    'github-activity': 'GitHub Activity',
-    'browser': 'Browser',
-    'help': 'Help',
-    'dev-ai': 'DevAI',
-  };
-  return names[appType] || appType;
+  return appTitle(appType);
 }
 
 /** Export for use elsewhere */

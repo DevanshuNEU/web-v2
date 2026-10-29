@@ -68,32 +68,48 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
         <Link href="/projects"><MetaLabel className="text-text-secondary hover:text-text">Projects</MetaLabel></Link>
         <MetaLabel className="text-text-secondary">{STATUS_LABEL[meta.status]}</MetaLabel>
       </p>
-      <h1 className="mt-4 editorial-hero text-text text-[clamp(2.5rem,8vw,4.5rem)]">{meta.displayName}</h1>
+      <h1 className="mt-4 font-display font-normal leading-[1.02] tracking-[-0.01em] text-text text-[clamp(2.5rem,8vw,4.5rem)] [overflow-wrap:normal] text-balance">
+        {meta.displayName}
+      </h1>
       <p className="mt-4 text-[20px] leading-snug text-text-secondary">{meta.tagline}</p>
-      <p className="mt-3 text-[15px] text-text-secondary">
-        Built by <Link href="/about" className="text-text underline underline-offset-4">{PERSON_NAME}</Link>,
-        software engineer, AI engineer and forward deployed engineer in Boston.
+
+      {meta.achievements.length > 0 && (
+        <ul aria-label="Key results" className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5">
+          {meta.achievements.map(a => (
+            <li key={a.label} className="flex flex-col gap-1 border-t border-border pt-3">
+              <span className="font-display text-[30px] leading-tight tabular-nums">{a.metric}</span>
+              <span className="font-medium text-[15px]">{a.label}</span>
+              <span className="text-[14px] text-text-secondary">{a.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-8 text-[15px] text-text-secondary">
+        Built by <Link href="/about" className="text-text underline underline-offset-4">{PERSON_NAME}</Link>
+        {meta.role
+          ? `, ${meta.role.toLowerCase()}.`
+          : ', software engineer, AI engineer and forward deployed engineer in Boston.'}
       </p>
 
-      {(meta.repoUrl || meta.liveUrl) && (
-        <p className="mt-6 flex flex-wrap gap-3 text-[15px]">
-          {meta.liveUrl && (
-            <a href={meta.liveUrl} className="px-3 py-1.5 bg-text text-bg font-medium">
-              {meta.liveLabel ?? 'Live site'}
-            </a>
-          )}
-          {meta.repoUrl && (
-            <a href={meta.repoUrl} className="px-3 py-1.5 border border-border font-medium">
-              Source on GitHub
-            </a>
-          )}
-          {meta.researchUrl && (
-            <a href={meta.researchUrl} className="px-3 py-1.5 border border-border font-medium">
-              Research data
-            </a>
-          )}
-        </p>
-      )}
+      <p className="mt-4 flex flex-wrap items-center gap-3 text-[15px]">
+        {meta.liveUrl && (
+          <a href={meta.liveUrl} className="px-3 py-1.5 bg-text text-bg font-medium">
+            {meta.liveLabel ?? 'Live site'}
+          </a>
+        )}
+        {meta.repoUrl && (
+          <a href={meta.repoUrl} className="px-3 py-1.5 border border-border font-medium">
+            Source on GitHub
+          </a>
+        )}
+        {meta.researchUrl && (
+          <a href={meta.researchUrl} className="px-3 py-1.5 border border-border font-medium">
+            Research data
+          </a>
+        )}
+        {!meta.repoUrl && <span className="text-text-secondary">Code not public</span>}
+      </p>
 
       {meta.descriptionOverride && (
         <Section label="Overview">
@@ -101,27 +117,11 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
         </Section>
       )}
 
-      <Section label="The story">
+      <Section label="How it works">
         <div className="flex flex-col gap-4 text-[16px] leading-relaxed text-text-secondary">
           {meta.story.map(p => <p key={p}>{p}</p>)}
         </div>
       </Section>
-
-      {meta.achievements.length > 0 && (
-        <Section label="Key results">
-          <dl className="flex flex-col">
-            {meta.achievements.map(a => (
-              <div key={a.label} className="flex items-start gap-6 py-4 border-b border-border last:border-b-0">
-                <dd className="shrink-0 w-32 font-display text-[26px] leading-tight">{a.metric}</dd>
-                <div className="flex flex-col gap-1">
-                  <dt className="font-medium text-[15px]">{a.label}</dt>
-                  <p className="text-[14px] text-text-secondary">{a.detail}</p>
-                </div>
-              </div>
-            ))}
-          </dl>
-        </Section>
-      )}
 
       {writing.length > 0 && (
         <Section label="Writing">
@@ -138,10 +138,10 @@ export default async function ProjectPage({ params }: { params: Promise<Params> 
       )}
 
       {meta.extraTech && meta.extraTech.length > 0 && (
-        <Section label="Built with">
+        <Section label="Stack">
           <ul className="flex flex-wrap gap-x-5 gap-y-2">
             {meta.extraTech.map(t => (
-              <li key={t}><MetaLabel className="text-text">{t}</MetaLabel></li>
+              <li key={t} className="font-mono text-[14px]">{t}</li>
             ))}
           </ul>
         </Section>

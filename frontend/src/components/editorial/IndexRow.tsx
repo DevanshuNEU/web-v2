@@ -6,8 +6,8 @@
  * A mono index number + a title, with optional right-aligned meta, and a
  * hairline below by default. When href or onClick is supplied the row becomes
  * a keyboard-focusable interactive element (anchor for href, button for
- * onClick) with a visible focus ring. Hover is a subtle graphite background
- * tint only - strictly monochrome, no color.
+ * onClick) and keeps the global :focus-visible ring (globals.css). Hover is a
+ * subtle graphite background tint only - strictly monochrome, no color.
  *
  * The hairline lives below the content so a stacked list reads as a single
  * ruled column; pass hairline={false} on the last row to drop the trailing rule.
@@ -49,13 +49,11 @@ export default function IndexRow({
 
   const tint =
     'hover:bg-black/[0.035] dark:hover:bg-white/[0.05] transition-colors';
-  const focus =
-    'focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]';
 
   const content = (
     <>
       <MetaLabel className="shrink-0 w-10 justify-start">{number}</MetaLabel>
-      <span className="flex-1 min-w-0 editorial-head text-text text-[clamp(1.25rem,3vw,1.75rem)] leading-tight truncate">
+      <span className="flex-1 min-w-0 editorial-head text-text text-[clamp(1.25rem,3cqi,1.75rem)] leading-tight truncate">
         {title}
       </span>
       {meta !== undefined && (
@@ -67,7 +65,6 @@ export default function IndexRow({
   const rowClass = cn(
     'w-full flex items-center gap-4 py-4 px-1 text-left',
     interactive && tint,
-    interactive && focus,
     active && 'bg-black/[0.045] dark:bg-white/[0.06]',
     className,
   );

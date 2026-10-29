@@ -1,17 +1,20 @@
 import { create } from 'zustand';
 import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 import type { AppType } from '../../../shared/types';
 
 /**
  * Phone-shell state. Parallel to osStore (window manager) — has no overlap.
  * Window concepts don't apply on mobile; instead we track which app is
- * currently fullscreen, which home page is visible, and which overlay
- * (Control Center, Spotlight, App Switcher) is up.
+ * currently fullscreen, which home page is visible, and whether the
+ * library search is up.
  *
- * History-API wiring: opening an app pushes a no-op history entry so that
- * the browser back button / Android system-back gesture closes the app
- * instead of leaving the page. PhoneShell installs a popstate listener
- * that routes the event into `closeAppFromPopstate()`.
+ * History-API wiring: opening an app pushes one history entry
+ * ({ devosApp: true, devosDepth: 1 }), and each drill-in inside the app's
+ * MobilePushView pushes one more (devosDepth 2, 3, ...). Browser back, the
+ * Android back gesture and Safari's left-edge swipe therefore step back one
+ * level: detail to list first, then list to home. PhoneShell's popstate
+ * listener closes the app only when the entry it lands on is not one of ours.
  */
 interface MobileStore {
   // Lock
@@ -36,42 +39,71 @@ interface MobileStore {
   closeAppFromPopstate: () => void;
 
   // Overlays
-  controlCenterOpen: boolean;
   spotlightOpen: boolean;
-  switcherOpen: boolean;
-  setControlCenter: (open: boolean) => void;
   setSpotlight: (open: boolean) => void;
-  setSwitcher: (open: boolean) => void;
-
-  // Wiggle mode (long-press → "edit home screen")
-  wiggleMode: boolean;
-  setWiggleMode: (on: boolean) => void;
 }
 
-// Internal — tracks whether openApp pushed a history entry on the
-// open-from-empty transition, so closeApp knows whether to pop.
-let historyPushed = false;
+/** History state the phone shell writes. devosDepth 1 = an app's root view. */
+export interface PhoneHistoryState {
+  devosApp: true;
+  devosDepth: number;
+}
 
-function pushHistoryEntry() {
-  if (typeof window === 'undefined') return;
+export function isPhoneHistoryState(state: unknown): state is PhoneHistoryState {
+  return !!state && typeof state === 'object' && (state as { devosApp?: unknown }).devosApp === true;
+}
+
+// Internal: how many history entries the open app owns (its root plus one per
+// drill-in), so closing it can step back over all of them at once.
+let historyEntries = 0;
+
+function pushHistoryEntry(depth: number) {
+  if (typeof window === 'undefined') return false;
   try {
-    window.history.pushState({ devosApp: true }, '');
-    historyPushed = true;
+    const state: PhoneHistoryState = { devosApp: true, devosDepth: depth };
+    window.history.pushState(state, '');
+    historyEntries = depth;
+    return true;
   } catch {
-    /* swallow — some sandboxed contexts disallow */
+    /* swallow: some sandboxed contexts disallow */
+    return false;
   }
 }
 
-function popHistoryEntry() {
+/** Step back `count` of our entries (all of them by default). */
+function popHistoryEntries(count = historyEntries) {
   if (typeof window === 'undefined') return;
-  if (!historyPushed) return;
-  historyPushed = false;
+  const n = Math.min(count, historyEntries);
+  if (n <= 0) return;
+  historyEntries -= n;
   try {
-    window.history.back();
+    window.history.go(-n);
   } catch {
     /* swallow */
   }
 }
+
+/**
+ * Called by MobilePushView when it drills in. Pushes a history entry so the
+ * system back gesture returns to the previous view. Returns false when history
+ * is unavailable, so the caller can fall back to a plain in-memory pop.
+ */
+export function pushPhoneNavEntry(depth: number): boolean {
+  if (historyEntries === 0) return false;
+  return pushHistoryEntry(depth);
+}
+
+/** Called from popstate: record which of our entries the browser landed on. */
+export function syncPhoneHistory(state: unknown) {
+  historyEntries = isPhoneHistoryState(state) ? state.devosDepth : 0;
+}
+
+/** True when MobilePushView's back can go through history.back(). */
+export function phoneHistoryActive(): boolean {
+  return historyEntries > 1;
+}
+
+const analytics = () => useAnalyticsStore.getState();
 
 export const useMobileStore = create<MobileStore>((set) => ({
   // Lock: the lock screen plays once per visit, like the desktop boot.
@@ -82,7 +114,7 @@ export const useMobileStore = create<MobileStore>((set) => ({
     set({ locked: false, lockedByUser: false });
   },
   lock: () => {
-    popHistoryEntry();
+    popHistoryEntries();
     set({ locked: true, lockedByUser: true, openAppType: null, openApps: [] });
   },
   syncLockWithSession: () =>
@@ -98,14 +130,16 @@ export const useMobileStore = create<MobileStore>((set) => ({
   openApp: (appType) =>
     set((state) => {
       // Only push a history entry on the first open (home → app).
-      // App-to-app navigation reuses the existing entry so "back" still
-      // means "leave to home" rather than walking back through the stack.
-      if (state.openAppType === null) pushHistoryEntry();
+      // App-to-app navigation reuses the app's root entry so "back" still
+      // means "leave to home"; drill-in entries of the previous app are
+      // dropped because its push stack unmounts.
+      if (state.openAppType === null) pushHistoryEntry(1);
+      else if (state.openAppType !== appType) popHistoryEntries(historyEntries - 1);
+      if (state.openAppType !== appType) analytics().trackAppOpen(appType);
       return {
         openAppType: appType,
         // Move to front, dedupe
         openApps: [appType, ...state.openApps.filter((a) => a !== appType)],
-        switcherOpen: false,
         spotlightOpen: false,
       };
     }),
@@ -116,16 +150,18 @@ export const useMobileStore = create<MobileStore>((set) => ({
       const remaining = state.openApps.filter((a) => a !== target);
       const newOpenAppType =
         state.openAppType === target ? null : state.openAppType;
-      // Transitioning to "no app" — pop the history entry we pushed.
-      if (newOpenAppType === null) popHistoryEntry();
+      // Transitioning to "no app": pop every history entry the app pushed.
+      if (newOpenAppType === null) popHistoryEntries();
+      analytics().trackAppClose(target);
       return { openApps: remaining, openAppType: newOpenAppType };
     }),
   closeAppFromPopstate: () =>
     set((state) => {
       // The user (or system) already popped history; just clear state.
-      historyPushed = false;
+      historyEntries = 0;
       if (!state.openAppType) return state;
       const target = state.openAppType;
+      analytics().trackAppClose(target);
       return {
         openApps: state.openApps.filter((a) => a !== target),
         openAppType: null,
@@ -133,14 +169,6 @@ export const useMobileStore = create<MobileStore>((set) => ({
     }),
 
   // Overlays
-  controlCenterOpen: false,
   spotlightOpen: false,
-  switcherOpen: false,
-  setControlCenter: (controlCenterOpen) => set({ controlCenterOpen }),
   setSpotlight: (spotlightOpen) => set({ spotlightOpen }),
-  setSwitcher: (switcherOpen) => set({ switcherOpen }),
-
-  // Wiggle
-  wiggleMode: false,
-  setWiggleMode: (wiggleMode) => set({ wiggleMode }),
 }));

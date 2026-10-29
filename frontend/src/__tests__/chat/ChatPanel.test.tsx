@@ -56,7 +56,7 @@ describe('ChatPanel', () => {
   });
 
   it('sends a question and streams the reply into the thread', async () => {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () =>
       streamingResponse('I build AI dev tools at the MCP layer.'),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -64,10 +64,16 @@ describe('ChatPanel', () => {
     render(<ChatPanel />);
     fireEvent.click(screen.getByText('What do you build?'));
 
-    // The streamed assistant reply appears in the thread.
+    // The streamed assistant reply appears in the thread. The thread is a
+    // polite log that is no longer busy once the reply is done, so screen
+    // readers hear the finished answer once.
     await waitFor(() =>
       expect(screen.getByText(/I build AI dev tools at the MCP layer\./)).toBeInTheDocument(),
     );
+    const log = screen.getByRole('log');
+    expect(log).toHaveAttribute('aria-live', 'polite');
+    await waitFor(() => expect(log).toHaveAttribute('aria-busy', 'false'));
+    expect(log).toHaveTextContent('I build AI dev tools at the MCP layer.');
 
     // It posted a multi-turn messages payload, not a one-shot {query}.
     expect(fetchMock).toHaveBeenCalledWith('/api/concierge', expect.any(Object));
@@ -80,8 +86,40 @@ describe('ChatPanel', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
 
     render(<ChatPanel />);
-    fireEvent.click(screen.getByText('What are you looking for?'));
+    fireEvent.click(screen.getByText('What roles are you open to?'));
 
     await waitFor(() => expect(screen.getByText(/offline/i)).toBeInTheDocument());
+    // A way to reach a person, not a dead end.
+    expect(screen.getByRole('button', { name: 'Copy email' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Contact' })).toBeInTheDocument();
+  });
+
+  it('shows a typing indicator and a Stop button while waiting for the reply', async () => {
+    // A fetch that never resolves until aborted: the panel stays "thinking".
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_input: unknown, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+            );
+          }),
+      ),
+    );
+
+    render(<ChatPanel />);
+    fireEvent.click(screen.getByText('What do you build?'));
+
+    expect(await screen.findByLabelText('Thinking')).toBeInTheDocument();
+    expect(screen.getByRole('log')).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Stop reply' }));
+    await waitFor(() => expect(screen.queryByLabelText('Thinking')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+  });
+
+  it('labels the composer visibly', () => {
+    render(<ChatPanel />);
+    expect(screen.getByLabelText("Message to Devanshu's AI")).toBe(screen.getByPlaceholderText('Ask Devanshu anything'));
   });
 });

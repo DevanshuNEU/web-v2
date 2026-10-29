@@ -29,3 +29,20 @@ describe('dockRegistry', () => {
     expect(getDockIconRect('about-me')).toBeNull();
   });
 });
+
+describe('dock order', () => {
+  it('puts the recruiter path first and keeps unknown apps at the end', async () => {
+    const { sortDockApps } = await import('@/lib/dockRegistry');
+    expect(sortDockApps(['display-options', 'contact', 'terminal', 'about-me', 'resume', 'projects']))
+      .toEqual(['about-me', 'projects', 'resume', 'contact', 'display-options', 'terminal']);
+  });
+
+  it('tracks the Launchpad button rect', async () => {
+    const { registerLaunchpadButton, getLaunchpadButtonRect } = await import('@/lib/dockRegistry');
+    expect(getLaunchpadButtonRect()).toBeNull();
+    const off = registerLaunchpadButton(() => fakeRect(40));
+    expect(getLaunchpadButtonRect()?.left).toBe(40);
+    off();
+    expect(getLaunchpadButtonRect()).toBeNull();
+  });
+});

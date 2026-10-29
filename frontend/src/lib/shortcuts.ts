@@ -53,3 +53,21 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement;
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
 }
+
+/**
+ * Whether the Option shortcuts (Option+1..4, Option+W, Option+T) may fire for
+ * a keystroke aimed at `target`.
+ *
+ * They fire everywhere except multi-line text: in a single-line field such as
+ * the Terminal prompt or a search box, Option+1 typing "¡" is almost never
+ * wanted, so the shortcut wins and keyboard users are not trapped in the
+ * field. In a textarea or a contenteditable (the contact message, the chat
+ * composer), someone writing prose may want Option characters, so the key
+ * stays text. AltGr on Windows reports Ctrl+Alt, which the matchers already
+ * reject, so AltGr characters always type.
+ */
+export function allowsOptionShortcut(target: EventTarget | null): boolean {
+  if (!target || typeof (target as HTMLElement).tagName !== 'string') return true;
+  const el = target as HTMLElement;
+  return el.tagName !== 'TEXTAREA' && !el.isContentEditable;
+}

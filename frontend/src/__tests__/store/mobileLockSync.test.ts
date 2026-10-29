@@ -6,6 +6,7 @@ import { markBootedThisSession } from '@/lib/bootSession';
 describe('mobile lock vs boot session', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    window.localStorage.clear();
     useMobileStore.setState({ locked: true, lockedByUser: false });
   });
 

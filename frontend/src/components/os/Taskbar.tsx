@@ -12,10 +12,12 @@ import {
 } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
+import { useLaunchpadStore } from '@/store/launchpadStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { appRegistry, getPinnedApps, getAppLabel } from '@/lib/appRegistry';
 import { spring } from '@/lib/motion';
-import { registerDockIcon } from '@/lib/dockRegistry';
+import { registerDockIcon, registerLaunchpadButton, sortDockApps } from '@/lib/dockRegistry';
+import { Z } from '@/lib/zLayers';
 import AppIcon from './AppIcon';
 import { Launchpad } from './Launchpad';
 import { LayoutGrid } from 'lucide-react';
@@ -56,6 +58,34 @@ function useDockMagnification(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Dock label: shown on hover and on keyboard focus. Centered with     */
+/*  framer's x (not Tailwind's -translate-x-1/2): framer writes its own */
+/*  inline transform for y/scale, which would wipe Tailwind's.          */
+/* ------------------------------------------------------------------ */
+
+function DockLabel({ show, reduced, children }: { show: boolean; reduced: boolean; children: React.ReactNode }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.span
+          aria-hidden
+          initial={reduced ? { opacity: 0, x: '-50%' } : { opacity: 0, x: '-50%', y: 4, scale: 0.96 }}
+          animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+          exit={reduced ? { opacity: 0, x: '-50%' } : { opacity: 0, x: '-50%', y: 4, scale: 0.96 }}
+          transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+          style={{ transformOrigin: 'center bottom' }}
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-8
+                     whitespace-nowrap rounded-md border border-border bg-surface/90 px-2 py-1
+                     text-[12px] font-medium text-text shadow-lg backdrop-blur-md"
+        >
+          {children}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Dock icon                                                          */
 /*                                                                     */
 /*  Two-layer approach so magnification actually pushes neighbors:     */
@@ -76,6 +106,7 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
   // ref lives on the outer div so getBoundingClientRect reflects the layout box
   const ref = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const scale = useDockMagnification(mouseX, ref, reduced);
 
   // Publish this icon's live rect so a minimizing window knows where to genie into.
@@ -101,36 +132,23 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Hover name label — mono, clears the magnified icon */}
-      <AnimatePresence>
-        {hovered && (
-          <motion.span
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
-            transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
-            style={{ transformOrigin: 'center bottom' }}
-            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-8 -translate-x-1/2
-                       whitespace-nowrap rounded-md border border-white/15 bg-black/75 px-2 py-1
-                       font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md"
-          >
-            {label.title}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      {/* Name label: clears the magnified icon */}
+      <DockLabel show={hovered || focused} reduced={reduced}>{label.title}</DockLabel>
 
       {/* Inner: visual scale only, grows upward */}
       <motion.button
         data-magnetic
         style={{ scale, originY: 1 }}
         onClick={onClick}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         className={`relative cursor-pointer ${isMinimized ? 'opacity-40' : ''}`}
-        aria-label={`${label.windowTitle}${isRunning ? ' (open)' : ''}`}
+        aria-label={`${label.title}${isMinimized ? ', minimized' : isRunning ? ', open' : ''}`}
       >
         <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={BASE_SIZE} />
 
         {isRunning && !isMinimized && (
-          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/80" />
+          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-text/80" />
         )}
       </motion.button>
     </motion.div>
@@ -144,7 +162,8 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
 function DockDivider() {
   return (
     <div
-      className="w-px bg-white/20 mx-1 self-stretch flex-shrink-0"
+      aria-hidden
+      className="w-px bg-text/20 mx-1 self-stretch flex-shrink-0"
       style={{ minHeight: BASE_SIZE }}
     />
   );
@@ -168,8 +187,15 @@ interface LaunchpadButtonProps {
 function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle }: LaunchpadButtonProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const scale = useDockMagnification(mouseX, ref, reduced);
   const layoutWidth = useTransform(scale, (s) => Math.round(s * BASE_SIZE));
+
+  // The first-visit hint points at this button, so publish its rect.
+  React.useEffect(
+    () => registerLaunchpadButton(() => ref.current?.getBoundingClientRect() ?? null),
+    []
+  );
 
   return (
     <motion.div
@@ -179,22 +205,7 @@ function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle 
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <AnimatePresence>
-        {hovered && (
-          <motion.span
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduced ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.96 }}
-            transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
-            style={{ transformOrigin: 'center bottom' }}
-            className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-8 -translate-x-1/2
-                       whitespace-nowrap rounded-md border border-white/15 bg-black/75 px-2 py-1
-                       font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md"
-          >
-            All apps
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <DockLabel show={hovered || focused} reduced={reduced}>All apps</DockLabel>
 
       {/* Pulse ring — first-time visitors only */}
       {pulse && (
@@ -215,14 +226,16 @@ function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle 
         data-magnetic
         style={{ scale, originY: 1, width: BASE_SIZE, height: BASE_SIZE }}
         onClick={onToggle}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         aria-label="Launchpad, explore all apps"
-        className={`relative flex items-center justify-center rounded-[12px] cursor-pointer transition-colors duration-150 ${
-          open
-            ? 'bg-white/25 dark:bg-white/20'
-            : 'bg-white/10 dark:bg-white/[0.08] hover:bg-white/20 dark:hover:bg-white/15'
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`relative flex items-center justify-center rounded-[12px] border border-text/10 cursor-pointer transition-colors duration-150 ${
+          open ? 'bg-text/[0.2]' : 'bg-text/[0.08] hover:bg-text/[0.14]'
         }`}
       >
-        <LayoutGrid size={22} strokeWidth={1.8} className="text-gray-700 dark:text-gray-200" />
+        <LayoutGrid size={22} strokeWidth={1.8} className="text-text" />
       </motion.button>
     </motion.div>
   );
@@ -239,7 +252,8 @@ export default function Taskbar() {
   const { mode } = useTheme();
   const mono = useIsMono();
 
-  const [launchpadOpen, setLaunchpadOpen] = useState(false);
+  const launchpadOpen = useLaunchpadStore(s => s.isOpen);
+  const setLaunchpadOpen = useLaunchpadStore(s => s.setOpen);
   const [firstVisit, setFirstVisit] = useState(false);
   const mouseX = useMotionValue(-1);
   const reduced = !!useReducedMotion();
@@ -251,7 +265,7 @@ export default function Taskbar() {
     }
   }, []);
 
-  const pinnedApps = getPinnedApps().map(a => a.appType);
+  const pinnedApps = sortDockApps(getPinnedApps().map(a => a.appType));
   const pinnedSet = new Set(pinnedApps);
   const runningUnpinned = windows.filter(w => w.isOpen && !pinnedSet.has(w.appType));
 
@@ -264,23 +278,23 @@ export default function Taskbar() {
   return (
     <>
       <Launchpad open={launchpadOpen} onClose={() => setLaunchpadOpen(false)} />
-      <FirstVisitHint onDismiss={() => setFirstVisit(false)} />
+      <FirstVisitHint active={firstVisit && !launchpadOpen} onDismiss={() => setFirstVisit(false)} />
 
       {/* Dock shelf — overflow-visible so scaled icons show above the shelf */}
-      <div
-        role="toolbar"
+      <nav
         aria-label="Dock"
-        className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50
+        className="fixed bottom-2 left-1/2 -translate-x-1/2
                    flex items-end gap-1 px-2.5 pb-2 pt-2
                    rounded-2xl overflow-visible
                    max-w-[calc(100vw-2rem)]"
         style={{
+          zIndex: Z.dock,
           background: mode === 'dark'
             ? 'rgba(30, 30, 30, 0.5)'
             : 'rgba(243, 243, 243, 0.55)',
           backdropFilter: 'blur(55px) saturate(180%)',
           WebkitBackdropFilter: 'blur(55px) saturate(180%)',
-          border: '1px solid rgba(255, 255, 255, 0.18)',
+          border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.18)' : '1px solid rgba(0, 0, 0, 0.10)',
           boxShadow: mode === 'dark'
             ? '0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset'
             : '0 8px 32px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.5) inset',
@@ -338,7 +352,7 @@ export default function Taskbar() {
             ))}
           </>
         )}
-      </div>
+      </nav>
     </>
   );
 }

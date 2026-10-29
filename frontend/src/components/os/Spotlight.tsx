@@ -3,7 +3,11 @@
 /**
  * Spotlight — the devOS command layer.
  *
- * Trigger:  Cmd/Ctrl+K or /   Dismiss:  Escape / backdrop click
+ * Trigger:  Cmd/Ctrl+K, /, the menu bar Search button or the right-click menu
+ * Dismiss:  Escape (topmost layer only, lib/escapeStack.ts) / backdrop click
+ *
+ * Keyboard model: focus stays in the input (a combobox); arrow keys move the
+ * active option of the listbox via aria-activedescendant, Enter runs it.
  *
  * A monochrome, editorial-mono command surface. Searches apps / projects /
  * skills / commands; the "Ask Devanshu" row hands the query to the floating
@@ -20,12 +24,15 @@
  * border), so no per-mode branching is needed.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useAssistantUiStore } from '@/store/assistantUiStore';
 import { useTerminalStore } from '@/store/terminalStore';
+import { useSpotlightStore } from '@/store/spotlightStore';
+import { useEscapeLayer } from '@/lib/escapeStack';
+import { Z } from '@/lib/zLayers';
 import { useIsMono } from '@/hooks/usePalette';
 import {
   searchSpotlight,
@@ -35,7 +42,6 @@ import {
 } from '@/lib/spotlightIndex';
 import {
   CATEGORY_LABEL,
-  CATEGORY_TAG,
   GLYPH,
   CATEGORY_ORDER,
   SUGGESTED_IDS,
@@ -49,12 +55,18 @@ type Row =
 interface Section { header: string; rows: Row[] }
 
 export default function Spotlight() {
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useSpotlightStore(state => state.isOpen);
+  const setOpen = useSpotlightStore(state => state.open);
+  const setClosed = useSpotlightStore(state => state.close);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotlightItem[]>([]);
   const [selIdx, setSelIdx] = useState(0);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // Whatever had focus before the palette opened gets it back on dismiss.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const listboxId = useId();
+  const rowId = (index: number) => `${listboxId}-row-${index}`;
   const openWindow = useOSStore(state => state.openWindow);
   const openAssistant = useAssistantUiStore(state => state.openAssistant);
   const reduced = useReducedMotion();
@@ -98,15 +110,27 @@ export default function Spotlight() {
   const maxIdx = Math.max(flatRows.length - 1, 0);
 
   // -- Open / close --
-  const open = useCallback(() => { setIsOpen(true); setQuery(''); setResults([]); setSelIdx(0); }, []);
-  const close = useCallback(() => { setIsOpen(false); setQuery(''); setResults([]); setSelIdx(0); }, []);
+  const open = useCallback(() => { setOpen(); }, [setOpen]);
+  const close = useCallback(() => { setClosed(); }, [setClosed]);
+  /** Close without running anything: focus goes back where it was. */
+  const dismiss = useCallback(() => {
+    const back = returnFocusRef.current;
+    close();
+    if (back && back.isConnected) setTimeout(() => back.focus(), 0);
+  }, [close]);
 
-  // -- Focus the input on open --
+  // -- Reset and focus the input on open, however it was opened --
   useEffect(() => {
     if (!isOpen) return;
+    const active = document.activeElement;
+    returnFocusRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    setQuery(''); setResults([]); setSelIdx(0);
     const t = setTimeout(() => inputRef.current?.focus(), 60);
     return () => clearTimeout(t);
   }, [isOpen]);
+
+  // Esc closes the palette and nothing behind it.
+  useEscapeLayer(isOpen, dismiss);
 
   // -- Action dispatch --
   const handleSelect = useCallback((item: SpotlightItem) => {
@@ -137,7 +161,7 @@ export default function Spotlight() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isPaletteShortcut(e)) {
         e.preventDefault();
-        if (!e.repeat) { if (isOpen) close(); else open(); }
+        if (!e.repeat) { if (isOpen) dismiss(); else open(); }
         return;
       }
       if (!isOpen && isSlashShortcut(e) && !isTypingTarget(e.target)) {
@@ -146,8 +170,9 @@ export default function Spotlight() {
         return;
       }
       if (!isOpen) return;
-      // stopPropagation: Escape closes the palette only, not the window behind it.
-      if (e.key === 'Escape')    { e.preventDefault(); e.stopPropagation(); close(); return; }
+      // Focus stays in the input: Tab would only land on the rows behind the
+      // active-descendant highlight, so it is held here.
+      if (e.key === 'Tab')       { e.preventDefault(); inputRef.current?.focus(); return; }
       if (e.key === 'ArrowDown') { e.preventDefault(); setSelIdx(i => Math.min(i + 1, maxIdx)); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); setSelIdx(i => Math.max(i - 1, 0)); return; }
       if (e.key === 'Enter')     { e.preventDefault(); const row = flatRows[selIdx]; if (row) runRow(row); }
@@ -156,13 +181,15 @@ export default function Spotlight() {
     // app that stops propagation can never swallow the palette shortcut.
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isOpen, close, open, flatRows, selIdx, maxIdx, runRow]);
+  }, [isOpen, dismiss, open, flatRows, selIdx, maxIdx, runRow]);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
     setResults(searchSpotlight(value));
     setSelIdx(0);
   };
+
+  const activeRow = flatRows[selIdx];
 
   return (
     <AnimatePresence>
@@ -172,59 +199,68 @@ export default function Spotlight() {
             key="cmd-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-            onClick={close}
-            className="fixed inset-0 z-[9000] bg-black/55 backdrop-blur-[3px]"
-            style={{ backgroundImage: 'radial-gradient(ellipse at 50% 38%, transparent 28%, rgba(0,0,0,0.4) 100%)' }}
+            onClick={dismiss}
+            className="fixed inset-0 bg-black/55 backdrop-blur-[3px]"
+            style={{ zIndex: Z.spotlight, backgroundImage: 'radial-gradient(ellipse at 50% 38%, transparent 28%, rgba(0,0,0,0.4) 100%)' }}
           />
 
           <motion.div
             key="cmd-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search devOS"
             initial={reduced ? { opacity: 0, x: '-50%', y: '-50%' } : { opacity: 0, x: '-50%', y: '-50%', scale: 0.97 }}
             animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
             exit={reduced ? { opacity: 0, x: '-50%', y: '-50%' } : { opacity: 0, x: '-50%', y: '-50%', scale: 0.985 }}
             transition={reduced ? { duration: 0.12 } : { type: 'spring', stiffness: 420, damping: 32, mass: 0.8 }}
-            style={{ transformOrigin: 'center top' }}
-            className="fixed left-1/2 top-[42%] z-[9001] w-[min(92vw,580px)] overflow-hidden rounded-[20px]
-                       border border-border/60 bg-surface/80 shadow-2xl backdrop-blur-2xl"
+            style={{ transformOrigin: 'center top', zIndex: Z.spotlight + 1 }}
+            className="fixed left-1/2 top-[42%] w-[min(92vw,580px)] overflow-hidden rounded-[20px]
+                       border border-border/60 bg-surface/90 shadow-2xl backdrop-blur-2xl"
           >
-            {/* Masthead */}
-            <div className="px-4 pt-3">
-              <span className="select-none font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary/45">
-                ⌘ devOS · command
-              </span>
-            </div>
-
-            {/* Input */}
-            <div className="flex items-center gap-3 px-4 pb-3 pt-2">
-              <Search size={17} strokeWidth={1.75} className="shrink-0 text-text-secondary/50" />
+            {/* Input: a combobox that owns focus for the whole session */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Search size={17} strokeWidth={1.75} aria-hidden className="shrink-0 text-text-secondary" />
               <input
                 ref={inputRef}
                 type="text"
+                role="combobox"
+                aria-label="Search apps and projects, or ask Devanshu"
+                aria-expanded="true"
+                aria-controls={listboxId}
+                aria-autocomplete="list"
+                aria-activedescendant={activeRow ? rowId(activeRow.index) : undefined}
                 value={query}
                 onChange={e => handleQueryChange(e.target.value)}
-                placeholder="Search apps, or ask Devanshu anything…"
-                className="flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-text-secondary/40"
+                placeholder="Search apps and projects, or ask Devanshu"
+                className="flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-text-secondary"
                 data-no-focus-ring
                 autoComplete="off"
                 spellCheck={false}
               />
-              <kbd className="shrink-0 rounded border border-border/70 bg-text/[0.04] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-secondary/50">
-                esc
-              </kbd>
+              <Hint>esc</Hint>
             </div>
 
             <div className="h-px bg-border/55" />
 
             {/* Results */}
-            <div className="max-h-[min(56vh,420px)] overflow-auto py-2">
+            <div
+              id={listboxId}
+              role="listbox"
+              aria-label="Results"
+              className="max-h-[min(56vh,420px)] overflow-auto py-2"
+            >
               {sections.map((section, si) => (
-                <div key={section.header} className={si > 0 ? 'mt-1' : ''}>
-                  <div className="select-none px-4 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-secondary/40">
+                <div key={section.header} role="group" aria-labelledby={`${listboxId}-h-${si}`} className={si > 0 ? 'mt-1' : ''}>
+                  <div
+                    id={`${listboxId}-h-${si}`}
+                    className="select-none px-4 pb-1 pt-2 text-[11px] font-medium text-text-secondary"
+                  >
                     {section.header}
                   </div>
                   {section.rows.map(row => (
                     <RowView
                       key={row.key}
+                      id={rowId(row.index)}
                       row={row}
                       selected={row.index === selIdx}
                       reduced={!!reduced}
@@ -240,10 +276,10 @@ export default function Spotlight() {
             <div className="h-px bg-border/55" />
 
             {/* Action bar */}
-            <div className="flex items-center gap-4 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-text-secondary/55">
+            <div className="flex items-center gap-4 px-4 py-2.5 text-[12px] text-text-secondary">
               <span className="flex items-center gap-1.5"><Hint>↑↓</Hint> navigate</span>
               <span className="flex items-center gap-1.5"><Hint>↵</Hint> open</span>
-              <span className="ml-auto flex items-center gap-1.5"><Hint>esc</Hint> dismiss</span>
+              <span className="ml-auto flex items-center gap-1.5"><Hint>esc</Hint> close</span>
             </div>
           </motion.div>
         </>
@@ -254,29 +290,32 @@ export default function Spotlight() {
 
 function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded border border-border/60 bg-text/[0.03] px-1 py-px font-mono text-[9px] leading-none text-text-secondary/70">
+    <kbd className="shrink-0 rounded border border-border bg-text/[0.04] px-1.5 py-0.5 font-mono text-[11px] leading-none text-text-secondary">
       {children}
     </kbd>
   );
 }
 
-function RowView({ row, selected, reduced, mono, onRun, onHover }: {
-  row: Row; selected: boolean; reduced: boolean; mono: boolean; onRun: () => void; onHover: () => void;
+function RowView({ id, row, selected, reduced, mono, onRun, onHover }: {
+  id: string; row: Row; selected: boolean; reduced: boolean; mono: boolean; onRun: () => void; onHover: () => void;
 }) {
   const isAsk = row.kind === 'ask';
   const glyph = isAsk ? '✦' : GLYPH[row.item.category];
   const title = isAsk ? 'Ask Devanshu' : row.item.title;
-  const tag = isAsk ? 'ASK' : CATEGORY_TAG[row.item.category];
-  const subtitle = isAsk ? 'Opens a chat with Devanshu' : row.item.subtitle;
+  const subtitle = isAsk ? 'AI answers as Devanshu' : row.item.subtitle;
   // In fun mode the Ask hero carries the single accent; everything else stays ink.
   const askAccent = isAsk && !mono;
 
   return (
-    <button
-      type="button"
+    <div
+      id={id}
+      role="option"
+      aria-selected={selected}
       onClick={onRun}
+      // Keep focus in the input when a row is clicked.
+      onMouseDown={e => e.preventDefault()}
       onMouseMove={() => { if (!selected) onHover(); }}
-      className="group relative flex w-full items-center gap-3 px-4 py-2.5 text-left
+      className="group relative flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left
                  transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.992]"
     >
       {selected && (
@@ -289,24 +328,21 @@ function RowView({ row, selected, reduced, mono, onRun, onHover }: {
         </motion.div>
       )}
 
-      <span className={`relative z-10 w-3 shrink-0 text-center font-mono text-[13px] ${askAccent ? 'text-accent' : 'text-text-secondary/70'}`}>
+      <span aria-hidden className={`relative z-10 w-3 shrink-0 text-center font-mono text-[13px] ${askAccent ? 'text-accent' : 'text-text-secondary'}`}>
         {glyph}
       </span>
 
       <span className="relative z-10 min-w-0 flex-1">
-        <span className="block truncate text-[13.5px] font-medium text-text">
+        <span className="block truncate text-[14px] font-medium text-text">
           {title}
           {isAsk && <span className={askAccent ? 'text-accent' : 'text-text-secondary'}> “{row.query}”</span>}
         </span>
-        <span className="block truncate text-[11.5px] leading-snug text-text-secondary/65">{subtitle}</span>
+        <span className="block truncate text-[12px] leading-snug text-text-secondary">{subtitle}</span>
       </span>
 
-      <span className={`relative z-10 shrink-0 font-mono text-[9.5px] uppercase tracking-[0.16em] ${askAccent ? 'text-accent/70' : 'text-text-secondary/45'}`}>
-        {tag}
-      </span>
       {selected && (
-        <span className="relative z-10 shrink-0 font-mono text-[11px] text-text-secondary/70">↵</span>
+        <span aria-hidden className="relative z-10 shrink-0 font-mono text-[12px] text-text-secondary">↵</span>
       )}
-    </button>
+    </div>
   );
 }

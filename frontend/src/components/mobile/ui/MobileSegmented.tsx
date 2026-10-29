@@ -77,7 +77,7 @@ function MobileSegmented<T extends string = string>({
             aria-pressed={isActive}
             aria-label={opt.ariaLabel}
             onClick={() => onChange(opt.value)}
-            className={`relative z-10 flex-1 px-3 py-1 text-[13px] font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded-[7px] ${
+            className={`relative z-10 flex-1 min-h-[40px] px-3 py-1 text-[13px] font-medium transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded-[7px] ${
               isActive ? 'text-text' : 'text-text-secondary'
             }`}
             style={{ minWidth: fullWidth ? undefined : 60 }}

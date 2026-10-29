@@ -14,6 +14,10 @@ const config: Config = {
         text: {
           DEFAULT: 'rgb(var(--color-text) / <alpha-value>)',
           secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
+          // Tertiary (text-text-tertiary): the dimmest text that still passes
+          // WCAG AA 4.5:1 on the window in both themes. Use it instead of
+          // opacity-50 or /50 alpha text, which measures 2.2-3.1:1.
+          tertiary: 'rgb(var(--color-text-tertiary) / <alpha-value>)',
         },
         accent: 'rgb(var(--color-accent) / <alpha-value>)',
         border: 'rgb(var(--color-border) / <alpha-value>)',

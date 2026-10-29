@@ -16,22 +16,25 @@
  * provides the chrome (orb / FAB / sheet, close affordance).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useReducedMotion } from 'framer-motion';
-import { ArrowUp, ArrowUpRight, X } from 'lucide-react';
-import { clampMessages, sanitizeVoice } from '@/lib/conciergeContext';
+import { ArrowUp, ArrowUpRight, Square, X } from 'lucide-react';
+import { CONCIERGE_COPY, clampMessages, sanitizeVoice } from '@/lib/conciergeContext';
+import { contactLinks } from '@/data/aboutMe';
 import { useChatStore } from '@/store/chatStore';
+import { useOSStore } from '@/store/osStore';
+import { useMobileStore } from '@/store/mobileStore';
 import { TypingDots, StreamCaret } from '@/components/os/TypingDots';
 
 const STARTERS = [
   'What do you build?',
   'How is your RAG different?',
-  'Are you good at systems?',
-  'What are you looking for?',
+  'What have you shipped to production?',
+  'What roles are you open to?',
 ] as const;
 
-type Err = null | 'offline' | 'rate_limited' | 'error';
+type Err = null | 'offline' | 'rate_limited' | 'error' | 'stopped';
 
 interface ChatPanelProps {
   /** Render a close affordance in the header (the host wires the action). */
@@ -40,14 +43,18 @@ interface ChatPanelProps {
   autoFocusComposer?: boolean;
   /** Render the presence header (default true). */
   showHeader?: boolean;
+  /** Which shell hosts the panel, so "Open Contact" opens a window or a phone app. */
+  variant?: 'desktop' | 'mobile';
 }
 
 export default function ChatPanel({
   onClose,
   autoFocusComposer = true,
   showHeader = true,
+  variant = 'desktop',
 }: ChatPanelProps) {
   const reduced = useReducedMotion();
+  const inputId = useId();
   const messages = useChatStore((s) => s.messages);
   const status = useChatStore((s) => s.status);
   const addUser = useChatStore((s) => s.addUser);
@@ -58,6 +65,7 @@ export default function ChatPanel({
 
   const [input, setInput] = useState('');
   const [error, setError] = useState<Err>(null);
+  const [copied, setCopied] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -109,6 +117,34 @@ export default function ChatPanel({
     }
   }, [appendAssistant, setStatus, startAssistant]);
 
+  // Stop a reply in flight. A partial answer stays in the thread; a question
+  // that never got an answer can be asked again with "Try again".
+  const stop = useCallback(() => {
+    const wasThinking = useChatStore.getState().status === 'thinking';
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus('idle');
+    if (wasThinking) setError('stopped');
+  }, [setStatus]);
+
+  const copyEmail = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(contactLinks.email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.location.href = `mailto:${contactLinks.email}`;
+    }
+  }, []);
+
+  const openContact = useCallback(() => {
+    if (variant === 'mobile') useMobileStore.getState().openApp('contact');
+    else {
+      useOSStore.getState().openWindow('contact');
+      onClose?.();
+    }
+  }, [variant, onClose]);
+
   const send = useCallback(
     async (raw: string) => {
       const content = raw.trim();
@@ -151,6 +187,7 @@ export default function ChatPanel({
   const busy = status !== 'idle';
   const empty = messages.length === 0;
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const thinking = status === 'thinking';
 
   return (
     // `container-type: size` makes the panel its own query container so the
@@ -166,19 +203,19 @@ export default function ChatPanel({
               <span className="text-[15px] font-semibold tracking-[-0.01em] text-text leading-none">
                 Devanshu
               </span>
-              <span className="text-[9.5px] font-medium uppercase tracking-[0.14em] text-text-secondary border border-border rounded-[5px] px-1.5 py-1 leading-none">
+              <span className="text-[11px] font-medium text-text-secondary border border-border rounded-[5px] px-1.5 py-1 leading-none">
                 AI
               </span>
             </div>
-            <div className="text-[11.5px] text-text-secondary mt-1.5 leading-none transition-colors">
-              {busy ? 'thinking…' : 'Trained on my work, answering as me'}
+            <div className="text-[12px] text-text-secondary mt-1.5 leading-none transition-colors">
+              {busy ? CONCIERGE_COPY.busy : CONCIERGE_COPY.subtitle}
             </div>
           </div>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label="Close chat"
               className="grid place-items-center w-7 h-7 -mr-1 rounded-full text-text-secondary hover:text-text hover:bg-border/50 transition-colors flex-shrink-0"
             >
               <X size={16} strokeWidth={2.25} />
@@ -187,8 +224,17 @@ export default function ChatPanel({
         </header>
       )}
 
-      {/* Thread */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="sr-only" role="status">{thinking ? CONCIERGE_COPY.thinking : ''}</div>
+
+      {/* Thread. aria-busy holds announcements while a reply streams, so
+          screen readers hear the finished answer once, not every chunk. */}
+      <div
+        role="log"
+        aria-live="polite"
+        aria-busy={busy}
+        aria-label="Conversation"
+        className="flex-1 min-h-0 overflow-auto"
+      >
         {empty ? (
           <EmptyState reduced={!!reduced} onPick={send} />
         ) : (
@@ -197,7 +243,7 @@ export default function ChatPanel({
               if (m.role === 'user') {
                 return (
                   <div key={i} className="space-y-1.5">
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-text-secondary/70">
+                    <div className="text-[12px] font-medium text-text-secondary">
                       You
                     </div>
                     <p className="text-[15px] leading-relaxed text-text-secondary whitespace-pre-wrap">
@@ -213,7 +259,7 @@ export default function ChatPanel({
               return (
                 <div key={i} className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-text-secondary/70">
+                    <span className="text-[12px] font-medium text-text-secondary">
                       Devanshu
                     </span>
                   </div>
@@ -238,6 +284,14 @@ export default function ChatPanel({
                 </div>
               );
             })}
+            {thinking && (
+              <div className="space-y-2">
+                <span className="text-[12px] font-medium text-text-secondary">Devanshu</span>
+                <div className="text-[15px] leading-relaxed">
+                  <TypingDots reduced={!!reduced} />
+                </div>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
         )}
@@ -248,27 +302,39 @@ export default function ChatPanel({
           the desktop orb, so the same tree is correct in both hosts. */}
       <div className="flex-shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 border-t border-border">
         {error && (
-          <div className="flex items-center gap-3 px-1 pb-2 text-[12px] text-text-secondary">
-            <span>
-              {error === 'offline' && 'Chat is offline right now.'}
-              {error === 'rate_limited' && 'A lot of questions are coming in. Give it a minute.'}
-              {error === 'error' && 'Something went wrong.'}
+          <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pb-2 text-[12px] text-text-secondary">
+            <span className="basis-full">
+              {error === 'offline' && CONCIERGE_COPY.offline}
+              {error === 'rate_limited' && CONCIERGE_COPY.rateLimited}
+              {error === 'error' && CONCIERGE_COPY.error}
+              {error === 'stopped' && 'Stopped before an answer came back.'}
             </span>
-            {lastUser && (
-              <button
-                onClick={runCompletion}
-                className="underline underline-offset-2 hover:text-text transition-colors"
-              >
+            {error !== 'offline' && lastUser && (
+              <button type="button" onClick={runCompletion} className={errAction}>
                 Try again
               </button>
             )}
+            {(error === 'offline' || error === 'error') && (
+              <>
+                <button type="button" onClick={copyEmail} className={errAction}>
+                  {copied ? 'Email copied' : 'Copy email'}
+                </button>
+                <button type="button" onClick={openContact} className={errAction}>
+                  Open Contact
+                </button>
+              </>
+            )}
           </div>
         )}
+        <label htmlFor={inputId} className="block px-1 pb-1.5 text-[12px] font-medium text-text-secondary">
+          {CONCIERGE_COPY.composerLabel}
+        </label>
         <form
           onSubmit={(e) => { e.preventDefault(); send(input); }}
           className="flex items-end gap-2 rounded-2xl border border-border bg-bg px-3 py-2 transition-colors focus-within:border-text-secondary"
         >
           <textarea
+            id={inputId}
             ref={taRef}
             value={input}
             onChange={(e) => { setInput(e.target.value); resizeInput(); }}
@@ -278,8 +344,18 @@ export default function ChatPanel({
             spellCheck={false}
             data-no-focus-ring
             // 16px min so iOS Safari never pinch-zooms on focus.
-            className="flex-1 bg-transparent resize-none outline-none text-[16px] text-text placeholder:text-text-secondary/60 leading-relaxed py-1.5 max-h-32"
+            className="flex-1 bg-transparent resize-none outline-none text-[16px] text-text placeholder:text-text-secondary leading-relaxed py-1.5 max-h-32"
           />
+          {busy ? (
+            <button
+              type="button"
+              onClick={stop}
+              aria-label="Stop reply"
+              className="grid place-items-center w-8 h-8 rounded-full flex-shrink-0 bg-text text-bg transition-all active:scale-95"
+            >
+              <Square size={12} strokeWidth={0} fill="currentColor" />
+            </button>
+          ) : (
           <button
             type="submit"
             disabled={!canSend}
@@ -290,11 +366,14 @@ export default function ChatPanel({
           >
             <ArrowUp size={16} strokeWidth={2.5} />
           </button>
+          )}
         </form>
       </div>
     </div>
   );
 }
+
+const errAction = 'underline underline-offset-2 hover:text-text transition-colors';
 
 function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string) => void }) {
   // Strong custom ease-out (the shell's --ease-out token) for the entrance; the
@@ -310,7 +389,7 @@ function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string)
       // from the top (off-centre reads as a real surface, not a cramped sheet),
       // with rhythm that opens up on the full-screen app and tightens in the orb
       // via cqh — the panel is its own size container.
-      className="flex min-h-full flex-col justify-start px-6 pt-[clamp(2rem,14cqh,6rem)] pb-8 gap-[clamp(1.25rem,4cqh,2rem)]"
+      className="flex min-h-full flex-col justify-start px-6 pt-[clamp(1rem,6cqh,3rem)] pb-6 gap-[clamp(1rem,3cqh,1.5rem)]"
     >
       <div className="space-y-[clamp(0.5rem,1.5cqh,0.75rem)]">
         <motion.p
@@ -327,8 +406,7 @@ function EmptyState({ reduced, onPick }: { reduced: boolean; onPick: (q: string)
           transition={{ duration: 0.28, delay: reduced ? 0 : 0.09, ease }}
           className="text-[13px] leading-relaxed text-text-secondary max-w-[42ch]"
         >
-          An AI trained on my work, answering in the first person as me. Pick a
-          thread to start, or just type below.
+          Pick a question or type your own.
         </motion.p>
       </div>
 

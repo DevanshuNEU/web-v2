@@ -7,12 +7,14 @@
  *   - { type: 'special'; id: string }  — renders a custom component in the terminal
  */
 
-import { runRecruiterTour } from './recruiterTour';
+import { runRecruiterTour, isRecruiterTourRunning } from './recruiterTour';
 import { opinions } from '@/data/aboutMe';
 import type { AppType } from '../../../shared/types';
 
 export type CommandResult =
   | string[]
+  /** ASCII art: shown as-is, hidden from screen readers, which read `alt`. */
+  | { type: 'art'; lines: string[]; alt: string }
   | { type: 'action'; action: 'openWindow'; payload: AppType }
   | { type: 'action'; action: 'openAssistant'; payload: string }
   | { type: 'action'; action: 'toggleTheme' }
@@ -22,6 +24,8 @@ export type TerminalContext = {
   openWindow: (appType: AppType) => void;
   toggleTheme: () => void;
   currentTheme: 'light' | 'dark';
+  /** Current palette, so neofetch reports the real one. */
+  palette?: 'mono' | 'color';
 };
 
 export type CommandHandler = (args: string[], ctx: TerminalContext) => CommandResult;
@@ -57,33 +61,90 @@ export const OPEN_APP_ALIASES: Record<string, AppType> = {
   'files': 'file-explorer',
   'resume': 'resume',
   'changelog': 'changelog',
+  'help': 'help',
+  'browser': 'browser',
+  'activity': 'github-activity',
+  'github': 'github-activity',
 };
+
+/** `open` aliases that start a chat with the AI instead of opening a window. */
+export const OPEN_CHAT_ALIASES = ['devai', 'chat', 'ai'] as const;
+
+/** One name per app for the `open` error list (first alias wins). */
+export function openAppNames(): string[] {
+  const seen = new Set<AppType>();
+  const names: string[] = [];
+  for (const [name, app] of Object.entries(OPEN_APP_ALIASES)) {
+    if (seen.has(app)) continue;
+    seen.add(app);
+    names.push(name);
+  }
+  return [...names, OPEN_CHAT_ALIASES[0]];
+}
+
+/** Rows of the `help` list: [command, description]. */
+export const HELP_ROWS: [string, string][] = [
+  ['about', 'Who I am'],
+  ['projects', "What I've built"],
+  ['skills', 'Things I know'],
+  ['opinions', 'Strongly held'],
+  ['contact', 'How to reach me'],
+  ['hire devanshu', 'A very good idea'],
+  ['ask <q>', 'Ask my AI a question'],
+  ['tour', 'Quick tour of the portfolio'],
+  ['open <app>', 'Open an app'],
+  ['theme <mode>', 'dark or light'],
+  ['github', 'My GitHub stats'],
+  ['neofetch', 'System info'],
+  ['matrix', 'Full screen. Do the thing'],
+  ['cowsay <msg>', 'Classic'],
+  ['secret', '???'],
+  ['clear', 'Start fresh'],
+];
+
+/** Plain-text equivalent of the neofetch art, for screen readers. */
+const NEOFETCH_ALT = (palette: string) =>
+  `devOS v2.0 system info: host Next.js 15, kernel React 19, shell Terminal.app, theme ${palette}, icons Lucide and Phosphor.`;
+
+/** Levenshtein distance, capped early: only small distances matter here. */
+function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+/** The closest command name within edit distance 2 (less for short words), or null. */
+export function suggestCommand(input: string): string | null {
+  const word = input.trim().toLowerCase().split(/\s+/)[0] ?? '';
+  if (!word) return null;
+  // Short words get less slack, so "x" does not suggest "ls".
+  let bestD = Math.min(2, Math.floor(word.length / 2)) + 1;
+  let best: string | null = null;
+  for (const name of Object.keys(commandRegistry)) {
+    const d = editDistance(word, name);
+    if (d < bestD) { bestD = d; best = name; }
+  }
+  return best;
+}
 
 /** Valid arguments to the `theme` command. */
 export const THEME_ARGS = ['dark', 'light'] as const;
 
 export const commandRegistry: Record<string, CommandHandler> = {
   help: () => [
-    '╔═══════════════════════════════════════════╗',
-    '║         devOS Terminal  :: help            ║',
-    '╠═══════════════════════════════════════════╣',
-    '║  about         Who I am                   ║',
-    '║  projects      What I\'ve built             ║',
-    '║  skills        Things I know               ║',
-    '║  opinions      Strongly held               ║',
-    '║  contact       How to reach me             ║',
-    '║  hire devanshu A very good idea            ║',
-    '║  ask <q>       Open the assistant and ask   ║',
-    '║  tour          Recruiter guided tour       ║',
-    '║  open <app>    Open an app window          ║',
-    '║  theme <mode>  dark | light                ║',
-    '║  github        My GitHub stats             ║',
-    '║  neofetch      System info                 ║',
-    '║  matrix        Full screen. Do the thing   ║',
-    '║  cowsay <msg>  Classic                     ║',
-    '║  secret        ???                         ║',
-    '║  clear         Start fresh                 ║',
-    '╚═══════════════════════════════════════════╝',
+    'Commands',
+    '',
+    ...HELP_ROWS.map(([cmd, desc]) => `  ${cmd.padEnd(16)}${desc}`),
+    '',
+    '  Tab completes a command. On an empty line, Tab moves focus out.',
     '',
   ],
 
@@ -100,20 +161,14 @@ export const commandRegistry: Record<string, CommandHandler> = {
   },
 
   about: () => [
-    '┌──────────────────────────────────────────┐',
-    '│  Devanshu Chicholikar                    │',
-    '│  Software, AI, Forward Deployed Engineer │',
-    '├──────────────────────────────────────────┤',
-    '│  MS Software Engineering Systems         │',
-    '│  Northeastern University                 │',
-    '│  Graduated: May 2026                     │',
-    '│  Location: Boston, MA                    │',
-    '└──────────────────────────────────────────┘',
+    'Devanshu Chicholikar',
+    'Software, AI, Forward Deployed Engineer',
     '',
-    '  Currently: Open to Software Engineer, AI Engineer',
-    '             and Forward Deployed Engineer roles.',
-    '  Specialties: MCP servers, code intelligence,',
-    '              AI dev tools, RAG, full-stack.',
+    '  Education    MS Software Engineering Systems, Northeastern University',
+    '  Graduated    May 2026',
+    '  Location     Boston, MA',
+    '  Currently    Open to Software Engineer, AI Engineer and Forward Deployed Engineer roles',
+    '  Specialties  MCP servers, code intelligence, AI dev tools, RAG, full-stack',
     '',
     '  Type `hire devanshu` if you\'re a recruiter.',
     '  (Seriously, try it.)',
@@ -133,7 +188,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  ->  SecureScale         99.9% uptime AWS infra with Terraform',
     '  ->  Mem Machines        Serverless GCP ingestion pipeline',
     '',
-    '  Double-click the Projects icon to explore them.',
+    '  Type open projects for details.',
     '',
   ],
 
@@ -156,7 +211,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  AI            MCP  RAG  Evals  LLM-as-a-judge  Voice agents',
     '  Observability CloudWatch  Sentry  CI/CD  GitHub Actions',
     '',
-    '  Open the Skill Tree app for the RPG version of this list.',
+    '  Type open skills for the interactive version.',
     '  (It\'s better.)',
     '',
   ],
@@ -169,8 +224,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     `  code  ${CONTACT.github}`,
     `  web   ${CONTACT.web}`,
     '',
-    '  Or just open the Ping Me app and send a message.',
-    '  (The contact form actually sends email now.)',
+    '  Or type open ping to send a message.',
     '',
   ],
 
@@ -189,13 +243,16 @@ export const commandRegistry: Record<string, CommandHandler> = {
   },
 
   open: (args, ctx) => {
-    const app = OPEN_APP_ALIASES[args[0]?.toLowerCase() ?? ''];
+    const name = args[0]?.toLowerCase() ?? '';
+    if ((OPEN_CHAT_ALIASES as readonly string[]).includes(name)) {
+      return { type: 'action', action: 'openAssistant', payload: '' };
+    }
+    const app = OPEN_APP_ALIASES[name];
     if (!app) {
       return [
         `open: no app named '${args[0] ?? '(nothing)'}'`,
         '',
-        'Available apps: about, projects, skills, contact, terminal,',
-        '               games, settings, finder, resume, changelog',
+        `Available apps: ${openAppNames().join(', ')}`,
         '',
       ];
     }
@@ -219,7 +276,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
     return [
       mode === 'dark'
         ? 'Switched to dark mode. Very mysterious.'
-        : 'Switched to light mode. Welcome back to the light side.',
+        : 'Switched to light mode. Welcome back to the light side. (The terminal stays dark.)',
       '',
     ];
   },
@@ -231,33 +288,41 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '  Personal repos: ~18  |  Org repos: 3',
     '  Top languages: TypeScript, Python, JavaScript',
     '',
-    '  Open the Finder app to browse repos interactively.',
+    '  Type open finder to browse the repos.',
     '',
   ],
 
-  neofetch: () => [
-    '         .---.          devanshu@devOS',
-    '        /     \\         ──────────────',
-    '       | o   o |        OS:     devOS v2.0',
-    '       |   ∆   |        Host:   Next.js 15',
-    '        \\ ___ /         Kernel: React 19',
-    '      ___/   \\___       Shell:  Terminal.app',
-    '     /           \\      Theme:  Monochrome',
-    '    |  devOS v2.0 |     Icons:  Lucide + Phosphor',
-    '     \\___________/      Memory: Too much Zustand',
-    '',
-    '  [TypeScript] [Python] [AWS] [Docker] [Terraform]',
-    '',
-  ],
+  neofetch: (_args, ctx) => {
+    const palette = ctx.palette === 'color' ? 'Fun' : 'Monochrome';
+    return {
+      type: 'art',
+      alt: NEOFETCH_ALT(palette),
+      lines: [
+        '         .---.          devanshu@devOS',
+        '        /     \\         --------------',
+        '       | o   o |        OS:     devOS v2.0',
+        '       |   ^   |        Host:   Next.js 15',
+        '        \\ ___ /         Kernel: React 19',
+        '      ___/   \\___       Shell:  Terminal.app',
+        `     /           \\      Theme:  ${palette}`,
+        '    |  devOS v2.0 |     Icons:  Lucide + Phosphor',
+        '     \\___________/      Memory: Too much Zustand',
+        '',
+        '  [TypeScript] [Python] [AWS] [Docker] [Terraform]',
+        '',
+      ],
+    };
+  },
 
-  // Recruiter tour — auto-opens About Me → Projects → Resume in sequence
+  // Quick tour: About Me, Projects, Resume, one window at a time. Running it
+  // again stops it.
   tour: () => {
+    const wasRunning = isRecruiterTourRunning();
     runRecruiterTour();
+    if (wasRunning) return ['Quick tour stopped.', ''];
     return [
-      'Starting recruiter tour...',
-      'About Me → Projects → Resume  (watch the desktop)',
-      '',
-      '  Shortcut: Option+T anytime.',
+      'Starting the quick tour: About Me, Projects, Resume.',
+      'Press Esc or Option+T to stop.',
       '',
     ];
   },
@@ -267,7 +332,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
   cowsay: (args) => {
     const msg = args.join(' ') || 'Hire me?';
     const border = '─'.repeat(msg.length + 2);
-    return [
+    return { type: 'art', alt: `A cow says: ${msg}`, lines: [
       ` ┌${border}┐`,
       ` │ ${msg} │`,
       ` └${border}┘`,
@@ -278,7 +343,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
       '            ||----w |',
       '            ||     ||',
       '',
-    ];
+    ] };
   },
 
   secret: () => [
@@ -314,6 +379,18 @@ export const commandRegistry: Record<string, CommandHandler> = {
     '',
   ],
 
+  cat: (args, ctx) => {
+    const file = (args[0] ?? '').toLowerCase().replace(/\/$/, '');
+    if (!file) return ['Usage: cat <file>   (try: cat README.md)', ''];
+    if (file === 'readme.md') return commandRegistry.help([], ctx);
+    if (file === 'contact.txt') return commandRegistry.contact([], ctx);
+    if (file === 'secret.txt') return commandRegistry.secret([], ctx);
+    if (file === 'about' || file === 'projects' || file === 'skills') {
+      return [`cat: ${file}/: Is a directory. Try: ${file}`, ''];
+    }
+    return [`cat: ${args[0]}: No such file`, ''];
+  },
+
   pwd: () => ['/home/guest/devOS', ''],
 
   date: () => [new Date().toLocaleString(), ''],
@@ -324,7 +401,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
 
   vim: () => ['vim: command not found', 'Just kidding. But seriously, use VS Code.', ''],
 
-  exit: () => ['You can close the window. This isn\'t a real terminal. Almost.', ''],
+  exit: () => ['Nothing to exit here. Close the window from the dots at top left.', ''],
 };
 
 /** Lookup a command (case-insensitive). Returns null if not found. */

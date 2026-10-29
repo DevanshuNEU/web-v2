@@ -1,52 +1,47 @@
 'use client';
 
 /**
- * FileExplorerApp - "Finder", reskinned into the Instrument editorial register.
+ * FileExplorerApp - "Finder", in the Instrument editorial register.
  *
- * A Finder-style project browser, monochrome and restraint-first. Categories
- * are folders (a left index rail on desktop, scrollable chips on mobile);
- * projects are "files" laid out as hairline-divided index rows. Selecting a
- * file opens a detail pane: serif title, a mono spec line (language / stars /
- * status), hairline-divided sections, and quiet editorial links (text +
- * hairline, never filled buttons).
+ * A Finder-style browser over the same projects the Projects app shows. The
+ * files come from data/projectMeta.ts (read-only here), never from a second
+ * copy, so the two apps cannot drift. Folders are views by status; a project
+ * opens a preview pane with its links and an "Open in Projects" action.
  *
- * Live data: GitHub stars AND primary language come from /api/github/repos
- * (the same source the app already used). Stars are never hardcoded; the mono
- * spec line just omits a cell when the live value is absent.
+ * Live data: GitHub stars AND primary language come from /api/github/repos.
+ * Stars are never hardcoded; the spec line just omits a cell when absent.
  *
- * Animation contract (shared with AboutMeApp / ResumeApp): content reveals
- * ONCE on mount via a staggered container, never on scroll - a windowed inner
- * scroll container makes in-view triggers unreliable. Micro-interactions:
- *   - a sliding selection marker (layoutId) glides between folder rows and
- *     between file rows, like the resume rail;
- *   - the detail pane re-runs a quiet staggered "opening" reveal, keyed on the
- *     selected file, so loading a file feels alive;
- *   - each folder shows a live mono item count.
- * All of it collapses to instant under reduced motion; browsing stays fully
- * usable with motion off.
+ * Window-responsive: the layout keys off the window (container queries on
+ * .app-content), never the viewport. Under 720px the folder rail becomes a
+ * chip row; under 860px the preview replaces the list (with Back) instead of
+ * squeezing in beside it. The preview pane is its own query container, so
+ * its title sizes to the pane and never clips.
  *
- * Strictly three-tone (text / text-secondary / bg + border). Status is a mono
- * uppercase label (ACTIVE / COMPLETED / EXPERIMENTAL), never a colored badge.
- * No language hue dots, no glass cards, no accent pills.
+ * Animation contract: content reveals ONCE on mount, never on scroll. A
+ * sliding marker glides between rows; all of it collapses to instant under
+ * reduced motion.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { ExternalLink } from 'lucide-react';
 import { Hairline, MetaLabel } from '@/components/editorial';
 import { reveal, withReduced, spring } from '@/lib/motion';
 import MobilePushView, { useMobileNavigation } from '@/components/mobile/ui/MobilePushView';
+import { projectMeta, getAllProjectKeys, type ProjectMeta } from '@/data/projectMeta';
+import { useOSStore } from '@/store/osStore';
 import type { EnrichedRepo } from '@/app/api/github/repos/route';
 
 // ---------------------------------------------------------------------------
-// Data
+// Data - derived from projectMeta, the source the Projects app reads.
 // ---------------------------------------------------------------------------
 
 interface Project {
+  /** projectMeta key (the GitHub repo name). */
   id: string;
   name: string;
   description: string;
   longDescription: string;
-  category: string;
   tech: string[];
   github?: string;
   live?: string;
@@ -54,8 +49,8 @@ interface Project {
   liveLabel?: string;
   /** Public repo with the data behind the headline numbers. */
   research?: string;
-  status: 'production' | 'active' | 'archived' | 'wip';
-  highlight?: boolean;
+  status: ProjectMeta['status'];
+  featured: boolean;
 }
 
 // Pull the repo name out of a github.com URL so we can match against the API.
@@ -65,142 +60,53 @@ function ghName(url: string | undefined): string | null {
   return m ? m[1].toLowerCase() : null;
 }
 
-const PROJECTS: Project[] = [
-  {
-    id: 'opencodeintel',
-    name: 'OpenCodeIntel',
-    description: 'Code-search platform for AI coding agents: web app, REST API and MCP server',
-    longDescription: 'A code-search platform that gives AI coding agents real context on a codebase: a web app, a REST API and a 12-tool MCP server. Tree-sitter splits code into function-level chunks (Python, JavaScript, TypeScript); search fuses BM25 and vector results with reciprocal rank fusion, then reranks the top results (Voyage rerank-2 in the research eval). 94% Hit@1 on a 665-query research eval across 14 open-source codebases. On the public playground (vector search with keyword and code-graph boosts), p50 641ms for a cold search and 242ms for cached repeats.',
-    category: 'AI / Agents',
-    tech: ['Python', 'FastAPI', 'FastMCP', 'tree-sitter', 'Pinecone', 'Cohere', 'Supabase', 'Redis', 'React'],
-    github: 'https://github.com/OpenCodeIntel/opencodeintel',
-    live: 'https://opencodeintel.com',
-    research: 'https://github.com/OpenCodeIntel/retrieval-research',
-    status: 'active',
-    highlight: true,
-  },
-  {
-    id: 'overhear',
-    name: 'Overhear',
-    description: 'QA analyst for voice agents: code checks the call log, an LLM judge checks what the agent said',
-    longDescription: 'Grades every call a Retell healthcare-scheduling agent takes. Code reads the call\'s action log to check identity, bookings and tool calls (3 of 7 rubric dimensions, 50% of the score); an LLM-as-a-judge, handed the real open slots, grades what the agent said. On a 39-call golden dataset it caught 23 of 23 planted failures, macro-F1 0.89, with 0.99 self-consistency across 3 repeat runs. Built in 7 days, 132 tests.',
-    category: 'AI / Agents',
-    tech: ['Next.js', 'TypeScript', 'Retell', 'Claude API', 'Postgres', 'Drizzle', 'Vitest'],
-    github: 'https://github.com/DevanshuNEU/overhear',
-    status: 'active',
-    highlight: true,
-  },
-  {
-    id: 'callbudget',
-    name: 'CallBudget',
-    description: 'Pharmacy stock prediction as active sensing under a calling budget',
-    longDescription: 'Treats the search for a shortage drug as a calling-budget problem: a HistGradientBoosting model ranks pharmacies by predicted stock, a Claude-driven voice agent calls the likeliest first (tested against a simulated pharmacist on real pharmacy data), and an abstention layer on the stock extractor took false "in stock" answers from 10% to 0% under deliberate noise. Expected calls to find fell from 4.3 to 2.3 (47%) on 19 Boston pharmacies. Ships as a FastMCP server; real public pharmacy data, synthetic outcomes, zero PHI.',
-    category: 'AI / Agents',
-    tech: ['Python', 'scikit-learn', 'FastMCP', 'Pipecat', 'Deepgram', 'Optuna', 'DuckDB', 'Claude API'],
-    github: 'https://github.com/DevanshuNEU/callbudget',
-    live: 'https://www.loom.com/share/0231954a438c4b3ab011fd21f4f41bf2',
-    liveLabel: 'Walkthrough',
-    status: 'active',
-    highlight: true,
-  },
-  {
-    id: 'saar-extension',
-    name: 'Saar',
-    description: 'Chrome extension that meters Claude.ai tokens and cost in real time',
-    longDescription: 'A Chrome extension, published on the Chrome Web Store, that tracks Claude.ai token usage and cost in real time, entirely in the browser. A page-context script reads exact token counts from the streaming responses, a content script draws a Shadow-DOM overlay, and a service worker runs a BPE tokenizer. 1,808 Vitest tests across 63 files.',
-    category: 'Dev Tools',
-    tech: ['TypeScript', 'WXT', 'Chrome MV3', 'React', 'Vitest', 'Playwright'],
-    github: 'https://github.com/OpenCodeIntel/lco',
-    live: 'https://getsaar.com',
-    status: 'active',
-    highlight: true,
-  },
-  {
-    id: 'saar-cli',
-    name: 'saar CLI',
-    description: 'Writes AGENTS.md, CLAUDE.md and .cursorrules from static analysis',
-    longDescription: 'A Python CLI on PyPI (20+ releases since February 2026) that statically analyzes a codebase (package manager, logging, auth patterns) and generates the context files coding agents read: AGENTS.md, CLAUDE.md and .cursorrules.',
-    category: 'Dev Tools',
-    tech: ['Python', 'Static analysis', 'CLI', 'PyPI'],
-    github: 'https://github.com/OpenCodeIntel/saar',
-    live: 'https://pypi.org/project/saar/',
-    liveLabel: 'PyPI',
-    status: 'active',
-  },
-  {
-    id: 'devos',
-    name: 'Portfolio OS',
-    description: 'A desktop operating system in a browser tab, built with Next.js 15',
-    longDescription: 'A full desktop OS simulator built as a portfolio: windowed apps, a dock with magnification, an animated boot sequence, a real terminal, an iOS-style phone shell on mobile, dark/light mode and custom wallpapers. Built with Next.js 15, React 19, Zustand and Framer Motion.',
-    category: 'Frontend',
-    tech: ['Next.js 15', 'React 19', 'TypeScript', 'Tailwind CSS', 'Framer Motion', 'Zustand', 'PostHog'],
-    github: 'https://github.com/DevanshuNEU/web-v2',
-    live: 'https://www.devanshuchicholikar.com',
-    status: 'production',
-    highlight: true,
-  },
-  {
-    id: 'financial-copilot',
-    name: 'Financial Copilot',
-    description: 'AI expense tracker with budgets, insights and a daily safe-to-spend figure',
-    longDescription: 'An AI expense tracker (ExpenseSink): automatic categorization, category budgets, dashboards, AI spending insights, week-over-week comparisons and a daily safe-to-spend figure. React 18 and TypeScript with Recharts on the front end; Supabase Edge Functions (Deno), Postgres and Supabase Auth behind it; deployed on Vercel.',
-    category: 'Full Stack',
-    tech: ['React 18', 'TypeScript', 'Tailwind CSS', 'Recharts', 'Supabase', 'PostgreSQL', 'Vercel'],
-    github: 'https://github.com/DevanshuNEU/financial-copilot',
-    status: 'production',
-    highlight: true,
-  },
-  {
-    id: 'securescale',
-    name: 'SecureScale',
-    description: 'Multi-AZ AWS infrastructure as modular Terraform',
-    longDescription: 'Multi-AZ AWS infrastructure (VPC, ALB, auto-scaling groups, RDS, S3 with KMS) as modular Terraform with least-privilege IAM, Packer-built AMIs, GitHub Actions and CloudWatch monitoring. Provisioning went from 2 hours to 10 minutes, cloud spend dropped 30%, at 99.9% uptime.',
-    category: 'Cloud / DevOps',
-    tech: ['AWS', 'Terraform', 'Packer', 'Lambda', 'RDS', 'KMS', 'GitHub Actions', 'CloudWatch'],
-    status: 'production',
-    highlight: true,
-  },
-  {
-    id: 'mem-machines',
-    name: 'Mem Machines',
-    description: 'Serverless ingestion on GCP Cloud Run, Pub/Sub and Firestore',
-    longDescription: 'An event-driven, serverless data ingestion pipeline on GCP: messages land in Pub/Sub, Cloud Run workers process them, results land in Firestore. Multi-tenant isolation and automatic PII redaction on the way in.',
-    category: 'Cloud / DevOps',
-    tech: ['Python', 'GCP Cloud Run', 'Pub/Sub', 'Firestore', 'Docker'],
-    github: 'https://github.com/DevanshuNEU/mem-machines',
-    status: 'archived',
-  },
-  {
-    id: 'tool-crowding',
-    name: 'Tool Crowding',
-    description: 'Harness measuring whether agents pick the wrong MCP tool as more servers load',
-    longDescription: 'A pre-registered harness for measuring MCP tool-selection interference in LLM agents: 345 tests, a 199-tool synthetic corpus and a 144-trial factorial design locked before any data. Every trial is cache-cold (per-trial nonce plus a hard-halt assertion on a cache hit). Status: harness built, 19 exploratory trials run, pilot not run yet.',
-    category: 'Research',
-    tech: ['Python', 'MCP', 'pytest', 'Anthropic API'],
-    github: 'https://github.com/DevanshuNEU/tool-crowding',
-    status: 'wip',
-  },
-  {
-    id: 'ibm-watsonx-hackathon',
-    name: 'watsonx Test Forge',
-    description: 'Hackathon: auto-generate Journey Success test cases for IBM watsonx agents',
-    longDescription: 'IBM watsonx Orchestrate hackathon project. Multi-tool agent that reads deployed agent specs and generates Journey Success test cases (happy path, edge, failure). Lifecycle: list_deployed_agents, get_agent_spec, generate_test_case, upload_test_case. Built on IBM ADK + watsonx Orchestrate MCP server with Bob IDE. 4 tools, 13 tests passing.',
-    category: 'AI / Agents',
-    tech: ['Python', 'IBM watsonx ADK', 'Pydantic', 'pytest'],
-    status: 'archived',
-  },
+function toProject(key: string, meta: ProjectMeta): Project {
+  return {
+    id: key,
+    name: meta.displayName,
+    description: meta.tagline,
+    longDescription: meta.descriptionOverride ?? meta.story[0] ?? meta.tagline,
+    tech: meta.extraTech ?? [],
+    github: meta.repoUrl,
+    live: meta.liveUrl,
+    liveLabel: meta.liveLabel,
+    research: meta.researchUrl,
+    status: meta.status,
+    featured: meta.featured,
+  };
+}
+
+/** Every project, in the Projects app's display order (featured first). */
+const PROJECTS: Project[] = getAllProjectKeys().map((key) => toProject(key, projectMeta[key]));
+
+// Folders are views over the same files. Status words match the Projects app.
+const STATUS_LABELS: Record<Project['status'], string> = {
+  active: 'Active',
+  completed: 'Completed',
+  experimental: 'Experimental',
+};
+
+interface Folder {
+  id: string;
+  label: string;
+  match: (p: Project) => boolean;
+}
+
+const ALL_FOLDERS: Folder[] = [
+  { id: 'all', label: 'All projects', match: () => true },
+  { id: 'featured', label: 'Featured', match: (p) => p.featured },
+  { id: 'active', label: STATUS_LABELS.active, match: (p) => p.status === 'active' },
+  { id: 'completed', label: STATUS_LABELS.completed, match: (p) => p.status === 'completed' },
+  { id: 'experimental', label: STATUS_LABELS.experimental, match: (p) => p.status === 'experimental' },
 ];
 
-const CATEGORIES = ['All', 'AI / Agents', 'Dev Tools', 'Full Stack', 'Frontend', 'Cloud / DevOps', 'Research'];
+/** Only folders that hold something. */
+const FOLDERS = ALL_FOLDERS.filter((f) => PROJECTS.some(f.match));
 
-// The local status enum maps to the three editorial labels. No color anywhere;
-// the label IS the signal.
-const STATUS_LABELS: Record<Project['status'], string> = {
-  production: 'COMPLETED',
-  active: 'ACTIVE',
-  wip: 'EXPERIMENTAL',
-  archived: 'COMPLETED',
-};
+function filesIn(folderId: string): Project[] {
+  const folder = FOLDERS.find((f) => f.id === folderId) ?? FOLDERS[0];
+  return PROJECTS.filter(folder.match);
+}
 
 // ---------------------------------------------------------------------------
 // Live data shape - stars + primary language keyed by lowercased repo name.
@@ -229,25 +135,18 @@ function specCells(project: Project, metaByName: RepoMetaMap): string[] {
   const cells: string[] = [];
   if (language) cells.push(language);
   if (meta && meta.stars > 0) {
-    cells.push(`${meta.stars} ${meta.stars === 1 ? 'STAR' : 'STARS'}`);
+    cells.push(`${meta.stars} ${meta.stars === 1 ? 'star' : 'stars'}`);
   }
   cells.push(STATUS_LABELS[project.status]);
   return cells;
 }
 
-/** Mono run of spec cells separated by middots. */
+/** Mono run of spec cells. Gaps, not middots, so a wrap never strands a dot. */
 function SpecLine({ cells, className }: { cells: string[]; className?: string }) {
   return (
-    <p className={`flex flex-wrap items-center gap-x-1 gap-y-1 ${className ?? ''}`}>
-      {cells.map((cell, i) => (
-        <React.Fragment key={cell}>
-          {i > 0 && (
-            <span aria-hidden className="font-mono-meta opacity-40">
-              &middot;
-            </span>
-          )}
-          <MetaLabel className="text-text-secondary">{cell}</MetaLabel>
-        </React.Fragment>
+    <p className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${className ?? ''}`}>
+      {cells.map((cell) => (
+        <MetaLabel key={cell} className="text-text-secondary">{cell}</MetaLabel>
       ))}
     </p>
   );
@@ -263,16 +162,14 @@ function EditorialLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group inline-flex items-center focus-visible:outline-none
+      className="group inline-flex items-center
                  transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
     >
-      <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
+      <MetaLabel className="text-text transition-colors">
         {label}
       </MetaLabel>
-      <span
-        aria-hidden
-        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
-      />
+      <ExternalLink size={12} aria-hidden className="ml-1.5 text-text-secondary transition-colors group-hover:text-text" />
+      <span className="sr-only">(opens in a new tab)</span>
     </a>
   );
 }
@@ -304,11 +201,10 @@ function FileRow({
         type="button"
         onClick={onClick}
         data-testid="finder-file-row"
-        aria-current={active ? 'true' : undefined}
+        aria-pressed={active}
         className="group relative flex w-full flex-col gap-1.5 px-3 py-4 text-left
                    transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                    hover:bg-black/[0.025] dark:hover:bg-white/[0.04]
-                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]
                    active:scale-[0.99]"
       >
         {/* Sliding selection marker: a thin graphite bar pinned to the row's
@@ -327,8 +223,7 @@ function FileRow({
 
         <div className="flex items-baseline justify-between gap-4">
           <h3
-            className={`font-display text-lg leading-tight truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                        ${active ? 'text-text' : 'text-text group-hover:text-text'}
+            className={`font-display text-lg leading-tight text-text [text-wrap:balance] transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                         ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
           >
             {project.name}
@@ -356,10 +251,13 @@ function DetailBody({
   project,
   metaByName,
   reduced,
+  onOpenProjects,
 }: {
   project: Project;
   metaByName: RepoMetaMap;
   reduced: boolean | null;
+  /** Open the Projects app (desktop only). */
+  onOpenProjects?: () => void;
 }) {
   const cells = specCells(project, metaByName);
 
@@ -373,14 +271,23 @@ function DetailBody({
     >
       {/* Title block. */}
       <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
-        <MetaLabel as="p" className="text-text-secondary">
-          {project.category}
-        </MetaLabel>
-        <h2 className="font-display text-text editorial-head leading-[0.95]">
+        <h2 className="font-display text-text editorial-head leading-[1.02] text-[clamp(1.75rem,9cqi,3rem)] [overflow-wrap:normal] [text-wrap:balance]">
           {project.name}
         </h2>
+        <p className="max-w-[60ch] text-base leading-snug text-text-secondary">{project.description}</p>
         <Hairline />
         <SpecLine cells={cells} />
+        {onOpenProjects && (
+          <button
+            type="button"
+            onClick={onOpenProjects}
+            className="mt-1 inline-flex self-start border border-text px-3.5 py-2 font-mono-meta text-text
+                       transition-[transform,background-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
+                       hover:bg-text hover:text-bg active:scale-[0.97]"
+          >
+            Open in Projects
+          </button>
+        )}
       </motion.div>
 
       {/* Overview. */}
@@ -393,27 +300,19 @@ function DetailBody({
       </motion.div>
 
       {/* Tech - a mono run, no pills. */}
+      {project.tech.length > 0 && (
       <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
         <MetaLabel as="p">Stack</MetaLabel>
         <Hairline />
-        <p className="flex flex-wrap items-baseline gap-x-1 gap-y-1">
-          {project.tech.map((t, i) => (
-            <React.Fragment key={t}>
-              {i > 0 && (
-                <span aria-hidden className="font-mono-meta opacity-40">
-                  &middot;
-                </span>
-              )}
-              <span
-                className="font-mono leading-snug text-text"
-                style={{ fontSize: 'clamp(0.72rem, 1.55cqi, 0.8125rem)' }}
-              >
-                {t}
-              </span>
-            </React.Fragment>
+        <ul className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
+          {project.tech.map((t) => (
+            <li key={t} className="font-mono text-[0.8125rem] leading-snug text-text">
+              {t}
+            </li>
           ))}
-        </p>
+        </ul>
       </motion.div>
+      )}
 
       {/* Links - quiet editorial, hairline-separated from the body above. */}
       {(project.github || project.live) && (
@@ -422,7 +321,7 @@ function DetailBody({
           <Hairline />
           <div className="flex flex-wrap gap-x-8 gap-y-3">
             {project.github && <EditorialLink href={project.github} label="GitHub" />}
-            {project.live && <EditorialLink href={project.live} label={project.liveLabel ?? 'Live Site'} />}
+            {project.live && <EditorialLink href={project.live} label={project.liveLabel ?? 'Live site'} />}
             {project.research && <EditorialLink href={project.research} label="Research Data" />}
           </div>
         </motion.div>
@@ -440,34 +339,38 @@ function DetailPanel({
   metaByName,
   reduced,
   onBack,
+  onOpenProjects,
 }: {
   project: Project;
   metaByName: RepoMetaMap;
   reduced: boolean | null;
   onBack: () => void;
+  onOpenProjects: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    // Its own query container: the title's cqi size measures this pane, not
+    // the whole window, so it never clips in a split layout.
+    <div className="flex h-full flex-col overflow-hidden [container-type:inline-size]">
       <div className="app-toolbar flex shrink-0 items-center gap-3 border-b px-5 py-3">
         <button
           type="button"
           onClick={onBack}
-          className="group inline-flex items-center focus-visible:outline-none
+          className="group inline-flex items-center
                      transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
-          aria-label="Close detail"
+          aria-label="Close preview"
         >
           <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
             Close
           </MetaLabel>
         </button>
-        <span aria-hidden className="font-mono-meta opacity-40">
+        <span aria-hidden className="font-mono-meta text-text-tertiary">
           /
         </span>
         <MetaLabel className="min-w-0 truncate text-text">{project.name}</MetaLabel>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-7">
-        <DetailBody project={project} metaByName={metaByName} reduced={reduced} />
+        <DetailBody project={project} metaByName={metaByName} reduced={reduced} onOpenProjects={onOpenProjects} />
       </div>
     </div>
   );
@@ -497,10 +400,10 @@ function FolderRow({
       type="button"
       onClick={onClick}
       data-testid="finder-folder-row"
-      aria-current={active ? 'true' : undefined}
+      aria-pressed={active}
       className="group relative flex w-full items-center gap-3 px-4 py-2 text-left
                  transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                 focus-visible:outline-none active:scale-[0.99]"
+                 active:scale-[0.99]"
     >
       {active && (
         <motion.span
@@ -515,16 +418,13 @@ function FolderRow({
       )}
       <span
         className={`font-mono-meta min-w-0 flex-1 truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                    ${active ? 'text-text' : 'text-text-secondary group-hover:text-text'}
+                    ${active ? 'font-semibold text-text' : 'text-text-secondary group-hover:text-text'}
                     ${reduced ? '' : '[@media(hover:hover)and(pointer:fine)]:group-hover:translate-x-0.5'}`}
       >
         {label}
       </span>
-      <span
-        className={`font-mono-meta shrink-0 tabular-nums transition-opacity
-                    ${active ? 'opacity-100' : 'opacity-40 group-hover:opacity-70'}`}
-      >
-        {String(count).padStart(2, '0')}
+      <span className={`font-mono-meta shrink-0 tabular-nums ${active ? 'text-text' : 'text-text-secondary'}`}>
+        {count}
       </span>
     </button>
   );
@@ -567,19 +467,19 @@ function useRepoMeta(): RepoMetaMap {
 export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mobile' } = {}) {
   const reduced = useReducedMotion();
   const metaByName = useRepoMeta();
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeFolder, setActiveFolder] = useState(FOLDERS[0].id);
   const [selected, setSelected] = useState<Project | null>(null);
 
-  const filtered = useMemo(
-    () =>
-      activeCategory === 'All'
-        ? PROJECTS
-        : PROJECTS.filter((p) => p.category === activeCategory),
-    [activeCategory],
-  );
+  const filtered = useMemo(() => filesIn(activeFolder), [activeFolder]);
+  const folderLabel = FOLDERS.find((f) => f.id === activeFolder)?.label ?? FOLDERS[0].label;
 
-  const countFor = (cat: string) =>
-    cat === 'All' ? PROJECTS.length : PROJECTS.filter((p) => p.category === cat).length;
+  // Escape closes the preview, like Quick Look.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
 
   if (variant === 'mobile') {
     return (
@@ -593,34 +493,36 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
     );
   }
 
-  const handleSelect = (project: Project) =>
-    setSelected((prev) => (prev?.id === project.id ? null : project));
+  // Selecting is idempotent: clicking the open file again keeps it open.
+  const handleSelect = (project: Project) => setSelected(project);
 
-  const handleCategory = (cat: string) => {
-    setActiveCategory(cat);
+  const handleFolder = (id: string) => {
+    setActiveFolder(id);
     setSelected(null);
   };
 
+  const openProjects = () => useOSStore.getState().openWindow('projects');
+
   return (
     <div className="flex h-full overflow-hidden bg-bg">
-      {/* Folder rail. */}
+      {/* Folder rail: only when the window is wide enough to spare it. */}
       <nav
-        aria-label="Project categories"
-        className="hidden w-48 shrink-0 flex-col overflow-y-auto border-r border-border md:flex"
+        aria-label="Folders"
+        className="hidden w-48 shrink-0 flex-col overflow-y-auto border-r border-border [@container(min-width:720px)]:flex"
       >
         <div className="px-4 py-5">
           <MetaLabel as="p">Folders</MetaLabel>
         </div>
         <Hairline />
         <div className="flex flex-col py-2">
-          {CATEGORIES.map((cat) => (
+          {FOLDERS.map((f) => (
             <FolderRow
-              key={cat}
-              label={cat}
-              count={countFor(cat)}
-              active={activeCategory === cat}
+              key={f.id}
+              label={f.label}
+              count={filesIn(f.id).length}
+              active={activeFolder === f.id}
               reduced={reduced}
-              onClick={() => handleCategory(cat)}
+              onClick={() => handleFolder(f.id)}
             />
           ))}
         </div>
@@ -628,29 +530,34 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
 
       {/* Main column. */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Narrow windows: the folders become a chip row. */}
+        <div className="[@container(min-width:720px)]:hidden">
+          <FolderChips active={activeFolder} reduced={reduced} onChange={handleFolder} />
+        </div>
+
         {/* Breadcrumb toolbar reflecting the current folder. */}
         <div className="app-toolbar flex shrink-0 items-center gap-3 border-b px-5 py-3">
           <MetaLabel className="text-text-secondary">Finder</MetaLabel>
-          <span aria-hidden className="font-mono-meta opacity-40">
+          <span aria-hidden className="font-mono-meta text-text-tertiary">
             /
           </span>
-          <MetaLabel className="text-text">{activeCategory}</MetaLabel>
-          <span className="ml-auto">
+          <MetaLabel className="min-w-0 truncate text-text">{folderLabel}</MetaLabel>
+          <span className="ml-auto shrink-0">
             <MetaLabel className="text-text-secondary tabular-nums">
-              {filtered.length} {filtered.length === 1 ? 'Item' : 'Items'}
+              {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
             </MetaLabel>
           </span>
         </div>
 
-        {/* File list + detail pane. */}
+        {/* File list + preview. Side by side from 860px; below that the
+            preview replaces the list, and Close returns to it. */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* File list - reveals once on mount, re-staggers on category change. */}
           <div
-            className={`min-w-0 overflow-y-auto px-3 py-2 transition-[flex-basis] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]
-                        ${selected ? 'hidden basis-1/2 lg:block' : 'basis-full'}`}
+            className={`min-w-0 overflow-y-auto px-3 py-2
+                        ${selected ? 'hidden [@container(min-width:860px)]:block [@container(min-width:860px)]:basis-1/2' : 'basis-full'}`}
           >
             <motion.div
-              key={activeCategory}
+              key={activeFolder}
               variants={reveal.container(reduced)}
               initial="hidden"
               animate="show"
@@ -671,7 +578,6 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
             </motion.div>
           </div>
 
-          {/* Detail pane. */}
           <AnimatePresence>
             {selected && (
               <motion.div
@@ -683,26 +589,18 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
                   { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
                   reduced,
                 )}
-                className="flex min-w-0 basis-full flex-col overflow-hidden border-l border-border lg:basis-1/2"
+                className="flex min-w-0 basis-full flex-col overflow-hidden [@container(min-width:860px)]:basis-1/2 [@container(min-width:860px)]:border-l [@container(min-width:860px)]:border-border"
               >
                 <DetailPanel
                   project={selected}
                   metaByName={metaByName}
                   reduced={reduced}
                   onBack={() => setSelected(null)}
+                  onOpenProjects={openProjects}
                 />
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Status bar. */}
-        <div className="app-toolbar flex shrink-0 items-center justify-center border-t px-5 py-2">
-          <MetaLabel className="text-text-secondary">
-            {selected
-              ? `${selected.name} / ${selected.tech.length} Technologies`
-              : `${filtered.length} ${filtered.length === 1 ? 'Project' : 'Projects'} / Select To Preview`}
-          </MetaLabel>
         </div>
       </div>
     </div>
@@ -710,10 +608,62 @@ export default function FileExplorerApp({ variant }: { variant?: 'desktop' | 'mo
 }
 
 // ---------------------------------------------------------------------------
-// Mobile - category chips + hairline file rows, push to an editorial detail.
+// Folder chips - narrow windows and the phone. Scrolls sideways with an edge
+// fade so the hidden folders read as "more this way".
 // ---------------------------------------------------------------------------
 
-const MOBILE_CHIP_MARKER_ID = 'finder-mobile-chip-active';
+const CHIP_MARKER_ID = 'finder-chip-active';
+
+function FolderChips({
+  active,
+  reduced,
+  onChange,
+}: {
+  active: string;
+  reduced: boolean | null;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <nav
+      aria-label="Folders"
+      className="hide-scrollbar flex shrink-0 gap-5 overflow-x-auto border-b border-border px-5
+                 [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]"
+    >
+      {FOLDERS.map((f) => {
+        const isActive = active === f.id;
+        return (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => onChange(f.id)}
+            aria-pressed={isActive}
+            data-testid="finder-folder-chip"
+            className="group relative flex min-h-[44px] shrink-0 items-center
+                       transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
+          >
+            <MetaLabel className={isActive ? 'font-semibold text-text' : 'text-text-secondary group-hover:text-text'}>
+              {f.label}
+            </MetaLabel>
+            {isActive && (
+              <motion.span
+                layoutId={CHIP_MARKER_ID}
+                aria-hidden
+                className="absolute bottom-2 left-0 right-0 h-px bg-text"
+                transition={withReduced(spring.window, reduced)}
+              />
+            )}
+          </button>
+        );
+      })}
+      {/* Room past the last chip so the fade never covers it at the end. */}
+      <span aria-hidden className="w-6 shrink-0" />
+    </nav>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile - folder chips + hairline file rows, push to an editorial detail.
+// ---------------------------------------------------------------------------
 
 function FinderMobileRoot({
   metaByName,
@@ -723,19 +673,15 @@ function FinderMobileRoot({
   reduced: boolean | null;
 }) {
   const nav = useMobileNavigation();
-  const [activeCategory, setActiveCategory] = useState('All');
-
-  const filtered =
-    activeCategory === 'All'
-      ? PROJECTS
-      : PROJECTS.filter((p) => p.category === activeCategory);
+  const [activeFolder, setActiveFolder] = useState(FOLDERS[0].id);
+  const filtered = filesIn(activeFolder);
 
   const openDetail = (project: Project) => {
     nav.push({
       id: project.id,
       title: project.name,
       element: (
-        <div className="overflow-y-auto px-5 py-6">
+        <div className="overflow-y-auto px-5 py-6 [container-type:inline-size]">
           <DetailBody project={project} metaByName={metaByName} reduced={reduced} />
         </div>
       ),
@@ -744,41 +690,12 @@ function FinderMobileRoot({
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
-      {/* Folder chips - mono, with a sliding underline marker. */}
-      <div className="hide-scrollbar flex gap-5 overflow-x-auto border-b border-border px-5 py-3">
-        {CATEGORIES.map((cat) => {
-          const active = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setActiveCategory(cat)}
-              aria-current={active ? 'true' : undefined}
-              className="group relative shrink-0 py-1 focus-visible:outline-none
-                         transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
-            >
-              <MetaLabel
-                className={active ? 'text-text' : 'text-text-secondary'}
-              >
-                {cat}
-              </MetaLabel>
-              {active && (
-                <motion.span
-                  layoutId={MOBILE_CHIP_MARKER_ID}
-                  aria-hidden
-                  className="absolute -bottom-0.5 left-0 right-0 h-px bg-text"
-                  transition={withReduced(spring.window, reduced)}
-                />
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <FolderChips active={activeFolder} reduced={reduced} onChange={setActiveFolder} />
 
-      {/* File rows - reveal once on mount, re-stagger on category change. */}
+      {/* File rows - reveal once on mount, re-stagger on folder change. */}
       <div className="flex-1 overflow-y-auto px-3 py-2">
         <motion.div
-          key={activeCategory}
+          key={activeFolder}
           variants={reveal.container(reduced)}
           initial="hidden"
           animate="show"

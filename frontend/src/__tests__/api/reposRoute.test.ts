@@ -29,5 +29,8 @@ describe('/api/github/repos liveLabel', () => {
     const data = await (await GET()).json();
     const secure = data.find((r: { name: string }) => r.name === 'SecureScale');
     expect(secure.htmlUrl).toBe('');
+    // No GitHub repo, so no "last updated" date (never a fake "today").
+    expect(secure.updatedAt).toBeNull();
+    expect(data.find((r: { name: string }) => r.name === 'callbudget').updatedAt).toBe('2026-10-01T00:00:00Z');
   });
 });

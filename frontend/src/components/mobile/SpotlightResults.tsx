@@ -116,7 +116,7 @@ export default function SpotlightResults({ query, onRan }: SpotlightResultsProps
     <div className="flex-1 overflow-y-auto overscroll-contain py-2">
       {sections.map((section, si) => (
         <div key={section.header} className={si > 0 ? 'mt-1' : ''}>
-          <div className="select-none px-4 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-secondary/40">
+          <div className="select-none px-4 pb-1 pt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text-secondary">
             {section.header}
           </div>
           {section.rows.map((row) => (
@@ -133,9 +133,10 @@ function MobileRowView({ row, mono, onRun }: {
 }) {
   const isAsk = row.kind === 'ask';
   const glyph = isAsk ? '✦' : GLYPH[row.item.category];
-  const title = isAsk ? 'Ask Devanshu' : row.item.title;
+  const title = isAsk ? 'Ask AI' : row.item.title;
   const tag = isAsk ? 'ASK' : CATEGORY_TAG[row.item.category];
-  const subtitle = isAsk ? 'Opens a chat with Devanshu' : row.item.subtitle;
+  // It is an AI answering from his work, not Devanshu live.
+  const subtitle = isAsk ? "An AI answers from Devanshu's work" : row.item.subtitle;
   // In fun mode the Ask hero carries the single accent; everything else stays ink.
   const askAccent = isAsk && !mono;
 
@@ -147,7 +148,7 @@ function MobileRowView({ row, mono, onRun }: {
                   rounded-xl transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.99]
                   ${mono ? 'active:bg-text/[0.06]' : 'active:bg-accent/10'}`}
     >
-      <span className={`w-3 shrink-0 text-center font-mono text-[14px] ${askAccent ? 'text-accent' : 'text-text-secondary/70'}`}>
+      <span aria-hidden className={`w-3 shrink-0 text-center font-mono text-[14px] ${askAccent ? 'text-accent' : 'text-text-secondary'}`}>
         {glyph}
       </span>
 
@@ -156,10 +157,10 @@ function MobileRowView({ row, mono, onRun }: {
           {title}
           {isAsk && <span className={askAccent ? 'text-accent' : 'text-text-secondary'}> “{row.query}”</span>}
         </span>
-        <span className="block truncate text-[12.5px] leading-snug text-text-secondary/65">{subtitle}</span>
+        <span className="block truncate text-[13px] leading-snug text-text-secondary">{subtitle}</span>
       </span>
 
-      <span className={`shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] ${askAccent ? 'text-accent/70' : 'text-text-secondary/45'}`}>
+      <span className={`shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] ${askAccent ? 'text-accent' : 'text-text-secondary'}`}>
         {tag}
       </span>
     </button>

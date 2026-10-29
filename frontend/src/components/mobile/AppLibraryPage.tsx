@@ -66,48 +66,42 @@ export default function AppLibraryPage() {
       className="snap-start w-full flex-shrink-0 flex flex-col"
       aria-label="App Library"
     >
-      {/* Pinned header — Library label + search field. */}
-      <div className="flex-shrink-0 px-6 pt-6">
-        <span className="select-none font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary/45">
-          Library
-        </span>
-
+      {/* Pinned header: the search field. (The 10px "Library" label was
+          dropped: the field and the page dot already say where you are.)
+          The input hides its own ring, so the wrapper carries the focus state. */}
+      <div className="flex-shrink-0 px-5 pt-4">
         <div
-          className={`mt-2 flex min-h-[44px] items-center gap-2.5 rounded-2xl px-4 ${
+          className={`flex min-h-[44px] items-center gap-2.5 rounded-2xl pl-4 pr-1 ${
             mono
-              ? 'border border-border bg-surface/70 backdrop-blur'
-              : 'glass-medium border border-white/20 shadow-lg'
+              ? 'border border-border bg-surface/70 backdrop-blur focus-within:border-text/60 focus-within:ring-2 focus-within:ring-text/30'
+              : 'glass-medium border border-white/20 shadow-lg focus-within:border-text/60 focus-within:ring-2 focus-within:ring-text/30'
           }`}
         >
-          <Search size={16} strokeWidth={1.75} className={mono ? 'text-text-secondary/60' : 'text-white/70'} />
+          <Search size={16} strokeWidth={1.75} className="text-text-secondary" aria-hidden />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search apps, or ask Devanshu anything…"
+            placeholder="Search or ask a question"
             // 16px min so iOS Safari doesn't pinch-zoom on focus.
-            className={`min-w-0 flex-1 bg-transparent text-[16px] outline-none ${
-              mono
-                ? 'text-text placeholder:text-text-secondary/40'
-                : 'text-white placeholder:text-white/45'
-            }`}
+            // Ink follows the theme tokens in both palettes: the glass surface
+            // turns white in light mode, where white text vanished.
+            className="min-w-0 flex-1 bg-transparent text-[16px] outline-none text-text placeholder:text-text-secondary"
             data-no-focus-ring
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
             enterKeyHint="search"
-            aria-label="Search apps"
+            aria-label="Search apps or ask a question"
           />
           {searching && (
             <button
               type="button"
               onClick={clear}
               aria-label="Clear search"
-              className={`shrink-0 rounded-full p-0.5 transition-transform active:scale-90 ${
-                mono ? 'text-text-secondary/60' : 'text-white/70'
-              }`}
+              className="touch-target shrink-0 grid place-items-center rounded-full text-text-secondary transition-transform active:scale-90"
             >
               <X size={16} strokeWidth={2} />
             </button>
@@ -136,9 +130,9 @@ export default function AppLibraryPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: reduced ? 1 : 0 }}
               transition={{ duration: reduced ? 0 : 0.14 }}
-              className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-2"
+              className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-4"
             >
-              <div className="grid grid-cols-4 gap-x-4 gap-y-6">
+              <div className="grid grid-cols-4 gap-x-3 gap-y-5">
                 {apps.map((app) => (
                   <div key={app.appType} className="flex justify-center">
                     <AppIcon appType={app.appType} onOpen={openApp} label={app.label} />

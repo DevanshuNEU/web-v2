@@ -64,4 +64,19 @@ describe('desktop right-click context menu', () => {
     // A menu item only renders once the trigger successfully opened the menu.
     expect(await screen.findByText('search devOS')).toBeInTheDocument();
   });
+
+  it('leaves right-clicks inside a window to the browser', async () => {
+    render(
+      <Desktop>
+        <div data-window>
+          <a href="https://example.com" data-testid="link">a link</a>
+        </div>
+      </Desktop>
+    );
+    const notPrevented = fireEvent.contextMenu(screen.getByTestId('link'));
+    // fireEvent returns false when a handler called preventDefault.
+    expect(notPrevented).toBe(true);
+    await new Promise(r => setTimeout(r, 20));
+    expect(screen.queryByText('search devOS')).not.toBeInTheDocument();
+  });
 });

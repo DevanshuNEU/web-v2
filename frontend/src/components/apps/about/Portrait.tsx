@@ -31,15 +31,21 @@ export interface PortraitProps {
   /** Square edge length in px. Used for both width and height (no CLS). */
   size: number;
   priority?: boolean;
+  /**
+   * Optional sizing class. When set, the box is sized by CSS (e.g. a
+   * container query) instead of the inline `size`, which then only sets the
+   * image's intrinsic resolution. The class must keep the box square.
+   */
+  className?: string;
 }
 
-export default function Portrait({ src, alt, size, priority }: PortraitProps) {
+export default function Portrait({ src, alt, size, priority, className }: PortraitProps) {
   const mono = useIsMono();
 
   return (
     <div
-      className="relative shrink-0 overflow-hidden border border-border bg-surface"
-      style={{ width: size, height: size }}
+      className={`relative shrink-0 overflow-hidden border border-border bg-surface ${className ?? ''}`}
+      style={className ? undefined : { width: size, height: size }}
     >
       <Image
         src={src}

@@ -1,51 +1,48 @@
 'use client';
 
 /**
- * ResumeApp - Editorial resume in the Instrument house language.
+ * ResumeApp - the resume as a readable document, plus the PDF.
  *
- * Two modes, both reskinned into the monochrome editorial register:
- *   (a) "Read" - the interactive document: serif section heads, mono metadata,
- *       a hairline-divided experience timeline, an inline mono skills run, and
- *       IndexRow-style project rows. Every section is always rendered as one
- *       scrolled document with a numbered index rail (desktop) / numbered
- *       eyebrows (mobile). Random-access without hiding content.
- *   (b) "PDF" - the raw file in an iframe, with quiet editorial chrome.
+ * Two modes:
+ *   (a) "Text" - the document: serif section heads, one scrolled column, a
+ *       scroll-spy index rail when the window is wide enough for it.
+ *   (b) "PDF" - the file itself in an iframe.
  *
- * The mode toggle and the Download control are quiet editorial controls
- * (mono labels + hairlines), never filled accent buttons.
+ * The toolbar carries the only copy of the name (the one h1), the role line,
+ * the contacts and a filled "Download PDF" button, so the document opens on
+ * content, not on a second masthead.
+ *
+ * Window-dynamic: layout keys off the WINDOW through container queries in the
+ * scoped <style> below, never the viewport (the root is the `rsroot` query
+ * container, as wide as the window). The rail shows from a 720px window; the document scroller is its own query container (`rsdoc`), so date
+ * columns sit beside their rows only when the column has room.
+ *
+ * Phone: no PDF mode (iOS cannot embed PDFs). One "Open PDF" button in a
+ * slim sticky row; everything else scrolls away.
  *
  * Animation contract (shared with AboutMeApp): sections reveal ONCE on mount
- * via a staggered container; never on scroll. A windowed inner scroll container
- * makes in-view triggers unreliable, so content must never depend on one. The
- * desktop index rail uses an IntersectionObserver purely for scroll-spy
- * highlighting (guarded for SSR / test env), never to reveal content.
- *
- * Persona: the resume's own education facts (school / degree / period) render
- * as normal resume content. The constructed `tagline` field carries graduation
- * + seeking framing, so it is intentionally NOT rendered; the clean `title`
- * stands in as the role line.
+ * via a staggered container, never on scroll. The rail uses scroll position
+ * only for highlighting, never to reveal content.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import {
-  EditorialSection,
-  Hairline,
-  MetaLabel,
-} from '@/components/editorial';
+import { Download, ExternalLink } from 'lucide-react';
+import { EditorialSection } from '@/components/editorial';
 import { reveal, withReduced, spring } from '@/lib/motion';
 import { RESUME } from '@/data/resume';
 
 // ---------------------------------------------------------------------------
-// Section registry - single source for the rail and the document.
+// Section registry - single source for the rail and the document. Order
+// follows the PDF (Projects, Skills, Experience, Education), summary first.
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { id: 'summary',    number: '01', label: 'Summary'    },
-  { id: 'experience', number: '02', label: 'Experience' },
-  { id: 'projects',   number: '03', label: 'Projects'   },
-  { id: 'skills',     number: '04', label: 'Skills'     },
-  { id: 'education',  number: '05', label: 'Education'   },
+  { id: 'summary',    label: 'Summary'    },
+  { id: 'projects',   label: 'Projects'   },
+  { id: 'skills',     label: 'Skills'     },
+  { id: 'experience', label: 'Experience' },
+  { id: 'education',  label: 'Education'  },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
@@ -56,190 +53,179 @@ const SECTION_DOM_ID = (id: SectionId) => `resume-section-${id}`;
 const PDF_HREF = '/resume.pdf';
 const PDF_DOWNLOAD = 'Devanshu_Chicholikar_Resume.pdf';
 
+const SCOPED_CSS = `
+/* Narrow window: the toolbar keeps only the name and the controls; the role
+   line and contacts open the document instead, so they scroll away. */
+[data-resume-root] { container: rsroot / inline-size; }
+[data-resume-rail], [data-resume-intro="toolbar"] { display: none; }
+[data-resume-intro="doc"] { display: flex; }
+@container rsroot (min-width: 640px) {
+  [data-resume-intro="toolbar"] { display: flex; }
+  [data-resume-intro="doc"] { display: none; }
+}
+@container rsroot (min-width: 720px) {
+  [data-resume-rail] { display: flex; }
+}
+
+[data-resume-doc] { container: rsdoc / inline-size; }
+[data-resume-page] { padding: 1.75rem 1.25rem 3rem; }
+[data-resume-compact] [data-resume-page] { padding-top: 1.25rem; }
+[data-resume-root] h2.editorial-head {
+  font-size: clamp(1.5rem, 4cqi, 2rem);
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+[data-resume-row] { display: flex; flex-direction: column; gap: 0.25rem; }
+[data-resume-skill] { display: flex; flex-direction: column; gap: 0.25rem; }
+
+@container rsdoc (min-width: 520px) {
+  [data-resume-page] { padding: 2.5rem 2.5rem 4rem; }
+  [data-resume-row] {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+  [data-resume-row] > :last-child { text-align: right; flex-shrink: 0; }
+  [data-resume-skill] {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+}
+`;
+
 // ---------------------------------------------------------------------------
-// Masthead - serif name + mono role line + hairline-divided contact run.
+// Contacts - plain words in one run, no separators to dangle when they wrap.
 // ---------------------------------------------------------------------------
 
-function Masthead() {
-  const reduced = useReducedMotion();
-  const { email, github, linkedin, location } = RESUME.contact;
-
-  // Contact cells as a mono run; first cell carries the role line above it.
-  const contacts: { label: string; href?: string }[] = [
+function ContactRow({ compact = false }: { compact?: boolean }) {
+  const { email, github, linkedin } = RESUME.contact;
+  const contacts = [
     { label: email, href: `mailto:${email}` },
-    { label: github, href: `https://${github}` },
+    { label: 'GitHub', href: `https://${github}` },
     { label: 'LinkedIn', href: `https://${linkedin}` },
-    { label: location },
   ];
-
   return (
-    <div className="flex flex-col gap-4">
-      <motion.h1
-        variants={reveal.item(reduced)}
-        className="editorial-hero font-display text-text leading-[0.95]"
-      >
-        {RESUME.name}
-      </motion.h1>
-
-      {/* Role line - the clean `title`, not the persona-laden tagline. */}
-      <motion.p variants={reveal.item(reduced)}>
-        <MetaLabel>{RESUME.title}</MetaLabel>
-      </motion.p>
-
-      {/* Contact run - mono cells separated by middots, hairline above. */}
-      <motion.div variants={reveal.item(reduced)} className="flex flex-col gap-3">
-        <Hairline />
-        <p className="flex flex-wrap items-center gap-x-1 gap-y-2">
-          {contacts.map((c, i) => (
-            <React.Fragment key={c.label}>
-              {i > 0 && (
-                <span aria-hidden className="font-mono-meta opacity-40">
-                  &middot;
-                </span>
-              )}
-              {c.href ? (
-                <a
-                  href={c.href}
-                  target={c.href.startsWith('http') ? '_blank' : undefined}
-                  rel="noopener noreferrer"
-                  className="group inline-flex"
-                >
-                  <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
-                    {c.label}
-                  </MetaLabel>
-                </a>
-              ) : (
-                <MetaLabel className="text-text-secondary">{c.label}</MetaLabel>
-              )}
-            </React.Fragment>
-          ))}
-        </p>
-      </motion.div>
-    </div>
+    <p className={`flex flex-wrap items-center gap-x-4 gap-y-1 ${compact ? 'text-[13px]' : 'text-[14px]'}`}>
+      {contacts.map(c => (
+        <a
+          key={c.label}
+          href={c.href}
+          target={c.href.startsWith('http') ? '_blank' : undefined}
+          rel="noopener noreferrer"
+          className="text-text-secondary underline decoration-text/25 underline-offset-4 transition-colors hover:text-text"
+        >
+          {c.label}
+        </a>
+      ))}
+    </p>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Section bodies - pure editorial typesetting, monochrome only.
+// Section bodies.
 // ---------------------------------------------------------------------------
 
 function SummaryBody() {
   return (
-    <p className="max-w-[68ch] text-lg leading-relaxed text-text-secondary">
+    <p className="max-w-[68ch] text-[17px] leading-relaxed text-text-secondary">
       {RESUME.summary}
     </p>
   );
 }
 
-function ExperienceBody() {
+function Dates({ period, location }: { period: string; location?: string }) {
   return (
-    <ol className="flex flex-col">
-      <Hairline />
-      {RESUME.experience.map((job) => (
-        <React.Fragment key={`${job.company}-${job.role}`}>
-          <li className="flex flex-col gap-3 py-6">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-              <div className="flex flex-col gap-1">
-                <h3 className="font-display text-xl leading-tight text-text">
-                  {job.role}
-                </h3>
-                <MetaLabel className="text-text-secondary">{job.company}</MetaLabel>
-              </div>
-              <div className="flex shrink-0 flex-col gap-0.5 sm:items-end">
-                <MetaLabel as="p">{job.period}</MetaLabel>
-                <MetaLabel as="p" className="text-text-secondary">
-                  {job.location}
-                </MetaLabel>
-              </div>
-            </div>
-
-            <ul className="mt-1 flex flex-col gap-2">
-              {job.bullets.map((b, i) => (
-                <li
-                  key={i}
-                  className="flex gap-3 text-sm leading-relaxed text-text-secondary"
-                >
-                  <span aria-hidden className="mt-[0.5em] h-px w-3 shrink-0 bg-text/40" />
-                  <span className="min-w-0">{b}</span>
-                </li>
-              ))}
-            </ul>
-          </li>
-          <Hairline />
-        </React.Fragment>
-      ))}
-    </ol>
+    <span className="flex flex-col gap-0.5">
+      <span className="font-mono text-[13px] text-text tabular-nums">{period}</span>
+      {location && <span className="text-[13px] text-text-secondary">{location}</span>}
+    </span>
   );
 }
 
 function ProjectsBody() {
   return (
     <div className="flex flex-col">
-      <Hairline />
-      {RESUME.projects.map((proj, idx) => (
-        <a
-          key={proj.name}
-          href={`https://${proj.link}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group flex flex-col gap-2 py-5 transition-colors [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025] dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]"
-        >
-          <div className="flex items-baseline gap-4">
-            <MetaLabel className="w-8 shrink-0 justify-start text-text-secondary">
-              {String(idx + 1).padStart(2, '0')}
-            </MetaLabel>
-            <div className="flex flex-1 items-baseline justify-between gap-4 min-w-0">
-              <h3 className="font-display text-xl leading-tight text-text truncate">
-                {proj.name}
-              </h3>
-              <MetaLabel className="shrink-0 justify-end text-text-secondary">
-                {proj.period}
-              </MetaLabel>
+      {RESUME.projects.map((proj, i) => {
+        const inner = (
+          <>
+            <div data-resume-row>
+              <h3 className="font-display text-[1.25rem] leading-tight text-text">{proj.name}</h3>
+              <Dates period={proj.period} />
             </div>
+            {proj.role && <p className="text-[14px] font-medium text-text">{proj.role}</p>}
+            <p className="font-mono text-[12px] leading-relaxed text-text-secondary">{proj.tech.split(' · ').join(', ')}</p>
+            <p className="max-w-[66ch] text-[15px] leading-relaxed text-text-secondary">{proj.desc}</p>
+            {proj.link && (
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-text underline decoration-text/30 underline-offset-4">
+                {proj.link} <ExternalLink size={12} aria-hidden />
+              </span>
+            )}
+          </>
+        );
+        const cls = `flex flex-col gap-2 py-5 ${i > 0 ? 'border-t border-border' : ''}`;
+        return proj.link ? (
+          <a
+            key={proj.name}
+            href={`https://${proj.link}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${cls} -mx-3 px-3 transition-colors focus-visible:-outline-offset-2 [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025] dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]`}
+          >
+            {inner}
+          </a>
+        ) : (
+          <div key={proj.name} className={cls}>
+            {inner}
           </div>
-          <div className="pl-12 flex flex-col gap-1.5">
-            <MetaLabel className="text-text-secondary">{proj.tech}</MetaLabel>
-            <p className="max-w-[64ch] text-sm leading-relaxed text-text-secondary">
-              {proj.desc}
-            </p>
-          </div>
-        </a>
-      ))}
-      <Hairline />
+        );
+      })}
     </div>
+  );
+}
+
+function ExperienceBody() {
+  return (
+    <ol className="flex flex-col">
+      {RESUME.experience.map((job, i) => (
+        <li
+          key={`${job.company}-${job.role}`}
+          className={`flex flex-col gap-3 py-5 ${i > 0 ? 'border-t border-border' : ''}`}
+        >
+          <div data-resume-row>
+            <div className="flex flex-col gap-1">
+              <h3 className="font-display text-[1.25rem] leading-tight text-text">{job.company}</h3>
+              <p className="text-[14px] leading-snug text-text">{job.role}</p>
+            </div>
+            <Dates period={job.period} location={job.location} />
+          </div>
+          <ul className="flex flex-col gap-2">
+            {job.bullets.map((b, j) => (
+              <li key={j} className="flex gap-3 text-[15px] leading-relaxed text-text-secondary">
+                <span aria-hidden className="mt-[0.75em] h-px w-3 shrink-0 bg-text/40" />
+                <span className="min-w-0">{b}</span>
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 function SkillsBody() {
   return (
     <dl className="flex flex-col">
-      <Hairline />
-      {RESUME.skills.map((group) => (
-        <React.Fragment key={group.category}>
-          <div className="flex flex-col gap-2 py-4 sm:flex-row sm:gap-6">
-            <dt className="shrink-0 sm:w-40">
-              <MetaLabel>{group.category}</MetaLabel>
-            </dt>
-            <dd className="flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-1">
-              {group.items.map((skill, i) => (
-                <React.Fragment key={skill}>
-                  {i > 0 && (
-                    <span aria-hidden className="font-mono-meta opacity-40">
-                      &middot;
-                    </span>
-                  )}
-                  <span
-                    className="font-mono leading-snug text-text"
-                    style={{ fontSize: 'clamp(0.7rem, 1.6cqi, 0.8125rem)' }}
-                  >
-                    {skill}
-                  </span>
-                </React.Fragment>
-              ))}
-            </dd>
-          </div>
-          <Hairline />
-        </React.Fragment>
+      {RESUME.skills.map((group, i) => (
+        <div
+          key={group.category}
+          data-resume-skill
+          className={`py-3.5 ${i > 0 ? 'border-t border-border' : ''}`}
+        >
+          <dt className="text-[14px] font-medium leading-snug text-text">{group.category}</dt>
+          <dd className="text-[15px] leading-relaxed text-text-secondary">{group.items.join(', ')}</dd>
+        </div>
       ))}
     </dl>
   );
@@ -248,30 +234,20 @@ function SkillsBody() {
 function EducationBody() {
   return (
     <ol className="flex flex-col">
-      <Hairline />
-      {RESUME.education.map((edu) => (
-        <React.Fragment key={edu.institution}>
-          <li className="flex flex-col gap-2 py-6">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-              <div className="flex flex-col gap-1">
-                <h3 className="font-display text-xl leading-tight text-text">
-                  {edu.institution}
-                </h3>
-                <MetaLabel className="text-text-secondary">{edu.degree}</MetaLabel>
-              </div>
-              <div className="flex shrink-0 flex-col gap-0.5 sm:items-end">
-                <MetaLabel as="p">{edu.period}</MetaLabel>
-                <MetaLabel as="p" className="text-text-secondary">
-                  {edu.location}
-                </MetaLabel>
-              </div>
+      {RESUME.education.map((edu, i) => (
+        <li
+          key={edu.institution}
+          className={`flex flex-col gap-2 py-5 ${i > 0 ? 'border-t border-border' : ''}`}
+        >
+          <div data-resume-row>
+            <div className="flex flex-col gap-1">
+              <h3 className="font-display text-[1.25rem] leading-tight text-text">{edu.institution}</h3>
+              <p className="text-[14px] leading-snug text-text">{edu.degree}</p>
             </div>
-            <p className="max-w-[64ch] text-sm leading-relaxed text-text-secondary">
-              {edu.detail}
-            </p>
-          </li>
-          <Hairline />
-        </React.Fragment>
+            <Dates period={edu.period} location={edu.location} />
+          </div>
+          <p className="max-w-[66ch] text-[15px] leading-relaxed text-text-secondary">{edu.detail}</p>
+        </li>
       ))}
     </ol>
   );
@@ -288,7 +264,7 @@ function SectionBody({ id }: { id: SectionId }) {
 }
 
 // ---------------------------------------------------------------------------
-// Quiet editorial controls - mode toggle + download, mono + hairline only.
+// Controls - view toggle and the filled Download button.
 // ---------------------------------------------------------------------------
 
 function ModeToggle({
@@ -301,11 +277,11 @@ function ModeToggle({
   reduced: boolean | null;
 }) {
   const items: { id: ViewMode; label: string }[] = [
-    { id: 'read', label: 'Read' },
+    { id: 'read', label: 'Text' },
     { id: 'pdf', label: 'PDF' },
   ];
   return (
-    <div className="flex items-center gap-5">
+    <div role="group" aria-label="View" className="flex items-center gap-1">
       {items.map(({ id, label }) => {
         const active = mode === id;
         return (
@@ -313,23 +289,17 @@ function ModeToggle({
             key={id}
             type="button"
             onClick={() => onMode(id)}
-            aria-current={active ? 'true' : undefined}
-            className="group relative origin-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+            aria-pressed={active}
+            className={`relative inline-flex h-8 items-center px-2 text-[14px] font-medium transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+              active ? 'text-text' : 'text-text-secondary hover:text-text'
+            }`}
           >
-            <MetaLabel
-              className={
-                active
-                  ? 'text-text'
-                  : 'text-text-secondary transition-colors group-hover:text-text'
-              }
-            >
-              {label}
-            </MetaLabel>
+            {label}
             {active && (
               <motion.span
                 layoutId="resume-mode-active"
                 aria-hidden
-                className="absolute -bottom-1 left-0 right-0 h-px bg-text"
+                className="absolute bottom-1 left-2 right-2 h-px bg-text"
                 transition={withReduced(spring.window, reduced)}
               />
             )}
@@ -340,28 +310,23 @@ function ModeToggle({
   );
 }
 
-function DownloadControl() {
+function DownloadButton({ label = 'Download PDF', open = false }: { label?: string; open?: boolean }) {
   return (
     <a
       href={PDF_HREF}
-      download={PDF_DOWNLOAD}
-      className="group inline-flex origin-center items-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+      {...(open ? { target: '_blank', rel: 'noopener noreferrer' } : { download: PDF_DOWNLOAD })}
+      className={`inline-flex shrink-0 items-center gap-2 bg-text px-3 text-[14px] font-medium text-bg transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+        open ? 'h-11' : 'h-8'
+      }`}
     >
-      <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
-        Download PDF
-      </MetaLabel>
-      <span
-        aria-hidden
-        className="ml-2 block h-px w-4 origin-left scale-x-100 bg-text/40 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
-      />
+      {open ? <ExternalLink size={15} aria-hidden /> : <Download size={15} aria-hidden />}
+      {label}
     </a>
   );
 }
 
 // ---------------------------------------------------------------------------
-// PDF surface - iframe embed with iOS fallback.
-// iOS Safari and Chrome on iOS cannot render PDFs in iframes (blank white
-// frame). Detect on mount and swap to a download/open link instead.
+// PDF surface - iframe embed with an iOS fallback (iPad in desktop mode).
 // ---------------------------------------------------------------------------
 
 function usePdfEmbedSupported(): boolean {
@@ -378,6 +343,12 @@ function usePdfEmbedSupported(): boolean {
   return supported;
 }
 
+const FADE = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } },
+  exit: { opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] as const } },
+};
+
 function PdfSurface() {
   const canEmbed = usePdfEmbedSupported();
 
@@ -385,72 +356,36 @@ function PdfSurface() {
     return (
       <motion.div
         key="pdf-fallback"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } }}
-        exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] as const } }}
-        className="flex flex-1 flex-col items-center justify-center gap-6 bg-bg px-8"
+        {...FADE}
+        className="flex flex-1 flex-col items-center justify-center gap-4 bg-bg px-8"
       >
-        <p className="max-w-[36ch] text-center text-sm leading-relaxed text-text-secondary">
-          PDF preview is not supported on this device.
+        <p className="max-w-[36ch] text-center text-[15px] leading-relaxed text-text-secondary">
+          This browser cannot show the PDF inline.
         </p>
-        <a
-          href={PDF_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group inline-flex origin-center items-center gap-2 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
-        >
-          <MetaLabel className="text-text transition-opacity [@media(hover:hover)and(pointer:fine)]:group-hover:opacity-70">
-            Open PDF
-          </MetaLabel>
-          <span
-            aria-hidden
-            className="block h-px w-4 origin-left scale-x-100 bg-text/60 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:group-hover:scale-x-150"
-          />
-        </a>
-        <a
-          href={PDF_HREF}
-          download={PDF_DOWNLOAD}
-          className="group inline-flex origin-center items-center"
-        >
-          <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
-            Download PDF
-          </MetaLabel>
-        </a>
+        <DownloadButton label="Open PDF" open />
       </motion.div>
     );
   }
 
   return (
-    <motion.div
-      key="pdf"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } }}
-      exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] as const } }}
-      className="flex-1 overflow-hidden bg-bg"
-    >
-      <iframe
-        src={PDF_HREF}
-        className="h-full w-full border-0"
-        title="Resume PDF"
-      />
+    <motion.div key="pdf" {...FADE} className="flex-1 overflow-hidden bg-bg">
+      <iframe src={PDF_HREF} className="h-full w-full border-0" title="Resume PDF" />
     </motion.div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Index rail (desktop) - numbered scroll-spy navigation, monochrome.
+// Index rail - scroll-spy navigation.
 // ---------------------------------------------------------------------------
 
 const RAIL_MARKER_ID = 'resume-rail-active';
 
 function RailRow({
-  number,
   label,
   active,
   reduced,
   onClick,
 }: {
-  number: string;
   label: string;
   active: boolean;
   reduced: boolean | null;
@@ -462,30 +397,18 @@ function RailRow({
       onClick={onClick}
       data-testid="rail-row"
       aria-current={active ? 'true' : undefined}
-      className="group relative flex w-full origin-left items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+      className="group relative flex w-full origin-left items-center px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] focus-visible:-outline-offset-2 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100"
     >
       {active && (
         <motion.span
           layoutId={RAIL_MARKER_ID}
           aria-hidden
           className="absolute left-0 top-1/2 h-[1.1em] w-[2px] -translate-y-1/2 bg-text"
-          transition={withReduced(
-            { type: 'spring', stiffness: 520, damping: 40, mass: 0.6 },
-            reduced,
-          )}
+          transition={withReduced({ type: 'spring', stiffness: 520, damping: 40, mass: 0.6 }, reduced)}
         />
       )}
       <span
-        className={`font-mono-meta shrink-0 transition-opacity duration-150 ${
-          active
-            ? 'opacity-100'
-            : 'opacity-50 [@media(hover:hover)and(pointer:fine)]:group-hover:opacity-80'
-        }`}
-      >
-        {number}
-      </span>
-      <span
-        className={`font-display min-w-0 flex-1 truncate transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+        className={`font-display min-w-0 flex-1 truncate text-[16px] transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${
           active
             ? 'text-text'
             : 'text-text-secondary [@media(hover:hover)and(pointer:fine)]:group-hover:text-text'
@@ -499,44 +422,38 @@ function RailRow({
 
 // ---------------------------------------------------------------------------
 // Scroll-spy - highlights the rail row in view (never reveals content).
+// `mode` is a dependency because the document remounts when the view flips
+// between Text and PDF; the listener must move to the new scroller.
 // ---------------------------------------------------------------------------
 
-function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>) {
+function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>, mode: ViewMode) {
   const [active, setActive] = useState<SectionId>('summary');
 
   useEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-
+    if (mode !== 'read') return;
     let raf = 0;
+    let root: HTMLDivElement | null = null;
+
     const compute = () => {
       raf = 0;
-      const nodes = Array.from(
-        root.querySelectorAll<HTMLElement>('[data-section-id]'),
-      );
+      if (!root) return;
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>('[data-section-id]'));
       if (nodes.length === 0) return;
 
-      // Bottom of scroll: the last section can never cross a top trigger line
-      // when it is short, so force it active once we reach the end. This is the
-      // fix for the last section (Education) never highlighting.
-      const atBottom =
-        root.scrollTop + root.clientHeight >= root.scrollHeight - 4;
-      if (atBottom) {
+      // Bottom of scroll: a short last section can never cross the trigger
+      // line, so force it active once we reach the end.
+      if (root.scrollTop + root.clientHeight >= root.scrollHeight - 4) {
         const last = nodes[nodes.length - 1].getAttribute('data-section-id');
         if (last) setActive(last as SectionId);
         return;
       }
 
-      // Otherwise the active section is the last one whose top has passed a
-      // trigger line ~32% down the scroll container.
+      // Otherwise: the last section whose top passed a line ~32% down.
       const line = root.getBoundingClientRect().top + root.clientHeight * 0.32;
       let current = nodes[0].getAttribute('data-section-id');
       for (const node of nodes) {
-        if (node.getBoundingClientRect().top <= line) {
-          current = node.getAttribute('data-section-id');
-        } else {
-          break;
-        }
+        if (node.getBoundingClientRect().top <= line) current = node.getAttribute('data-section-id');
+        else break;
       }
       if (current) setActive(current as SectionId);
     };
@@ -545,117 +462,92 @@ function useScrollSpy(scrollRef: React.RefObject<HTMLDivElement | null>) {
       if (!raf) raf = requestAnimationFrame(compute);
     };
 
-    compute();
-    root.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      root.removeEventListener('scroll', onScroll);
-      if (raf) cancelAnimationFrame(raf);
+    // The Text view fades in under AnimatePresence (mode="wait"), so the new
+    // scroller may mount a frame after this effect runs. Wait for it.
+    let tries = 0;
+    let attach = 0;
+    const tryAttach = () => {
+      root = scrollRef.current;
+      if (!root) {
+        if (tries++ < 60) attach = requestAnimationFrame(tryAttach);
+        return;
+      }
+      compute();
+      root.addEventListener('scroll', onScroll, { passive: true });
     };
-  }, [scrollRef]);
+    tryAttach();
+
+    return () => {
+      if (attach) cancelAnimationFrame(attach);
+      if (raf) cancelAnimationFrame(raf);
+      root?.removeEventListener('scroll', onScroll);
+    };
+  }, [scrollRef, mode]);
 
   return active;
 }
 
 // ---------------------------------------------------------------------------
-// Read document - the scrolled editorial body (shared by desktop + mobile).
+// Document - the sections, shared by desktop (own scroller) and phone.
 // ---------------------------------------------------------------------------
 
-function ReadDocument({
-  scrollRef,
-  reduced,
-  withMasthead,
-  padClass,
-}: {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  reduced: boolean | null;
-  withMasthead: boolean;
-  padClass: string;
-}) {
+function Intro({ where, compact = false }: { where?: 'toolbar' | 'doc'; compact?: boolean }) {
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <motion.div
-        className={`mx-auto flex max-w-3xl flex-col gap-16 ${padClass}`}
-        variants={reveal.container(reduced)}
-        initial="hidden"
-        animate="show"
-      >
-        {withMasthead && <Masthead />}
-
-        {SECTIONS.map(({ id, number, label }) => (
-          <motion.div
-            key={id}
-            id={SECTION_DOM_ID(id)}
-            data-section-id={id}
-            variants={reveal.item(reduced)}
-          >
-            <EditorialSection number={number} eyebrow={label} title={label}>
-              <SectionBody id={id} />
-            </EditorialSection>
-          </motion.div>
-        ))}
-      </motion.div>
+    <div data-resume-intro={where} className={`flex flex-col ${compact ? 'gap-1' : 'gap-1.5'}`}>
+      <p className={`${compact ? 'text-[13px]' : 'text-[14px]'} leading-snug text-text-secondary`}>{RESUME.tagline}</p>
+      <ContactRow compact={compact} />
     </div>
   );
 }
 
+function DocumentSections({ reduced, intro = false }: { reduced: boolean | null; intro?: boolean }) {
+  return (
+    <motion.div
+      data-resume-page
+      className="mx-auto flex max-w-3xl flex-col gap-12"
+      variants={reveal.container(reduced)}
+      initial="hidden"
+      animate="show"
+    >
+      {intro && <Intro where="doc" />}
+      {SECTIONS.map(({ id, label }) => (
+        <motion.div key={id} id={SECTION_DOM_ID(id)} data-section-id={id} variants={reveal.item(reduced)}>
+          <EditorialSection title={label}>
+            <SectionBody id={id} />
+          </EditorialSection>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Mobile layout - single scroll, numbered eyebrows, sticky quiet controls.
+// Phone - one scroll, a slim sticky row with Open PDF.
 // ---------------------------------------------------------------------------
 
 function ResumeMobile() {
   const reduced = useReducedMotion();
-  const [mode, setMode] = useState<ViewMode>('read');
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
-      {/* Header - name, role, quiet controls. */}
-      <div
-        className="app-toolbar flex shrink-0 flex-col gap-3 border-b pb-3 pt-5"
-        style={{
-          paddingLeft: 'var(--sp-hero-pad)',
-          paddingRight: 'var(--sp-hero-pad)',
-        }}
-      >
-        <h1 className="font-display text-2xl leading-tight text-text">
-          {RESUME.name}
-        </h1>
-        <MetaLabel className="text-text-secondary">{RESUME.title}</MetaLabel>
-        <div className="flex items-center justify-between">
-          <ModeToggle mode={mode} onMode={setMode} reduced={reduced} />
-          <DownloadControl />
+    <div data-resume-root data-resume-compact className="flex h-full flex-col overflow-hidden bg-bg">
+      <style>{SCOPED_CSS}</style>
+      <div data-resume-doc className="flex-1 overflow-y-auto">
+        {/* Compact header: the nav bar already says Resume, so one slim
+            sticky row (name + Open PDF) and a two-line intro, then content. */}
+        <div className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border bg-bg/95 px-[var(--sp-hero-pad)] backdrop-blur">
+          <h1 className="min-w-0 truncate text-[15px] font-medium text-text">{RESUME.name}</h1>
+          <DownloadButton label="Open PDF" open />
         </div>
+        <div className="px-[var(--sp-hero-pad)] pt-3">
+          <Intro compact />
+        </div>
+        <DocumentSections reduced={reduced} />
       </div>
-
-      <AnimatePresence mode="wait">
-        {mode === 'pdf' ? (
-          <PdfSurface key="pdf" />
-        ) : (
-          <motion.div
-            key="read"
-            initial={{ opacity: 0 }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
-            }}
-            exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
-            className="flex flex-1 flex-col overflow-hidden"
-          >
-            <ReadDocument
-              scrollRef={scrollRef}
-              reduced={reduced}
-              withMasthead={false}
-              padClass="px-[var(--sp-hero-pad)] py-8"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Main app - desktop default, mobile branch.
+// Main app - desktop default, phone branch.
 // ---------------------------------------------------------------------------
 
 export default function ResumeApp({
@@ -665,7 +557,7 @@ export default function ResumeApp({
   const [mode, setMode] = useState<ViewMode>('read');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const active = useScrollSpy(scrollRef);
+  const active = useScrollSpy(scrollRef, mode);
 
   const scrollTo = useCallback(
     (id: SectionId) => {
@@ -673,10 +565,7 @@ export default function ResumeApp({
       if (!root) return;
       const target = root.querySelector<HTMLElement>(`#${SECTION_DOM_ID(id)}`);
       if (!target) return;
-      root.scrollTo({
-        top: target.offsetTop - 24,
-        behavior: reduced ? 'auto' : 'smooth',
-      });
+      root.scrollTo({ top: target.offsetTop - 16, behavior: reduced ? 'auto' : 'smooth' });
     },
     [reduced],
   );
@@ -686,21 +575,18 @@ export default function ResumeApp({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Top bar - name + role left, quiet controls right. */}
-      <div className="app-toolbar flex shrink-0 items-end justify-between gap-6 border-b px-6 py-4">
+    <div data-resume-root className="flex h-full flex-col overflow-hidden">
+      <style>{SCOPED_CSS}</style>
+
+      {/* Toolbar: the one copy of the name, role line, contacts, controls. */}
+      <div className="app-toolbar flex shrink-0 flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b px-6 py-4">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h1 className="font-display text-2xl leading-tight text-text">
-            {RESUME.name}
-          </h1>
-          <MetaLabel className="text-text-secondary">{RESUME.title}</MetaLabel>
+          <h1 className="font-display text-[1.625rem] leading-tight text-text">{RESUME.name}</h1>
+          <Intro where="toolbar" />
         </div>
-        <div className="flex shrink-0 items-center gap-6">
+        <div className="flex shrink-0 items-center gap-4">
           <ModeToggle mode={mode} onMode={setMode} reduced={reduced} />
-          <span aria-hidden className="self-stretch">
-            <Hairline orientation="vertical" />
-          </span>
-          <DownloadControl />
+          <DownloadButton />
         </div>
       </div>
 
@@ -708,45 +594,26 @@ export default function ResumeApp({
         {mode === 'pdf' ? (
           <PdfSurface key="pdf" />
         ) : (
-          <motion.div
-            key="read"
-            initial={{ opacity: 0 }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] },
-            }}
-            exit={{ opacity: 0, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
-            className="flex flex-1 overflow-hidden"
-          >
-            {/* Index rail. */}
+          <motion.div key="read" {...FADE} className="flex min-h-0 flex-1 overflow-hidden">
             <nav
+              data-resume-rail
               aria-label="Resume sections"
-              className="hidden w-44 shrink-0 flex-col overflow-y-auto border-r border-border md:flex"
+              className="w-44 shrink-0 flex-col overflow-y-auto border-r border-border py-4"
             >
-              <div className="px-4 py-5">
-                <MetaLabel as="p">Resume</MetaLabel>
-              </div>
-              <Hairline />
-              <div className="flex flex-col py-2">
-                {SECTIONS.map(({ id, number, label }) => (
-                  <RailRow
-                    key={id}
-                    number={number}
-                    label={label}
-                    active={active === id}
-                    reduced={reduced}
-                    onClick={() => scrollTo(id)}
-                  />
-                ))}
-              </div>
+              {SECTIONS.map(({ id, label }) => (
+                <RailRow
+                  key={id}
+                  label={label}
+                  active={active === id}
+                  reduced={reduced}
+                  onClick={() => scrollTo(id)}
+                />
+              ))}
             </nav>
 
-            <ReadDocument
-              scrollRef={scrollRef}
-              reduced={reduced}
-              withMasthead
-              padClass="px-8 py-10 sm:px-10 sm:py-12"
-            />
+            <div ref={scrollRef} data-resume-doc className="min-w-0 flex-1 overflow-y-auto">
+              <DocumentSections reduced={reduced} intro />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

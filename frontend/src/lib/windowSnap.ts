@@ -4,13 +4,16 @@
  * Pure function so the snap targets can be unit-tested without a DOM. All
  * values are viewport coordinates, matching how windows are positioned
  * (maximize uses top: 28 and full 100vh). The usable band sits between the
- * 28px menu bar and the ~60px dock.
+ * 28px menu bar and the dock. DOCK_H is the dock's full footprint measured
+ * from the viewport bottom (Taskbar.tsx: bottom-2 offset 8 + border 1 +
+ * pt-2 8 + 48px icons + pb-2 8 + border 1 = 74), so maximized and snapped
+ * windows end exactly at the dock's top edge.
  */
 
 export type SnapBounds = { x: number; y: number; width: number; height: number };
 
 export const MENUBAR_H = 28;
-export const DOCK_H = 60;
+export const DOCK_H = 74;
 export const SNAP_EDGE = 26; // px proximity to a screen edge that triggers a snap
 
 /**

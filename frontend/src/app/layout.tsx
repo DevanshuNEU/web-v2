@@ -8,7 +8,7 @@
  * - Toast notifications
  */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -39,6 +39,25 @@ const newsreader = Newsreader({
   style: ["normal", "italic"],
   display: "swap",
 });
+
+// viewport-fit=cover lets env(safe-area-inset-*) resolve on phones, so the
+// pt-safe / pb-safe utilities clear the notch and home indicator. themeColor
+// tints the browser chrome to match each theme's background. Zoom stays on.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
+    { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
+  ],
+};
+
+// Runs before first paint: applies the saved theme (store/themeStore.ts
+// persists it under "portfolio-os-theme") so the page does not paint light
+// and then switch to dark after hydration. Defaults match the store: dark,
+// mono. ThemeProvider takes over once React mounts.
+const THEME_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem('portfolio-os-theme')||'{}').state||{};var r=document.documentElement;if(s.mode!=='light')r.classList.add('dark');r.dataset.palette=s.palette==='color'?'color':'mono';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -109,8 +128,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the boot script sets class and data-palette
+    // on <html> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <meta name="google-site-verification" content="F3zO-86yLvebJBNNSRX5vrSEOmQrQVsvZ3Dx5NEJXkI" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

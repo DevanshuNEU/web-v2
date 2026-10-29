@@ -1,19 +1,19 @@
 /**
- * About Me data — single source of truth for all About Me section content.
+ * About Me data: single source of truth for all About Me section content.
  *
  * Consumed by:
- *   - AboutMeApp.tsx (masthead, spec sheet)
- *   - JourneySection.tsx
- *   - ExcitesSection.tsx
- *   - CurrentlySection.tsx
- *   - ContactSection.tsx
+ *   - AboutMeApp.tsx (masthead, link row, spec sheet)
+ *   - about/OpinionsSection.tsx
+ *   - about/BuildingSection.tsx
+ *   - about/OutsideSection.tsx
+ *   - about/ContactSection.tsx
  *
- * To update your bio, availability status, fun facts, or contact links:
- * edit this file. Components are thin renderers — no content lives in JSX.
+ * To update your bio, availability status, projects, or contact links:
+ * edit this file. Components are thin renderers.
  *
- * Long-form narrative paragraphs (journey, excites) remain in their
- * components since they're pure storytelling and tied to specific layouts.
- * Structured, update-prone data (contact, availability, lists) lives here.
+ * Long-form narrative paragraphs (journey) remain in their component since
+ * they're pure storytelling and tied to a specific layout. Structured,
+ * update-prone data (contact, availability, lists) lives here.
  */
 
 import portfolioData from './portfolio.json';
@@ -29,20 +29,24 @@ export const identity = {
   title:        personalInfo.title,
   location:     personalInfo.location,
   availability: 'Open to Software Engineer, AI Engineer and Forward Deployed Engineer roles',
+  /** Short form for the masthead chip; the long form renders in Contact. */
+  availabilityShort: 'Open to SWE / AI Eng roles',
   photo:        '/devanshu-photo.png',
 } as const;
 
 // ---------------------------------------------------------------------------
-// Masthead spec-line - identity-from-specifics, rendered as mono MetaLabel
-// cells separated by middots. No role-label padding, no student/visa framing.
+// Masthead: role + place under the name, then the one-liner. The work itself
+// (MCP / OpenCodeIntel / Saar) lives in the spec sheet right below, so the
+// masthead doesn't repeat it. No student/visa framing.
 // ---------------------------------------------------------------------------
 
 export const mastheadSpecLine = [
-  'SOFTWARE + AI ENGINEER',
-  'MCP · RAG · EVALS',
-  'BOSTON',
-  'OCI / OVERHEAR / SAAR',
+  'Software + AI Engineer',
+  'Boston, MA',
 ] as const;
+
+export const oneLiner =
+  'I ship AI to production end to end: MCP servers, retrieval that actually works, evals that catch real failures, and voice agents.';
 
 // ---------------------------------------------------------------------------
 // Overview spec sheet - "About This Machine" definition list. Mono values,
@@ -61,7 +65,6 @@ export const specs: SpecItem[] = [
   { key: 'Stack',       value: 'TypeScript · Python · Go · AWS' },
   { key: 'Retrieval',   value: 'BM25 + vectors, RRF fusion, rerank' },
   { key: 'Shipping',    value: 'OpenCodeIntel · Overhear · CallBudget · Saar' },
-  { key: 'Based in',    value: 'Boston, MA' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -128,7 +131,6 @@ export const lookingFor = [
   'Teams that ship to real users every week',
   'Engineers who argue with data and change their minds when it disagrees',
   'Environment between startup energy and structured growth',
-  'Good paycheck + security (being realistic here)',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -156,14 +158,13 @@ export interface LearningItem {
 export const currentlyMastering: LearningItem[] = [
   { name: 'Go / Golang',          detail: 'Building high-performance microservices. The concurrency model is beautiful.' },
   { name: 'Advanced Kubernetes',  detail: "Container orchestration at scale. Because Docker Compose isn't enough anymore." },
-  { name: 'System Design',        detail: 'Thinking at scale. Designing for failure. The big picture stuff.' },
+  { name: 'System Design',        detail: 'How services talk to each other, where the bottlenecks are, what happens when things fail.' },
 ];
 
 export const readingList = [
   '"Designing Data-Intensive Applications" (the bible)',
-  'System design blogs and case studies',
+  'system design blogs and case studies',
   'AWS whitepapers (yes, actually reading them)',
-  "PostHog's engineering blog (inspiration)",
 ] as const;
 
 export interface LifeItem {
@@ -184,6 +185,29 @@ export const portfolioTechStack = [
 ] as const;
 
 // ---------------------------------------------------------------------------
+// What I'm building: the ONE place About describes the projects. Wording
+// follows projectMeta.ts (the Projects app), trimmed to a line or two each.
+// ---------------------------------------------------------------------------
+
+export interface BuildingItem {
+  name: string;
+  text: string;
+}
+
+export const buildingIntro = [
+  "Most of my energy goes into the workflow layer between LLMs and the real work developers do. The models are incredible, but they fly blind about your codebase, your context, your intent.",
+  "Most RAG is one embedding model and a prayer. Get retrieval right and the agent stops hallucinating about your code. Get it wrong and no amount of prompt engineering saves you.",
+] as const;
+
+export const building: BuildingItem[] = [
+  { name: 'OpenCodeIntel', text: 'Code search for AI coding agents: a web app, a REST API and a 12-tool MCP server. Tree-sitter chunks, vector search fused with BM25 keyword scoring, then reranking, so the agent stops guessing about your codebase.' },
+  { name: 'Overhear',      text: "A QA analyst for voice agents that grades every call. Code checks what the call log proves; an LLM judge checks what the agent said against the clinic's real open slots. Evaluated on a 39-call golden dataset." },
+  { name: 'CallBudget',    text: 'Teach a pharmacy-finder to call less and find more: predict which pharmacy most likely has a hard-to-find drug, call that one first, and learn from every answer.' },
+  { name: 'Saar',          text: 'A Chrome extension on the Web Store that meters Claude.ai tokens and cost in real time, entirely in the browser.' },
+  { name: 'Portfolio OS',  text: "The site you're inside. Started as a weekend project, turned into an ongoing experiment. The OS idea came from PostHog's website, which I found on Hacker News." },
+];
+
+// ---------------------------------------------------------------------------
 // Contact section
 // ---------------------------------------------------------------------------
 
@@ -192,3 +216,8 @@ export const contactLinks = {
   linkedin: personalInfo.linkedin,
   github:   personalInfo.github,
 } as const;
+
+/** Link text for a URL: no protocol, no www, no trailing slash. */
+export function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
