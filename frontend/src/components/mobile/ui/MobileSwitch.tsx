@@ -42,7 +42,9 @@ export default function MobileSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!on)}
-      className={`relative inline-flex items-center w-[51px] h-[31px] rounded-full flex-shrink-0 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${
+      // The before: layer widens the hit area to 65x45 without changing the
+      // 51x31 iOS track you see.
+      className={`relative inline-flex items-center w-[51px] h-[31px] rounded-full flex-shrink-0 before:absolute before:-inset-[7px] before:content-[''] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${
         on ? onFill : 'bg-text/15'
       } ${className}`}
     >

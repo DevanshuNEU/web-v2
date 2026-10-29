@@ -16,6 +16,13 @@
  * previous view's title). Pass `hideNavBar: true` on a per-view basis to
  * opt out (e.g. for views that render their own header).
  *
+ * Inside the phone shell (an AppChromeContext provider from AppView) the view
+ * draws no bar of its own: it hands title, Back and right action to the
+ * shell's single nav bar. There, each push also adds a browser history entry,
+ * so system back (Android back, Safari's left-edge swipe, the browser button)
+ * returns to the previous view instead of closing the whole app, and the
+ * in-app edge drag is off so it does not fight Safari's own edge gesture.
+ *
  * v1 limitation: views are passed as fully-formed React elements, not
  * route definitions. If your view needs the nav stack, capture it in a
  * closure from a parent that holds `useMobileNavigation()` — or pass
@@ -27,6 +34,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -40,6 +48,12 @@ import {
 } from 'framer-motion';
 import { spring, withReduced } from '@/lib/motion';
 import MobileNavBar from './MobileNavBar';
+import { useAppChrome } from './AppChromeContext';
+import {
+  isPhoneHistoryState,
+  phoneHistoryActive,
+  pushPhoneNavEntry,
+} from '@/store/mobileStore';
 
 export interface PushViewEntry {
   /** Unique ID; used as the React key for animation continuity. */
@@ -96,18 +110,68 @@ export default function MobilePushView({
   className = '',
 }: MobilePushViewProps) {
   const [stack, setStack] = useState<PushViewEntry[]>([rootView]);
+  const chrome = useAppChrome();
+  const inShell = chrome !== null;
+  // Mirror of stack.length for the callbacks below, so they stay stable.
+  const depthRef = useRef(1);
+  depthRef.current = stack.length;
 
-  const push = useCallback((view: PushViewEntry) => {
-    setStack((s) => [...s, view]);
-  }, []);
-
-  const pop = useCallback(() => {
+  const popLocal = useCallback(() => {
     setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
   }, []);
 
+  const push = useCallback(
+    (view: PushViewEntry) => {
+      if (inShell) pushPhoneNavEntry(depthRef.current + 1);
+      setStack((s) => [...s, view]);
+    },
+    [inShell]
+  );
+
+  // In the shell, Back goes through history so the browser's stack and ours
+  // never disagree; the popstate listener below does the actual pop.
+  const pop = useCallback(() => {
+    if (depthRef.current <= 1) return;
+    if (inShell && phoneHistoryActive()) window.history.back();
+    else popLocal();
+  }, [inShell, popLocal]);
+
   const popToRoot = useCallback(() => {
-    setStack((s) => (s.length > 1 ? [s[0]] : s));
-  }, []);
+    const extra = depthRef.current - 1;
+    if (extra <= 0) return;
+    if (inShell && phoneHistoryActive()) window.history.go(-extra);
+    else setStack((s) => (s.length > 1 ? [s[0]] : s));
+  }, [inShell]);
+
+  useEffect(() => {
+    if (!inShell) return;
+    const onPop = (e: PopStateEvent) => {
+      // Landing on our depth-N entry means views above N were popped. Any
+      // other entry means the app is closing; PhoneShell handles that.
+      if (!isPhoneHistoryState(e.state)) return;
+      const depth = Math.max(1, e.state.devosDepth);
+      setStack((s) => (s.length > depth ? s.slice(0, depth) : s));
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [inShell]);
+
+  // Hand the top view's navigation to the shell's nav bar.
+  const top = stack[stack.length - 1];
+  const below = stack.length > 1 ? stack[stack.length - 2] : undefined;
+  useEffect(() => {
+    if (!chrome) return;
+    chrome.setNav({
+      title: top.title,
+      onBack: below ? pop : undefined,
+      backLabel: below?.title,
+      rightAction: top.navBarRight,
+    });
+  }, [chrome, top, below, pop]);
+  useEffect(() => {
+    if (!chrome) return;
+    return () => chrome.setNav(null);
+  }, [chrome]);
 
   const nav = useMemo<MobileNavigation>(
     () => ({ push, pop, popToRoot, depth: stack.length }),
@@ -128,8 +192,8 @@ export default function MobilePushView({
               index={i}
               previousTitle={i > 0 ? stack[i - 1].title : undefined}
               isTop={i === stack.length - 1}
-              showNavBar={showNavBar}
-              enableSwipeBack={enableSwipeBack}
+              showNavBar={showNavBar && !inShell}
+              enableSwipeBack={enableSwipeBack && !inShell}
               onPop={pop}
             />
           ))}

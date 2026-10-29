@@ -432,7 +432,7 @@ export default function MobilePreviewPage() {
           </div>
         </PhoneFrame>
         <p className="text-[12px] text-text-secondary mt-1 leading-relaxed px-1">
-          Badge variants: number (12, 3), capped (123 → "99+"), boolean dot
+          Badge variants: number (12, 3), capped (123 → &ldquo;99+&rdquo;), boolean dot
           (Music), none.
         </p>
       </Group>

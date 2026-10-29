@@ -21,7 +21,7 @@ beforeEach(() => {
 describe('AppLibraryPage', () => {
   it('shows the all-apps grid (with search field) when the query is empty', () => {
     render(<AppLibraryPage />);
-    expect(screen.getByLabelText('Search apps')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search apps or ask a question')).toBeInTheDocument();
     // Representative apps from the flat grid — including the new DevAI app.
     expect(screen.getByText('About Me')).toBeInTheDocument();
     expect(screen.getByText('DevAI')).toBeInTheDocument();
@@ -29,8 +29,8 @@ describe('AppLibraryPage', () => {
 
   it('shows inline Spotlight results (with an Ask row) when typing', async () => {
     render(<AppLibraryPage />);
-    await userEvent.type(screen.getByLabelText('Search apps'), 'terminal');
-    expect(screen.getByText('Ask Devanshu')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Search apps or ask a question'), 'terminal');
+    expect(screen.getByText('Ask AI')).toBeInTheDocument();
     expect(screen.getByText('Apps')).toBeInTheDocument();
   });
 

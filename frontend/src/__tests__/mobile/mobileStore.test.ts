@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useMobileStore } from '@/store/mobileStore';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 
 const reset = () => {
   useMobileStore.setState({
@@ -7,10 +8,7 @@ const reset = () => {
     currentPage: 0,
     openApps: [],
     openAppType: null,
-    controlCenterOpen: false,
     spotlightOpen: false,
-    switcherOpen: false,
-    wiggleMode: false,
   });
 };
 
@@ -45,12 +43,18 @@ describe('mobileStore', () => {
     expect(state.openApps).toEqual(['about-me', 'projects']);
   });
 
-  it('openApp closes overlays', () => {
-    useMobileStore.setState({ spotlightOpen: true, switcherOpen: true });
+  it('openApp closes the spotlight', () => {
+    useMobileStore.setState({ spotlightOpen: true });
     useMobileStore.getState().openApp('terminal');
-    const state = useMobileStore.getState();
-    expect(state.spotlightOpen).toBe(false);
-    expect(state.switcherOpen).toBe(false);
+    expect(useMobileStore.getState().spotlightOpen).toBe(false);
+  });
+
+  it('openApp records the open for the Analytics app', () => {
+    const before = useAnalyticsStore.getState().events.length;
+    useMobileStore.getState().openApp('projects');
+    const events = useAnalyticsStore.getState().events;
+    expect(events.length).toBe(before + 1);
+    expect(events[events.length - 1].type).toBe('app_open');
   });
 
   it('closeApp removes the current app and clears openAppType', () => {
@@ -77,15 +81,8 @@ describe('mobileStore', () => {
     expect(useMobileStore.getState().currentPage).toBe(2);
   });
 
-  it('overlay setters work independently', () => {
-    const { setControlCenter, setSpotlight, setSwitcher } =
-      useMobileStore.getState();
-    setControlCenter(true);
-    setSpotlight(true);
-    setSwitcher(true);
-    const s = useMobileStore.getState();
-    expect(s.controlCenterOpen).toBe(true);
-    expect(s.spotlightOpen).toBe(true);
-    expect(s.switcherOpen).toBe(true);
+  it('spotlight setter works', () => {
+    useMobileStore.getState().setSpotlight(true);
+    expect(useMobileStore.getState().spotlightOpen).toBe(true);
   });
 });
