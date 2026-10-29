@@ -232,8 +232,7 @@ function NavButton({
       whileTap={reduced ? undefined : { scale: 0.97 }}
       transition={{ duration: 0.1, ease: EASE_OUT }}
       className="grid h-8 w-8 place-items-center text-text-secondary transition-colors
-                 hover:text-text disabled:opacity-25 disabled:hover:text-text-secondary
-                 focus-visible:outline-none"
+                 hover:text-text disabled:opacity-25 disabled:hover:text-text-secondary"
     >
       {children}
     </motion.button>
@@ -351,8 +350,7 @@ function StartTile({
       whileTap={reduced ? undefined : { scale: 0.99 }}
       transition={{ duration: 0.12, ease: EASE_OUT }}
       data-testid="start-tile"
-      className="group flex w-full items-baseline gap-4 border-b border-border py-4 text-left
-                 focus-visible:outline-none"
+      className="group flex w-full items-baseline gap-4 border-b border-border py-4 text-left"
     >
       <MetaLabel className="w-8 shrink-0 justify-start text-text-secondary">{index}</MetaLabel>
 

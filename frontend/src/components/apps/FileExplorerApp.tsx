@@ -263,7 +263,7 @@ function EditorialLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group inline-flex items-center focus-visible:outline-none
+      className="group inline-flex items-center
                  transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
     >
       <MetaLabel className="text-text-secondary transition-colors group-hover:text-text">
@@ -308,7 +308,6 @@ function FileRow({
         className="group relative flex w-full flex-col gap-1.5 px-3 py-4 text-left
                    transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                    hover:bg-black/[0.025] dark:hover:bg-white/[0.04]
-                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]
                    active:scale-[0.99]"
       >
         {/* Sliding selection marker: a thin graphite bar pinned to the row's
@@ -452,7 +451,7 @@ function DetailPanel({
         <button
           type="button"
           onClick={onBack}
-          className="group inline-flex items-center focus-visible:outline-none
+          className="group inline-flex items-center
                      transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
           aria-label="Close detail"
         >
@@ -500,7 +499,7 @@ function FolderRow({
       aria-current={active ? 'true' : undefined}
       className="group relative flex w-full items-center gap-3 px-4 py-2 text-left
                  transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
-                 focus-visible:outline-none active:scale-[0.99]"
+                 active:scale-[0.99]"
     >
       {active && (
         <motion.span
@@ -754,7 +753,7 @@ function FinderMobileRoot({
               type="button"
               onClick={() => setActiveCategory(cat)}
               aria-current={active ? 'true' : undefined}
-              className="group relative shrink-0 py-1 focus-visible:outline-none
+              className="group relative shrink-0 py-1
                          transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]"
             >
               <MetaLabel

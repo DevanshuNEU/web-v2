@@ -333,7 +333,7 @@ function HistoryBlock({
           type="button"
           onClick={copy}
           aria-label="Copy output"
-          className="terminal-copy absolute right-0 top-0 z-10 hidden p-1 text-white/30 transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none"
+          className="terminal-copy absolute right-0 top-0 z-10 hidden p-1 text-white/30 transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70"
         >
           {copied ? <Check size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
         </button>

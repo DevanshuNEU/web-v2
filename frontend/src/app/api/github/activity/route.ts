@@ -7,10 +7,11 @@ import {
   type ActivityEvent,
   type ContributionCalendar,
 } from '@/lib/github';
+import { GITHUB_OWNER } from '@/lib/githubExclusions';
 
 export const revalidate = 600; // 10 minutes — fresher than repos because commits are time-sensitive
 
-const USER = 'DevanshuNEU';
+const USER = GITHUB_OWNER;
 const ORG = 'OpenCodeIntel';
 
 export interface ActivityPayload {
@@ -78,6 +79,19 @@ async function buildActivity(
     }),
   ]);
 
+  // The events feed does not say whether a repo is a fork, so drop events on
+  // owner repos that the repo list (forks and excluded repos already removed
+  // in lib/github) does not contain. Skipped when that list failed to load.
+  const ownRepos = new Set(personalRepos.map((r) => r.full_name.toLowerCase()));
+  const ownerPrefix = `${USER.toLowerCase()}/`;
+  const portfolioEvents =
+    ownRepos.size === 0
+      ? events
+      : events.filter((e) => {
+          const repo = e.repo.toLowerCase();
+          return !repo.startsWith(ownerPrefix) || ownRepos.has(repo);
+        });
+
   // Active = pushed within the last 60 days, sorted by recency, top 8.
   const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
   const activeRepos = [...personalRepos, ...orgRepos]
@@ -96,7 +110,7 @@ async function buildActivity(
 
   const payload: ActivityPayload = {
     username: USER,
-    events,
+    events: portfolioEvents,
     calendar,
     activeRepos,
     fetchedAt: new Date().toISOString(),

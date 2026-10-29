@@ -277,8 +277,7 @@ function SkillCard({
       tabIndex={0}
       data-testid="skill-card"
       data-mode={mode}
-      className="group relative flex flex-col gap-3 p-4 text-left select-none cursor-default
-                 focus-visible:outline-none"
+      className="group relative flex flex-col gap-3 p-4 text-left select-none cursor-default"
       style={{
         // No nested cards: a single hairline frame. Active/related thickens the
         // top edge to the ink color; everything else stays at the border token.
@@ -375,7 +374,7 @@ function FilterPill({
       // occasional, so a brief feedback press is appropriate; no hue, no glow.
       // Gated on reduced motion (the prior CSS active:scale fired regardless).
       whileTap={reduced ? undefined : { scale: 0.97, transition: { duration: 0.12, ease: EASE_OUT } }}
-      className="group relative px-3 py-1.5 focus-visible:outline-none"
+      className="group relative px-3 py-1.5"
     >
       <MetaLabel
         className={

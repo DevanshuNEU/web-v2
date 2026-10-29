@@ -633,8 +633,7 @@ function FeedRow({ item, reduced }: { item: FeedItem; reduced: boolean | null })
       whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
       className="group flex items-baseline gap-3 py-3 transition-colors duration-150
                  [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.02]
-                 dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]
-                 focus-visible:outline-none focus-visible:bg-black/[0.04] dark:focus-visible:bg-white/[0.06]"
+                 dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.04]"
     >
       <span
         aria-hidden
@@ -678,8 +677,7 @@ function RepoRow({
         whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.13, ease: EASE_OUT } }}
         className="group flex items-baseline gap-4 py-4 transition-colors duration-150
                    [@media(hover:hover)and(pointer:fine)]:hover:bg-black/[0.025]
-                   dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.05]
-                   focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]"
+                   dark:[@media(hover:hover)and(pointer:fine)]:hover:bg-white/[0.05]"
       >
         <MetaLabel className="shrink-0 w-8 justify-start text-text-secondary">
           {String(index).padStart(2, '0')}

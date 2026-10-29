@@ -314,7 +314,7 @@ function ModeToggle({
             type="button"
             onClick={() => onMode(id)}
             aria-current={active ? 'true' : undefined}
-            className="group relative origin-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+            className="group relative origin-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
           >
             <MetaLabel
               className={
@@ -345,7 +345,7 @@ function DownloadControl() {
     <a
       href={PDF_HREF}
       download={PDF_DOWNLOAD}
-      className="group inline-flex origin-center items-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+      className="group inline-flex origin-center items-center transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
     >
       <MetaLabel className="text-text-secondary transition-colors [@media(hover:hover)and(pointer:fine)]:group-hover:text-text">
         Download PDF
@@ -462,7 +462,7 @@ function RailRow({
       onClick={onClick}
       data-testid="rail-row"
       aria-current={active ? 'true' : undefined}
-      className="group relative flex w-full origin-left items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none"
+      className="group relative flex w-full origin-left items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100"
     >
       {active && (
         <motion.span

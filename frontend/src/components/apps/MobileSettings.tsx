@@ -93,7 +93,6 @@ function MonoSwitch({
       aria-label={label}
       onClick={() => onChange?.(!on)}
       className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-text/30
                   ${on ? 'bg-text' : 'bg-text/15'}`}
     >
       <motion.span

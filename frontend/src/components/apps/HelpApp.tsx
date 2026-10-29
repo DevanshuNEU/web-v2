@@ -233,7 +233,7 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
         <button
           type="button"
           onClick={onExit}
-          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] focus-visible:outline-none focus-visible:text-text"
+          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] focus-visible:text-text"
         >
           Skip
         </button>
@@ -301,7 +301,7 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
           type="button"
           onClick={back}
           disabled={step === 0}
-          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] disabled:opacity-30 disabled:active:scale-100 disabled:hover:text-text-secondary focus-visible:outline-none focus-visible:text-text"
+          className="font-mono-meta text-text-secondary transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:text-text active:scale-[0.97] disabled:opacity-30 disabled:active:scale-100 disabled:hover:text-text-secondary focus-visible:text-text"
         >
           Back
         </button>
@@ -319,7 +319,7 @@ function TourView({ steps, onExit }: { steps: TourStep[]; onExit: () => void }) 
         <button
           type="button"
           onClick={next}
-          className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
+          className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
         >
           {isLast ? 'Done' : 'Next'}
         </button>
@@ -354,7 +354,7 @@ function OverviewBody({
       <button
         type="button"
         onClick={onStartTour}
-        className="w-fit font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
+        className="w-fit font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
       >
         Take the {tourLength}-step tour &rarr;
       </button>
@@ -599,7 +599,7 @@ function ReferenceView({
               type="button"
               onClick={() => scrollTo(id)}
               data-testid="index-row"
-              className="group flex w-full items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] focus-visible:outline-none"
+              className="group flex w-full items-center gap-3 px-4 py-2 text-left transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98]"
             >
               <span className="font-mono-meta shrink-0 opacity-50 transition-opacity group-hover:opacity-80">
                 {number}
@@ -615,7 +615,7 @@ function ReferenceView({
           <button
             type="button"
             onClick={onStartTour}
-            className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:outline-none focus-visible:opacity-70"
+            className="font-mono-meta text-text transition-[opacity,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:opacity-70 active:scale-[0.97] focus-visible:opacity-70"
           >
             Take the tour &rarr;
           </button>

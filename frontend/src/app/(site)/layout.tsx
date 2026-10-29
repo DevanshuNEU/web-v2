@@ -4,7 +4,7 @@
  * The desktop at / is a client-rendered OS, which crawlers and AI search see
  * as a near-empty shell. These pages carry the same content as real HTML,
  * built from data/, so every project and role has a URL that can rank and be
- * quoted. The body is overflow-hidden for the OS, so this shell scrolls itself.
+ * quoted. The document scrolls normally here; only the OS at / locks the body.
  */
 
 import Link from 'next/link';
@@ -20,7 +20,7 @@ const NAV = [
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-screen overflow-y-auto bg-bg text-text">
+    <div className="min-h-dvh bg-bg text-text">
       <div className="mx-auto max-w-3xl px-6 sm:px-8">
         <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-8 border-b border-border">
           <Link href="/about" className="font-display text-[22px] text-text">

@@ -241,7 +241,6 @@ function IndexEntry({
                   transition-[transform,background-color] duration-150 ease-out
                   hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
                   active:scale-[0.985]
-                  focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]
                   ${active ? 'bg-black/[0.045] dark:bg-white/[0.06]' : ''}`}
     >
       {/* Sliding active marker - a thin graphite bar that glides between rows. */}
@@ -326,8 +325,7 @@ function IndexColumn({
               key={f.key}
               type="button"
               onClick={() => setFilter(f.key)}
-              className="group relative font-mono-meta transition-opacity active:scale-[0.97]
-                         focus-visible:outline-none"
+              className="group relative font-mono-meta transition-opacity active:scale-[0.97]"
               aria-pressed={filter === f.key}
             >
               <span className={filter === f.key ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>

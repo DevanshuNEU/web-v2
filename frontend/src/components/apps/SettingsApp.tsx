@@ -221,7 +221,6 @@ function MonoToggle({
       aria-label={label}
       onClick={() => onChange(!on)}
       className={`relative h-6 w-11 shrink-0 rounded-full border transition-[background-color,border-color,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/30
                   ${on ? 'border-text bg-text' : 'border-border bg-transparent'}`}
     >
       <motion.span
@@ -271,7 +270,7 @@ function EditorialChoice<T extends string>({
             type="button"
             onClick={() => onChange(id)}
             aria-current={active ? 'true' : undefined}
-            className="group relative focus-visible:outline-none"
+            className="group relative"
           >
             <MetaLabel
               className={
@@ -415,7 +414,6 @@ function WallpaperThumb({
       aria-label={`Use ${wp.name} wallpaper`}
       aria-pressed={selected}
       className={`group relative w-full overflow-hidden border transition-[border-color,transform] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98]
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text/30
                   ${selected ? 'border-text' : 'border-border [@media(hover:hover)and(pointer:fine)]:hover:border-text/50'}`}
       style={{ aspectRatio: '16/9', filter: mono ? 'grayscale(1)' : undefined }}
     >
@@ -590,7 +588,7 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
                         }}
                         aria-label={`Set accent ${name}`}
                         aria-pressed={isActive}
-                        className="relative h-7 w-7 rounded-full transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:hover:scale-110 active:scale-[0.97] focus:outline-none"
+                        className="relative h-7 w-7 rounded-full transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] [@media(hover:hover)and(pointer:fine)]:hover:scale-110 active:scale-[0.97]"
                         style={{
                           background: color,
                           boxShadow: isActive
@@ -890,7 +888,7 @@ function RailRow({
       onClick={onClick}
       data-testid="rail-row"
       aria-current={active ? 'true' : undefined}
-      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline-none"
+      className="group relative flex w-full items-center gap-3 px-4 py-2 text-left"
     >
       {active && (
         <motion.span

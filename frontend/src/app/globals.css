@@ -12,6 +12,7 @@
   --color-surface: 255 255 255;      /* #ffffff - White surfaces */
   --color-text: 29 29 31;            /* #1d1d1f - Dark text */
   --color-text-secondary: 110 110 115; /* #6e6e73 - Secondary text */
+  --color-text-tertiary: 110 110 115;  /* #6e6e73 - Tertiary: already at the AA floor on light surfaces */
   --color-border: 210 210 215;       /* #d2d2d7 - Borders */
   
   /* Accent color - User controlled (default: iOS Blue) */
@@ -94,6 +95,7 @@
   --color-surface: 28 28 30;         /* #1c1c1e - Dark surfaces */
   --color-text: 245 245 247;         /* #f5f5f7 - Light text */
   --color-text-secondary: 152 152 157; /* #98989d - Secondary text */
+  --color-text-tertiary: 134 134 139;  /* #86868b - Tertiary: 5.2:1 on the #111112 window */
   --color-border: 56 56 58;          /* #38383a - Borders */
   
   /* Accent stays same but shows differently on dark */
@@ -164,9 +166,61 @@ body {
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: rgb(var(--color-bg));
   color: rgb(var(--color-text));
-  overflow: hidden; /* OS environment */
+}
+
+/* OS environment: only the desktop at / locks the page to the screen
+   (app/page.tsx renders the [data-os-root] marker). Plain routes such as
+   (site)/* scroll as normal documents, so PageDown and Space work at once. */
+body:has([data-os-root]) {
+  overflow: hidden;
   height: 100vh;
   width: 100vw;
+}
+
+/* ============================================
+   EDITORIAL TYPE (component layer)
+   Component classes sit in @layer components, which Tailwind emits BEFORE
+   its utilities, so an explicit utility on the same element (text-[...],
+   leading-*, text-text) wins at equal specificity. Unstyled uses keep the
+   defaults below.
+   ============================================ */
+
+@layer components {
+  .font-mono-meta {
+    color: rgb(var(--ink-mid));
+  }
+
+  /* Oversized serif hero. */
+  .editorial-hero {
+    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.02;
+    font-size: var(--fs-editorial);
+  }
+
+  /* Section-level serif headline. */
+  .editorial-head {
+    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.08;
+    font-size: var(--fs-display-lg);
+  }
+
+  /* In-window display sizes scale off the WINDOW width. `:where()` keeps each
+     selector at one class (0-1-0, same as a utility), and the component
+     layer puts it before the utilities, so a per-element size class always
+     wins and these only set the default. Upper clamp = the global token
+     ceiling (128px / 72px), matching the viewport-fluid version maximized. */
+  :where(.app-content) .editorial-hero { font-size: clamp(2.25rem, 14cqi, 8rem); }
+  /* Projects poster name: a project name is multi-word and shares the stage
+     with a subtitle + metadata, so it gets a tamer ceiling than the hero. */
+  :where(.app-content) .editorial-hero:where(.project-hero) { font-size: clamp(1.9rem, 8cqi, 4.5rem); }
+  :where(.app-content) .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
+  /* Sub-heads: an h3 with no size class steps down to a clear sub-head size
+     instead of matching its h2 section title. */
+  :where(.app-content h3).editorial-head { font-size: clamp(1.5rem, 4.5cqi, 1.875rem); line-height: 1.15; }
 }
 
 /* ============================================
@@ -236,32 +290,15 @@ body {
      500/600 are available for tasteful emphasis. Never go heavy/black (700+).
      ============================================ */
 
-  /* Uppercase mono eyebrow used across editorial surfaces. */
+  /* Uppercase mono eyebrow used across editorial surfaces. Its default color
+     lives in @layer components (below) so a text-* utility on the same
+     element wins: selected states and filled-button labels need that. */
   .font-mono-meta {
     font-family: var(--font-geist-mono), 'SF Mono', Monaco, Consolas, monospace;
     text-transform: uppercase;
     letter-spacing: var(--tracking-meta);
     font-size: var(--fs-meta);
-    color: rgb(var(--ink-mid));
     font-weight: 500;
-  }
-
-  /* Oversized serif hero. */
-  .editorial-hero {
-    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    line-height: 1.02;
-    font-size: var(--fs-editorial);
-  }
-
-  /* Section-level serif headline. */
-  .editorial-head {
-    font-family: var(--font-serif), Georgia, Cambria, 'Times New Roman', serif;
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    line-height: 1.08;
-    font-size: var(--fs-display-lg);
   }
 
   /* Inline emphasis: thin graphite underline, generous offset. */
@@ -521,29 +558,15 @@ body {
 .app-content .text-2xl { font-size: clamp(1.15rem, 3cqi, 1.5rem); }
 .app-content .text-xl  { font-size: clamp(1.05rem, 2.4cqi, 1.25rem); }
 
-/* Editorial display heads scale off the WINDOW width too. Upper clamp = the
-   global token ceiling (128px / 72px), so a maximized window matches the
-   viewport-fluid version; small windows scale the serif down gracefully. */
-.app-content .editorial-hero { font-size: clamp(2.25rem, 14cqi, 8rem); }
-/* Projects poster name: a project name is multi-word and shares the stage with
-   a subtitle + metadata, so it gets a tamer ceiling than the page-title hero.
-   Still window-dynamic via cqi; specificity (0-3-0) beats the base ramp. */
-.app-content .editorial-hero.project-hero { font-size: clamp(1.9rem, 8cqi, 4.5rem); }
-.app-content .editorial-head { font-size: clamp(1.75rem, 9cqi, 4.5rem); }
-/* Sub-heads: the rule above (0-2-0) beats a per-element Tailwind size, so an
-   h3 rendered as big as its h2 section title. Scoped to h3 (0-2-1) so every
-   h2/h1/span .editorial-head keeps its current size; h3s step down to a
-   clear sub-head size in every app. */
-.app-content h3.editorial-head { font-size: clamp(1.5rem, 4.5cqi, 1.875rem); line-height: 1.15; }
+/* Editorial display heads (.editorial-hero / .editorial-head) also scale off
+   the window: see the component-layer rules near the top of this file.
 
-/* Body, small text, and mono metadata scale off the WINDOW too, so a small
-   window reads proportionally tighter while a maximized one matches the
-   original size (upper clamp = the Tailwind/token value). Gentle ranges so
-   nothing breaks across the OS; this is what makes every app feel dynamic to
-   its window rather than fixed. */
-.app-content .text-base      { font-size: clamp(0.85rem, 1.9cqi, 1rem); }
-.app-content .text-sm        { font-size: clamp(0.78rem, 1.65cqi, 0.875rem); }
-.app-content .font-mono-meta { font-size: clamp(0.62rem, 1.45cqi, 0.75rem); }
+   Body, small text, and mono metadata scale off the WINDOW too, with reading
+   floors: body 15px, small 13px, mono labels 11px. A maximized window matches
+   the original size (upper clamp = the Tailwind/token value). */
+.app-content .text-base      { font-size: clamp(0.9375rem, 1.9cqi, 1rem); }
+.app-content .text-sm        { font-size: clamp(0.8125rem, 1.65cqi, 0.875rem); }
+.app-content .font-mono-meta { font-size: clamp(0.6875rem, 1.45cqi, 0.75rem); }
 
 /* ============================================
    MAGNETIC FLAT BUTTONS

@@ -96,7 +96,6 @@ function ReleaseEntry({
         aria-controls={panelId}
         data-testid="release-row"
         className="group w-full text-left flex flex-col gap-2 py-5
-                   focus-visible:outline-none
                    transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                    active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100"
       >

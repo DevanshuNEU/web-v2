@@ -61,7 +61,7 @@ export default function AppIcon({
     <button
       onClick={handleClick}
       {...handlers}
-      className={`flex flex-col items-center gap-1.5 select-none focus:outline-none ${
+      className={`flex flex-col items-center gap-1.5 select-none ${
         wiggleMode ? 'animate-[wiggle_0.3s_ease-in-out_infinite_alternate]' : ''
       }`}
       aria-label={label}

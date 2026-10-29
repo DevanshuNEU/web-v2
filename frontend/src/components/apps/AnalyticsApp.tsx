@@ -539,7 +539,7 @@ function QuietLink({
       target="_blank"
       rel="noopener noreferrer"
       whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.16, ease: EASE_OUT } }}
-      className="group inline-flex w-fit items-center gap-2 text-sm text-text focus-visible:outline-none"
+      className="group inline-flex w-fit items-center gap-2 text-sm text-text"
     >
       <span className="relative">
         {label}
@@ -585,7 +585,7 @@ function QuietToggle({
       aria-pressed={on}
       whileTap={reduced ? undefined : { transform: 'scale(0.97)', transition: { duration: 0.16, ease: EASE_OUT } }}
       className="group inline-flex w-fit items-center gap-2.5 border border-border px-3 py-1.5
-                 transition-colors hover:border-text/40 focus-visible:outline-none"
+                 transition-colors hover:border-text/40"
     >
       <span
         aria-hidden

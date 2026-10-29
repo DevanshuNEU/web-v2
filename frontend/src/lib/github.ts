@@ -3,7 +3,11 @@
  *
  * Server-side only — all calls go through Next.js API routes.
  * Uses GITHUB_TOKEN env var if set (5000 req/hr vs 60 unauthenticated).
+ * Every fetcher drops the repos in lib/githubExclusions.ts (forks, the
+ * profile README, the job-search list), so no route can show them.
  */
+
+import { isExcludedRepo } from './githubExclusions';
 
 export interface GitHubRepo {
   id: number;
@@ -39,7 +43,7 @@ function headers(): HeadersInit {
   };
 }
 
-/** Fetch all non-fork repos for a user */
+/** Fetch a user's public portfolio repos (no forks, archived or excluded repos) */
 export async function getUserRepos(username: string): Promise<GitHubRepo[]> {
   const res = await fetch(
     `${BASE}/users/${username}/repos?type=owner&sort=pushed&per_page=100`,
@@ -47,10 +51,10 @@ export async function getUserRepos(username: string): Promise<GitHubRepo[]> {
   );
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   const repos: GitHubRepo[] = await res.json();
-  return repos.filter(r => !r.fork && !r.private && !r.archived);
+  return repos.filter(isPortfolioRepo);
 }
 
-/** Fetch all repos for an org */
+/** Fetch an org's public portfolio repos (same rules as getUserRepos) */
 export async function getOrgRepos(org: string): Promise<GitHubRepo[]> {
   const res = await fetch(
     `${BASE}/orgs/${org}/repos?type=public&sort=pushed&per_page=100`,
@@ -58,7 +62,11 @@ export async function getOrgRepos(org: string): Promise<GitHubRepo[]> {
   );
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   const repos: GitHubRepo[] = await res.json();
-  return repos.filter(r => !r.fork && !r.private && !r.archived);
+  return repos.filter(isPortfolioRepo);
+}
+
+function isPortfolioRepo(r: GitHubRepo): boolean {
+  return !r.private && !r.archived && !isExcludedRepo(r.full_name, { fork: r.fork });
 }
 
 /** Fetch language breakdown for a repo */
@@ -139,7 +147,7 @@ export async function getUserEvents(
   );
 
   return raw
-    .filter((e) => interesting.has(e.type))
+    .filter((e) => interesting.has(e.type) && !isExcludedRepo(e.repo.name))
     .map((e): ActivityEvent => {
       const base = {
         id: e.id,

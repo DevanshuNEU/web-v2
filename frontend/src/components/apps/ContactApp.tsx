@@ -43,8 +43,7 @@ const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 const PRESSABLE =
   "transition-[transform,background-color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] " +
   "active:scale-[0.98] active:duration-100 motion-reduce:active:scale-100 " +
-  "hover:bg-black/[0.035] dark:hover:bg-white/[0.05] " +
-  "focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]";
+  "hover:bg-black/[0.035] dark:hover:bg-white/[0.05]";
 
 // Hover-only glyph nudge, gated behind a real (fine) pointer so a touch tap
 // never strands the glyph in its hover position. Collapses under reduced motion.
@@ -415,7 +414,7 @@ export default function ContactApp(_props: ContactAppProps = {}) {
                                        transition-[color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)]
                                        hover:text-text active:scale-[0.97] active:duration-100
                                        motion-reduce:active:scale-100
-                                       focus-visible:outline-none focus-visible:text-text"
+                                       focus-visible:text-text"
                           >
                             Retry
                           </button>

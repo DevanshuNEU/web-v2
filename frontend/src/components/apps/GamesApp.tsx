@@ -126,8 +126,7 @@ function SelectorEntry({
       className={`group relative flex w-full items-baseline gap-4 px-3 py-4 text-left
                   transition-[transform,background-color] duration-150 ease-out
                   hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
-                  active:scale-[0.985]
-                  focus-visible:outline-none focus-visible:bg-black/[0.05] dark:focus-visible:bg-white/[0.07]`}
+                  active:scale-[0.985]`}
     >
       <MetaLabel className="shrink-0 w-7 justify-start tabular-nums text-text-secondary/55 group-hover:text-text-secondary">
         {number}
@@ -235,7 +234,7 @@ function GameHeader({
 }) {
   // Mono editorial HUD frame: a single hairline rule under a quiet bar.
   const iconBtn =
-    'p-1.5 text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95 focus-visible:outline-none';
+    'p-1.5 text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95';
   return (
     <div className="flex-shrink-0">
       <div className="flex items-center gap-4 px-4 py-3 bg-surface/20">
@@ -284,7 +283,7 @@ function OverlayButton({
         onClick={onClick}
         className="inline-flex items-center justify-center gap-2 border border-border px-5 py-2 text-text font-medium
                    transition-[transform,border-color] duration-150 ease-out hover:border-text/45 active:scale-[0.97]
-                   focus-visible:outline-none font-mono-meta"
+                   font-mono-meta"
       >
         {children}
       </button>
@@ -298,7 +297,7 @@ function OverlayButton({
       onClick={onClick}
       className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 font-semibold
                   transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97]
-                  focus-visible:outline-none font-mono-meta ${colorCls}`}
+                  font-mono-meta ${colorCls}`}
       style={mono ? undefined : { background: accent }}
       onMouseEnter={mono || !accentHover ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accentHover; }}
       onMouseLeave={mono || !accent ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accent; }}
@@ -460,7 +459,7 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
   const canvasSize = SNAKE_GRID * cellSize;
 
   // Shared button style for on-screen controls - mirrors Tetris exactly.
-  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none focus-visible:outline-none";
+  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none";
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -521,7 +520,7 @@ function SnakeGameView({ onBack, isMobile }: { onBack: () => void; isMobile: boo
 
           {/* Action button - Start when idle/over, otherwise pause/resume */}
           <button
-            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none ${
+            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] ${
               mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
             }`}
             style={mono ? undefined : { background: '#22c55e' }}
@@ -819,14 +818,14 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
   const previewSize = Math.max(40, Math.round(cs * 0.75) * 4);
 
   // Shared button style for on-screen controls - editorial mono, pressable.
-  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none focus-visible:outline-none";
+  const ctrlBtn = "w-9 h-9 flex items-center justify-center border border-border text-text-secondary hover:text-text hover:border-text/40 active:scale-95 transition-[color,border-color,transform] duration-150 ease-out cursor-pointer select-none";
 
   return (
     <div
       ref={containerRef}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="h-full flex flex-col overflow-hidden outline-none"
+      className="h-full flex flex-col overflow-hidden"
     >
       <GameHeader title="Tetris" score={state.score} best={state.best} onBack={onBack} onReset={() => dispatch({ type: 'RESET' })}>
         <HudStat label="Lines" value={state.lines} />
@@ -896,7 +895,7 @@ function TetrisGame({ onBack, isMobile }: { onBack: () => void; isMobile: boolea
 
           {/* Action buttons */}
           <button
-            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none ${
+            className={`h-9 px-4 font-mono-meta cursor-pointer select-none transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97] ${
               mono ? 'bg-text text-bg hover:opacity-90' : 'text-white'
             }`}
             style={mono ? undefined : { background: '#6366f1' }}
@@ -1036,7 +1035,7 @@ function TypeRacerGame({ onBack, isMobile }: { onBack: () => void; isMobile: boo
               key={i}
               onClick={() => setSnippetIdx(i)}
               aria-pressed={snippetIdx === i}
-              className="group relative font-mono-meta transition-[opacity,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none"
+              className="group relative font-mono-meta transition-[opacity,transform] duration-150 ease-out active:scale-[0.97]"
             >
               <span className={snippetIdx === i ? 'text-text' : 'text-text-secondary/55 group-hover:text-text-secondary'}>
                 {s.label}
