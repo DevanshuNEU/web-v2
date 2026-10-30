@@ -92,3 +92,20 @@ export function resizeBounds(
 
   return { x, y, width, height };
 }
+
+/**
+ * Clamp a dragged window's top-left to the desktop band: x in [0, vw - width],
+ * y in [menu bar, vh - height - dock]. A window larger than the band pins to
+ * the band's top-left instead of going negative.
+ */
+export function clampWindowPosition(
+  pos: { x: number; y: number },
+  size: Size,
+  vw: number,
+  vh: number
+): { x: number; y: number } {
+  return {
+    x: Math.max(0, Math.min(pos.x, vw - size.width)),
+    y: Math.max(MENUBAR_H, Math.min(pos.y, vh - DOCK_H - size.height)),
+  };
+}

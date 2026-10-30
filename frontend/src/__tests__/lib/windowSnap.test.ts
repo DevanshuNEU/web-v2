@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeSnap } from '@/lib/windowSnap';
+import { computeSnap, sameSnap } from '@/lib/windowSnap';
 
 // Reference viewport: 1000x800 → usable band top=28, bottom=726 (74px dock),
 // usableH=698, halfW=500, halfH=349.
@@ -29,5 +29,32 @@ describe('computeSnap', () => {
 
   it('snaps to the bottom-right quarter in the bottom-right corner', () => {
     expect(computeSnap(998, 730, VW, VH)).toEqual({ x: 500, y: 377, width: 500, height: 349 });
+  });
+
+  it('still fills at the very top of the thin zone', () => {
+    expect(computeSnap(500, 32, VW, VH)).toEqual({ x: 0, y: 28, width: 1000, height: 698 });
+  });
+
+  it('does not fill just below the thin top zone', () => {
+    expect(computeSnap(500, 40, VW, VH)).toBeNull();
+  });
+
+  it('snaps to the left half, not the quarter, below the thin top zone', () => {
+    expect(computeSnap(4, 40, VW, VH)).toEqual({ x: 0, y: 28, width: 500, height: 698 });
+  });
+});
+
+describe('sameSnap', () => {
+  const a = { x: 0, y: 28, width: 500, height: 698 };
+
+  it('treats two nulls as equal', () => {
+    expect(sameSnap(null, null)).toBe(true);
+  });
+
+  it('compares bounds by value', () => {
+    expect(sameSnap(a, { ...a })).toBe(true);
+    expect(sameSnap(a, null)).toBe(false);
+    expect(sameSnap(null, a)).toBe(false);
+    expect(sameSnap(a, { ...a, width: a.width + 1 })).toBe(false);
   });
 });
