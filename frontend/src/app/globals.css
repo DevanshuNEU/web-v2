@@ -1060,3 +1060,14 @@ body:has([data-os-root]) {
   .gh-heat-week[data-old] { display: none; }
   .gh-heat-month-narrow { display: inline; }
 }
+
+/* Two-tone app glyphs (components/shared/AppTile.tsx): Phosphor's duotone
+   back layer carries the opacity attribute; it takes the flavor's flat color,
+   and the outline takes the per-tile gradient. */
+.glyph-two-tone [opacity] {
+  fill: var(--glyph-back);
+  opacity: 0.9;
+}
+.glyph-two-tone > :not([opacity]) {
+  fill: var(--glyph-front);
+}

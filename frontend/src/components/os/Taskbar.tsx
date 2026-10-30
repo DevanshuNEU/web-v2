@@ -146,7 +146,7 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
         className={`relative cursor-pointer ${isMinimized ? 'opacity-40' : ''}`}
         aria-label={`${label.title}${isMinimized ? ', minimized' : isRunning ? ', open' : ''}`}
       >
-        <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={BASE_SIZE} />
+        <AppIcon appType={appType} size={BASE_SIZE} />
 
         {isRunning && !isMinimized && (
           <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-text/80" />

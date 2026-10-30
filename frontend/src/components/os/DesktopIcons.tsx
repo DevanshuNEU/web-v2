@@ -35,12 +35,10 @@ const DESKTOP_APP_TYPES: AppType[] = ['about-me', 'projects', 'resume', 'contact
 
 interface DesktopIconProps {
   appType: AppType;
-  icon: React.ElementType;
   label: string;
-  iconColor: string;
 }
 
-function DesktopIcon({ appType, icon, label, iconColor }: DesktopIconProps) {
+function DesktopIcon({ appType, label }: DesktopIconProps) {
   const openWindow = useOSStore(state => state.openWindow);
   const ref = useRef<HTMLButtonElement>(null);
   const reduced = useReducedMotion();
@@ -106,7 +104,7 @@ function DesktopIcon({ appType, icon, label, iconColor }: DesktopIconProps) {
             whileTap={{ scale: 0.92 }}
             className="block"
           >
-            <AppIcon icon={icon} colorKey={iconColor} size={56} />
+            <AppIcon appType={appType} size={56} />
           </motion.span>
         </span>
 
@@ -152,9 +150,7 @@ export default function DesktopIcons() {
           <DesktopIcon
             key={appType}
             appType={appType}
-            icon={reg.icon}
             label={label.title}
-            iconColor={reg.iconColor}
           />
         );
       })}

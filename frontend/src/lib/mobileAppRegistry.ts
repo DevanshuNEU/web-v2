@@ -16,7 +16,6 @@ export interface MobileAppRegistration {
   appType: AppType;
   component: (typeof appRegistry)[AppType]['component'];
   icon: (typeof appRegistry)[AppType]['icon'];
-  iconColor: string;
   label: string;
 }
 
@@ -66,7 +65,6 @@ export function getMobileApp(appType: AppType): MobileAppRegistration {
     appType,
     component: reg.component,
     icon: reg.icon,
-    iconColor: reg.iconColor,
     label: MOBILE_LABEL_OVERRIDES[appType] ?? label.title,
   };
 }
