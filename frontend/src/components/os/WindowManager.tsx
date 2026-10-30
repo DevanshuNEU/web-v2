@@ -18,6 +18,23 @@ import Window from './Window';
 import AppLoader from './AppLoader';
 import type { AppType } from '../../../../shared/types';
 
+/**
+ * The app inside a window. Memoized on appType alone, so the window chrome
+ * re-rendering on every drag or resize commit does not re-render the app.
+ */
+const AppBody = React.memo(function AppBody({ appType }: { appType: AppType }) {
+  const registration = appRegistry[appType];
+  if (!registration) return null;
+  const AppComponent = registration.component;
+  return (
+    <Suspense fallback={<AppLoader />}>
+      <ErrorBoundary key={appType} label={getAppLabel(appType).title}>
+        <AppComponent />
+      </ErrorBoundary>
+    </Suspense>
+  );
+});
+
 export default function WindowManager() {
   const windows = useOSStore(state => state.windows);
 
@@ -82,15 +99,10 @@ export default function WindowManager() {
       {visibleWindows.map((window) => {
         const registration = appRegistry[window.appType];
         if (!registration) return null;
-        const AppComponent = registration.component;
 
         return (
           <Window key={window.id} window={window}>
-            <Suspense fallback={<AppLoader />}>
-              <ErrorBoundary key={window.appType} label={getAppLabel(window.appType).title}>
-                <AppComponent />
-              </ErrorBoundary>
-            </Suspense>
+            <AppBody appType={window.appType} />
           </Window>
         );
       })}

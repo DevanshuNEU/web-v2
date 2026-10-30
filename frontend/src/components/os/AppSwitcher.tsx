@@ -93,23 +93,25 @@ function SwitcherCell({
 // ---------------------------------------------------------------------------
 
 export default function AppSwitcher() {
-  const windows        = useOSStore(s => s.windows);
+  // No subscription to windows: the list is read from the store when the
+  // switcher opens and when it cycles, so commits from dragging or resizing
+  // never re-render it or rebind its key listeners.
   const focusWindow    = useOSStore(s => s.focusWindow);
-  const activeWindowId = useOSStore(s => s.activeWindowId);
 
   const [isOpen,   setIsOpen]   = useState(false);
   const [selIdx,   setSelIdx]   = useState(0);
+  const [entries,  setEntries]  = useState<SwitcherEntry[]>([]);
   const entriesRef = useRef<SwitcherEntry[]>([]);
   const heldKeyRef = useRef<'Alt' | 'Control'>('Alt');
 
   // Esc closes the switcher with no focus change, and nothing behind it.
   useEscapeLayer(isOpen, () => { setIsOpen(false); setSelIdx(0); });
 
-  // Build the list of switcher entries whenever windows change. Windows come
-  // most recently used first: zIndex rises on every focus, so z-order is MRU
-  // order. Desktop goes last.
+  // Snapshot the switcher entries from the store. Windows come most recently
+  // used first: zIndex rises on every focus, so z-order is MRU order. Desktop
+  // goes last.
   const buildEntries = useCallback((): SwitcherEntry[] => {
-    const openWins = windows
+    const openWins = useOSStore.getState().windows
       .filter(w => w.isOpen)
       .sort((a, b) => {
         // Minimized windows sit behind visible ones.
@@ -123,7 +125,7 @@ export default function AppSwitcher() {
       title:    w.title,
     }));
     return [...winEntries, desktop];
-  }, [windows]);
+  }, []);
 
   // -- Keyboard handling --
 
@@ -137,18 +139,19 @@ export default function AppSwitcher() {
 
       e.preventDefault(); // keep the keystroke from the page and the browser
 
-      const entries = buildEntries();
-      entriesRef.current = entries;
+      const fresh = buildEntries();
+      entriesRef.current = fresh;
+      setEntries(fresh);
 
-      if (entries.length <= 1) return; // no apps open, nothing to switch
+      if (fresh.length <= 1) return; // no apps open, nothing to switch
 
       if (!isOpen) {
         // Opening: the focused window is entry 0, so a quick tap lands on the
         // previous one. With nothing focused, start on the most recent window.
         heldKeyRef.current = e.altKey ? 'Alt' : 'Control';
-        const focusedFirst = entries[0]?.windowId === activeWindowId;
+        const focusedFirst = fresh[0]?.windowId === useOSStore.getState().activeWindowId;
         const startIdx = e.shiftKey
-          ? entries.length - 1
+          ? fresh.length - 1
           : (focusedFirst ? 1 : 0);
         setSelIdx(startIdx);
         setIsOpen(true);
@@ -156,8 +159,8 @@ export default function AppSwitcher() {
         // Already open: cycle
         setSelIdx(i => {
           const next = e.shiftKey
-            ? (i - 1 + entries.length) % entries.length
-            : (i + 1) % entries.length;
+            ? (i - 1 + fresh.length) % fresh.length
+            : (i + 1) % fresh.length;
           return next;
         });
       }
@@ -190,11 +193,10 @@ export default function AppSwitcher() {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup',   onKeyUp);
     };
-  }, [isOpen, activeWindowId, windows, focusWindow, buildEntries]);
+  }, [isOpen, focusWindow, buildEntries]);
 
   // -- Render --
 
-  const entries = buildEntries();
   const selected = entries[selIdx];
 
   return (

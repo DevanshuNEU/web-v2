@@ -16,8 +16,12 @@ import { WifiTray, BatteryTray } from './TrayMenus';
 export default function MenuBar() {
   const { mode, toggleMode } = useTheme();
   const trackEvent = useAnalyticsStore(s => s.trackEvent);
-  const windows = useOSStore(s => s.windows);
-  const activeWindowId = useOSStore(s => s.activeWindowId);
+  // The focused, visible window's app type, as a string: moves and resizes
+  // leave it unchanged, so they do not re-render the menu bar.
+  const activeAppType = useOSStore(s => {
+    const active = s.windows.find(w => w.id === s.activeWindowId && w.isOpen && !w.isMinimized);
+    return active ? active.appType : null;
+  });
 
   const [time, setTime] = useState<Date | null>(null);
   useEffect(() => {
@@ -42,10 +46,7 @@ export default function MenuBar() {
     setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
   }, []);
 
-  const activeWindow = windows.find(w => w.id === activeWindowId && w.isOpen && !w.isMinimized);
-  const activeAppLabel = activeWindow
-    ? getAppLabel(activeWindow.appType).windowTitle
-    : null;
+  const activeAppLabel = activeAppType ? getAppLabel(activeAppType).windowTitle : null;
 
   const handleThemeToggle = () => {
     const next = mode === 'dark' ? 'light' : 'dark';
