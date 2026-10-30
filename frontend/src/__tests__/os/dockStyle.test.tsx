@@ -46,6 +46,13 @@ describe('dock (color palette)', () => {
     expect(runningDot(/^About Me, open/)!.style.background).toBe('rgb(0, 212, 255)');
   });
 
+  it('rings the running dot in light mode so pale family colors still read', () => {
+    useThemeStore.setState({ mode: 'light' });
+    useOSStore.getState().openWindow('about-me');
+    render(<Taskbar />);
+    expect(runningDot(/^About Me, open/)!.style.boxShadow).toBe('0 0 0 1px rgb(var(--color-text) / 0.45)');
+  });
+
   it('pulses the Launchpad button in the accent color for first-time visitors', () => {
     render(<Taskbar />);
     const ring = document.querySelector<HTMLElement>('.animate-ping')!;

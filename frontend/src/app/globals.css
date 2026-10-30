@@ -447,7 +447,7 @@ body:has([data-os-root]) {
    ============================================ */
 
 :focus-visible {
-  outline: 3px solid rgb(var(--color-accent) / 0.6);
+  outline: 3px solid rgb(var(--color-accent));
   outline-offset: 2px;
 }
 

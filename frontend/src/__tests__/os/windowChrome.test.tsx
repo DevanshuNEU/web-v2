@@ -72,6 +72,7 @@ describe('window chrome', () => {
     expect(min.style.background).toBe('oklch(0.84 0.16 84)');
     expect(zoom.style.background).toBe('oklch(0.76 0.19 145)');
     expect(close.style.boxShadow).toContain('inset 0 0 0 0.5px');
+    expect(close.style.transition).toBe('background-color 150ms cubic-bezier(0.25, 1, 0.5, 1)');
   });
 
   it('greys out the traffic lights of an inactive window and hides their glyphs', () => {

@@ -12,7 +12,7 @@ import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { useThemeStore } from '@/store/themeStore';
-import { spring, INSTANT } from '@/lib/motion';
+import { spring, INSTANT, ease } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
 import { MENUBAR_H, DOCK_H } from '@/lib/windowSnap';
 import { DEFAULT_MIN_SIZE, type ResizeDir } from '@/lib/windowGeometry';
@@ -257,7 +257,7 @@ export default function Window({ window, children }: WindowProps) {
                   className={`grid h-3 w-3 place-items-center rounded-full ${
                     mono
                       ? 'transition-colors bg-black/45 group-hover/btn:bg-black/60 dark:bg-white/55 dark:group-hover/btn:bg-white/70'
-                      : 'transition-[background-color] duration-150 ease-[cubic-bezier(.25,1,.5,1)]'
+                      : ''
                   }`}
                   style={
                     mono
@@ -265,6 +265,7 @@ export default function Window({ window, children }: WindowProps) {
                       : {
                           background: isActive ? fill : INACTIVE_LIGHT,
                           boxShadow: isActive ? `inset 0 0 0 0.5px ${ring}` : undefined,
+                          transition: `background-color 150ms cubic-bezier(${ease.stripe.join(', ')})`,
                         }
                   }
                 >

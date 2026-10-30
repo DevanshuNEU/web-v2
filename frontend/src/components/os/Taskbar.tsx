@@ -12,7 +12,7 @@ import {
 } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useOSStore } from '@/store/osStore';
-import { useTheme } from '@/store/themeStore';
+import { useTheme, useThemeStore } from '@/store/themeStore';
 import { useLaunchpadStore } from '@/store/launchpadStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { appRegistry, getPinnedApps, getAppLabel } from '@/lib/appRegistry';
@@ -149,6 +149,7 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
 
   const reg = appRegistry[appType];
   const mono = useIsMono();
+  const dark = useThemeStore(s => s.mode === 'dark');
   if (!reg) return null;
 
   const label = getAppLabel(appType);
@@ -181,7 +182,16 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
           <span
             data-running-dot
             className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${mono ? 'bg-text/80' : ''}`}
-            style={mono ? undefined : { background: FLAVORS[reg.flavor].back }}
+            // Pale family colors vanish on the light dock glass, so light mode
+            // adds a hairline ring in the text color.
+            style={
+              mono
+                ? undefined
+                : {
+                    background: FLAVORS[reg.flavor].back,
+                    boxShadow: dark ? undefined : '0 0 0 1px rgb(var(--color-text) / 0.45)',
+                  }
+            }
           />
         )}
       </motion.button>
