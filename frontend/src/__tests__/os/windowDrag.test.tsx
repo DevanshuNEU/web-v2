@@ -6,7 +6,8 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { useOSStore } from '@/store/osStore';
 import Window from '@/components/os/Window';
 import { useWindowDrag } from '@/hooks/useWindowDrag';
-import { MotionGlobalConfig } from 'framer-motion';
+import { AnimatePresence, MotionGlobalConfig } from 'framer-motion';
+import { registerDockIcon } from '@/lib/dockRegistry';
 
 /**
  * Titlebar drag: pointer-captured, moved on x/y MotionValues, committed to the
@@ -339,20 +340,21 @@ describe('drag during the open animation', () => {
     const bar = screen.getByTestId('bar');
 
     act(() => {
-      hook!.x.set(-12);
-      hook!.y.set(18);
+      hook!.x.set(-12.4);
+      hook!.y.set(18.6);
     });
 
     down(bar, 400, 100);
     // Nothing moved yet: the window holds its in-flight spot.
-    expect(hook!.x.get()).toBe(-12);
-    expect(hook!.y.get()).toBe(18);
+    expect(hook!.x.get()).toBe(-12.4);
+    expect(hook!.y.get()).toBe(18.6);
     move(bar, 450, 110);
-    expect(hook!.x.get()).toBe(-12 + 50);
-    expect(hook!.y.get()).toBe(18 + 10);
+    // Whole pixels: 200 - 12.4 + 50 = 237.6 -> 238, 100 + 18.6 + 10 = 128.6 -> 129.
+    expect(hook!.x.get()).toBe(38);
+    expect(hook!.y.get()).toBe(29);
     up(bar, 450, 110);
 
-    expect(stored().position).toEqual({ x: START.x - 12 + 50, y: START.y + 18 + 10 });
+    expect(stored().position).toEqual({ x: 238, y: 129 });
     expect(hook!.x.get()).toBe(0);
     expect(hook!.y.get()).toBe(0);
   });
@@ -380,5 +382,136 @@ describe('drag during the open animation', () => {
     const snapped = renders.filter((r) => r.width === Math.round(VW / 2));
     expect(snapped.length).toBeGreaterThan(0);
     expect(snapped.every((r) => r.key === 1)).toBe(true);
+  });
+});
+
+describe('presses that must not touch x/y', () => {
+  afterEach(() => {
+    MotionGlobalConfig.skipAnimations = true;
+  });
+
+  /** Mirrors WindowManager: minimized windows drop out of AnimatePresence. */
+  function PresenceHost() {
+    const win = useOSStore((s) => s.windows.find((w) => !w.isMinimized));
+    return (
+      <AnimatePresence>
+        {win && (
+          <Window key={win.id} window={win}>
+            <div />
+          </Window>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  it('a click during the open rise leaves the open animation running', async () => {
+    MotionGlobalConfig.skipAnimations = false;
+    openAboutMe();
+    render(<Host />);
+    const bar = titlebar();
+    const el = windowEl();
+    expect(el.style.transform).toContain('translateY(30px)');
+    const { counts, unsub } = trackStore();
+
+    down(bar, 400, 100);
+    up(bar, 400, 100);
+    expect(flag()).toBe(false);
+
+    await waitFor(() => expect(el.style.transform).toBe('none'), { timeout: 3000 });
+    unsub();
+    expect(counts.positionWrites).toBe(0);
+    expect(stored().position).toEqual(START);
+  });
+
+  it('a press during the close animation is ignored and the window is still removed', async () => {
+    openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+    const bar = titlebar();
+
+    MotionGlobalConfig.skipAnimations = false;
+    act(() => useOSStore.getState().closeWindow(stored().id));
+    expect(windowEl()).not.toBeNull();
+    down(bar, 400, 100);
+    move(bar, 450, 120);
+    expect(flag()).toBe(false);
+    expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+  });
+
+  it('a press during the genie minimize is ignored and the minimize still commits', async () => {
+    const unregister = registerDockIcon('about-me', () => new DOMRect(700, 840, 48, 48));
+    try {
+      openAboutMe();
+      render(<PresenceHost />);
+      await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+      const bar = titlebar();
+
+      MotionGlobalConfig.skipAnimations = false;
+      fireEvent.click(screen.getByRole('button', { name: `Minimize ${stored().title}` }));
+      down(bar, 400, 100);
+      move(bar, 450, 120);
+      expect(flag()).toBe(false);
+      expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(stored().isMinimized).toBe(true), { timeout: 3000 });
+      expect(stored().position).toEqual(START);
+    } finally {
+      unregister();
+    }
+  });
+
+  it('a store minimize mid-drag commits the last drag position, not the exit offset', async () => {
+    openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+    const bar = titlebar();
+
+    down(bar, 400, 100);
+    move(bar, 450, 100);
+    MotionGlobalConfig.skipAnimations = false;
+    // recruiterTour minimizes through the store directly.
+    act(() => useOSStore.getState().minimizeWindow(stored().id));
+    // Moves during the exit are ignored; the exit owns x/y now.
+    move(bar, 700, 300);
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+    expect(flag()).toBe(false);
+    expect(stored().position).toEqual({ x: START.x + 50, y: START.y });
+  });
+
+  it('a store minimize mid-press with no move writes no position', async () => {
+    openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+    const bar = titlebar();
+    const { counts, unsub } = trackStore();
+
+    down(bar, 400, 100);
+    MotionGlobalConfig.skipAnimations = false;
+    act(() => useOSStore.getState().minimizeWindow(stored().id));
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+    unsub();
+    expect(flag()).toBe(false);
+    expect(counts.positionWrites).toBe(0);
+    expect(stored().position).toEqual(START);
+  });
+
+  it('releasing a drag after the close started does not cancel the exit', async () => {
+    openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+    const bar = titlebar();
+
+    down(bar, 400, 100);
+    move(bar, 450, 100);
+    MotionGlobalConfig.skipAnimations = false;
+    act(() => useOSStore.getState().closeWindow(stored().id));
+    up(bar, 450, 100);
+    expect(flag()).toBe(false);
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
   });
 });

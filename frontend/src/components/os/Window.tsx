@@ -46,7 +46,10 @@ export default function Window({ window, children }: WindowProps) {
   const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
   const updateWindowSize = useOSStore(state => state.updateWindowSize);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
-  const { x, y, snapPreview, layoutKey, titlebarProps } = useWindowDrag(window);
+  // Set while the genie flies the window into the dock, so a titlebar press
+  // cannot stop that animation (its promise would never settle).
+  const genieRef = React.useRef(false);
+  const { x, y, snapPreview, layoutKey, titlebarProps } = useWindowDrag(window, { busyRef: genieRef });
   const resizeStart = React.useRef<{ dir: ResizeDir; px: number; py: number; bounds: WindowBounds } | null>(null);
   const [isResizing, setIsResizing] = React.useState(false);
   const minSize = appRegistry[window.appType]?.minSize ?? DEFAULT_MIN_SIZE;
@@ -89,14 +92,19 @@ export default function Window({ window, children }: WindowProps) {
     const r = el.getBoundingClientRect();
     const dx = dock.left + dock.width / 2 - (r.left + r.width / 2);
     const dy = dock.top + dock.height / 2 - (r.top + r.height / 2);
-    await controls.start({
-      x: dx,
-      y: dy,
-      scale: 0.06,
-      skewX: 8,
-      opacity: 0,
-      transition: spring.genie,
-    });
+    genieRef.current = true;
+    try {
+      await controls.start({
+        x: dx,
+        y: dy,
+        scale: 0.06,
+        skewX: 8,
+        opacity: 0,
+        transition: spring.genie,
+      });
+    } finally {
+      genieRef.current = false;
+    }
     minimizeWindow(window.id);
   };
 

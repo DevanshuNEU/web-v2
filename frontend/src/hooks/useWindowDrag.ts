@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { frame, useMotionValue, type MotionValue } from 'framer-motion';
+import { frame, useIsPresent, useMotionValue, type MotionValue } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { clampWindowPosition, type Size } from '@/lib/windowGeometry';
 import { computeSnap, sameSnap, type SnapBounds } from '@/lib/windowSnap';
@@ -24,6 +24,20 @@ export interface WindowDrag {
   };
 }
 
+export interface WindowDragOptions {
+  /** True while the window runs its own x/y animation (genie minimize). */
+  busyRef?: React.RefObject<boolean>;
+}
+
+interface Moved {
+  /** On-screen position when the first real move happened (stored plus in-flight x/y). */
+  startX: number;
+  startY: number;
+  /** Last whole-pixel position this drag set. This is what gets committed. */
+  lastX: number;
+  lastY: number;
+}
+
 interface DragSession {
   windowId: string;
   pointerId: number;
@@ -33,12 +47,11 @@ interface DragSession {
   /** Stored left/top; x/y are offsets from it. */
   baseX: number;
   baseY: number;
-  /** On-screen position at pointerdown (base plus any in-flight x/y). */
-  startX: number;
-  startY: number;
   size: Size;
   vw: number;
   vh: number;
+  /** Null until the pointer actually moves; a plain click never touches x/y. */
+  moved: Moved | null;
   /** True once the pointer has been outside every snap zone this drag. */
   leftZones: boolean;
   preview: SnapBounds | null;
@@ -51,15 +64,25 @@ interface DragSession {
  * one position write on release. Keeping drag moves out of React also keeps
  * them away from the `layout` spring, which restarted from rest on every move.
  *
- * Invariant: x and y are 0 whenever no drag is in progress, so the open,
- * close and genie animations (which drive the same values) start from 0.
+ * x/y are 0 whenever no drag has moved the window, so the open, close and
+ * genie animations (which drive the same values) start from 0. A press on a
+ * window that is exiting or flying into the dock is ignored: stopping those
+ * animations would leave their promises unsettled and the window stuck.
  */
-export function useWindowDrag(win: WindowState): WindowDrag {
+export function useWindowDrag(win: WindowState, { busyRef }: WindowDragOptions = {}): WindowDrag {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+  const isPresent = useIsPresent();
   const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
   const [layoutKey, setLayoutKey] = React.useState(0);
   const session = React.useRef<DragSession | null>(null);
+  // Read inside the memoized `finish`, so kept in a ref.
+  const presentRef = React.useRef(isPresent);
+  presentRef.current = isPresent;
+  const animating = React.useCallback(
+    () => !presentRef.current || busyRef?.current === true,
+    [busyRef]
+  );
 
   // Runs once per gesture: the first end path to arrive clears the session.
   const finish = React.useCallback(
@@ -69,20 +92,27 @@ export function useWindowDrag(win: WindowState): WindowDrag {
       session.current = null;
       s.end();
 
-      const nx = s.baseX + x.get();
-      const ny = s.baseY + y.get();
-      const store = useOSStore.getState();
-      const stillOpen = store.windows.some(w => w.id === s.windowId);
-      if (stillOpen && (nx !== s.baseX || ny !== s.baseY)) {
-        store.updateWindowPosition(s.windowId, { x: nx, y: ny });
+      // Commit what the drag set, not x/y now: an exit animation may be
+      // driving them. No move means no write and x/y are left alone.
+      const m = s.moved;
+      if (m) {
+        const store = useOSStore.getState();
+        const stillOpen = store.windows.some(w => w.id === s.windowId);
+        if (stillOpen && (m.lastX !== s.baseX || m.lastY !== s.baseY)) {
+          store.updateWindowPosition(s.windowId, { x: m.lastX, y: m.lastY });
+        }
+        // jump() would cancel an exit or genie animation on x/y and its
+        // promise would never settle; that animation owns x/y now.
+        if (!unmounting && !animating()) {
+          x.jump(0);
+          y.jump(0);
+        }
       }
-      x.jump(0);
-      y.jump(0);
 
       if (unmounting) return;
       const snap = s.preview;
       if (snap) setSnapPreview(null);
-      if (commitSnap && snap) {
+      if (commitSnap && snap && !animating()) {
         // After Motion has rendered x/y = 0 with left/top at the drop point,
         // so the snap's layout animation measures its start from there.
         frame.postRender(() => {
@@ -91,7 +121,7 @@ export function useWindowDrag(win: WindowState): WindowDrag {
         });
       }
     },
-    [x, y]
+    [x, y, animating]
   );
 
   // A window closed or minimized mid-drag must not leave the gesture flag set.
@@ -99,12 +129,9 @@ export function useWindowDrag(win: WindowState): WindowDrag {
 
   const onPointerDown: TitlebarHandler = e => {
     if (e.button !== 0 || win.isMaximized || session.current) return;
+    if (animating()) return;
     if ((e.target as Element).closest('button')) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    // End any open or restore spring on x/y so it does not fight the drag.
-    // controls.stop() would also freeze an in-flight opacity fade.
-    x.stop();
-    y.stop();
     useOSStore.getState().focusWindow(win.id);
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
@@ -115,11 +142,10 @@ export function useWindowDrag(win: WindowState): WindowDrag {
       py: e.clientY,
       baseX: win.position.x,
       baseY: win.position.y,
-      startX: win.position.x + x.get(),
-      startY: win.position.y + y.get(),
       size: win.size,
       vw,
       vh,
+      moved: null,
       leftZones: computeSnap(e.clientX, e.clientY, vw, vh) === null,
       preview: null,
       end: beginWindowGesture(),
@@ -128,13 +154,30 @@ export function useWindowDrag(win: WindowState): WindowDrag {
 
   const onPointerMove: TitlebarHandler = e => {
     const s = session.current;
-    if (!s || e.pointerId !== s.pointerId) return;
+    if (!s || e.pointerId !== s.pointerId || animating()) return;
+    const dx = e.clientX - s.px;
+    const dy = e.clientY - s.py;
+    if (!s.moved) {
+      if (dx === 0 && dy === 0) return;
+      // First real move: end any open spring on x/y so it does not fight the
+      // drag, and start from where the window is on screen right now, so a
+      // grab during the open rise does not jump. controls.stop() would also
+      // freeze an in-flight opacity fade.
+      x.stop();
+      y.stop();
+      const startX = s.baseX + x.get();
+      const startY = s.baseY + y.get();
+      s.moved = { startX, startY, lastX: s.baseX, lastY: s.baseY };
+    }
+    const m = s.moved;
     const pos = clampWindowPosition(
-      { x: s.startX + e.clientX - s.px, y: s.startY + e.clientY - s.py },
+      { x: Math.round(m.startX + dx), y: Math.round(m.startY + dy) },
       s.size,
       s.vw,
       s.vh
     );
+    m.lastX = pos.x;
+    m.lastY = pos.y;
     x.set(pos.x - s.baseX);
     y.set(pos.y - s.baseY);
 
