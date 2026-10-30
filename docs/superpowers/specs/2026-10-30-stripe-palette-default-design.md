@@ -107,7 +107,7 @@ Each flavor's `back` and both gradient stops must reach at least 3:1 contrast ag
 
 ### Focus and motion
 
-- `:focus-visible` outline becomes `3px solid rgb(var(--color-accent) / 0.6)` with `outline-offset: 2px` (research §4.4). Applies in both palettes; in mono the accent var is graphite.
+- `:focus-visible` outline becomes `3px solid rgb(var(--color-accent))` with `outline-offset: 2px` (research §4.4, minus Stripe's 0.6 alpha: at 0.6 blurple measured about 2.4:1, below WCAG 1.4.11's 3:1). Applies in both palettes; in mono the accent var is graphite.
 - Add `ease.stripe = [0.25, 1, 0.5, 1]` to `lib/motion.ts` and use it (as the CSS `cubic-bezier(.25,1,.5,1)`, 150 ms) for the traffic-light color transition. No other motion changes; no new hover effects on tiles (the dock magnification and desktop tilt stay as they are).
 
 ## Verification

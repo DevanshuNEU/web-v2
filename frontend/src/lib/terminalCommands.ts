@@ -293,7 +293,7 @@ export const commandRegistry: Record<string, CommandHandler> = {
   ],
 
   neofetch: (_args, ctx) => {
-    const palette = ctx.palette === 'color' ? 'Color' : 'Monochrome';
+    const palette = ctx.palette === 'color' ? 'Color' : 'Mono';
     return {
       type: 'art',
       alt: NEOFETCH_ALT(palette),

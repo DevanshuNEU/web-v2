@@ -34,6 +34,12 @@ describe('palette naming', () => {
     expect(text).toContain('Color or Mono');
     expect(text).not.toMatch(/\bFun\b/);
   });
+
+  it('reports the mono palette as Mono, matching Settings', async () => {
+    const { commandRegistry } = await import('@/lib/terminalCommands');
+    const result = commandRegistry.neofetch([], { palette: 'mono' } as Parameters<typeof commandRegistry.neofetch>[1]);
+    expect(JSON.stringify(result)).toMatch(/Theme:  Mono(?!chrome)/);
+  });
 });
 
 describe('neofetch palette name', () => {
@@ -43,5 +49,11 @@ describe('neofetch palette name', () => {
     const text = JSON.stringify(result);
     expect(text).toContain('Theme:  Color');
     expect(text).not.toMatch(/\bFun\b/);
+  });
+
+  it('reports the mono palette as Mono, matching Settings', async () => {
+    const { commandRegistry } = await import('@/lib/terminalCommands');
+    const result = commandRegistry.neofetch([], { palette: 'mono' } as Parameters<typeof commandRegistry.neofetch>[1]);
+    expect(JSON.stringify(result)).toMatch(/Theme:  Mono(?!chrome)/);
   });
 });
