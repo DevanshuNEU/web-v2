@@ -15,10 +15,15 @@ export type SnapBounds = { x: number; y: number; width: number; height: number }
 export const MENUBAR_H = 28;
 export const DOCK_H = 74;
 export const SNAP_EDGE = 26; // px proximity to a screen edge that triggers a snap
+export const SNAP_TOP_EDGE = 4; // thinner zone below the menu bar for the top (fill) snap
 
 /**
  * Given the pointer position and viewport size, return the region the window
  * should snap to, or null when the pointer isn't near an edge.
+ *
+ * The top zone is thin (SNAP_TOP_EDGE) because a window parked against the
+ * menu bar has its titlebar inside a full SNAP_EDGE zone, so grabbing it
+ * would snap to fill straight away. Left, right and bottom keep SNAP_EDGE.
  */
 export function computeSnap(
   px: number,
@@ -34,7 +39,7 @@ export function computeSnap(
 
   const nearLeft = px <= SNAP_EDGE;
   const nearRight = px >= vw - SNAP_EDGE;
-  const nearTop = py <= top + SNAP_EDGE;
+  const nearTop = py <= top + SNAP_TOP_EDGE;
   const nearBottom = py >= bottom - SNAP_EDGE;
 
   if (nearLeft && nearTop) return { x: 0, y: top, width: halfW, height: halfH };
@@ -45,4 +50,10 @@ export function computeSnap(
   if (nearLeft) return { x: 0, y: top, width: halfW, height: usableH };
   if (nearRight) return { x: vw - halfW, y: top, width: halfW, height: usableH };
   return null;
+}
+
+/** Value equality for snap previews, so state only updates when the zone changes. */
+export function sameSnap(a: SnapBounds | null, b: SnapBounds | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }

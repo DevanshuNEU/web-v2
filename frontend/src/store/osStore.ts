@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { appRegistry, getAppLabel } from '@/lib/appRegistry';
-import { fitWindow } from '@/lib/windowGeometry';
+import { fitWindow, type WindowBounds } from '@/lib/windowGeometry';
 import type { WindowState, AppType } from '../../../shared/types';
 
 interface OSStore {
@@ -27,6 +27,7 @@ interface OSStore {
     windowId: string,
     bounds: { x: number; y: number; width: number; height: number }
   ) => void;
+  setWindowBounds: (windowId: string, bounds: WindowBounds) => void;
 }
 
 export const useOSStore = create<OSStore>()(
@@ -105,7 +106,19 @@ export const useOSStore = create<OSStore>()(
   },
 
   focusWindow: (windowId: string) => {
-    const currentZIndex = get().nextZIndex;
+    const { nextZIndex: currentZIndex, activeWindowId, windows } = get();
+
+    // Already active, visible and on top: skip the set so a titlebar press does
+    // not trigger a persist write or notify subscribers for nothing.
+    const target = windows.find(w => w.id === windowId);
+    if (
+      target &&
+      activeWindowId === windowId &&
+      !target.isMinimized &&
+      target.zIndex === currentZIndex - 1
+    ) {
+      return;
+    }
 
     set(state => ({
       windows: state.windows.map(window =>
@@ -179,6 +192,22 @@ export const useOSStore = create<OSStore>()(
       ),
       activeWindowId: windowId,
       nextZIndex: currentZIndex + 1,
+    }));
+  },
+
+  // Commit position and size in one set, so a resize end costs a single
+  // persist write instead of two.
+  setWindowBounds: (windowId, bounds) => {
+    set(state => ({
+      windows: state.windows.map(window =>
+        window.id === windowId
+          ? {
+              ...window,
+              position: { x: bounds.x, y: bounds.y },
+              size: { width: bounds.width, height: bounds.height },
+            }
+          : window
+      ),
     }));
   },
     }),

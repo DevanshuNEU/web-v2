@@ -1,15 +1,23 @@
 'use client';
 
 import React from 'react';
-import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
+import {
+  motion,
+  useAnimationControls,
+  useReducedMotion,
+  type ResolvedValues,
+  type Variants,
+} from 'framer-motion';
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
 import { spring, INSTANT } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
-import { computeSnap, MENUBAR_H, DOCK_H, type SnapBounds } from '@/lib/windowSnap';
-import { resizeBounds, DEFAULT_MIN_SIZE, type ResizeDir, type WindowBounds } from '@/lib/windowGeometry';
+import { MENUBAR_H, DOCK_H } from '@/lib/windowSnap';
+import { DEFAULT_MIN_SIZE, type ResizeDir } from '@/lib/windowGeometry';
 import { appRegistry } from '@/lib/appRegistry';
+import { useWindowDrag } from '@/hooks/useWindowDrag';
+import { useWindowResize } from '@/hooks/useWindowResize';
 import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
@@ -37,47 +45,56 @@ const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
   { dir: 'se', className: '-bottom-1 -right-1 w-3 h-3 cursor-nwse-resize' },
 ];
 
+// The close and minimize exit drops the window 20px from wherever it is on
+// screen. A fixed `y: 20` would slide a window closed mid-drag back toward its
+// stored spot, since y holds the drag offset until release. The label is
+// unique so app content with its own variants never matches it.
+const WINDOW_VARIANTS: Variants = {
+  windowExit: (_custom: unknown, current: ResolvedValues) => ({
+    opacity: 0,
+    scale: 0.88,
+    y: (typeof current.y === 'number' ? current.y : 0) + 20,
+    transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
+  }),
+};
+
 export default function Window({ window, children }: WindowProps) {
   const closeWindow = useOSStore(state => state.closeWindow);
   const focusWindow = useOSStore(state => state.focusWindow);
   const minimizeWindow = useOSStore(state => state.minimizeWindow);
   const maximizeWindow = useOSStore(state => state.maximizeWindow);
-  const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
-  const updateWindowSize = useOSStore(state => state.updateWindowSize);
-  const snapWindow = useOSStore(state => state.snapWindow);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
-  const isDragging = React.useRef(false);
-  const [isDraggingState, setIsDraggingState] = React.useState(false);
-  const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
-  const snapPreviewRef = React.useRef<SnapBounds | null>(null);
-  const dragOffset = React.useRef({ x: 0, y: 0 });
-  const resizeStart = React.useRef<{ dir: ResizeDir; px: number; py: number; bounds: WindowBounds } | null>(null);
-  const [isResizing, setIsResizing] = React.useState(false);
+  // Set while the genie flies the window into the dock, so a titlebar press
+  // cannot stop that animation (its promise would never settle).
+  const genieRef = React.useRef(false);
+  const { x, y, snapPreview, layoutKey, titlebarProps } = useWindowDrag(window, { busyRef: genieRef });
   const minSize = appRegistry[window.appType]?.minSize ?? DEFAULT_MIN_SIZE;
   const reduced = useReducedMotion();
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
+  const { isResizing, handleProps } = useWindowResize(window, elRef, minSize, { busyRef: genieRef });
   const mono = useIsMono();
   const titleId = React.useId();
 
-  // Drive open / drag scale through the same controls the genie minimize uses,
-  // so there is one animation owner per window.
+  // Drive the open animation through the same controls the genie minimize
+  // uses, so there is one animation owner per window. Runs on mount and on a
+  // reduced-motion change only: drag never restarts it.
   React.useEffect(() => {
     controls.start({
       opacity: 1,
       x: 0,
       y: 0,
-      scale: isDraggingState ? 1.02 : 1,
+      scale: 1,
       skewX: 0,
       transition: reduced
         ? INSTANT
         : {
             ...spring.window,
             opacity: { duration: 0.35, ease: 'easeOut' },
-            scale: { duration: isDraggingState ? 0.15 : 0.4, ease: [0.16, 1, 0.3, 1] },
+            scale: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
           },
     });
-  }, [isDraggingState, reduced, controls]);
+  }, [reduced, controls]);
 
   // Genie minimize: fly the window into its dock icon, then commit the state.
   // Falls back to a plain minimize under reduced motion or if the dock icon
@@ -92,119 +109,20 @@ export default function Window({ window, children }: WindowProps) {
     const r = el.getBoundingClientRect();
     const dx = dock.left + dock.width / 2 - (r.left + r.width / 2);
     const dy = dock.top + dock.height / 2 - (r.top + r.height / 2);
-    await controls.start({
-      x: dx,
-      y: dy,
-      scale: 0.06,
-      skewX: 8,
-      opacity: 0,
-      transition: spring.genie,
-    });
+    genieRef.current = true;
+    try {
+      await controls.start({
+        x: dx,
+        y: dy,
+        scale: 0.06,
+        skewX: 8,
+        opacity: 0,
+        transition: spring.genie,
+      });
+    } finally {
+      genieRef.current = false;
+    }
     minimizeWindow(window.id);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'BUTTON' || target.closest('button')) {
-      return;
-    }
-
-    focusWindow(window.id);
-    isDragging.current = true;
-    setIsDraggingState(true);
-    dragOffset.current = {
-      x: e.clientX - window.position.x,
-      y: e.clientY - window.position.y,
-    };
-
-    e.stopPropagation();
-  };
-
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging.current && !window.isMaximized) {
-        const viewportWidth = document.documentElement.clientWidth;
-        const viewportHeight = document.documentElement.clientHeight;
-
-        const newX = Math.max(0, Math.min(
-          viewportWidth - window.size.width,
-          e.clientX - dragOffset.current.x
-        ));
-        const newY = Math.max(28, Math.min(
-          viewportHeight - window.size.height - DOCK_H,
-          e.clientY - dragOffset.current.y
-        ));
-
-        updateWindowPosition(window.id, { x: newX, y: newY });
-
-        // Preview a snap region when the pointer reaches a screen edge.
-        const snap = computeSnap(e.clientX, e.clientY, viewportWidth, viewportHeight);
-        snapPreviewRef.current = snap;
-        setSnapPreview(snap);
-      }
-    };
-
-    const handleMouseUp = () => {
-      const wasDragging = isDragging.current;
-      isDragging.current = false;
-      setIsDraggingState(false);
-
-      // Commit a pending snap on release.
-      if (wasDragging && snapPreviewRef.current) {
-        snapWindow(window.id, snapPreviewRef.current);
-      }
-      snapPreviewRef.current = null;
-      setSnapPreview(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [window.id, window.size, window.isMaximized, updateWindowPosition, snapWindow]);
-
-  // Resize from an edge or corner. Pointer capture keeps the move/up events on
-  // the handle even when the pointer races ahead of the window edge.
-  const handleResizeStart = (dir: ResizeDir) => (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || window.isMaximized) return;
-    e.preventDefault();
-    e.stopPropagation();
-    focusWindow(window.id);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    resizeStart.current = {
-      dir,
-      px: e.clientX,
-      py: e.clientY,
-      bounds: { ...window.position, ...window.size },
-    };
-    setIsResizing(true);
-  };
-
-  const handleResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const start = resizeStart.current;
-    if (!start) return;
-    const next = resizeBounds(
-      start.bounds,
-      start.dir,
-      e.clientX - start.px,
-      e.clientY - start.py,
-      document.documentElement.clientWidth,
-      document.documentElement.clientHeight,
-      minSize
-    );
-    updateWindowSize(window.id, { width: next.width, height: next.height });
-    // Left and top edges move the origin so the opposite edge stays put.
-    if (start.dir.includes('n') || start.dir.includes('w')) {
-      updateWindowPosition(window.id, { x: next.x, y: next.y });
-    }
-  };
-
-  const handleResizeEnd = () => {
-    resizeStart.current = null;
-    setIsResizing(false);
   };
 
   const windowStyle = window.isMaximized
@@ -223,10 +141,11 @@ export default function Window({ window, children }: WindowProps) {
 
   return (
     <>
-      {/* Snap-zone preview — shown while dragging toward a screen edge */}
-      {snapPreview && isDraggingState && (
+      {/* Snap-zone preview, shown while dragging toward a screen edge */}
+      {snapPreview && (
         <div
           aria-hidden
+          data-snap-preview
           className="fixed pointer-events-none rounded-xl border-2 z-[9998]"
           style={{
             left: snapPreview.x,
@@ -245,20 +164,14 @@ export default function Window({ window, children }: WindowProps) {
       role="region"
       aria-labelledby={titleId}
       layout
+      // Measure layout only on maximize and snap. Without this every drag or
+      // resize render would start a layout spring from rest.
+      layoutDependency={`${window.isMaximized}:${layoutKey}`}
       initial={reduced ? false : { opacity: 0, scale: 0.92, y: 30 }}
       animate={controls}
-      exit={
-        reduced
-          ? { opacity: 0, transition: INSTANT }
-          : {
-              opacity: 0,
-              scale: 0.88,
-              y: 20,
-              transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
-            }
-      }
-      // No layout spring while resizing: the box tracks the pointer 1:1.
-      transition={{ layout: reduced || isResizing ? INSTANT : spring.windowLayout }}
+      variants={WINDOW_VARIANTS}
+      exit={reduced ? { opacity: 0, transition: INSTANT } : 'windowExit'}
+      transition={{ layout: reduced ? INSTANT : spring.windowLayout }}
       className={`
         absolute
         flex flex-col
@@ -269,6 +182,8 @@ export default function Window({ window, children }: WindowProps) {
         ${window.isMaximized ? 'rounded-none shadow-none' : 'rounded-xl'}
       `}
       style={{
+        x,
+        y,
         zIndex: window.zIndex,
         boxShadow: window.isMaximized ? 'none' : isActive
           ? `0 0 0 1px rgb(var(--color-accent) / 0.15), 0 20px 60px rgba(0,0,0,0.3)`
@@ -283,11 +198,11 @@ export default function Window({ window, children }: WindowProps) {
           flex items-center px-4 py-2.5
           border-b border-white/10 dark:border-white/5
           transition-[border-radius,opacity] duration-300 ease-out
-          cursor-move select-none
+          cursor-move select-none touch-none
           ${window.isMaximized ? 'rounded-none' : 'rounded-t-xl'}
           ${isActive ? 'opacity-100' : 'opacity-60'}
         `}
-        onMouseDown={handleMouseDown}
+        {...titlebarProps}
         onDoubleClick={(e) => {
           if ((e.target as HTMLElement).closest('button')) return;
           maximizeWindow(window.id);
@@ -369,11 +284,7 @@ export default function Window({ window, children }: WindowProps) {
           aria-hidden
           data-resize={dir}
           className={`absolute z-10 touch-none ${className}`}
-          onPointerDown={handleResizeStart(dir)}
-          onPointerMove={handleResizeMove}
-          onPointerUp={handleResizeEnd}
-          onPointerCancel={handleResizeEnd}
-          onLostPointerCapture={handleResizeEnd}
+          {...handleProps(dir)}
         />
       ))}
     </motion.div>

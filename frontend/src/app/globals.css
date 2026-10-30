@@ -365,6 +365,11 @@ body:has([data-os-root]) {
   background: rgba(var(--color-text-secondary), 0.45);
 }
 
+/* While a window is dragged or resized, iframes (Browser, Resume) must not swallow the pointer. */
+[data-window-drag] iframe {
+  pointer-events: none;
+}
+
 /* ============================================
    APP CHROME — macOS inner chrome utilities
    ============================================ */

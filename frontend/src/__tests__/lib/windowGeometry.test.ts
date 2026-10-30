@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitWindow, resizeBounds, DEFAULT_MIN_SIZE } from '@/lib/windowGeometry';
+import { fitWindow, resizeBounds, clampWindowPosition, DEFAULT_MIN_SIZE } from '@/lib/windowGeometry';
 
 // Reference viewport: 1440x900 → desktop band top=28, bottom=826 (74px dock), bandH=798.
 const VW = 1440;
@@ -63,5 +63,28 @@ describe('resizeBounds', () => {
     expect(resizeBounds(start, 'w', -5000, 0, VW, VH)).toMatchObject({ x: 0, width: 1000 });
     expect(resizeBounds(start, 'n', 0, -5000, VW, VH)).toMatchObject({ y: 28, height: 672 });
     expect(resizeBounds(start, 's', 0, 5000, VW, VH).height).toBe(VH - 74 - 100);
+  });
+});
+
+describe('clampWindowPosition', () => {
+  const size = { width: 800, height: 600 };
+
+  it('leaves a position inside the band untouched', () => {
+    expect(clampWindowPosition({ x: 300, y: 200 }, size, VW, VH)).toEqual({ x: 300, y: 200 });
+  });
+
+  it('pushes a position past the left or menu bar edge back to the band', () => {
+    expect(clampWindowPosition({ x: -40, y: 5 }, size, VW, VH)).toEqual({ x: 0, y: 28 });
+  });
+
+  it('stops the window at the right edge and above the dock', () => {
+    // x max 1440 - 800 = 640, y max 900 - 600 - 74 = 226.
+    expect(clampWindowPosition({ x: 2000, y: 2000 }, size, VW, VH)).toEqual({ x: 640, y: 226 });
+  });
+
+  it('pins a window larger than the viewport to the top-left of the band', () => {
+    expect(
+      clampWindowPosition({ x: 50, y: 300 }, { width: 1600, height: 1000 }, VW, VH)
+    ).toEqual({ x: 0, y: 28 });
   });
 });

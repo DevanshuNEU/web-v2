@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   motion,
   AnimatePresence,
@@ -10,6 +10,7 @@ import {
   useReducedMotion,
   type MotionValue,
 } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { useOSStore } from '@/store/osStore';
 import { useTheme } from '@/store/themeStore';
 import { useLaunchpadStore } from '@/store/launchpadStore';
@@ -246,7 +247,23 @@ function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle 
 /* ------------------------------------------------------------------ */
 
 export default function Taskbar() {
-  const windows = useOSStore(s => s.windows);
+  // Only what the dock draws: one primitive string per open window, in store
+  // order. Position, size and zIndex are not in it, so a drag or resize commit
+  // leaves the dock alone. Strings compare by value under useShallow.
+  const openKeys = useOSStore(
+    useShallow(s =>
+      s.windows
+        .filter(w => w.isOpen)
+        .map(w => `${w.appType}|${w.isMinimized ? 1 : 0}|${w.id}`)
+    )
+  );
+  const openWindows = useMemo(
+    () => openKeys.map(key => {
+      const [appType, minimized, id] = key.split('|');
+      return { appType: appType as AppType, isMinimized: minimized === '1', id };
+    }),
+    [openKeys]
+  );
   const openWindow = useOSStore(s => s.openWindow);
   const focusWindow = useOSStore(s => s.focusWindow);
   const { mode } = useTheme();
@@ -267,10 +284,10 @@ export default function Taskbar() {
 
   const pinnedApps = sortDockApps(getPinnedApps().map(a => a.appType));
   const pinnedSet = new Set(pinnedApps);
-  const runningUnpinned = windows.filter(w => w.isOpen && !pinnedSet.has(w.appType));
+  const runningUnpinned = openWindows.filter(w => !pinnedSet.has(w.appType));
 
   const handleDockIconClick = (appType: AppType) => {
-    const win = windows.find(w => w.appType === appType && w.isOpen);
+    const win = openWindows.find(w => w.appType === appType);
     if (win) focusWindow(win.id);
     else openWindow(appType);
   };
@@ -321,7 +338,7 @@ export default function Taskbar() {
 
         {/* Pinned apps */}
         {pinnedApps.map((appType) => {
-          const win = windows.find(w => w.appType === appType && w.isOpen);
+          const win = openWindows.find(w => w.appType === appType);
           return (
             <DockIcon
               key={appType}
