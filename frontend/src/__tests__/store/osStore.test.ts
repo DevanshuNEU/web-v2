@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useOSStore } from '@/store/osStore';
 
 const reset = () =>
@@ -98,5 +98,78 @@ describe('osStore.updateWindowSize', () => {
     const after = useOSStore.getState().windows;
     expect(after[0].size).toEqual({ width: 500, height: 420 });
     expect(after[1].size).toEqual(b.size);
+  });
+});
+
+describe('osStore.focusWindow', () => {
+  beforeEach(reset);
+
+  it('does nothing when the window is already active and on top', () => {
+    useOSStore.getState().openWindow('about-me');
+    const id = useOSStore.getState().windows[0].id;
+    useOSStore.getState().focusWindow(id);
+    const before = useOSStore.getState();
+
+    const listener = vi.fn();
+    const unsubscribe = useOSStore.subscribe(listener);
+    useOSStore.getState().focusWindow(id);
+    unsubscribe();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(useOSStore.getState().nextZIndex).toBe(before.nextZIndex);
+  });
+
+  it('raises a window that is not on top', () => {
+    useOSStore.getState().openWindow('about-me');
+    useOSStore.getState().openWindow('projects');
+    const aboutId = useOSStore.getState().windows[0].id;
+    const zBefore = useOSStore.getState().nextZIndex;
+
+    const listener = vi.fn();
+    const unsubscribe = useOSStore.subscribe(listener);
+    useOSStore.getState().focusWindow(aboutId);
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const about = useOSStore.getState().windows.find((w) => w.id === aboutId)!;
+    expect(about.zIndex).toBe(zBefore);
+    expect(useOSStore.getState().activeWindowId).toBe(aboutId);
+  });
+
+  it('still un-minimizes a minimized active window', () => {
+    useOSStore.getState().openWindow('about-me');
+    const id = useOSStore.getState().windows[0].id;
+    // Minimize while keeping it active and on top.
+    useOSStore.setState((s) => ({
+      windows: s.windows.map((w) => (w.id === id ? { ...w, isMinimized: true } : w)),
+      activeWindowId: id,
+    }));
+
+    useOSStore.getState().focusWindow(id);
+
+    expect(useOSStore.getState().windows[0].isMinimized).toBe(false);
+  });
+});
+
+describe('osStore.setWindowBounds', () => {
+  beforeEach(reset);
+
+  it('writes position and size in a single update', () => {
+    useOSStore.getState().openWindow('about-me');
+    useOSStore.getState().openWindow('projects');
+    const [a, b] = useOSStore.getState().windows;
+    const bBefore = { ...b };
+
+    const listener = vi.fn();
+    const unsubscribe = useOSStore.subscribe(listener);
+    useOSStore.getState().setWindowBounds(a.id, { x: 10, y: 40, width: 700, height: 500 });
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const state = useOSStore.getState();
+    const aAfter = state.windows.find((w) => w.id === a.id)!;
+    expect(aAfter.position).toEqual({ x: 10, y: 40 });
+    expect(aAfter.size).toEqual({ width: 700, height: 500 });
+    expect(state.windows.find((w) => w.id === b.id)).toEqual(bBefore);
   });
 });
