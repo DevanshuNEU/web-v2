@@ -68,8 +68,14 @@ export const DEFAULT_WALLPAPERS: Wallpaper[] = [
   },
 ];
 
-// Preset accent colors (iOS-style)
+/** Stripe's classic blurple: the default accent of the color palette. */
+export const BLURPLE = "#635BFF";
+/** The blurple preset as rendered on dark surfaces, where #635BFF loses contrast. */
+export const BLURPLE_DARK = "#7A73FF";
+
+// Preset accent colors. Blurple first: it is the default.
 export const ACCENT_COLORS = {
+  blurple: BLURPLE,
   blue: "#007AFF",
   purple: "#AF52DE",
   pink: "#FF2D55",
@@ -104,14 +110,28 @@ export function defaultWallpaperFor(mode: "light" | "dark"): Wallpaper {
   return DEFAULT_WALLPAPER_BY_MODE[mode];
 }
 
+/**
+ * Persisted theme migration. Before version 1, mono was the default, so a
+ * stored "mono" says nothing about what the visitor wanted. Everyone saved
+ * before then moves to the color palette and the blurple accent once; every
+ * other saved choice (mode, wallpaper, tint) is kept.
+ */
+export function migrateTheme(persisted: unknown, version: number): unknown {
+  const state = (persisted ?? {}) as Record<string, unknown>;
+  if (version < 1) {
+    return { ...state, palette: "color", accentColor: BLURPLE };
+  }
+  return state;
+}
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
       // Initial state
       mode: "dark",
-      // Premium black & white is the default; "Fun" (color) is opt-in.
-      palette: "mono",
-      accentColor: ACCENT_COLORS.blue,
+      // Color is the default; Mono (black and white) is opt-in.
+      palette: "color",
+      accentColor: BLURPLE,
       wallpaper: DEFAULT_WALLPAPER_BY_MODE.dark,
       wallpaperByMode: {},
       wallpaperTint: null,
@@ -153,6 +173,9 @@ export const useThemeStore = create<ThemeStore>()(
     }),
     {
       name: "portfolio-os-theme", // localStorage key
+      // Version 1 made color the default; see migrateTheme.
+      version: 1,
+      migrate: migrateTheme,
     }
   )
 );

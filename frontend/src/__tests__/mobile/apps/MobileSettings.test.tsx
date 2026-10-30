@@ -35,7 +35,7 @@ vi.mock('@/hooks/useSoundEffects', async () => {
 
 import MobileSettings from '@/components/apps/MobileSettings';
 import SettingsApp from '@/components/apps/SettingsApp';
-import { useThemeStore } from '@/store/themeStore';
+import { useThemeStore, BLURPLE } from '@/store/themeStore';
 import { setSoundEnabled } from '@/hooks/useSoundEffects';
 
 beforeEach(() => {
@@ -153,7 +153,7 @@ describe('MobileSettings — Display & Brightness (REAL theme wiring)', () => {
     const swatches = screen.getAllByRole('button', { name: /set accent/i });
     expect(swatches.length).toBeGreaterThan(1);
     await userEvent.click(swatches[1]);
-    expect(useThemeStore.getState().accentColor).not.toBe('#007AFF');
+    expect(useThemeStore.getState().accentColor).not.toBe(BLURPLE);
   });
 });
 
