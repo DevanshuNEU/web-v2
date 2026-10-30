@@ -8,9 +8,10 @@ import { useIsMono } from '@/hooks/usePalette';
 import { spring, INSTANT } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
 import { MENUBAR_H, DOCK_H } from '@/lib/windowSnap';
-import { resizeBounds, DEFAULT_MIN_SIZE, type ResizeDir, type WindowBounds } from '@/lib/windowGeometry';
+import { DEFAULT_MIN_SIZE, type ResizeDir } from '@/lib/windowGeometry';
 import { appRegistry } from '@/lib/appRegistry';
 import { useWindowDrag } from '@/hooks/useWindowDrag';
+import { useWindowResize } from '@/hooks/useWindowResize';
 import type { WindowState } from '../../../../shared/types';
 
 interface WindowProps {
@@ -43,19 +44,16 @@ export default function Window({ window, children }: WindowProps) {
   const focusWindow = useOSStore(state => state.focusWindow);
   const minimizeWindow = useOSStore(state => state.minimizeWindow);
   const maximizeWindow = useOSStore(state => state.maximizeWindow);
-  const updateWindowPosition = useOSStore(state => state.updateWindowPosition);
-  const updateWindowSize = useOSStore(state => state.updateWindowSize);
   const isActive = useOSStore(state => state.activeWindowId === window.id);
   // Set while the genie flies the window into the dock, so a titlebar press
   // cannot stop that animation (its promise would never settle).
   const genieRef = React.useRef(false);
   const { x, y, snapPreview, layoutKey, titlebarProps } = useWindowDrag(window, { busyRef: genieRef });
-  const resizeStart = React.useRef<{ dir: ResizeDir; px: number; py: number; bounds: WindowBounds } | null>(null);
-  const [isResizing, setIsResizing] = React.useState(false);
   const minSize = appRegistry[window.appType]?.minSize ?? DEFAULT_MIN_SIZE;
   const reduced = useReducedMotion();
   const controls = useAnimationControls();
   const elRef = React.useRef<HTMLDivElement>(null);
+  const { isResizing, handleProps } = useWindowResize(window, elRef, minSize, { busyRef: genieRef });
   const mono = useIsMono();
   const titleId = React.useId();
 
@@ -106,47 +104,6 @@ export default function Window({ window, children }: WindowProps) {
       genieRef.current = false;
     }
     minimizeWindow(window.id);
-  };
-
-  // Resize from an edge or corner. Pointer capture keeps the move/up events on
-  // the handle even when the pointer races ahead of the window edge.
-  const handleResizeStart = (dir: ResizeDir) => (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || window.isMaximized) return;
-    e.preventDefault();
-    e.stopPropagation();
-    focusWindow(window.id);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    resizeStart.current = {
-      dir,
-      px: e.clientX,
-      py: e.clientY,
-      bounds: { ...window.position, ...window.size },
-    };
-    setIsResizing(true);
-  };
-
-  const handleResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const start = resizeStart.current;
-    if (!start) return;
-    const next = resizeBounds(
-      start.bounds,
-      start.dir,
-      e.clientX - start.px,
-      e.clientY - start.py,
-      document.documentElement.clientWidth,
-      document.documentElement.clientHeight,
-      minSize
-    );
-    updateWindowSize(window.id, { width: next.width, height: next.height });
-    // Left and top edges move the origin so the opposite edge stays put.
-    if (start.dir.includes('n') || start.dir.includes('w')) {
-      updateWindowPosition(window.id, { x: next.x, y: next.y });
-    }
-  };
-
-  const handleResizeEnd = () => {
-    resizeStart.current = null;
-    setIsResizing(false);
   };
 
   const windowStyle = window.isMaximized
@@ -316,11 +273,7 @@ export default function Window({ window, children }: WindowProps) {
           aria-hidden
           data-resize={dir}
           className={`absolute z-10 touch-none ${className}`}
-          onPointerDown={handleResizeStart(dir)}
-          onPointerMove={handleResizeMove}
-          onPointerUp={handleResizeEnd}
-          onPointerCancel={handleResizeEnd}
-          onLostPointerCapture={handleResizeEnd}
+          {...handleProps(dir)}
         />
       ))}
     </motion.div>
