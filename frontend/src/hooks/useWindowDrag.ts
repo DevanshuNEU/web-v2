@@ -1,0 +1,171 @@
+'use client';
+
+import React from 'react';
+import { frame, useMotionValue, type MotionValue } from 'framer-motion';
+import { useOSStore } from '@/store/osStore';
+import { clampWindowPosition, type Size } from '@/lib/windowGeometry';
+import { computeSnap, sameSnap, type SnapBounds } from '@/lib/windowSnap';
+import { beginWindowGesture } from '@/lib/windowGesture';
+import type { WindowState } from '../../../shared/types';
+
+type TitlebarHandler = (e: React.PointerEvent<HTMLDivElement>) => void;
+
+export interface WindowDrag {
+  x: MotionValue<number>;
+  y: MotionValue<number>;
+  snapPreview: SnapBounds | null;
+  layoutKey: number;
+  titlebarProps: {
+    onPointerDown: TitlebarHandler;
+    onPointerMove: TitlebarHandler;
+    onPointerUp: TitlebarHandler;
+    onPointerCancel: TitlebarHandler;
+    onLostPointerCapture: TitlebarHandler;
+  };
+}
+
+interface DragSession {
+  windowId: string;
+  pointerId: number;
+  /** Pointer at pointerdown. */
+  px: number;
+  py: number;
+  /** Stored left/top; x/y are offsets from it. */
+  baseX: number;
+  baseY: number;
+  /** On-screen position at pointerdown (base plus any in-flight x/y). */
+  startX: number;
+  startY: number;
+  size: Size;
+  vw: number;
+  vh: number;
+  /** True once the pointer has been outside every snap zone this drag. */
+  leftZones: boolean;
+  preview: SnapBounds | null;
+  end: () => void;
+}
+
+/**
+ * Titlebar drag on x/y MotionValues. The window follows the pointer as a
+ * transform with no React render and no store write per move; the store gets
+ * one position write on release. Keeping drag moves out of React also keeps
+ * them away from the `layout` spring, which restarted from rest on every move.
+ *
+ * Invariant: x and y are 0 whenever no drag is in progress, so the open,
+ * close and genie animations (which drive the same values) start from 0.
+ */
+export function useWindowDrag(win: WindowState): WindowDrag {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
+  const [layoutKey, setLayoutKey] = React.useState(0);
+  const session = React.useRef<DragSession | null>(null);
+
+  // Runs once per gesture: the first end path to arrive clears the session.
+  const finish = React.useCallback(
+    (commitSnap: boolean, unmounting = false) => {
+      const s = session.current;
+      if (!s) return;
+      session.current = null;
+      s.end();
+
+      const nx = s.baseX + x.get();
+      const ny = s.baseY + y.get();
+      const store = useOSStore.getState();
+      const stillOpen = store.windows.some(w => w.id === s.windowId);
+      if (stillOpen && (nx !== s.baseX || ny !== s.baseY)) {
+        store.updateWindowPosition(s.windowId, { x: nx, y: ny });
+      }
+      x.jump(0);
+      y.jump(0);
+
+      if (unmounting) return;
+      const snap = s.preview;
+      if (snap) setSnapPreview(null);
+      if (commitSnap && snap) {
+        // After Motion has rendered x/y = 0 with left/top at the drop point,
+        // so the snap's layout animation measures its start from there.
+        frame.postRender(() => {
+          setLayoutKey(k => k + 1);
+          useOSStore.getState().snapWindow(s.windowId, snap);
+        });
+      }
+    },
+    [x, y]
+  );
+
+  // A window closed or minimized mid-drag must not leave the gesture flag set.
+  React.useEffect(() => () => finish(false, true), [finish]);
+
+  const onPointerDown: TitlebarHandler = e => {
+    if (e.button !== 0 || win.isMaximized || session.current) return;
+    if ((e.target as Element).closest('button')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    // End any open or restore spring on x/y so it does not fight the drag.
+    // controls.stop() would also freeze an in-flight opacity fade.
+    x.stop();
+    y.stop();
+    useOSStore.getState().focusWindow(win.id);
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    session.current = {
+      windowId: win.id,
+      pointerId: e.pointerId,
+      px: e.clientX,
+      py: e.clientY,
+      baseX: win.position.x,
+      baseY: win.position.y,
+      startX: win.position.x + x.get(),
+      startY: win.position.y + y.get(),
+      size: win.size,
+      vw,
+      vh,
+      leftZones: computeSnap(e.clientX, e.clientY, vw, vh) === null,
+      preview: null,
+      end: beginWindowGesture(),
+    };
+  };
+
+  const onPointerMove: TitlebarHandler = e => {
+    const s = session.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    const pos = clampWindowPosition(
+      { x: s.startX + e.clientX - s.px, y: s.startY + e.clientY - s.py },
+      s.size,
+      s.vw,
+      s.vh
+    );
+    x.set(pos.x - s.baseX);
+    y.set(pos.y - s.baseY);
+
+    // A drag that starts inside a zone (window parked at an edge) must leave
+    // it once before a preview can show, or every grab there would snap.
+    const zone = computeSnap(e.clientX, e.clientY, s.vw, s.vh);
+    if (zone === null) s.leftZones = true;
+    const next = s.leftZones ? zone : null;
+    if (!sameSnap(next, s.preview)) {
+      s.preview = next;
+      setSnapPreview(next);
+    }
+  };
+
+  const onEnd = (commitSnap: boolean): TitlebarHandler => e => {
+    const s = session.current;
+    if (!s || e.pointerId !== s.pointerId) return;
+    finish(commitSnap);
+  };
+
+  return {
+    x,
+    y,
+    snapPreview,
+    layoutKey,
+    titlebarProps: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: onEnd(true),
+      onPointerCancel: onEnd(false),
+      onLostPointerCapture: onEnd(false),
+    },
+  };
+}
