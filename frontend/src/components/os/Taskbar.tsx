@@ -20,6 +20,7 @@ import { spring } from '@/lib/motion';
 import { registerDockIcon, registerLaunchpadButton, sortDockApps } from '@/lib/dockRegistry';
 import { Z } from '@/lib/zLayers';
 import AppIcon from './AppIcon';
+import { FLAVORS } from '@/lib/appTile';
 import { Launchpad } from './Launchpad';
 import { LayoutGrid } from 'lucide-react';
 import type { AppType } from '../../../../shared/types';
@@ -28,6 +29,33 @@ import FirstVisitHint from './FirstVisitHint';
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
+
+// Dock glass. Color: tinted navy with Stripe's xl shadow geometry (research
+// note on Stripe icons and color, section 5.6). Mono: neutral glass.
+const COLOR_DOCK = {
+  dark: {
+    background: 'oklch(0.22 0.05 268 / 0.55)',
+    border: '1px solid oklch(1 0 0 / 0.10)',
+    boxShadow: '0 20px 80px -16px #0d173840, 0 10px 60px -16px #0d173833',
+  },
+  light: {
+    background: 'oklch(0.98 0.005 248 / 0.6)',
+    border: '1px solid oklch(1 0 0 / 0.10)',
+    boxShadow: '0 20px 80px -16px #0d173840, 0 10px 60px -16px #0d173833',
+  },
+} as const;
+const MONO_DOCK = {
+  dark: {
+    background: 'rgba(30, 30, 30, 0.5)',
+    border: '1px solid rgba(255, 255, 255, 0.18)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset',
+  },
+  light: {
+    background: 'rgba(243, 243, 243, 0.55)',
+    border: '1px solid rgba(0, 0, 0, 0.10)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.5) inset',
+  },
+} as const;
 
 const BASE_SIZE = 48;   // resting icon size in px
 const MAX_SIZE  = 72;   // max icon size at peak magnification
@@ -120,6 +148,7 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
   const layoutWidth = useTransform(scale, (s) => Math.round(s * BASE_SIZE));
 
   const reg = appRegistry[appType];
+  const mono = useIsMono();
   if (!reg) return null;
 
   const label = getAppLabel(appType);
@@ -149,7 +178,11 @@ function DockIcon({ appType, mouseX, onClick, isRunning, isMinimized, reduced }:
         <AppIcon appType={appType} size={BASE_SIZE} />
 
         {isRunning && !isMinimized && (
-          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-text/80" />
+          <span
+            data-running-dot
+            className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${mono ? 'bg-text/80' : ''}`}
+            style={mono ? undefined : { background: FLAVORS[reg.flavor].back }}
+          />
         )}
       </motion.button>
     </motion.div>
@@ -217,7 +250,7 @@ function LaunchpadButton({ mouseX, reduced, open, pulse, mono, isDark, onToggle 
             height: BASE_SIZE,
             background: mono
               ? (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.22)')
-              : 'rgba(59,130,246,0.35)',
+              : 'rgb(var(--color-accent) / 0.35)',
             animationDuration: '1.6s',
           }}
         />
@@ -306,15 +339,9 @@ export default function Taskbar() {
                    max-w-[calc(100vw-2rem)]"
         style={{
           zIndex: Z.dock,
-          background: mode === 'dark'
-            ? 'rgba(30, 30, 30, 0.5)'
-            : 'rgba(243, 243, 243, 0.55)',
           backdropFilter: 'blur(55px) saturate(180%)',
           WebkitBackdropFilter: 'blur(55px) saturate(180%)',
-          border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.18)' : '1px solid rgba(0, 0, 0, 0.10)',
-          boxShadow: mode === 'dark'
-            ? '0 8px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset'
-            : '0 8px 32px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.5) inset',
+          ...(mono ? MONO_DOCK[mode] : COLOR_DOCK[mode]),
         }}
         onMouseMove={(e) => mouseX.set(e.clientX)}
         onMouseLeave={() => mouseX.set(-1)}
