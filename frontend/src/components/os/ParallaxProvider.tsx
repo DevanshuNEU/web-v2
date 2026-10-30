@@ -17,6 +17,7 @@
 
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion';
+import { isWindowGestureActive } from '@/lib/windowGesture';
 
 interface ParallaxContextValue {
   /** Normalized pointer X offset from viewport center, ~[-0.5, 0.5]. */
@@ -39,6 +40,8 @@ export function ParallaxProvider({ children }: { children: ReactNode }) {
     if (!window.matchMedia('(pointer: fine)').matches) return;
 
     const onMove = (e: PointerEvent) => {
+      // Hold the wallpaper still while a window is being dragged or resized.
+      if (isWindowGestureActive()) return;
       nx.set(e.clientX / window.innerWidth - 0.5);
       ny.set(e.clientY / window.innerHeight - 0.5);
     };
