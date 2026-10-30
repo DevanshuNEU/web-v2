@@ -111,6 +111,13 @@ describe('Taskbar', () => {
     fireEvent.click(getByLabelText(new RegExp(`^${getAppLabel('about-me').title}`)));
     expect(useOSStore.getState().windows.find((w) => w.id === id)!.zIndex).toBeGreaterThan(zBefore);
     expect(useOSStore.getState().activeWindowId).toBe(id);
+
+    // A pinned app with no window yet gets one opened and focused.
+    expect(useOSStore.getState().windows.some((w) => w.appType === 'contact')).toBe(false);
+    fireEvent.click(getByLabelText(new RegExp(`^${getAppLabel('contact').title}$`)));
+    const opened = useOSStore.getState().windows.filter((w) => w.appType === 'contact');
+    expect(opened).toHaveLength(1);
+    expect(useOSStore.getState().activeWindowId).toBe(opened[0].id);
   });
 });
 

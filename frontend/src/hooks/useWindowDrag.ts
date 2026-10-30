@@ -76,9 +76,12 @@ export function useWindowDrag(win: WindowState, { busyRef }: WindowDragOptions =
   const [snapPreview, setSnapPreview] = React.useState<SnapBounds | null>(null);
   const [layoutKey, setLayoutKey] = React.useState(0);
   const session = React.useRef<DragSession | null>(null);
-  // Read inside the memoized `finish`, so kept in a ref.
+  // Read inside the memoized `finish`, so kept in a ref. Synced in a layout
+  // effect so render stays pure; no pointer event can land in between.
   const presentRef = React.useRef(isPresent);
-  presentRef.current = isPresent;
+  React.useLayoutEffect(() => {
+    presentRef.current = isPresent;
+  }, [isPresent]);
   const animating = React.useCallback(
     () => !presentRef.current || busyRef?.current === true,
     [busyRef]
@@ -116,8 +119,11 @@ export function useWindowDrag(win: WindowState, { busyRef }: WindowDragOptions =
         // After Motion has rendered x/y = 0 with left/top at the drop point,
         // so the snap's layout animation measures its start from there.
         frame.postRender(() => {
+          // Closed in the frame since release: snapping would make a dead id active.
+          const store = useOSStore.getState();
+          if (!store.windows.some(w => w.id === s.windowId)) return;
           setLayoutKey(k => k + 1);
-          useOSStore.getState().snapWindow(s.windowId, snap);
+          store.snapWindow(s.windowId, snap);
         });
       }
     },

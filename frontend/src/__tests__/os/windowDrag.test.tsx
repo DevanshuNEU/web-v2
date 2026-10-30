@@ -299,6 +299,23 @@ describe('window titlebar drag', () => {
     expect(stored().size).toEqual(SIZE);
     expect(stored().position).toEqual({ x: 2, y: 320 });
   });
+
+  it('a window closed before the deferred snap runs is not made active', async () => {
+    const id = openAboutMe();
+    const { bar } = await renderWindow();
+
+    down(bar, 400, 100);
+    move(bar, 700, 400);
+    move(bar, 4, 400);
+    up(bar, 4, 400);
+    // Same tick as the release, so the snap's frame.postRender has not run yet.
+    act(() => useOSStore.getState().closeWindow(id));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+
+    expect(useOSStore.getState().activeWindowId).not.toBe(id);
+    expect(useOSStore.getState().activeWindowId).toBeNull();
+    expect(useOSStore.getState().windows.some((w) => w.id === id)).toBe(false);
+  });
 });
 
 describe('drag during the open animation', () => {
@@ -497,6 +514,39 @@ describe('presses that must not touch x/y', () => {
     expect(flag()).toBe(false);
     expect(counts.positionWrites).toBe(0);
     expect(stored().position).toEqual(START);
+  });
+
+  it('a close mid-drag exits 20px below where the drag left the window', async () => {
+    const id = openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.opacity).toBe('1'));
+    const bar = titlebar();
+    const el = windowEl();
+
+    down(bar, 400, 100);
+    move(bar, 700, 300);
+    await waitFor(() => expect(el.style.transform).toContain('translateY(200px)'));
+    act(() => useOSStore.getState().closeWindow(id));
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull());
+    // The detached element keeps the last frame the exit wrote: y ends 20px
+    // below the drag offset, and x stays where the drag put it.
+    expect(el.style.transform).toContain('translateX(300px)');
+    expect(el.style.transform).toContain('translateY(220px)');
+    expect(flag()).toBe(false);
+  });
+
+  it('a close with no drag still exits 20px down from rest', async () => {
+    const id = openAboutMe();
+    render(<PresenceHost />);
+    await waitFor(() => expect(windowEl().style.transform).toBe('none'));
+    const el = windowEl();
+
+    act(() => useOSStore.getState().closeWindow(id));
+
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull());
+    expect(el.style.transform).toContain('translateY(20px)');
+    expect(el.style.transform).not.toContain('translateX');
   });
 
   it('releasing a drag after the close started does not cancel the exit', async () => {

@@ -1,7 +1,13 @@
 'use client';
 
 import React from 'react';
-import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
+import {
+  motion,
+  useAnimationControls,
+  useReducedMotion,
+  type ResolvedValues,
+  type Variants,
+} from 'framer-motion';
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
@@ -38,6 +44,19 @@ const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
   { dir: 'sw', className: '-bottom-1 -left-1 w-3 h-3 cursor-nesw-resize' },
   { dir: 'se', className: '-bottom-1 -right-1 w-3 h-3 cursor-nwse-resize' },
 ];
+
+// The close and minimize exit drops the window 20px from wherever it is on
+// screen. A fixed `y: 20` would slide a window closed mid-drag back toward its
+// stored spot, since y holds the drag offset until release. The label is
+// unique so app content with its own variants never matches it.
+const WINDOW_VARIANTS: Variants = {
+  windowExit: (_custom: unknown, current: ResolvedValues) => ({
+    opacity: 0,
+    scale: 0.88,
+    y: (typeof current.y === 'number' ? current.y : 0) + 20,
+    transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
+  }),
+};
 
 export default function Window({ window, children }: WindowProps) {
   const closeWindow = useOSStore(state => state.closeWindow);
@@ -150,16 +169,8 @@ export default function Window({ window, children }: WindowProps) {
       layoutDependency={`${window.isMaximized}:${layoutKey}`}
       initial={reduced ? false : { opacity: 0, scale: 0.92, y: 30 }}
       animate={controls}
-      exit={
-        reduced
-          ? { opacity: 0, transition: INSTANT }
-          : {
-              opacity: 0,
-              scale: 0.88,
-              y: 20,
-              transition: { duration: 0.25, ease: [0.4, 0, 1, 1] },
-            }
-      }
+      variants={WINDOW_VARIANTS}
+      exit={reduced ? { opacity: 0, transition: INSTANT } : 'windowExit'}
       transition={{ layout: reduced ? INSTANT : spring.windowLayout }}
       className={`
         absolute

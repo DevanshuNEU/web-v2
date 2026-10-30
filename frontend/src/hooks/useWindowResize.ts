@@ -67,9 +67,12 @@ export function useWindowResize(
   const isPresent = useIsPresent();
   const [isResizing, setIsResizing] = React.useState(false);
   const session = React.useRef<ResizeSession | null>(null);
-  // Read inside the memoized `finish`, so kept in a ref.
+  // Read inside the memoized `finish`, so kept in a ref. Synced in a layout
+  // effect so render stays pure; no pointer event can land in between.
   const presentRef = React.useRef(isPresent);
-  presentRef.current = isPresent;
+  React.useLayoutEffect(() => {
+    presentRef.current = isPresent;
+  }, [isPresent]);
   const animating = React.useCallback(
     () => !presentRef.current || busyRef?.current === true,
     [busyRef]
