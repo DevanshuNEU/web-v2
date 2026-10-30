@@ -5,7 +5,7 @@
  * register, mounted as the mobile variant of SettingsApp. Keeps the iOS
  * grouped-list / push-navigation feel but drops the colored iOS chrome:
  * in Mono the icon tiles, switches, selection markers, and accent checks are
- * graphite; the original color is opt-in via the Fun palette (useIsMono()).
+ * graphite; the original color is opt-in via the Color palette (useIsMono()).
  *
  * Wires real controls (light/dark mode, palette, accent, wallpaper, sound
  * effects, usage analytics) to themeStore + the sound + analytics stores, so
@@ -109,8 +109,8 @@ function switchAccessory(
 
 /**
  * MonoIconTile - the leading squircle. In Mono it is graphite-on-bg with a
- * hairline; in Fun it keeps the original iOS color. The `color` prop stays the
- * source of truth for the Fun palette so nothing about that path changes.
+ * hairline; in Color it keeps the original iOS color. The `color` prop stays the
+ * source of truth for the Color palette so nothing about that path changes.
  */
 function MonoIconTile({
   color,
@@ -236,13 +236,13 @@ function DisplayBrightnessView() {
       <MobileSection
         inset
         header="Palette"
-        footer="Mono is black and white, the default. Fun is full color, with an accent you pick."
+        footer="Color is navy tiles with two-tone icons and an accent you pick. Mono is black and white."
       >
         <div className="px-4 py-3">
           <MobileSegmented<'mono' | 'color'>
             options={[
+              { value: 'color', label: 'Color' },
               { value: 'mono', label: 'Mono' },
-              { value: 'color', label: 'Fun' },
             ]}
             value={palette}
             onChange={(next) => setPalette(next)}
@@ -250,7 +250,7 @@ function DisplayBrightnessView() {
         </div>
       </MobileSection>
 
-      {/* Accent picker - inherently colorful, gated to the Fun palette. */}
+      {/* Accent picker - inherently colorful, gated to the Color palette. */}
       {palette === 'color' && (
         <MobileSection
           inset

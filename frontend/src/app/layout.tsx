@@ -16,6 +16,7 @@ import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SITE_URL, SITE_DESCRIPTION, HOME_TITLE } from "@/lib/site";
+import { THEME_BOOT_SCRIPT } from "@/lib/themeBoot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,12 +53,6 @@ export const viewport: Viewport = {
     { media: '(prefers-color-scheme: light)', color: '#f5f5f7' },
   ],
 };
-
-// Runs before first paint: applies the saved theme (store/themeStore.ts
-// persists it under "portfolio-os-theme") so the page does not paint light
-// and then switch to dark after hydration. Defaults match the store: dark,
-// mono. ThemeProvider takes over once React mounts.
-const THEME_BOOT_SCRIPT = `(function(){try{var s=JSON.parse(localStorage.getItem('portfolio-os-theme')||'{}').state||{};var r=document.documentElement;if(s.mode!=='light')r.classList.add('dark');r.dataset.palette=s.palette==='color'?'color':'mono';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

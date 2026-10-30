@@ -15,8 +15,8 @@
   --color-text-tertiary: 110 110 115;  /* #6e6e73 - Tertiary: already at the AA floor on light surfaces */
   --color-border: 210 210 215;       /* #d2d2d7 - Borders */
   
-  /* Accent color - User controlled (default: iOS Blue) */
-  --color-accent: 0 122 255;         /* #007AFF */
+  /* Accent color - User controlled (default: Stripe blurple) */
+  --color-accent: 99 91 255;         /* #635BFF */
   
   /* Glass effect levels - Light mode */
   --glass-bg-subtle: rgba(255, 255, 255, 0.8);
@@ -44,7 +44,7 @@
   --foreground: 29 29 31;
   --card: 255 255 255;
   --card-foreground: 29 29 31;
-  --primary: 0 122 255;
+  --primary: 99 91 255;
   --primary-foreground: 255 255 255;
   --secondary: 245 245 247;
   --secondary-foreground: 29 29 31;
@@ -53,7 +53,7 @@
   --destructive: 239 68 68;
   --destructive-foreground: 255 255 255;
   --border: 210 210 215;
-  --ring: 0 122 255;
+  --ring: 99 91 255;
   --radius: 0.75rem;
 
   /* Motion easing — single source of truth for the interaction curves the apps
@@ -97,6 +97,9 @@
   --color-text-secondary: 152 152 157; /* #98989d - Secondary text */
   --color-text-tertiary: 134 134 139;  /* #86868b - Tertiary: 5.2:1 on the #111112 window */
   --color-border: 56 56 58;          /* #38383a - Borders */
+
+  /* Accent: blurple, lightened for dark surfaces (#7A73FF) */
+  --color-accent: 122 115 255;
   
   /* Accent stays same but shows differently on dark */
   
@@ -120,7 +123,7 @@
   --foreground: 245 245 247;
   --card: 28 28 30;
   --card-foreground: 245 245 247;
-  --primary: 0 122 255;
+  --primary: 122 115 255;
   --primary-foreground: 255 255 255;
   --secondary: 28 28 30;
   --secondary-foreground: 245 245 247;
@@ -129,14 +132,14 @@
   --destructive: 239 68 68;
   --destructive-foreground: 255 255 255;
   --border: 56 56 58;
-  --ring: 0 122 255;
+  --ring: 122 115 255;
 }
 
 /* ============================================
-   PALETTE — mono (default) vs color ("Fun")
+   PALETTE: color (default) vs mono
    ThemeProvider drives the live accent via inline style on <html>; these
-   selectors are the pre-hydration / no-JS fallback so the mono default paints
-   graphite instead of flashing the color accent. ThemeProvider sets
+   selectors are the pre-hydration / no-JS fallback so a visitor who chose
+   mono paints graphite instead of flashing the color accent. ThemeProvider sets
    data-palette on mount, after which its inline accent takes precedence.
    ============================================ */
 
@@ -444,7 +447,7 @@ body:has([data-os-root]) {
    ============================================ */
 
 :focus-visible {
-  outline: 2px solid rgb(var(--color-accent));
+  outline: 3px solid rgb(var(--color-accent));
   outline-offset: 2px;
 }
 
@@ -1056,4 +1059,15 @@ body:has([data-os-root]) {
   .gh-heat-grid { --gh-weeks: 26; }
   .gh-heat-week[data-old] { display: none; }
   .gh-heat-month-narrow { display: inline; }
+}
+
+/* Two-tone app glyphs (components/shared/AppTile.tsx): Phosphor's duotone
+   back layer carries the opacity attribute; it takes the flavor's flat color,
+   and the outline takes the per-tile gradient. */
+.glyph-two-tone [opacity] {
+  fill: var(--glyph-back);
+  opacity: 0.9;
+}
+.glyph-two-tone > :not([opacity]) {
+  fill: var(--glyph-front);
 }

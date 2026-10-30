@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useTheme } from '@/store/themeStore';
+import { useTheme, BLURPLE, BLURPLE_DARK } from '@/store/themeStore';
 
 // Graphite foreground per mode — the accent in mono palette resolves to the
 // text color so every accent consumer renders premium black & white.
@@ -28,9 +28,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Resolve the accent. In mono, the single accent var becomes graphite, so
     // all ~20 accent consumers cascade to black & white. In color, inject the
-    // chosen accent exactly as before.
+    // chosen accent; the blurple preset renders lighter on dark surfaces.
+    const colorAccent =
+      mode === 'dark' && accentColor.toUpperCase() === BLURPLE ? BLURPLE_DARK : accentColor;
     const accentRgb =
-      palette === 'mono' ? MONO_ACCENT[mode] : hexToRgb(accentColor);
+      palette === 'mono' ? MONO_ACCENT[mode] : hexToRgb(colorAccent);
     if (accentRgb) {
       const triple = `${accentRgb.r} ${accentRgb.g} ${accentRgb.b}`;
       root.style.setProperty('--color-accent', triple);

@@ -29,8 +29,22 @@ import {
   IdentificationCard,
   Folders,
   ReadCvLogo,
+  ChartBar as PhChartBar,
+  Compass as PhCompass,
+  GameController as PhGameController,
+  GearSix as PhGearSix,
+  GithubLogo as PhGithubLogo,
+  HardDrives as PhHardDrives,
+  Lifebuoy as PhLifebuoy,
+  PaperPlaneTilt as PhPaperPlaneTilt,
+  Pulse as PhPulse,
+  Scroll as PhScroll,
+  Sparkle as PhSparkle,
+  TerminalWindow as PhTerminalWindow,
+  type Icon as PhosphorIcon,
 } from '@phosphor-icons/react';
 import type { AppType } from '../../../shared/types';
+import type { FlavorKey } from '@/lib/appTile';
 
 // Phosphor icon wrappers — bake in the weight so AppIcon gets the right visual style
 const AboutMeIcon = (props: React.SVGProps<SVGSVGElement> & { size?: number }) =>
@@ -46,8 +60,10 @@ export interface AppRegistration {
   component: React.LazyExoticComponent<React.ComponentType>;
   /** Lucide icon component */
   icon: React.ElementType;
-  /** Tailwind color name for icon tint (e.g. 'blue', 'orange') */
-  iconColor: string;
+  /** Phosphor glyph drawn on the app tile (duotone weight). */
+  glyph: PhosphorIcon;
+  /** Flavor family that colors the glyph in the color palette (lib/appTile.ts). */
+  flavor: FlavorKey;
   /** Default window size; shrunk to fit smaller screens when the window opens */
   defaultSize: { width: number; height: number };
   /** Default window position, or 'center' to center it in the desktop area */
@@ -90,7 +106,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'about-me': {
     component: components['about-me'],
     icon: AboutMeIcon,
-    iconColor: 'blue',
+    glyph: IdentificationCard,
+    flavor: 'chroma',
     defaultSize: { width: 1040, height: 720 },
     defaultPosition: 'center',
     pinnedToDock: true,
@@ -99,7 +116,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'projects': {
     component: components['projects'],
     icon: ProjectsIcon,
-    iconColor: 'orange',
+    glyph: Folders,
+    flavor: 'sunburst',
     defaultSize: { width: 1000, height: 700 },
     defaultPosition: { x: 150, y: 70 },
     pinnedToDock: true,
@@ -108,7 +126,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'skills-dashboard': {
     component: components['skills-dashboard'],
     icon: Activity,
-    iconColor: 'purple',
+    glyph: PhPulse,
+    flavor: 'overcast',
     defaultSize: { width: 880, height: 640 },
     defaultPosition: { x: 200, y: 90 },
     pinnedToDock: false,
@@ -117,7 +136,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'analytics': {
     component: components['analytics'],
     icon: BarChart3,
-    iconColor: 'teal',
+    glyph: PhChartBar,
+    flavor: 'wintergreen',
     defaultSize: { width: 960, height: 680 },
     defaultPosition: { x: 240, y: 80 },
     pinnedToDock: false,
@@ -126,7 +146,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'contact': {
     component: components['contact'],
     icon: Mail,
-    iconColor: 'pink',
+    glyph: PhPaperPlaneTilt,
+    flavor: 'pomegranate',
     defaultSize: { width: 600, height: 560 },
     defaultPosition: { x: 300, y: 110 },
     pinnedToDock: true,
@@ -135,7 +156,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'terminal': {
     component: components['terminal'],
     icon: Terminal,
-    iconColor: 'slate',
+    glyph: PhTerminalWindow,
+    flavor: 'slate',
     defaultSize: { width: 760, height: 480 },
     defaultPosition: { x: 180, y: 140 },
     pinnedToDock: false,
@@ -144,7 +166,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'games': {
     component: components['games'],
     icon: Gamepad2,
-    iconColor: 'green',
+    glyph: PhGameController,
+    flavor: 'sunset',
     defaultSize: { width: 680, height: 640 },
     defaultPosition: { x: 220, y: 90 },
     minSize: { width: 420, height: 460 },
@@ -154,7 +177,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'display-options': {
     component: components['display-options'],
     icon: Settings,
-    iconColor: 'red',
+    glyph: PhGearSix,
+    flavor: 'slate',
     defaultSize: { width: 720, height: 600 },
     defaultPosition: { x: 350, y: 100 },
     // Reached from the right-click menu and the Launchpad; the dock stays for content.
@@ -164,7 +188,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'file-explorer': {
     component: components['file-explorer'],
     icon: HardDrive,
-    iconColor: 'sky',
+    glyph: PhHardDrives,
+    flavor: 'slate',
     defaultSize: { width: 900, height: 620 },
     defaultPosition: { x: 180, y: 90 },
     pinnedToDock: false,
@@ -173,7 +198,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'resume': {
     component: components['resume'],
     icon: ResumeIcon,
-    iconColor: 'amber',
+    glyph: ReadCvLogo,
+    flavor: 'chroma',
     defaultSize: { width: 880, height: 720 },
     defaultPosition: { x: 200, y: 60 },
     pinnedToDock: true,
@@ -182,7 +208,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'changelog': {
     component: components['changelog'],
     icon: ScrollText,
-    iconColor: 'indigo',
+    glyph: PhScroll,
+    flavor: 'sunburst',
     defaultSize: { width: 720, height: 620 },
     defaultPosition: { x: 250, y: 100 },
     pinnedToDock: false,
@@ -191,7 +218,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'github-activity': {
     component: components['github-activity'],
     icon: Github,
-    iconColor: 'green',
+    glyph: PhGithubLogo,
+    flavor: 'lemonLime',
     defaultSize: { width: 880, height: 660 },
     defaultPosition: { x: 180, y: 80 },
     pinnedToDock: true,
@@ -200,7 +228,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'browser': {
     component: components['browser'],
     icon: Compass,
-    iconColor: 'sky',
+    glyph: PhCompass,
+    flavor: 'overcast',
     defaultSize: { width: 1040, height: 720 },
     defaultPosition: { x: 160, y: 60 },
     minSize: { width: 480, height: 360 },
@@ -210,7 +239,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'help': {
     component: components['help'],
     icon: LifeBuoy,
-    iconColor: 'amber',
+    glyph: PhLifebuoy,
+    flavor: 'slate',
     defaultSize: { width: 860, height: 640 },
     defaultPosition: { x: 200, y: 80 },
     pinnedToDock: false,
@@ -219,7 +249,8 @@ export const appRegistry: Record<AppType, AppRegistration> = {
   'dev-ai': {
     component: components['dev-ai'],
     icon: MessageSquare,
-    iconColor: 'indigo',
+    glyph: PhSparkle,
+    flavor: 'cottonCandy',
     defaultSize: { width: 560, height: 640 },
     defaultPosition: { x: 320, y: 100 },
     // A phone app and a desktop window. On desktop the assistant orb is the

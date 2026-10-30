@@ -2,9 +2,8 @@
 
 import React from 'react';
 import type { AppType } from '../../../../shared/types';
-import { appRegistry, getAppLabel } from '@/lib/appRegistry';
-import { getIconColors, MONO_ICON_SCHEME } from '@/lib/iconColors';
-import { useIsMono } from '@/hooks/usePalette';
+import { getAppLabel } from '@/lib/appRegistry';
+import AppTile from '@/components/shared/AppTile';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useWallpaperTone } from './useWallpaperTone';
 
@@ -24,7 +23,7 @@ interface AppIconProps {
 }
 
 /**
- * iOS-style app icon — squircle with rich gradient, drop shadow, label below.
+ * iOS-style app icon: the shared app tile (components/shared/AppTile), label below.
  * Tap → open. (Long-press wiggle mode was removed: it did nothing and ate
  * the next tap.)
  */
@@ -36,11 +35,7 @@ export default function AppIcon({
   label: labelOverride,
   labelOn = 'wallpaper',
 }: AppIconProps) {
-  const mono = useIsMono();
-  const reg = appRegistry[appType];
   const label = labelOverride ?? getAppLabel(appType).title;
-  const colors = mono ? MONO_ICON_SCHEME : getIconColors(reg.iconColor);
-  const Icon = reg.icon;
 
   const haptics = useHaptics();
   const tone = useWallpaperTone();
@@ -69,22 +64,7 @@ export default function AppIcon({
       className="flex min-w-[44px] flex-col items-center gap-1.5 rounded-2xl select-none"
       aria-label={label}
     >
-      <div
-        className="rounded-[22%] flex items-center justify-center"
-        style={{
-          width: size,
-          height: size,
-          background: colors.gradient,
-          // Mono: flat graphite face with hairline border + soft shadow, no gloss.
-          // Color (Fun): today's gradient with raised inset highlight.
-          border: mono ? `1px solid ${colors.glow}` : undefined,
-          boxShadow: mono
-            ? `0 4px 12px ${colors.shadow}, 0 1px 2px rgba(0,0,0,0.18)`
-            : `0 8px 16px ${colors.shadow}, inset 0 1px 0 rgba(255,255,255,0.3)`,
-        }}
-      >
-        <Icon size={Math.round(size * 0.55)} className="text-white" strokeWidth={2} />
-      </div>
+      <AppTile appType={appType} size={size} />
       {!hideLabel && (
         <span
           className={`text-[12px] font-medium leading-tight max-w-[76px] text-center truncate ${labelInk}`}

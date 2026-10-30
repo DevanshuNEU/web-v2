@@ -71,7 +71,7 @@ function SwitcherCell({
         `}
       >
         {reg ? (
-          <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={56} />
+          <AppIcon appType={entry.appType!} size={56} />
         ) : (
           // Desktop pseudo-entry
           <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">

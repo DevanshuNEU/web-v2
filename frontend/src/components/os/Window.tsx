@@ -11,7 +11,8 @@ import {
 import { X, Minus, Square } from 'lucide-react';
 import { useOSStore } from '@/store/osStore';
 import { useIsMono } from '@/hooks/usePalette';
-import { spring, INSTANT } from '@/lib/motion';
+import { useThemeStore } from '@/store/themeStore';
+import { spring, INSTANT, ease } from '@/lib/motion';
 import { getDockIconRect } from '@/lib/dockRegistry';
 import { MENUBAR_H, DOCK_H } from '@/lib/windowSnap';
 import { DEFAULT_MIN_SIZE, type ResizeDir } from '@/lib/windowGeometry';
@@ -27,12 +28,24 @@ interface WindowProps {
 
 // Invisible resize hit areas: 6px edges and 12px corners that straddle the
 // window border, like macOS. Corners come last so they sit above the edges.
-// Traffic lights in macOS order. `fun` / `funGlyph` are the Fun palette colors.
+// Traffic lights in macOS order. `fill`, `ring` and `glyph` are the color
+// palette's values (research note on Stripe icons and color, section 5.5): a
+// fill with a hairline inset ring a shade darker, and a deeper glyph on hover.
 const TRAFFIC_LIGHTS = [
-  { kind: 'close', Icon: X, size: 8, fun: 'bg-red-500 group-hover/btn:bg-red-600', funGlyph: 'text-red-900' },
-  { kind: 'minimize', Icon: Minus, size: 8, fun: 'bg-yellow-400 group-hover/btn:bg-yellow-500', funGlyph: 'text-yellow-900' },
-  { kind: 'maximize', Icon: Square, size: 6, fun: 'bg-green-500 group-hover/btn:bg-green-600', funGlyph: 'text-green-900' },
+  { kind: 'close', Icon: X, size: 8, fill: 'oklch(0.68 0.20 27)', ring: 'oklch(0.55 0.18 27)', glyph: 'oklch(0.45 0.12 27)' },
+  { kind: 'minimize', Icon: Minus, size: 8, fill: 'oklch(0.84 0.16 84)', ring: 'oklch(0.68 0.15 80)', glyph: 'oklch(0.50 0.11 84)' },
+  { kind: 'maximize', Icon: Square, size: 6, fill: 'oklch(0.76 0.19 145)', ring: 'oklch(0.60 0.17 145)', glyph: 'oklch(0.45 0.12 145)' },
 ] as const;
+
+/** All three lights on a window that is not in front (color palette). */
+const INACTIVE_LIGHT = 'oklch(0.55 0.015 260 / 0.45)';
+
+// Stripe's layered, navy-tinted window shadows. Neutral in both palettes.
+const SHADOW_ACTIVE_DARK =
+  '0 0 0 1px oklch(1 0 0 / 0.06), 0 50px 100px -20px rgba(50,50,93,0.25), 0 30px 60px -30px rgba(0,0,0,0.5)';
+const SHADOW_ACTIVE_LIGHT =
+  '0 0 0 1px oklch(1 0 0 / 0.06), 0 50px 100px -20px rgba(50,50,93,0.25), 0 30px 60px -30px rgba(0,0,0,0.3)';
+const SHADOW_INACTIVE = '0 30px 45px -30px rgba(50,50,93,0.25), 0 18px 36px -18px rgba(0,0,0,0.1)';
 
 const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
   { dir: 'n', className: '-top-[3px] left-3 right-3 h-1.5 cursor-ns-resize' },
@@ -74,6 +87,7 @@ export default function Window({ window, children }: WindowProps) {
   const elRef = React.useRef<HTMLDivElement>(null);
   const { isResizing, handleProps } = useWindowResize(window, elRef, minSize, { busyRef: genieRef });
   const mono = useIsMono();
+  const dark = useThemeStore(state => state.mode === 'dark');
   const titleId = React.useId();
 
   // Drive the open animation through the same controls the genie minimize
@@ -185,9 +199,11 @@ export default function Window({ window, children }: WindowProps) {
         x,
         y,
         zIndex: window.zIndex,
-        boxShadow: window.isMaximized ? 'none' : isActive
-          ? `0 0 0 1px rgb(var(--color-accent) / 0.15), 0 20px 60px rgba(0,0,0,0.3)`
-          : `0 8px 32px rgba(0,0,0,0.12)`,
+        boxShadow: window.isMaximized
+          ? 'none'
+          : isActive
+            ? dark ? SHADOW_ACTIVE_DARK : SHADOW_ACTIVE_LIGHT
+            : SHADOW_INACTIVE,
         ...windowStyle,
       }}
       onClick={() => focusWindow(window.id)}
@@ -210,10 +226,11 @@ export default function Window({ window, children }: WindowProps) {
       >
         {/* Traffic-light controls. 12px dots inside 20px hit areas. In mono
             the three dots share one shade that passes 3:1 and always show
-            their glyph, since color can't tell them apart; in Fun the glyphs
-            appear on hover or keyboard focus like macOS. */}
+            their glyph, since color can't tell them apart; in Color the glyphs
+            appear on hover or keyboard focus like macOS, and an inactive
+            window's lights go grey with no glyph. */}
         <div className="group/lights -ml-1 flex items-center">
-          {TRAFFIC_LIGHTS.map(({ kind, Icon, size, fun, funGlyph }) => {
+          {TRAFFIC_LIGHTS.map(({ kind, Icon, size, fill, ring, glyph }) => {
             const label = kind === 'close'
               ? 'Close'
               : kind === 'minimize'
@@ -236,21 +253,34 @@ export default function Window({ window, children }: WindowProps) {
               >
                 <span
                   aria-hidden
-                  className={`grid h-3 w-3 place-items-center rounded-full transition-colors ${
+                  data-traffic-light={kind}
+                  className={`grid h-3 w-3 place-items-center rounded-full ${
                     mono
-                      ? 'bg-black/45 group-hover/btn:bg-black/60 dark:bg-white/55 dark:group-hover/btn:bg-white/70'
-                      : fun
+                      ? 'transition-colors bg-black/45 group-hover/btn:bg-black/60 dark:bg-white/55 dark:group-hover/btn:bg-white/70'
+                      : ''
                   }`}
+                  style={
+                    mono
+                      ? undefined
+                      : {
+                          background: isActive ? fill : INACTIVE_LIGHT,
+                          boxShadow: isActive ? `inset 0 0 0 0.5px ${ring}` : undefined,
+                          transition: `background-color 150ms cubic-bezier(${ease.stripe.join(', ')})`,
+                        }
+                  }
                 >
-                  <Icon
-                    size={size}
-                    strokeWidth={2.5}
-                    className={`transition-opacity ${
-                      mono
-                        ? 'text-white opacity-70 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100 dark:text-black'
-                        : `${funGlyph} opacity-0 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100`
-                    }`}
-                  />
+                  {(mono || isActive) && (
+                    <Icon
+                      size={size}
+                      strokeWidth={2.5}
+                      style={mono ? undefined : { color: glyph }}
+                      className={`transition-opacity ${
+                        mono
+                          ? 'text-white opacity-70 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100 dark:text-black'
+                          : 'opacity-0 group-hover/lights:opacity-100 group-focus-within/lights:opacity-100'
+                      }`}
+                    />
+                  )}
                 </span>
               </button>
             );

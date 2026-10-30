@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import { reveal } from '@/lib/motion';
-import { getLaunchpadApps, getAppLabel, appRegistry } from '@/lib/appRegistry';
+import { getLaunchpadApps, getAppLabel } from '@/lib/appRegistry';
 import { useEscapeLayer } from '@/lib/escapeStack';
 import { Z } from '@/lib/zLayers';
 import AppIcon from './AppIcon';
@@ -76,7 +76,6 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
 
   const tile = (appType: AppType) => {
     const label = getAppLabel(appType);
-    const reg = appRegistry[appType];
     return (
       <motion.button
         key={appType}
@@ -87,7 +86,7 @@ export function Launchpad({ open, onClose }: LaunchpadProps) {
         className="flex flex-col items-center gap-2.5 cursor-pointer group rounded-xl"
       >
         <div className="transition-transform duration-150 ease-out group-hover:scale-110">
-          <AppIcon icon={reg.icon} colorKey={reg.iconColor} size={72} />
+          <AppIcon appType={appType} size={72} />
         </div>
         <span
           className="text-[12px] font-medium text-center leading-tight text-white
