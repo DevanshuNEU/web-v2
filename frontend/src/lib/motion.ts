@@ -33,6 +33,12 @@ export const spring = {
   bubble: { type: 'spring', damping: 18, stiffness: 240, mass: 0.7 },
 } satisfies Record<string, Transition>;
 
+/** Easing curves (cubic-bezier control points). */
+export const ease = {
+  /** Stripe's most-used curve on stripe.com: fast out, long settle. */
+  stripe: [0.25, 1, 0.5, 1],
+} as const;
+
 /** Collapses any animation to no perceptible motion (reduced-motion path). */
 export const INSTANT: Transition = { duration: 0 };
 
