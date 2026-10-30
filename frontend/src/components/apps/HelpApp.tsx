@@ -79,7 +79,7 @@ export const TOUR_STEPS_DESKTOP: TourStep[] = [
   },
   {
     title: 'Ask and make it yours',
-    body: `The round chat button at the bottom right asks my AI. In ${label('display-options')}, switch the palette (Fun or Mono) or flip between light and dark.`,
+    body: `The round chat button at the bottom right asks my AI. In ${label('display-options')}, switch the palette (Color or Mono) or flip between light and dark.`,
   },
   {
     title: "You're set",
@@ -111,7 +111,7 @@ export const TOUR_STEPS_MOBILE: TourStep[] = [
   },
   {
     title: 'DevAI and settings',
-    body: 'Open DevAI to chat with my AI. In Settings, switch the palette (Fun or Mono) or flip between light and dark.',
+    body: 'Open DevAI to chat with my AI. In Settings, switch the palette (Color or Mono) or flip between light and dark.',
   },
   {
     title: "You're set",

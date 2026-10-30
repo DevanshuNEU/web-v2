@@ -15,7 +15,7 @@
  * own query container, so rows stack under 480px of column and the preview
  * moves beside the controls from 640px of column.
  *
- * All wiring is preserved verbatim - theme mode, palette, accent (Fun-gated),
+ * All wiring is preserved verbatim - theme mode, palette, accent (Color-gated),
  * wallpaper, sound effects, and analytics opt-out still write to their stores.
  *
  * Animation contract (shared with AboutMeApp / ResumeApp): content reveals
@@ -26,7 +26,7 @@
  *
  * Monochrome contract: three tones only (text / text-secondary / bg+border).
  * The single inherently-colorful control - the accent picker - is gated to the
- * Fun ("color") palette, as before. Everything else branches via useIsMono().
+ * Color palette, as before. Everything else branches via useIsMono().
  *
  * Micro-interactions (restrained, reduced-motion gated, mono-safe):
  *   (a) a LIVE PREVIEW tile that reflects the current mode / palette / accent /
@@ -250,7 +250,7 @@ function MonoToggle({
 /*  EditorialChoice - two-option segmented control (mode / palette).   */
 /*                                                                     */
 /*  A hairline box with the active option filled ink-on-paper, so the   */
-/*  choice reads at a glance in light, dark, mono and Fun. Exposed as a */
+/*  choice reads at a glance in light, dark, mono and color. Exposed as a */
 /*  radiogroup: arrow keys move the selection, one tab stop.            */
 /* ------------------------------------------------------------------ */
 
@@ -304,7 +304,7 @@ function EditorialChoice<T extends string>({
 /*  live mode / palette / accent / wallpaper choice in real time.      */
 /*                                                                     */
 /*  Mono-safe: in Mono the chrome + accent dot stay graphite; only the  */
-/*  Fun palette lets the accent dot carry the live accent color, which  */
+/*  Color palette lets the accent dot carry the live accent color, which  */
 /*  is the one place color is intentionally on (gated by useIsMono).   */
 /* ------------------------------------------------------------------ */
 
@@ -526,8 +526,8 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
             label="Palette"
             hint={
               palette === 'mono'
-                ? 'Black and white, the way it ships.'
-                : 'Full color, with an accent you pick.'
+                ? 'Black and white.'
+                : 'Navy tiles, two-tone icons.'
             }
             reduced={reduced}
             pulse={pinged === 'palette'}
@@ -536,8 +536,8 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
               <EditorialChoice
                 label="Palette"
                 options={[
+                  { id: 'color', label: 'Color' },
                   { id: 'mono', label: 'Mono' },
-                  { id: 'color', label: 'Fun' },
                 ]}
                 value={palette}
                 onChange={handlePalette}
@@ -545,7 +545,7 @@ function AppearanceBody({ reduced }: { reduced: boolean | null }) {
             }
           />
 
-          {/* Accent picker - inherently colorful, gated to the Fun palette. */}
+          {/* Accent picker - inherently colorful, gated to the Color palette. */}
           <AnimatePresence initial={false}>
             {palette === 'color' && (
               <motion.div
