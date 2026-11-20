@@ -113,7 +113,7 @@ export default function SpotlightResults({ query, onRan }: SpotlightResultsProps
   };
 
   return (
-    <div className="flex-1 overflow-y-auto overscroll-contain py-2">
+    <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain py-2">
       {sections.map((section, si) => (
         <div key={section.header} className={si > 0 ? 'mt-1' : ''}>
           <div className="select-none px-4 pb-1 pt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text-secondary">
