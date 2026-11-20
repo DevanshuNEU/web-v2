@@ -115,12 +115,20 @@ describe('Aura Tower: taps', () => {
 
   it('a miss ends the round, saves the best and shows the result card', async () => {
     await openTower();
-    fireEvent.pointerDown(play());
-    // The first slab always lands (a full width slab cannot miss). The second
-    // comes in from the far right over a narrow top, so an instant tap misses.
-    fireEvent.pointerDown(play());
-    fireEvent.pointerDown(play());
-    expect(await screen.findByRole('button', { name: 'Play again' }, { timeout: 3000 })).toBeInTheDocument();
+    // Animation frames run on a fake clock from here, so the fall animation
+    // takes the same simulated time however busy the machine is.
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
+    try {
+      fireEvent.pointerDown(play());
+      // The first slab always lands (a full width slab cannot miss). The second
+      // comes in from the far right over a narrow top, so an instant tap misses.
+      fireEvent.pointerDown(play());
+      fireEvent.pointerDown(play());
+      await act(async () => { vi.advanceTimersByTime(5000); });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await screen.findByRole('button', { name: 'Play again' })).toBeInTheDocument();
     expect(status()).toBe('Game over. 1 floor.');
     expect(localStorage.getItem('devos-stacker-hs')).toBe('1');
     expect(screen.getByText(/floor stacked, a new best/)).toBeInTheDocument();

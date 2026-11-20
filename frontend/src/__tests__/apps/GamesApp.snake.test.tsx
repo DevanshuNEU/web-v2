@@ -19,16 +19,25 @@ beforeEach(() => {
 });
 
 describe('Snake — mobile touch controls', () => {
-  it('renders the on-screen D-pad and the touch hint in the mobile variant', async () => {
+  it('on a phone: swipes only, no D-pad, and a pause button in the header', async () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
 
+    for (const d of ['Move up', 'Move left', 'Move down', 'Move right']) {
+      expect(screen.queryByLabelText(d)).not.toBeInTheDocument();
+    }
+    expect(screen.getByText(/swipe anywhere to steer/i)).toBeInTheDocument();
+    // No pause button until a round is running.
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Start' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
+  });
+
+  it('keeps the D-pad on desktop', async () => {
+    render(<GamesApp variant="desktop" />);
+    await userEvent.click(screen.getByText('Sigma Snake'));
     expect(screen.getByLabelText('Move up')).toBeInTheDocument();
-    expect(screen.getByLabelText('Move left')).toBeInTheDocument();
-    expect(screen.getByLabelText('Move down')).toBeInTheDocument();
-    expect(screen.getByLabelText('Move right')).toBeInTheDocument();
-    // Mobile variant shows the touch hint, never the keyboard "P pause" / WASD text.
-    expect(screen.getByText(/swipe or tap the controls/i)).toBeInTheDocument();
   });
 
   it('shows keyboard hints (not touch) in the desktop variant', async () => {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Pause } from 'lucide-react';
 import { useIsMono } from '@/hooks/usePalette';
 import { useSwipe } from '@/hooks/useSwipe';
 import { Hairline, MetaLabel } from '@/components/editorial';
@@ -392,7 +392,19 @@ export default function SnakeGame({ onBack, isMobile }: { onBack: () => void; is
       className="h-full flex flex-col overflow-hidden overscroll-contain select-none focus-visible:[outline-offset:-2px]"
     >
       <GameStatus>{announce}</GameStatus>
-      <GameHeader title="Sigma Snake" score={score} best={best} onBack={onBack} onReset={startGame} />
+      <GameHeader title="Sigma Snake" score={score} best={best} onBack={onBack} onReset={startGame}>
+        {isMobile && status === 'playing' && (
+          <button
+            type="button"
+            onClick={togglePause}
+            onPointerDown={(e) => e.preventDefault()}
+            aria-label="Pause"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center text-text-secondary hover:text-text"
+          >
+            <Pause size={18} />
+          </button>
+        )}
+      </GameHeader>
       <div ref={containerRef} {...swipe} className="relative flex-1 min-h-0 flex items-center justify-center p-3 bg-surface/20 overflow-hidden touch-none">
         <div>
           <canvas
@@ -449,24 +461,11 @@ export default function SnakeGame({ onBack, isMobile }: { onBack: () => void; is
         </div>
       </div>
 
-      {/* ── On-screen controls - touch & small-window play ── */}
-      <div className="flex-shrink-0">
-        <Hairline />
-        {isMobile ? (
-          // Phone: a thumb-sized cross pad, with the action button beside it.
-          <div className="flex items-center justify-center gap-6 px-4 py-3 bg-surface/10">
-            <div className="grid grid-cols-3 grid-rows-3 gap-1">
-              {dpad('UP', 'Move up', 'Up (↑)', <ChevronUp size={22} />, 'col-start-2 row-start-1')}
-              {dpad('LEFT', 'Move left', 'Left (←)', <ChevronLeft size={22} />, 'col-start-1 row-start-2')}
-              {dpad('RIGHT', 'Move right', 'Right (→)', <ChevronRight size={22} />, 'col-start-3 row-start-2')}
-              {dpad('DOWN', 'Move down', 'Down (↓)', <ChevronDown size={22} />, 'col-start-2 row-start-3')}
-            </div>
-            {/* The overlay has its own Start; down here it is only Pause or Resume. */}
-            <div className="w-[6.5rem] flex justify-center">
-              {(status === 'playing' || status === 'paused') && actionButton}
-            </div>
-          </div>
-        ) : (
+      {/* On a phone the whole board is the swipe surface: no D-pad. The
+          desktop keeps the on-screen pad for small windows and mice. */}
+      {!isMobile && (
+        <div className="flex-shrink-0">
+          <Hairline />
           <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface/10">
             {dpad('UP', 'Move up', 'Up (↑)', <ChevronUp size={16} />)}
             {dpad('LEFT', 'Move left', 'Left (←)', <ChevronLeft size={16} />)}
@@ -475,10 +474,11 @@ export default function SnakeGame({ onBack, isMobile }: { onBack: () => void; is
             <div className="w-px h-5 bg-border mx-1" />
             {actionButton}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <ControlsHint>{isMobile ? 'Swipe or tap the controls' : 'Arrow keys or WASD to steer. Space to pause.'}</ControlsHint>
+      {/* On a phone the start card already says to swipe; the strip would only cost board space. */}
+      {!isMobile && <ControlsHint>Arrow keys or WASD to steer. Space to pause.</ControlsHint>}
     </div>
   );
 }
