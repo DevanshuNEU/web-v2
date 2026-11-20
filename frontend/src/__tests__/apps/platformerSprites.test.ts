@@ -155,10 +155,20 @@ describe('hero attacks (the blade)', () => {
     for (const grid of HERO.anims.downStrike.frames) expect(countKeys([grid[23]], BLADE)).toBeGreaterThan(0);
   });
 
-  it('anticipation frames wind the blade back or up, away from the strike', () => {
-    expect(BLADE_TIP.attack1[0].y).toBeLessThan(6);
-    expect(BLADE_TIP.attack2[0].x).toBeLessThan(10);
-    expect(BLADE_TIP.attack3[0].x).toBeLessThan(10);
+  it('anticipation frames wind the blade back, away from the strike and clear of the face', () => {
+    for (const a of ['attack1', 'attack2', 'attack3', 'airSlash'] as const) {
+      expect(BLADE_TIP[a][0].x, a).toBeLessThan(10);
+      // the face (eyes and hood shadow) sits around columns 14 to 19, rows 6 to 10
+      const g = HERO.anims[a].frames[0];
+      for (let y = 6; y <= 10; y++) expect(countKeys([g[y].slice(14, 20)], BLADE), `${a} row ${y}`).toBe(0);
+    }
+    expect(BLADE_TIP.attack1[0].y).toBeGreaterThan(12);
+  });
+
+  it('the sword arm has its own sleeve tone in every attack frame', () => {
+    for (const a of HERO_ATTACK_ANIMS) {
+      for (const grid of HERO.anims[a].frames) expect(countKeys(grid, 'A'), a).toBeGreaterThanOrEqual(2);
+    }
   });
 });
 
