@@ -190,8 +190,13 @@ export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, 
   h.wallDir = sliding ? touch : 0;
 
   const vyBefore = h.vy;
+  const wasGround = h.onGround;
   moveBody(h, dt, solid, c);
-  if (c.landed) { r.landedAt = vyBefore; h.landT = 0; h.dashReady = true; h.wallDir = 0; }
+  if (c.landed) {
+    r.landedAt = vyBefore; h.dashReady = true; h.wallDir = 0;
+    // Standing still lands every tick; only a real landing restarts the count.
+    if (!wasGround) h.landT = 0;
+  }
   bodyState(h, h.onGround ? 'ground' : h.wallDir !== 0 ? 'wallSlide' : 'air');
   return r;
 }

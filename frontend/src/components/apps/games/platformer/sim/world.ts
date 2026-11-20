@@ -419,7 +419,7 @@ export function stepWorld(w: World, input: InputFrame, fixedDt: number) {
   syncHeroState(w);
   w.hero.animT += dt;
   stepAfterimages(w, dt);
-  stepScarf(w.scarf, neckOf(w.hero, NECK), torsoOf(w.hero, TORSO), w.hero.facing, w.hero.vx, w.hero.vy, dt);
+  stepScarf(w.scarf, neckOf(w.hero, NECK), torsoOf(w.hero, TORSO), w.hero.facing, w.hero.vx, w.hero.vy, dt, w.solid);
   for (const e of w.enemies) if (e.deadT >= 0) e.deadT -= dt;
   if (w.enemies.some(e => e.deadT < 0 && e.deadT !== -1)) w.enemies = w.enemies.filter(e => e.deadT === -1 || e.deadT >= 0);
   stepCamera(w, dt);
@@ -615,7 +615,9 @@ function collectPickups(w: World) {
 }
 
 function landed(w: World, speed: number) {
+  // world.landT counts down from 0.14 as hero.landT counts up from 0 (the old renderer reads it).
   w.landT = 0.14;
+  w.hero.landT = 0;
   emit(w, 'land', w.hero.x + w.hero.w / 2, w.hero.y + w.hero.h, speed);
 }
 

@@ -4,7 +4,8 @@ import {
 } from '@/components/apps/games/platformer/sim/scarf';
 import { createHero } from '@/components/apps/games/platformer/sim/hero';
 import { PHYS } from '@/components/apps/games/platformer/sim/physics';
-import { DT, FLAT, run, worldOn } from '../setup/platformerWorld';
+import { DT, FLAT, G40, run, worldOn } from '../setup/platformerWorld';
+import type { World } from '@/components/apps/games/platformer/sim/world';
 
 const REST = (SCARF_POINTS - 1) * SCARF_SEG;
 
@@ -86,5 +87,44 @@ describe('Main Character scarf in the world', () => {
     const n = neckOf(w.hero);
     expect(w.scarf[0].x).toBeCloseTo(n.x, 9);
     expect(w.scarf[SCARF_POINTS - 1].x).toBeLessThan(n.x);
+  });
+
+  /** Scarf points (past the neck) inside a solid tile right now. */
+  const buried = (w: World) => w.scarf.slice(1).filter(p => w.solid(Math.floor(p.x), Math.floor(p.y))).length;
+
+  it('rests on the roof, never in it: an idle hero for 2 s', () => {
+    const w = worldOn(FLAT);
+    let worst = 0;
+    run(w, 2, {}, ww => { worst = Math.max(worst, buried(ww)); });
+    expect(worst).toBe(0);
+    // It still hangs down to the roof rather than floating.
+    expect(Math.max(...w.scarf.map(p => p.y))).toBeGreaterThan(11.8);
+  });
+
+  /** A wall at column 15, rows 2 to 11, on flat ground. */
+  const WALL = [
+    ...Array.from({ length: 9 }, () => '...............#........................'),
+    '.P.............#........................',
+    G40, G40,
+  ];
+
+  it('never goes into a wall: running into it, and standing with his back to it', () => {
+    const w = worldOn(WALL);
+    let worst = 0;
+    run(w, 2, { move: 1 }, ww => { worst = Math.max(worst, buried(ww)); });
+    expect(w.hero.x + w.hero.w).toBeCloseTo(15, 5);
+    w.hero.facing = -1;
+    run(w, 1.5, {}, ww => { worst = Math.max(worst, buried(ww)); });
+    expect(worst).toBe(0);
+  });
+
+  it('keeps its length against the roof and the wall', () => {
+    const w = worldOn(WALL);
+    let longest = 0;
+    run(w, 2, { move: 1 }, ww => {
+      for (let i = 1; i < ww.scarf.length; i++) longest = Math.max(longest, Math.hypot(ww.scarf[i].x - ww.scarf[i - 1].x, ww.scarf[i].y - ww.scarf[i - 1].y));
+    });
+    expect(longest).toBeLessThanOrEqual(SCARF_SEG * 1.05);
+    expect(scarfLength(w.scarf)).toBeGreaterThan(REST * 0.5);
   });
 });

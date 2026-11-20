@@ -4,10 +4,11 @@
  * (damping, gravity, a pull behind him that grows with speed, a flutter
  * while running), then distance passes that keep every segment at its
  * length, then a push out of his torso to its back or top, so the scarf
- * swings over him on a turn and never passes through him.
+ * swings over him on a turn and never passes through him, and out of solid
+ * tiles, so it lies on a roof and stays out of walls.
  */
 
-import { PHYS } from './physics';
+import { PHYS, type SolidFn } from './physics';
 
 export const SCARF_POINTS = 10;
 /** Segment length, tiles. */
@@ -64,8 +65,12 @@ export function scarfLength(s: readonly ScarfPoint[]): number {
   return L;
 }
 
-/** One tick. `vx`, `vy` are the hero's velocity (tiles per second). */
-export function stepScarf(s: ScarfPoint[], neck: { x: number; y: number }, torso: Box, facing: 1 | -1, vx: number, vy: number, dt: number) {
+/**
+ * One tick. `vx`, `vy` are the hero's velocity (tiles per second). With
+ * `solid`, points are also pushed out of solid tiles (one tile lookup per
+ * point per pass), so the scarf lies on a roof and never sinks into a wall.
+ */
+export function stepScarf(s: ScarfPoint[], neck: { x: number; y: number }, torso: Box, facing: 1 | -1, vx: number, vy: number, dt: number, solid?: SolidFn) {
   const speed = Math.min(1, Math.hypot(vx, vy) / PHYS.runMax);
   const damp = Math.pow(DAMP, dt * 120);
   const ax = -facing * (TRAIL_IDLE + TRAIL_RUN * speed);
@@ -92,7 +97,7 @@ export function stepScarf(s: ScarfPoint[], neck: { x: number; y: number }, torso
       a.x += dx * f * 0.5; a.y += dy * f * 0.5;
       b.x -= dx * f * 0.5; b.y -= dy * f * 0.5;
     }
-    for (let i = 1; i < s.length; i++) pushOut(s[i], torso, facing);
+    for (let i = 1; i < s.length; i++) { pushOut(s[i], torso, facing); if (solid) outOfTiles(s[i], solid); }
   }
   // A fast dash can outrun the passes: clamp any stretched segment, then
   // keep clear of the torso once more.
@@ -102,7 +107,25 @@ export function stepScarf(s: ScarfPoint[], neck: { x: number; y: number }, torso
     const d = Math.hypot(dx, dy);
     if (d > SCARF_SEG) { b.x = a.x + (dx / d) * SCARF_SEG; b.y = a.y + (dy / d) * SCARF_SEG; }
     pushOut(b, torso, facing);
+    if (solid) outOfTiles(b, solid);
   }
+}
+
+const SKIN = 1e-3;
+
+/** Out of a solid tile through its nearest face that opens onto an empty tile. */
+function outOfTiles(p: ScarfPoint, solid: SolidFn) {
+  const tx = Math.floor(p.x), ty = Math.floor(p.y);
+  if (!solid(tx, ty)) return;
+  const fx = p.x - tx, fy = p.y - ty;
+  let best = Infinity, nx = p.x, ny = p.y;
+  if (!solid(tx, ty - 1) && fy < best) { best = fy; nx = p.x; ny = ty - SKIN; }
+  if (!solid(tx - 1, ty) && fx < best) { best = fx; nx = tx - SKIN; ny = p.y; }
+  if (!solid(tx + 1, ty) && 1 - fx < best) { best = 1 - fx; nx = tx + 1 + SKIN; ny = p.y; }
+  if (!solid(tx, ty + 1) && 1 - fy < best) { best = 1 - fy; nx = p.x; ny = ty + 1 + SKIN; }
+  // Buried deep in rock: lift it to the top of the column's solid run.
+  if (best === Infinity) { let y = ty; while (y > 0 && solid(tx, y - 1)) y--; nx = p.x; ny = y - SKIN; }
+  p.x = nx; p.y = ny;
 }
 
 /** Out of the torso through its back or its top, whichever is nearer. */

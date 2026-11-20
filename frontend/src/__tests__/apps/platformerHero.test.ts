@@ -286,4 +286,20 @@ describe('Main Character hero: states the world owns', () => {
     expect(runUntil(w, ww => ww.hero.onGround, {}, 3)).toBe(true);
     expect(w.hero.landT).toBeLessThan(0.02);
   });
+
+  it('landT counts up from the last landing while he stays on the ground, and the world countdown matches it', () => {
+    const w = worldOn(FLAT);
+    run(w, 1);
+    expect(w.hero.landT).toBeGreaterThan(0.9);
+    run(w, 0.1, { jumpPressed: true, jumpHeld: true });
+    expect(runUntil(w, ww => ww.hero.onGround, {}, 3)).toBe(true);
+    const at = w.hero.landT;
+    expect(at).toBeLessThan(0.02);
+    expect(w.landT + w.hero.landT).toBeCloseTo(0.14, 6);
+    run(w, 0.05);
+    expect(w.landT + w.hero.landT).toBeCloseTo(0.14, 6);
+    run(w, 0.5);
+    expect(w.hero.landT).toBeCloseTo(at + 0.55, 6);
+    expect(w.landT).toBe(0);
+  });
 });
