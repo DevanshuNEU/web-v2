@@ -70,3 +70,17 @@ describe('crown', () => {
     expect(resolveName('Juniper', noCrown)).toMatchObject({ ok: true, crowned: false });
   });
 });
+
+describe('invisible characters', () => {
+  it('refuses zero-width and other invisible characters in any name', () => {
+    for (const n of ['Dev\u200B', 'De\u034Fv', 'Dev\uFEFF', 'D\u2060ev', 'Dev\uFE0F']) {
+      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: false, code: 'bad_name' });
+    }
+  });
+
+  it('still allows real accented and non-Latin names', () => {
+    for (const n of ['Zoë', 'José', 'देव', 'Ана', '小明']) {
+      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: true });
+    }
+  });
+});

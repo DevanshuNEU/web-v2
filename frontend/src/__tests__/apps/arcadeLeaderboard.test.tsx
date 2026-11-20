@@ -5,7 +5,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RunResult, BoardView } from '@/components/apps/games/leaderboard/Leaderboard';
-import { checkName, startRun, submitScore, fetchBoard, savedName } from '@/components/apps/games/leaderboard/api';
+import { checkName, startRun, submitScore, fetchBoard, savedName, savedCrown } from '@/components/apps/games/leaderboard/api';
+import { StrictMode } from 'react';
 import type { Board } from '@/components/apps/games/leaderboard/api';
 
 type Handler = (url: string, init?: RequestInit) => unknown;
@@ -48,6 +49,7 @@ describe('checkName (client side, mirrors the server)', () => {
     ['  Dev  ', null],
     ['Jo_2', null],
     ['Zoë', null],
+    ['देव', null],
     ['D', 'Use at least 2 characters.'],
     ['ThirteenChars', 'Use 12 characters or fewer.'],
     ['no!pe', 'Use letters, numbers, spaces or underscores.'],
@@ -141,13 +143,44 @@ describe('RunResult', () => {
     expect(savedName()).toBe('Dev');
   });
 
-  it('keeps the crown code she typed, so it keeps working next round', async () => {
-    localStorage.setItem('devos-arcade-name', 'secretcode');
-    mockFetch(() => ok({ name: 'Her Name', crowned: true, week: 2, all: 2 }));
+  it('keeps the crown code apart from her name: the code posts, the name shows', async () => {
+    const f = mockFetch(() => ok({ name: 'Her Name', crowned: true, week: 2, all: 2 }));
     renderResult();
+    await userEvent.type(screen.getByLabelText('Name on the board'), 'secretcode');
+    await userEvent.click(screen.getByRole('button', { name: 'Post score' }));
     await screen.findByText('#2 this week');
     expect(screen.getAllByLabelText('Crowned').length).toBeGreaterThan(0);
-    expect(savedName()).toBe('secretcode');
+    expect(savedName()).toBe('Her Name');
+    expect(savedCrown()).toBe('secretcode');
+    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe('secretcode');
+  });
+
+  it('next round posts with the saved crown code, without asking', async () => {
+    localStorage.setItem('devos-arcade-name', 'Her Name');
+    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    const f = mockFetch(() => ok({ name: 'Her Name', crowned: true }));
+    renderResult();
+    await screen.findByText('#3 this week');
+    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe('secretcode');
+  });
+
+  it('posts once even when the effect runs twice (React strict mode)', async () => {
+    localStorage.setItem('devos-arcade-name', 'Dev');
+    const f = mockFetch(() => ok());
+    render(
+      <StrictMode>
+        <RunResult game="snake" score={12} getToken={async () => 'tok'} onPlayAgain={() => {}} onShowBoard={() => {}} mono={false} />
+      </StrictMode>,
+    );
+    await screen.findByText('#3 this week');
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it('celebrates first place with confetti', async () => {
+    localStorage.setItem('devos-arcade-name', 'Dev');
+    mockFetch(() => ok({ isTop: true, all: 1, week: 1 }));
+    renderResult();
+    expect(await screen.findByTestId('confetti')).toBeInTheDocument();
   });
 
   it('celebrates first place', async () => {

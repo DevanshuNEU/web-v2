@@ -6,7 +6,7 @@ import { Crown, X } from 'lucide-react';
 import { OverlayButton } from '../shared/chrome';
 import { sfx, buzz } from '../shared/sound';
 import {
-  checkName, clearName, fetchBoard, isError, saveName, savedName, submitScore,
+  checkName, clearCrown, clearName, fetchBoard, isError, saveCrown, saveName, savedCrown, savedName, submitScore,
   type ArcadeGame, type Board, type BoardEntry, type SubmitOk,
 } from './api';
 
@@ -16,6 +16,31 @@ const GAME_NAMES: Record<ArcadeGame, string> = {
   stacker: 'Aura Tower',
   merge: 'Brainrot Evolution',
 };
+
+// First place: a one-shot burst of cast-coloured confetti from the card.
+// Under reduced motion it stays as a still scatter.
+const CONFETTI_COLORS = ['#ff5fa2', '#ffd23f', '#3ee0ff', '#8cf25a', '#a98bff', '#ff9a3c'];
+function Confetti({ reduced }: { reduced: boolean }) {
+  const pieces = Array.from({ length: 36 }, (_, i) => {
+    const a = (i / 36) * Math.PI * 2 + (i % 3) * 0.3;
+    const d = 90 + (i * 37) % 80;
+    return { x: Math.cos(a) * d, y: Math.sin(a) * d - 40, r: (i * 47) % 360, c: CONFETTI_COLORS[i % CONFETTI_COLORS.length], w: 6 + (i % 3) * 2 };
+  });
+  return (
+    <div data-testid="confetti" aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-0 w-0">
+      {pieces.map((p, i) => (
+        <motion.span
+          key={i}
+          className="absolute block rounded-[2px]"
+          style={{ width: p.w, height: p.w * 0.45, background: p.c }}
+          initial={reduced ? { x: p.x, y: p.y, rotate: p.r, opacity: 1 } : { x: 0, y: 0, rotate: 0, opacity: 1 }}
+          animate={reduced ? undefined : { x: p.x, y: [0, p.y, p.y + 160], rotate: p.r + 360, opacity: [1, 1, 0] }}
+          transition={reduced ? undefined : { duration: 1.8, ease: 'easeOut', times: [0, 0.35, 1] }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function fmt(n: number) { return n.toLocaleString('en-US'); }
 
@@ -179,9 +204,18 @@ export function RunResult({
   const [nameError, setNameError] = useState<string | null>(null);
   const tokenRef = useRef<string | null | undefined>(undefined);
   const posted = useRef(false);
+  // Guards against a second post while the first is in flight (React runs
+  // effects twice in development, and a double tap on Post score).
+  const inFlight = useRef(false);
 
   const post = useCallback(async (name: string) => {
-    if (posted.current) return;
+    if (posted.current || inFlight.current) return;
+    inFlight.current = true;
+    try { await postOnce(name); } finally { inFlight.current = false; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken, score]);
+
+  async function postOnce(name: string) {
     setPhase({ kind: 'posting' });
     if (tokenRef.current === undefined) tokenRef.current = await getToken();
     const token = tokenRef.current;
@@ -192,7 +226,7 @@ export function RunResult({
     const r = await submitScore(token, name, score);
     if (isError(r)) {
       if (r.error.code === 'bad_name' || r.error.code === 'name_taken') {
-        clearName();
+        clearName(); clearCrown();
         setNameError(r.error.message);
         setPhase({ kind: 'name' });
         return;
@@ -202,18 +236,19 @@ export function RunResult({
     }
     posted.current = true;
     // The server answers with the stored display name (first casing wins).
-    // A crown code maps to her name: keep the code she typed so it keeps
-    // working; everyone else keeps the board's spelling.
-    saveName(r.crowned ? name : r.name);
+    // A crown code maps to her name: keep the code for the next post and
+    // show the name the board shows.
+    saveName(r.name);
+    if (r.crowned) saveCrown(name); else clearCrown();
     setPhase({ kind: 'done', result: r });
     if (r.isTop) { sfx('win'); buzz([30, 50, 30, 50, 60]); }
     else if (r.rank.week !== null && r.rank.week <= 10) sfx('perfect');
-  }, [getToken, score]);
+  }
 
   // Auto-post when she already has a name; ask for one otherwise.
   useEffect(() => {
     if (score <= 0) return;
-    const name = savedName();
+    const name = savedCrown() ?? savedName();
     if (name && !checkName(name)) void post(name);
     else setPhase({ kind: 'name' });
   }, [post, score]);
@@ -226,6 +261,7 @@ export function RunResult({
     if (phase.kind === 'rename') {
       // This round is already on the board; the new name applies from the next one.
       saveName(draft.trim());
+      clearCrown();
       setPhase({ kind: 'done', result: phase.previous });
       return;
     }
@@ -244,6 +280,7 @@ export function RunResult({
             transition={{ type: 'spring', stiffness: 420, damping: 16 }}
             className="flex flex-col items-center gap-1"
           >
+            <Confetti reduced={!!reduced} />
             <Crown size={36} className="text-[#ffd23f]" aria-hidden />
             <p className="font-display text-[26px] leading-tight text-text">First place on the board.</p>
           </motion.div>

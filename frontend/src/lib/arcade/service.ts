@@ -187,7 +187,7 @@ export async function submitScore(input: SubmitInput, ctx: { ip: string; now?: n
 
 // ---------- board ----------
 
-/** The storage key a board lookup should use for a typed name. */
+/** The storage key for a name typed by the admin (the crown code resolves to her name). */
 function lookupKey(raw: string): string {
   const { code, herName } = crownEnv();
   if (code && herName && raw.toLowerCase() === code.toLowerCase()) return nameKey(herName.normalize('NFC'));
@@ -213,7 +213,9 @@ export async function getBoard(game: unknown, name?: string | null, now = Date.n
   let me: BoardData['me'] = null;
   const typed = typeof name === 'string' ? name.normalize('NFC').trim() : '';
   if (typed) {
-    const key = lookupKey(typed);
+    // A plain lookup, never through the crown code: this route has no rate
+    // limit, so resolving the code here would let anyone guess it.
+    const key = nameKey(typed.replace(/ {2,}/g, ' '));
     const [rec, meAll, meWeek] = await Promise.all([
       store.hget(NAMES_KEY, key).then(parseRecord),
       standing(store, aKey, key),

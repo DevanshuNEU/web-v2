@@ -10,6 +10,30 @@ export const NAME_MIN = 2;
 export const NAME_MAX = 12;
 
 const ALLOWED = /^[\p{L}\p{M}\p{N} _]+$/u;
+// Invisible characters that render as nothing: the combining grapheme
+// joiner, zero-width spaces and joiners, word joiners, the BOM, variation
+// selectors and tag characters. Never allowed, so two names that look the
+// same are the same name.
+const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]|\uDB40[\uDC00-\uDDEF]/u;
+
+// Letters from other scripts that look like Latin ones, for the
+// impersonation check only (the name itself is stored as typed).
+const CONFUSABLE: Record<string, string> = {
+  а: 'a', в: 'b', е: 'e', ё: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x',
+  і: 'i', ї: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w', һ: 'h', ү: 'y', ӏ: 'l',
+  α: 'a', β: 'b', ε: 'e', η: 'n', ι: 'i', κ: 'k', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', ω: 'w',
+  ı: 'i', ł: 'l', ø: 'o', đ: 'd', ħ: 'h', ŀ: 'l', ɡ: 'g', ɑ: 'a', ʀ: 'r',
+};
+
+/**
+ * What a name looks like: compatibility-folded (full-width letters become
+ * ASCII), accents stripped, look-alike letters mapped to Latin, then
+ * squashed. Two names with the same skeleton read the same on the board.
+ */
+export function skeleton(s: string): string {
+  const folded = s.normalize('NFKD').replace(/\p{M}+/gu, '').toLowerCase();
+  return squash(Array.from(folded, (ch) => CONFUSABLE[ch] ?? ch).join(''));
+}
 const HAS_ALNUM = /[\p{L}\p{N}]/u;
 
 const LEET: Record<string, string> = {
@@ -86,6 +110,10 @@ export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
   if (typeof raw !== 'string') {
     return { ok: false, code: 'bad_name', message: `Send a name as text, ${NAME_MIN} to ${NAME_MAX} characters.` };
   }
+  // Checked before trim(), which would quietly drop a trailing BOM.
+  if (INVISIBLE.test(raw)) {
+    return { ok: false, code: 'bad_name', message: 'That name has an invisible character in it. Type it again without it.' };
+  }
   const trimmed = raw.normalize('NFC').trim();
 
   if (env.code && trimmed.toLowerCase() === env.code.toLowerCase()) {
@@ -116,7 +144,7 @@ export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
 
   if (env.herName) {
     const her = env.herName.normalize('NFC');
-    if (nameKey(display) === nameKey(her) || squash(display) === squash(her)) {
+    if (nameKey(display) === nameKey(her) || squash(display) === squash(her) || skeleton(display) === skeleton(her)) {
       return { ok: false, code: 'name_taken', message: TAKEN };
     }
   }

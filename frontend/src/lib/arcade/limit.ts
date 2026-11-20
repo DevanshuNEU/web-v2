@@ -5,7 +5,9 @@
  * needs ten minutes, so it lives here.
  */
 
-export const SUBMITS_PER_WINDOW = 20;
+// Rounds of Aura Tower can be 15 seconds and two people may share one
+// network, so this allows a post every 15 seconds on average.
+export const SUBMITS_PER_WINDOW = 40;
 export const WINDOW_MS = 10 * 60 * 1000;
 
 const hits = new Map<string, number[]>();

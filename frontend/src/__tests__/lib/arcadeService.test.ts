@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { startRun, submitScore, getBoard, removeEntry, allKey, weekKey } from '@/lib/arcade/service';
 import { getStore, resetStore, createMemoryStore } from '@/lib/arcade/store';
-import { resetLimiter } from '@/lib/arcade/limit';
+import { resetLimiter, SUBMITS_PER_WINDOW } from '@/lib/arcade/limit';
 import { issueToken } from '@/lib/arcade/token';
 import type { GameId } from '@/lib/arcade/games';
 
@@ -81,11 +81,11 @@ describe('submitScore', () => {
     expect((await submitScore({ token, name: 'Dev', score: 10 }, { ip: nextIp() })).ok).toBe(true);
   });
 
-  it('rate limits one IP after 20 submits in 10 minutes', async () => {
-    for (let i = 0; i < 20; i++) {
+  it('rate limits one IP after SUBMITS_PER_WINDOW submits in 10 minutes', async () => {
+    for (let i = 0; i < SUBMITS_PER_WINDOW; i++) {
       expect((await play(`p${i}`, 1, { ms: 3000, ip: '203.0.113.9' })).ok).toBe(true);
     }
-    expect(await play('p20', 1, { ms: 3000, ip: '203.0.113.9' })).toMatchObject({ status: 429, code: 'rate_limited' });
+    expect(await play('pover', 1, { ms: 3000, ip: '203.0.113.9' })).toMatchObject({ status: 429, code: 'rate_limited' });
     expect((await play('p21', 1, { ms: 3000, ip: nextIp() })).ok).toBe(true);
   });
 
@@ -139,11 +139,23 @@ describe('crown', () => {
   it('stores the code under her name with a crown', async () => {
     const r = await play('MOONLIGHT', 60);
     expect(r).toMatchObject({ ok: true, data: { name: 'Juniper', crowned: true, isTop: true } });
-    const board = await getBoard('snake', 'moonlight');
+    const board = await getBoard('snake', 'Juniper');
     expect(board.ok && board.data.all).toEqual([{ rank: 1, name: 'Juniper', score: 60, crown: true }]);
     expect(board.ok && board.data.me).toEqual({ name: 'Juniper', all: { rank: 1, score: 60 }, week: { rank: 1, score: 60 } });
     const store = await getStore();
     expect(await store.zscore(allKey('snake'), 'moonlight')).toBeNull();
+  });
+
+  it('the board lookup never confirms a guessed crown code', async () => {
+    await play('moonlight', 60);
+    const guess = await getBoard('snake', 'moonlight');
+    expect(guess.ok && guess.data.me).toEqual({ name: 'moonlight', all: null, week: null });
+  });
+
+  it('blocks look-alikes of her name: Cyrillic letters, invisible marks, accents', async () => {
+    for (const fake of ['Jun\u0456per', 'Juni\u034Fper', 'Jun\u200Biper', 'J\u00FAniper', '\uFF2Auniper']) {
+      expect(await play(fake, 60)).toMatchObject({ ok: false });
+    }
   });
 
   it('blocks anyone typing her name', async () => {

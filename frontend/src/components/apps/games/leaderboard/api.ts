@@ -42,12 +42,31 @@ export function clearName() {
   try { localStorage.removeItem(NAME_KEY); } catch { /* private mode */ }
 }
 
+// The crown code is kept apart from the display name. It is only ever sent
+// to the score route (rate limited); the board is looked up by the name the
+// board shows, so the code never sits in a URL.
+const CROWN_KEY = 'devos-arcade-crown';
+
+export function savedCrown(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(CROWN_KEY); } catch { return null; }
+}
+
+export function saveCrown(code: string) {
+  try { localStorage.setItem(CROWN_KEY, code); } catch { /* private mode */ }
+}
+
+export function clearCrown() {
+  try { localStorage.removeItem(CROWN_KEY); } catch { /* private mode */ }
+}
+
 /** Same rule the server applies, so most mistakes are caught before a round trip. */
 export function checkName(raw: string): string | null {
   const name = raw.trim();
-  if (name.length < 2) return 'Use at least 2 characters.';
-  if (name.length > 12) return 'Use 12 characters or fewer.';
-  if (!/^[\p{L}\p{N} _]+$/u.test(name)) return 'Use letters, numbers, spaces or underscores.';
+  const length = Array.from(name).length;
+  if (length < 2) return 'Use at least 2 characters.';
+  if (length > 12) return 'Use 12 characters or fewer.';
+  if (!/^[\p{L}\p{M}\p{N} _]+$/u.test(name)) return 'Use letters, numbers, spaces or underscores.';
   return null;
 }
 

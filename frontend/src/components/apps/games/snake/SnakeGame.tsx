@@ -234,8 +234,15 @@ export default function SnakeGame({ onBack, isMobile }: { onBack: () => void; is
 
   // requestAnimationFrame with an accumulator: the rules advance in whole
   // ticks at the chosen speed, the drawing runs every frame in between.
+  // The loop reads draw / onAte / endGame through a ref, so a resize (new
+  // cellSize, new callbacks) never restarts it and the snake keeps moving
+  // while the window is dragged.
+  const fx = useRef({ draw, onAte, endGame });
+  fx.current = { draw, onAte, endGame };
+
   useEffect(() => {
     if (status !== 'playing' || typeof window === 'undefined' || !window.requestAnimationFrame) return;
+    const cb = fx;
     let raf = 0; let last = performance.now(); let acc = 0;
     const frame = (now: number) => {
       const dtMs = Math.min(250, now - last);
@@ -247,16 +254,16 @@ export default function SnakeGame({ onBack, isMobile }: { onBack: () => void; is
         acc -= tick;
         const next = step(gameRef.current);
         gameRef.current = next;
-        if (next.ate) { setScore(next.score); onAte(next); }
-        if (next.over) { endGame(); return; }
+        if (next.ate) { setScore(next.score); cb.current.onAte(next); }
+        if (next.over) { cb.current.endGame(); return; }
         tick = tickMs(speedRef.current, next.score);
       }
-      draw(reduced ? 1 : acc / tick);
+      cb.current.draw(reduced ? 1 : acc / tick);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [status, draw, endGame, reduced, onAte]);
+  }, [status, reduced]);
 
   // After a crash, keep drawing for a moment so the shake and the fail word
   // play out under the game-over card.

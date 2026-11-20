@@ -98,7 +98,7 @@ describe('plausibility rules', () => {
 
   it('enforces the hard cap whatever the duration', () => {
     expect(checkPlausible('snake', RULES.snake.cap + 1, 3_600_000)).toEqual({ ok: false, reason: 'over_cap' });
-    expect(checkPlausible('stacker', 5000, 3_600_000)).toEqual({ ok: true });
+    expect(checkPlausible('stacker', RULES.stacker.cap, 3_600_000)).toEqual({ ok: true });
   });
 });
 
@@ -113,5 +113,19 @@ describe('games and weeks', () => {
     expect(isoWeek(Date.UTC(2026, 10, 18))).toBe('2026-W47');
     expect(isoWeek(Date.UTC(2021, 0, 3))).toBe('2020-W53');
     expect(isoWeek(Date.UTC(2024, 11, 30))).toBe('2025-W01');
+  });
+});
+
+describe('score caps sit near what a perfect run can reach', () => {
+  it('snake: a 20x20 board holds at most 399 snacks', () => {
+    expect(RULES.snake.cap).toBe(399);
+  });
+  it('platformer: about 20,900 is the most four worlds hold', () => {
+    expect(RULES.platformer.cap).toBeLessThanOrEqual(25_000);
+    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(21_000);
+  });
+  it('merge: a fast honest player (6 moves a second, about 45k at the Moon Gigachad) passes', () => {
+    const seconds = 270 / 6;
+    expect(checkPlausible('merge', 45_000, seconds * 1000)).toEqual({ ok: true });
   });
 });

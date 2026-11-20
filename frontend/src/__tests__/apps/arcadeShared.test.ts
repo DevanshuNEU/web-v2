@@ -10,7 +10,7 @@ import { arcadeTheme, COLOR_THEME, MONO_THEME, hypeFont } from '@/components/app
 import { isArcadeSoundOn, setArcadeSound, sfx } from '@/components/apps/games/shared/sound';
 import { GAMES, BOARD_GAMES } from '@/components/apps/games/registry';
 
-const DASHES = /[–—]/;
+const DASHES = /[\u2013\u2014]/;
 
 describe('slang', () => {
   it('picks from the requested tier, deterministically with an injected rand', () => {

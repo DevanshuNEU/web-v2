@@ -55,3 +55,17 @@ describe('Upstash store adapter', () => {
     expect(await (await getStore()).hget('h', 'f')).toBeNull();
   });
 });
+
+describe('shared in-memory store', () => {
+  it('is one store across module instances (Next dev loads each route separately)', async () => {
+    const { resetStore: reset, getStore: a } = await import('@/lib/arcade/store');
+    reset();
+    const first = await a();
+    await first.zaddGt('arcade:snake:all', 5, 'dev');
+    vi.resetModules();
+    const fresh = await import('@/lib/arcade/store');
+    const second = await fresh.getStore();
+    expect(await second.zscore('arcade:snake:all', 'dev')).toBe(5);
+    fresh.resetStore();
+  });
+});

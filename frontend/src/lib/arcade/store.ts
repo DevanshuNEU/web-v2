@@ -177,7 +177,12 @@ export function createUpstashStore(redis: Redis): ArcadeStore {
 
 // ---------- selection ----------
 
-let memory: ArcadeStore | null = null;
+// Next.js loads each route handler as its own module in development, so a
+// module-level store would give /score and /board two separate boards. The
+// in-memory store lives on globalThis so every route shares one.
+const GLOBAL_KEY = '__devosArcadeMemoryStore';
+type ArcadeGlobal = typeof globalThis & { [GLOBAL_KEY]?: ArcadeStore | null };
+const g = globalThis as ArcadeGlobal;
 let upstash: { url: string; token: string; store: ArcadeStore } | null = null;
 
 /**
@@ -195,12 +200,12 @@ export async function getStore(): Promise<ArcadeStore> {
     upstash = { url, token, store: createUpstashStore(redis) };
     return upstash.store;
   }
-  memory ??= createMemoryStore();
-  return memory;
+  g[GLOBAL_KEY] ??= createMemoryStore();
+  return g[GLOBAL_KEY];
 }
 
 /** Tests: drop the in-memory data and any cached Upstash client. */
 export function resetStore(): void {
-  memory = null;
+  g[GLOBAL_KEY] = null;
   upstash = null;
 }

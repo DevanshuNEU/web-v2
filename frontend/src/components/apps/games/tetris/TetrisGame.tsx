@@ -339,7 +339,7 @@ export default function TetrisGame({ onBack, isMobile }: { onBack: () => void; i
                 </>
               ) : (
                 <>
-                  <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Game Over</h2>
+                  <h2 className="font-display text-text leading-none text-[clamp(1.5rem,4.5cqi,2.25rem)]">Game over</h2>
                   <div className="flex flex-col items-center gap-1">
                     <span className="font-mono-meta tabular-nums text-text text-[clamp(1.1rem,3cqi,1.5rem)]">{state.score.toLocaleString()}</span>
                     <MetaLabel className="text-text-secondary">Points</MetaLabel>
