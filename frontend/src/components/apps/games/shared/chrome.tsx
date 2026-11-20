@@ -67,10 +67,10 @@ export function GameHeader({
 }) {
   // Mono editorial HUD frame: a single hairline rule under a quiet bar.
   const iconBtn =
-    'p-1.5 text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95';
+    'inline-flex min-h-11 min-w-11 items-center justify-center text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95';
   return (
     <div className="flex-shrink-0">
-      <div className="flex items-center gap-4 px-4 py-3 bg-surface/20">
+      <div className="flex items-center gap-3 px-2 py-1 bg-surface/20">
         <button onClick={onBack} className={iconBtn} aria-label="Back to arcade">
           <ArrowLeft size={15} />
         </button>
@@ -104,9 +104,9 @@ export const OVERLAY_EASE = [0.23, 1, 0.32, 1] as const;
 // 'ghost' = hairline outline. Mono palette keeps it monochrome; Fun keeps the
 // per-game accent passed in via `accent`/`accentHover`.
 export function OverlayButton({
-  children, onClick, variant = 'primary', mono, accent, accentHover, size = 'lg',
+  children, onClick, variant = 'primary', mono, accent, accentHover, size = 'lg', type = 'button',
 }: {
-  children: React.ReactNode; onClick: () => void;
+  children: React.ReactNode; onClick: () => void; type?: 'button' | 'submit';
   variant?: 'primary' | 'ghost'; mono: boolean;
   accent?: string; accentHover?: string;
   /** 'lg' for overlays, 'sm' for the 36px control bar. */
@@ -117,7 +117,7 @@ export function OverlayButton({
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex items-center justify-center gap-2 border border-border px-5 py-2 text-text font-medium
+        className="inline-flex items-center justify-center gap-2 min-h-11 border border-border px-5 py-2 text-text font-medium
                    transition-[transform,border-color] duration-150 ease-out hover:border-text/45 active:scale-[0.97]
                    font-mono-meta"
       >
@@ -131,10 +131,10 @@ export function OverlayButton({
   return (
     <button
       onClick={onClick}
-      type="button"
+      type={type}
       className={`inline-flex items-center justify-center gap-2 font-semibold
                   transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97]
-                  font-mono-meta ${size === 'sm' ? 'h-9 px-4' : 'px-6 py-2.5'} ${colorCls}`}
+                  font-mono-meta ${size === 'sm' ? 'min-h-11 px-4' : 'min-h-11 px-6 py-2.5'} ${colorCls}`}
       style={mono ? undefined : { background: accent }}
       onMouseEnter={mono || !accentHover ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accentHover; }}
       onMouseLeave={mono || !accent ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = accent; }}
@@ -150,12 +150,14 @@ export function OverlayButton({
 // Without it, light mode washed the board to a muddy gray.
 export function GameOverlay({ reduced, children }: { reduced: boolean | null; children: React.ReactNode }) {
   return (
-    <div className="dark absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-[2px]">
+    // m-auto on the card (not justify-center on the scrim) so a card taller
+    // than a short phone screen scrolls instead of clipping its top.
+    <div className="dark absolute inset-0 z-10 flex overflow-y-auto overscroll-contain bg-black/70 backdrop-blur-[2px]">
       <motion.div
         initial={reduced ? false : { opacity: 0, y: 8, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={withReduced({ duration: 0.24, ease: OVERLAY_EASE }, reduced)}
-        className="flex flex-col items-center gap-4 px-8 text-center"
+        className="m-auto flex flex-col items-center gap-4 px-6 py-6 text-center"
       >
         {children}
       </motion.div>
