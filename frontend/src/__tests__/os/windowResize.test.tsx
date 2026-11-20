@@ -3,12 +3,20 @@
 import '../setup/dom';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+
 import { AnimatePresence, MotionGlobalConfig } from 'framer-motion';
 import { useOSStore } from '@/store/osStore';
 import Window from '@/components/os/Window';
 import { registerDockIcon } from '@/lib/dockRegistry';
 import { appRegistry } from '@/lib/appRegistry';
 import { DEFAULT_MIN_SIZE, type ResizeDir } from '@/lib/windowGeometry';
+
+// Real framer-motion animations run in these tests. On a busy machine (the
+// full suite in parallel) they can take well over the 3 s the tests used to
+// allow, so the waits get a generous ceiling; they still resolve as soon as
+// the animation commits.
+const ANIMATION_TIMEOUT = 10000;
+vi.setConfig({ testTimeout: ANIMATION_TIMEOUT + 5000 });
 
 /**
  * Edge and corner resize: live bounds go straight to the element's inline
@@ -379,7 +387,7 @@ describe('resize while the window is leaving', () => {
     expect(flag()).toBe(false);
     expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: ANIMATION_TIMEOUT });
   });
 
   it('a press during the genie minimize is ignored and the minimize still commits', async () => {
@@ -396,7 +404,7 @@ describe('resize while the window is leaving', () => {
       expect(flag()).toBe(false);
       expect(Element.prototype.setPointerCapture).not.toHaveBeenCalled();
 
-      await waitFor(() => expect(stored().isMinimized).toBe(true), { timeout: 3000 });
+      await waitFor(() => expect(stored().isMinimized).toBe(true), { timeout: ANIMATION_TIMEOUT });
       expect(stored().size).toEqual(SIZE);
     } finally {
       unregister();
@@ -415,7 +423,7 @@ describe('resize while the window is leaving', () => {
     // Moves during the exit are ignored.
     move(h, 1000, 700);
 
-    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: ANIMATION_TIMEOUT });
     expect(flag()).toBe(false);
     expect(stored().size).toEqual({ width: 650, height: 430 });
   });
@@ -431,7 +439,7 @@ describe('resize while the window is leaving', () => {
     act(() => useOSStore.getState().closeWindow(stored().id));
     const { counts, unsub } = trackStore();
 
-    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: 3000 });
+    await waitFor(() => expect(document.querySelector('[data-window]')).toBeNull(), { timeout: ANIMATION_TIMEOUT });
     unsub();
     expect(flag()).toBe(false);
     expect(counts.notify).toBe(0);

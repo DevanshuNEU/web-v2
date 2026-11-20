@@ -9,6 +9,10 @@ import GamesApp from '@/components/apps/GamesApp';
 import type { World } from '@/components/apps/games/platformer/sim/world';
 import { useMobileStore } from '@/store/mobileStore';
 
+// The game-over test waits for the dying sequence on stubbed frames; give
+// it room when the full suite runs in parallel.
+vi.setConfig({ testTimeout: 15000 });
+
 beforeEach(() => {
   stubCanvas();
   localStorage.clear();
@@ -137,8 +141,10 @@ describe('Main Character in the arcade', () => {
       w.lives = 1;
       w.hero.y = 30; // into the pit
     });
-    await act(async () => { await new Promise(r => setTimeout(r, 1700)); });
-    expect(await screen.findByRole('heading', { name: 'Out of lives' })).toBeInTheDocument();
+    // Wait for the outcome, not a fixed time: under a busy full-suite run the
+    // stubbed frames arrive late and 1.7 s of wall time was sometimes not
+    // enough game time for the dying sequence.
+    expect(await screen.findByRole('heading', { name: 'Out of lives' }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getAllByText('70').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
   });
