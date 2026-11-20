@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  PHYS, contacts, createHero, moveBody, pressJump, stepHero, stompBounce, stompOrHurt,
-  type Body, type Hero, type HeroInput, type SolidFn,
-} from '@/components/apps/games/platformer/sim/physics';
+import { PHYS, contacts, moveBody, stompOrHurt, type Body, type SolidFn } from '@/components/apps/games/platformer/sim/physics';
+import { createHero, pressJump, stepHero, stompBounce, type Hero, type HeroInput } from '@/components/apps/games/platformer/sim/hero';
 
 const DT = 1 / 120;
 

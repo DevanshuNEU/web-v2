@@ -64,7 +64,7 @@ describe('Main Character in the arcade', () => {
     await open('mobile');
     await userEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(screen.queryByRole('heading', { name: 'Main Character' })).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/world 1, touch grass/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/world 1, \w/i);
     await userEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Resume' }));

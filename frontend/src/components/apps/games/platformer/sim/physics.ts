@@ -1,5 +1,7 @@
 /**
- * Baguettino Run physics. Pure: no DOM, no clock, no randomness.
+ * Main Character physics: bodies and the tile grid. Pure: no DOM, no clock,
+ * no randomness. The hero's moves (run, jump, dash, wall slide) live in
+ * ./hero.ts on top of these.
  *
  * Units are tiles and seconds, with y pointing down, so the feel is the same
  * at every screen size. A body is an axis-aligned box whose (x, y) is its top
@@ -7,8 +9,6 @@
  * (x first, then y), in sub-steps shorter than half a tile, so even a body at
  * terminal velocity on a long frame cannot tunnel through a one-tile floor.
  */
-
-import type { InputFrame } from '../input/frame';
 
 export const PHYS = {
   /** Top run speed, tiles per second. */
@@ -38,10 +38,29 @@ export const PHYS = {
   /** Hero hitbox, tiles. */
   heroW: 0.68,
   heroH: 1.3,
+  /** Air dash: this fast, this long, gravity off. */
+  dashSpeed: 22,
+  dashTime: 0.16,
+  /** Speed the hero keeps when a dash ends (he runs out of it). */
+  dashExit: 8.5,
+  /** Hit stop when a dash starts. */
+  dashFreeze: 0.06,
+  /** Fastest fall while pushing into a wall in the air. */
+  wallSlideMax: 4,
+  /** Wall jump: up this fast, away this fast. */
+  wallJumpY: 16,
+  wallJumpX: 10,
+  /** Seconds after a wall jump that the stick is ignored. */
+  wallJumpLock: 0.12,
+  /** A jump this close to a wall (tiles) is a wall jump. */
+  wallGrace: 0.35,
 } as const;
 
-/** True when the tile at column tx, row ty blocks movement. */
-export type SolidFn = (tx: number, ty: number) => boolean;
+/**
+ * True when the tile at column tx, row ty blocks movement. It may carry
+ * `oneWay`: tiles that only stop a body falling onto them from above.
+ */
+export type SolidFn = ((tx: number, ty: number) => boolean) & { oneWay?: (tx: number, ty: number) => boolean };
 
 export interface Body {
   x: number; y: number; w: number; h: number;
@@ -120,9 +139,12 @@ export function moveY(b: Body, dy: number, solid: SolidFn, c: Contacts) {
     if (d > 0) {
       const ty = Math.floor(b.y + b.h - EPS);
       const cx = Math.floor(b.x + b.w / 2);
+      // A one-way tile counts only if the feet started this sub-step above it.
+      const above = b.y + b.h - d <= ty + EPS;
+      const oneWay = above ? solid.oneWay : undefined;
       let hit = -1;
       for (let tx = x0; tx <= x1; tx++) {
-        if (solid(tx, ty)) { if (hit < 0 || tx === cx) hit = tx; }
+        if (solid(tx, ty) || oneWay?.(tx, ty)) { if (hit < 0 || tx === cx) hit = tx; }
       }
       if (hit >= 0) {
         b.y = ty - b.h; b.vy = 0; b.onGround = true;
@@ -158,104 +180,6 @@ export function moveBody(b: Body, dt: number, solid: SolidFn, c: Contacts) {
   b.onGround = false;
   moveX(b, b.vx * dt, solid, c);
   moveY(b, b.vy * dt, solid, c);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// The hero
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface Hero extends Body {
-  facing: 1 | -1;
-  /** Seconds of coyote time left. */
-  coyote: number;
-  /** Seconds a buffered jump press stays alive. */
-  buffer: number;
-  /** In a jump whose upward speed can still be cut by releasing. */
-  cuttable: boolean;
-}
-
-/** The part of the input frame the hero's body reads each step. */
-export type HeroInput = Pick<InputFrame, 'move' | 'jumpHeld'>;
-
-export function createHero(x: number, feetY: number): Hero {
-  return {
-    x: x + (1 - PHYS.heroW) / 2, y: feetY - PHYS.heroH, w: PHYS.heroW, h: PHYS.heroH,
-    vx: 0, vy: 0, onGround: true, facing: 1, coyote: PHYS.coyote, buffer: 0, cuttable: false,
-  };
-}
-
-/** Register a jump press (the edge, not the hold). It fires as soon as it can. */
-export function pressJump(h: Hero) {
-  h.buffer = PHYS.buffer;
-}
-
-export interface StepResult {
-  jumped: boolean;
-  /** Speed the hero hit the ground at, 0 if he did not land this step. */
-  landedAt: number;
-  /** Started pushing against his own motion on the ground (dust puff). */
-  skidded: boolean;
-}
-
-const STEP: StepResult = { jumped: false, landedAt: 0, skidded: false };
-
-/**
- * Advance the hero one fixed step. `gravityScale` is 1 everywhere except the
- * calm secret level. Returns a shared result object (read it before the next
- * call).
- */
-export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, c: Contacts, gravityScale = 1): StepResult {
-  const r = STEP;
-  r.jumped = false; r.landedAt = 0; r.skidded = false;
-  // Analog: a thumb part way across its zone runs part speed.
-  const move = Math.max(-1, Math.min(1, input.move));
-  const dir = move > 0 ? 1 : move < 0 ? -1 : 0;
-
-  // Run: acceleration and friction, never instant velocity.
-  if (dir !== 0) {
-    const against = h.vx !== 0 && Math.sign(h.vx) !== dir;
-    if (against && h.onGround && Math.abs(h.vx) > PHYS.runMax * 0.5 && h.facing !== dir) r.skidded = true;
-    h.facing = dir;
-    const a = h.onGround ? (against ? PHYS.skid : PHYS.accelGround) : PHYS.accelAir;
-    h.vx = approach(h.vx, move * PHYS.runMax, a * dt);
-  } else {
-    h.vx = approach(h.vx, 0, (h.onGround ? PHYS.frictionGround : PHYS.frictionAir) * dt);
-  }
-
-  // Jump: coyote time after a ledge, buffer before a landing.
-  if (h.onGround) h.coyote = PHYS.coyote;
-  if (h.buffer > 0 && h.coyote > 0) {
-    h.vy = -PHYS.jumpV;
-    h.coyote = 0; h.buffer = 0;
-    h.onGround = false;
-    h.cuttable = true;
-    r.jumped = true;
-  }
-  h.coyote = Math.max(0, h.coyote - dt);
-  h.buffer = Math.max(0, h.buffer - dt);
-
-  // Variable height: letting go early caps the rise.
-  if (h.cuttable && !input.jumpHeld) {
-    if (h.vy < -PHYS.jumpCut) h.vy = -PHYS.jumpCut;
-    h.cuttable = false;
-  }
-  if (h.vy >= 0) h.cuttable = false;
-
-  const g = (h.vy < 0 && input.jumpHeld ? PHYS.gravityHold : PHYS.gravity) * gravityScale;
-  h.vy = Math.min(PHYS.terminal, h.vy + g * dt);
-
-  const vyBefore = h.vy;
-  moveBody(h, dt, solid, c);
-  if (c.landed) r.landedAt = vyBefore;
-  return r;
-}
-
-/** Bounce off a stomped enemy. Holding jump bounces higher (and can be cut). */
-export function stompBounce(h: Hero, holdingJump: boolean) {
-  h.vy = -(holdingJump ? PHYS.stompBounceHeld : PHYS.stompBounce);
-  h.cuttable = holdingJump;
-  h.onGround = false;
-  h.coyote = 0;
 }
 
 /** Axis-aligned overlap of two boxes. */

@@ -19,8 +19,10 @@ import { useRun } from '../leaderboard/useRun';
 import { RunResult, BoardSheet } from '../leaderboard/Leaderboard';
 import { fetchSecret, isError } from '../leaderboard/api';
 import { createWorld, drainEvents, score as worldScore, setSecret, stepWorld, type GameEvent, type Result, type Secret, type World } from './sim/world';
+import { POWER_KINDS } from './sim/powers';
+import { createMusic, type Music } from './audio/music';
 import { SECRET_FALLBACK } from './sim/level';
-import { drawFrame, tileFor } from './render/pipeline';
+import { drawFrame, viewTile } from './render/frame';
 import { emptyFrame, readInto, releaseAll } from './input/frame';
 import { createKeyboard } from './input/keyboard';
 import { TouchDeck } from './input/TouchDeck';
@@ -40,6 +42,23 @@ interface Hud { score: number; coins: number; lives: number; level: number; time
  * view full bleed, thumb overlay on top, the shell's chrome hidden.
  */
 type Layout = 'desktop' | 'portrait' | 'landscape';
+
+/** A fresh seed per run, so every run is a different level. */
+function newSeed(): number {
+  try {
+    const a = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(a);
+    return a[0];
+  } catch {
+    return Math.floor(Math.random() * 4294967296) >>> 0;
+  }
+}
+
+/** "World 1, Neon Rooftops. Storm Warning." for the status line. */
+function worldLine(w: World): string {
+  const mod = w.modifier?.name ? ` ${w.modifier.name}.` : '';
+  return `World ${Math.min(w.levelIndex + 1, 4)}, ${w.level.name}.${mod}`;
+}
 
 function hudOf(w: World): Hud {
   return { score: worldScore(w), coins: w.stats.coins, lives: Math.max(0, w.lives), level: w.levelIndex, time: Math.floor(w.levelTime) };
@@ -70,6 +89,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   const secretRef = useRef<Secret>({ ...SECRET_FALLBACK });
   const tickCount = useRef(0);
   const tileRef = useRef(24);
+  const fittedLevel = useRef<World['level'] | null>(null);
   const { containerRef, canvasRef, size, getCtx, style } = useCanvas();
   const orientation = useOrientation(rootRef);
   const layout: Layout = !isMobile ? 'desktop' : orientation;
@@ -84,20 +104,37 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     return () => setImmersive(false);
   }, [layout, setImmersive]);
 
-  useEffect(() => { juiceRef.current.reduced = !!reduced; }, [reduced]);
+  useEffect(() => {
+    juiceRef.current.reduced = !!reduced;
+    worldRef.current.noFreeze = !!reduced;
+  }, [reduced]);
+
+  // World music: made once, stopped whenever the game is not playing.
+  const musicRef = useRef<Music | null>(null);
+  const music = useCallback(() => (musicRef.current ??= createMusic()), []);
+  useEffect(() => () => { musicRef.current?.dispose(); musicRef.current = null; }, []);
+  const playMusic = useCallback((w: World) => {
+    const m = music();
+    if (w.level.theme === 'rooftops') { m.play('rooftops'); m.setIntensity(1); } else m.stop();
+  }, [music]);
+  const seedRef = useRef(0);
 
   const setStatus = useCallback((s: Status) => { statusRef.current = s; setStatusState(s); }, []);
   const refocus = useCallback(() => rootRef.current?.focus({ preventScroll: true }), []);
   useEffect(() => { refocus(); }, [refocus]);
 
   // View metrics: about 13 rows on a wide view; on a tall phone view, tiles
-  // come from the width and the extra rows are sky (see tileFor).
-  useEffect(() => {
-    const T = tileFor(size.w, size.h);
+  // come from the width and the extra rows are sky (see tileFor). The pixel
+  // renderer (world 1) rounds tiles to whole device pixels per art pixel, so
+  // the size follows the level's theme and is refitted when the level changes.
+  const fitView = useCallback((w: World) => {
+    const T = viewTile(w.level.theme, size.w, size.h, size.dpr);
     tileRef.current = T;
-    worldRef.current.viewCols = size.w / T;
-    worldRef.current.viewRows = size.h / T;
+    w.viewCols = size.w / T;
+    w.viewRows = size.h / T;
+    fittedLevel.current = w.level;
   }, [size]);
+  useEffect(() => { fitView(worldRef.current); }, [fitView]);
 
   const clearInput = useCallback(() => {
     keyboard.current.reset();
@@ -133,7 +170,28 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
         j.float(x, y - T * 0.5, '+20', th.text, Math.max(13, T * 0.6), 0.6);
         break;
       case 'crown': sfx('perfect'); break;
+      case 'powerOn':
+        if (POWER_KINDS[e.n] === 'aura') {
+          sfx('power'); buzz(20);
+          j.burst(x, y, th.violet, 18, 220, 4);
+          j.float(w.hero.x * T, w.hero.y * T - T * 0.5, 'AURA MODE', th.violet, Math.max(17, T * 0.85), 1.2);
+        }
+        break;
+      case 'powerOff':
+        if (POWER_KINDS[e.n] === 'aura') j.float(w.hero.x * T, w.hero.y * T - T * 0.5, 'aura fading', th.textDim, Math.max(13, T * 0.6), 0.9);
+        break;
+      case 'tempo': musicRef.current?.setTempo(e.n); break;
+      case 'dash': sfx('slide'); buzz(8); j.burst(x, y, th.pink, 6, 120, 3); break;
+      case 'wallJump': sfx('jump'); j.burst(x, y, '#fff4e0', 6, 90, 3); break;
+      case 'sigma':
+        sfx('perfect'); buzz(25);
+        j.burst(x, y, th.sun, 20, 240, 4);
+        j.float(x, y - T * 0.5, `+${e.n} SIGMA`, th.sun, Math.max(20, T), 1.4);
+        break;
+      case 'shot': sfx('tap'); break;
       case 'power':
+        // the Aura Crown of the old worlds; world 1 uses Aura Mode (powerOn)
+        if (w.level.theme === 'rooftops') break;
         sfx('power'); buzz(20);
         j.burst(w.hero.x * T, w.hero.y * T, th.sun, 18, 220, 4);
         j.float(w.hero.x * T, w.hero.y * T - T * 0.5, 'AURA CROWN', th.sun, Math.max(17, T * 0.85), 1.2);
@@ -169,13 +227,13 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       case 'tick': if (++tickCount.current % 3 === 0) sfx('tap'); break;
       case 'clear': sfx('win'); break;
       case 'level':
-        if (e.n > 0) setAnnounce(`World ${Math.min(e.n + 1, 4)}, ${w.level.name}.`);
+        if (e.n > 0) { setAnnounce(worldLine(w)); playMusic(w); }
         j.clear();
         break;
-      case 'over': sfx('over'); break;
-      case 'win': sfx('win'); break;
+      case 'over': sfx('over'); musicRef.current?.stop(); break;
+      case 'win': sfx('win'); musicRef.current?.stop(); break;
     }
-  }, [mono]);
+  }, [mono, playMusic]);
 
   const finish = useCallback(() => {
     const w = worldRef.current;
@@ -194,15 +252,16 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
 
   const update = useCallback((dt: number) => {
     const w = worldRef.current;
+    if (w.level !== fittedLevel.current) fitView(w);
     stepWorld(w, readInto(stepInput.current, sources.current), dt);
     if (w.events.length) for (const e of drainEvents(w)) onEvent(e, w);
     juiceRef.current.update(dt);
-  }, [onEvent]);
+  }, [onEvent, fitView]);
 
   const render = useCallback((alpha: number) => {
     const ctx = getCtx();
     const w = worldRef.current;
-    if (ctx) drawFrame(ctx, w, { w: size.w, h: size.h, mono, reduced: !!reduced, alpha }, juiceRef.current);
+    if (ctx) drawFrame(ctx, w, { w: size.w, h: size.h, dpr: size.dpr, mono, reduced: !!reduced, alpha }, juiceRef.current);
     const next = hudOf(w);
     const prev = hudRef.current;
     if (next.score !== prev.score || next.coins !== prev.coins || next.lives !== prev.lives || next.level !== prev.level || next.time !== prev.time) {
@@ -221,14 +280,19 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
 
   useGameLoop({ running: status === 'playing', update, render, onHidden: pause });
 
+  // Music plays only while playing: paused, over and the start screen are quiet.
+  useEffect(() => {
+    if (status === 'playing') playMusic(worldRef.current);
+    else musicRef.current?.stop();
+  }, [status, playMusic]);
+
   // Draw a still frame whenever the loop is not running (idle, paused, over, resize).
   useEffect(() => { if (status !== 'playing') render(1); }, [status, render]);
 
   const startGame = useCallback((levelIndex = 0) => {
-    const w = createWorld({ levelIndex, secret: secretRef.current });
-    const T = tileFor(size.w, size.h);
-    w.viewCols = size.w / T;
-    w.viewRows = size.h / T;
+    seedRef.current = newSeed();
+    const w = createWorld({ levelIndex, secret: secretRef.current, seed: seedRef.current, noFreeze: !!reduced });
+    fitView(w);
     worldRef.current = w;
     juiceRef.current.clear();
     drainEvents(w);
@@ -238,10 +302,10 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     setShowBoard(false);
     clearInput();
     run.begin();
-    setAnnounce(`World ${levelIndex + 1}, ${w.level.name}. Run to the flag.`);
+    setAnnounce(`${worldLine(w)} ${w.level.goal.kind === 'beacon' ? 'Run to the beacon.' : 'Run to the flag.'}`);
     setStatus('playing');
     refocus();
-  }, [size, clearInput, run, setStatus, refocus]);
+  }, [fitView, clearInput, run, setStatus, refocus, reduced]);
 
   const resume = useCallback(() => {
     if (statusRef.current !== 'paused') return;

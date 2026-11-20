@@ -120,9 +120,10 @@ describe('score caps sit near what a perfect run can reach', () => {
   it('snake: a 20x20 board holds at most 399 snacks', () => {
     expect(RULES.snake.cap).toBe(399);
   });
-  it('platformer: about 20,900 is the most four worlds hold', () => {
-    expect(RULES.platformer.cap).toBeLessThanOrEqual(25_000);
-    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(21_000);
+  it('platformer: covers the 23,760 bound for any seed, within 15 percent of the best of 500 seeds (22,000)', () => {
+    // Derived from the level data in src/__tests__/apps/platformerScore.test.ts.
+    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(23_760);
+    expect(RULES.platformer.cap).toBeLessThanOrEqual(22_000 * 1.15);
   });
   it('merge: a fast honest player (6 moves a second, about 45k at the Moon Gigachad) passes', () => {
     const seconds = 270 / 6;

@@ -62,6 +62,13 @@ const PALETTES: Record<WorldTheme, Pal> = {
     brick: '#ff8f7a', mortar: '#b5493a', aura: '#ffd23f', used: '#a9a3b8', stone: '#c9b8e8', stoneHi: '#e6dcf7',
     spike: '#f4eefc', platform: '#ffffff', platformShade: '#bfe6fb', pole: '#fff4e0', flag: '#ff5fa2', text: '#120b1f',
   },
+  // Only used if a rooftop level is ever drawn by this renderer; world 1 has its own (./pixel).
+  rooftops: {
+    skyTop: '#05040f', skyBottom: '#2a1440', far: '#1d1838', near: '#130f27', deco: '#ff3d9a',
+    ground: '#2a1b38', groundTop: '#544c7e', speck: '#1f1530',
+    brick: '#a8504f', mortar: '#5c2436', aura: '#9a5cff', used: '#3a345e', stone: '#544c7e', stoneHi: '#7a73a8',
+    spike: '#c6dbea', platform: '#7d9bb6', platformShade: '#4a6684', pole: '#c6dbea', flag: '#ff3d9a', text: '#fff4e0',
+  },
   stars: {
     skyTop: '#070512', skyBottom: '#1d1430', far: '#241a3d', near: '#2e2150', deco: '#fff4e0',
     ground: '#2b2147', groundTop: '#ff5fa2', speck: '#221a3a',
@@ -482,19 +489,29 @@ export function wrapLines(measure: (s: string) => number, text: string, maxW: nu
   return lines;
 }
 
-function drawCards(ctx: CanvasRenderingContext2D, world: World, v: View, mono: boolean) {
+/** Level card, tally and the secret finale, in CSS pixels. Shared with the pixel renderer. */
+export function drawCards(ctx: CanvasRenderingContext2D, world: World, v: View, mono: boolean) {
   const { w, h } = v;
   const th = arcadeTheme(mono);
   if (world.cardT > 0 && world.phase === 'play') {
     const k = Math.min(1, world.cardT / 0.5, (CARD_SECONDS - world.cardT) / 0.2);
     ctx.globalAlpha = Math.max(0, k);
     const size = Math.min(h * 0.11, w * 0.085);
-    panel(ctx, w / 2, h * 0.3, Math.min(w * 0.8, size * 9), size * 2.6, '#1d1430');
+    // This run's world modifier (when the sim has one) gets a third line in the card.
+    const mod = (world as { modifier?: { name?: unknown } | null }).modifier;
+    const modName = mod && typeof mod.name === 'string' ? mod.name : '';
+    panel(ctx, w / 2, h * 0.3 + (modName ? size * 0.36 : 0), Math.min(w * 0.8, size * 9), size * (modName ? 3.4 : 2.6), '#1d1430');
     ctx.font = hypeFont(size * 0.48);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = th.textDim;
     ctx.fillText(world.level.label, w / 2, h * 0.3 - size * 0.62);
     outlinedText(ctx, world.level.name, w / 2, h * 0.3 + size * 0.28, size, th.sun);
+    if (modName) {
+      ctx.font = hypeFont(size * 0.44);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = th.pink;
+      ctx.fillText(modName, w / 2, h * 0.3 + size * 1.2);
+    }
     ctx.globalAlpha = 1;
   }
   if (world.phase === 'tally') {
@@ -623,7 +640,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, world: World, v: View, 
     }
     if (dead) ctx.globalAlpha = Math.max(0, e.deadT / 0.45);
     const lift = e.kind === 'pebble' ? 0.32 : 0.46;
-    drawCreature(ctx, e.kind, ex, feet - s * 0.5 + s * (0.5 - lift), s, { mono: v.mono, t, facing: e.dir, squash, dizzy: dead });
+    // World 1's new kinds only appear here if a rooftop level is drawn by this renderer.
+    const creature = e.kind === 'pebble' || e.kind === 'frog' ? e.kind : e.kind === 'adDrone' ? 'frog' : 'pebble';
+    drawCreature(ctx, creature, ex, feet - s * 0.5 + s * (0.5 - lift), s, { mono: v.mono, t, facing: e.dir, squash, dizzy: dead });
     ctx.globalAlpha = 1;
   }
 

@@ -8,8 +8,9 @@ import { FONT, MAX_NAME, textCells } from '@/components/apps/games/platformer/si
 const count = (rows: readonly string[], ch: string) => rows.join('').split(ch).length - 1;
 
 describe('platformer levels: data', () => {
-  it('has three worlds: grass, cave and sky, in that order', () => {
-    expect(LEVELS.map(l => l.theme)).toEqual(['grass', 'cave', 'sky']);
+  it('has three worlds: generated rooftops, then the hand-made cave and sky', () => {
+    expect(MAIN_LEVELS.map(l => l.theme)).toEqual(['rooftops', 'cave', 'sky']);
+    expect(LEVELS.map(l => l.theme)).toEqual(['cave', 'sky']);
   });
 
   for (const def of LEVELS) {
@@ -80,15 +81,15 @@ describe('platformer levels: data', () => {
     });
   }
 
-  it('level 1 teaches with pebbles only; frogs appear from the cave on', () => {
-    expect(MAIN_LEVELS[0].enemies.every(e => e.kind === 'pebble')).toBe(true);
+  it('world 1 has rooftop enemies only; frogs appear from the cave on', () => {
+    const rooftop = new Set(['doomCrawler', 'adDrone', 'eliteDrone']);
+    expect(MAIN_LEVELS[0].enemies.every(e => rooftop.has(e.kind))).toBe(true);
     expect(MAIN_LEVELS[1].enemies.some(e => e.kind === 'frog')).toBe(true);
     expect(MAIN_LEVELS[2].enemies.some(e => e.kind === 'frog')).toBe(true);
   });
 
-  it('only the cave has spikes, and only the sky has moving platforms of both kinds', () => {
-    expect(count(LEVELS[0].rows, '^')).toBe(0);
-    expect(count(LEVELS[1].rows, '^')).toBeGreaterThan(5);
+  it('the cave has spikes, world 1 has no moving platforms, the sky has moving platforms of both kinds', () => {
+    expect(count(LEVELS[0].rows, '^')).toBeGreaterThan(5);
     expect(MAIN_LEVELS[0].platforms).toHaveLength(0);
     const axes = new Set(MAIN_LEVELS[2].platforms.map(p => p.axis));
     expect(axes).toEqual(new Set(['x', 'y']));

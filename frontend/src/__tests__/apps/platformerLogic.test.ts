@@ -54,7 +54,7 @@ const G40 = '#'.repeat(40);
 
 describe('platformer scoring rules', () => {
   it('scores coins 10, stomps 50, bricks 20, clears 1000, plus flag and time bonus', () => {
-    expect(scoreOf({ coins: 3, stomps: 2, bricks: 1, flag: 400, clears: 1, time: 870 })).toBe(30 + 100 + 20 + 400 + 1000 + 870);
+    expect(scoreOf({ coins: 3, stomps: 2, bricks: 1, flag: 400, clears: 1, time: 870, bonus: 500 })).toBe(30 + 100 + 20 + 400 + 1000 + 870 + 500);
   });
 
   it('time bonus starts at 1000 and falls 5 points per whole second to 0', () => {

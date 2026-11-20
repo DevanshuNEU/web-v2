@@ -1,8 +1,10 @@
 /**
- * Baguettino Run level data. Each level is a list of string rows, 14 rows
+ * Main Character level data. Each level is a list of string rows, 14 rows
  * tall, one character per tile. `parseLevel` in ./level.ts turns them into a
- * tile grid plus entity spawns. The secret fourth level is built in code from
- * a name (see ./level.ts), so it is not here.
+ * tile grid plus entity spawns. World 1 (neon rooftops) is generated per
+ * seed from the chunks in ./chunks/rooftops.ts by ./generate.ts; worlds 2
+ * and 3 are the hand-made levels below; the secret fourth level is built in
+ * code from a name (see ./level.ts).
  *
  * Legend
  *   .  empty
@@ -21,9 +23,22 @@
  *   f  Frogatti Bossini, the hopping frog
  *   -  horizontal moving platform (a run of dashes is one platform)
  *   !  vertical moving platform (a run of bangs is one platform)
+ *
+ * Rooftops (world 1)
+ *   =  roof surface (solid, like #)
+ *   _  one-way platform (land from above, pass from below and the side)
+ *   $  golden Sigma coin (500)
+ *   %  cracked wall (solid; a dash smashes it)
+ *   a  Aura Mode orb
+ *   c  Doom Crawler (walks, turns at walls and ledges)
+ *   d  Ad Drone (hovers, dives at a hero below it)
+ *   e  elite drone (an Ad Drone that fires slow shots)
+ *   G  goal beacon top (its mast runs down to the roof; replaces F and |)
+ *   L  neon sign with its light; T water tower, N antenna, U AC unit,
+ *      H chimney, R crate (scenery, never solid)
  */
 
-export type WorldTheme = 'grass' | 'cave' | 'sky' | 'stars';
+export type WorldTheme = 'grass' | 'rooftops' | 'cave' | 'sky' | 'stars';
 
 export interface LevelDef {
   id: number;
@@ -35,29 +50,8 @@ export interface LevelDef {
   rows: readonly string[];
 }
 
+/** The hand-made worlds 2 and 3. */
 export const LEVELS: readonly LevelDef[] = [
-  {
-    id: 1,
-    label: 'World 1',
-    name: 'Touch Grass',
-    theme: 'grass',
-    rows: [
-      '........................................................................................................................................................................................................',
-      '........................................................................................................................................................................................................',
-      '...................................................................................................................................................................................F....................',
-      '...................................................................................................................................................................................|....................',
-      '............................S...................................................................................S..................................................................|....................',
-      '...................................................................................................................................................................................|....................',
-      '...........................................................................................oooo..............oo....................................................................|....................',
-      '...................................................................oooooo....................................BB....................................oo.....S...S....................|....................',
-      '.........ooo...S..........BSBCB................oo..................BBSBBB..................####......................oo......BBSBBSB...............##.........................XX...|....................',
-      '........o...o..................................##...........................ooo...........######..........BB........o..o.....................##....##........................XXX...|....................',
-      '.....................................##........##.........oooooo.........................########..................o....o...............#....##....##...ooooooooo...........XXXX...|....................',
-      '...P..................n..........n...##...n....##...........n..n....................K...##########..n..n....................n..n..n.....#..n.##..n.##..............n.......XXXXX...|....................',
-      '#####################################################..#####################...#####################################....##############################################..################################',
-      '#####################################################..#####################...#####################################....##############################################..################################',
-    ],
-  },
   {
     id: 2,
     label: 'World 2',
