@@ -116,3 +116,35 @@ describe('Snake: keys stay inside the game', () => {
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
   });
 });
+
+/**
+ * Snake moved too fast on phones (a fixed 140ms tick). The start screen now
+ * offers Chill / Classic / Fast, defaults to Chill on phones, and remembers
+ * the choice.
+ */
+describe('Snake: speed picker', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('defaults to Chill on a phone', async () => {
+    render(<GamesApp variant="mobile" />);
+    await userEvent.click(screen.getByText('Snake'));
+    expect(screen.getByRole('radio', { name: 'Chill' })).toBeChecked();
+  });
+
+  it('defaults to Classic on desktop', async () => {
+    render(<GamesApp variant="desktop" />);
+    await userEvent.click(screen.getByText('Snake'));
+    expect(screen.getByRole('radio', { name: 'Classic' })).toBeChecked();
+  });
+
+  it('remembers the speed she picked', async () => {
+    const { unmount } = render(<GamesApp variant="mobile" />);
+    await userEvent.click(screen.getByText('Snake'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Fast' }));
+    expect(localStorage.getItem('devos-snake-speed')).toBe('fast');
+    unmount();
+    render(<GamesApp variant="mobile" />);
+    await userEvent.click(screen.getByText('Snake'));
+    expect(screen.getByRole('radio', { name: 'Fast' })).toBeChecked();
+  });
+});
