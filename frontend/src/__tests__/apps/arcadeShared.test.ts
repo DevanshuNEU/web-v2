@@ -191,3 +191,19 @@ describe('registry', () => {
     }
   });
 });
+
+describe('sound graph for music', () => {
+  it('gives no audio graph while sound is off, and tells listeners when it flips', async () => {
+    const { arcadeAudio, onArcadeSoundChange } = await import('@/components/apps/games/shared/sound');
+    setArcadeSound(false);
+    expect(arcadeAudio()).toBeNull();
+    const seen: boolean[] = [];
+    const off = onArcadeSoundChange((on) => seen.push(on));
+    setArcadeSound(true);
+    setArcadeSound(false);
+    off();
+    setArcadeSound(true);
+    expect(seen).toEqual([true, false]);
+    setArcadeSound(false);
+  });
+});

@@ -103,6 +103,24 @@ const SFX = {
 
 export type SfxName = keyof typeof SFX;
 
+/**
+ * The shared audio graph for music: the context and the master gain every
+ * arcade sound goes through. Null while sound is off, or where Web Audio is
+ * missing, so callers never make a noise the player did not ask for.
+ */
+export function arcadeAudio(): { ctx: AudioContext; master: GainNode } | null {
+  if (!enabled) return null;
+  const a = audio();
+  return a && master ? { ctx: a, master } : null;
+}
+
+/** Listen for the sound toggle (music starts and stops with it). Returns the unsubscribe. */
+export function onArcadeSoundChange(cb: (on: boolean) => void): () => void {
+  const l = () => cb(enabled);
+  listeners.add(l);
+  return () => { listeners.delete(l); };
+}
+
 /** Play a sound if the player turned sound on. Safe to call anywhere. */
 export function sfx(name: SfxName, arg?: number) {
   if (!enabled) return;
