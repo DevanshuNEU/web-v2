@@ -14,8 +14,9 @@ import { makeCanvas, resize, type Canvas, type Ctx } from './canvas';
 import { atlas, drawFrame, rectOf, type Atlas } from './sprites';
 import type { Decor } from './read';
 import { hash2 } from './skyline';
+import { toMono } from '../bake';
 
-export const K = { EMPTY: 0, ROOF: 1, BRICK: 2, AURA: 3, USED: 4, STONE: 5, SPIKE: 6, COIN: 7, ONEWAY: 8, SIGMA: 9, CRACK: 10 } as const;
+export const K = { EMPTY: 0, ROOF: 1, BRICK: 2, AURA: 3, USED: 4, STONE: 5, SPIKE: 6, COIN: 7, ONEWAY: 8, SIGMA: 9, CRACK: 10, CRATE: 11 } as const;
 
 /** Tile code to kind. */
 export const KIND = new Uint8Array(256);
@@ -27,6 +28,7 @@ export const KIND = new Uint8Array(256);
     // cracked walls break in play, so they are drawn per frame, not baked
     if (n === 'BRICK') k = K.BRICK;
     else if (n.includes('CRACK') || n.includes('BREAK')) k = K.CRACK;
+    else if (n.includes('CRATE')) k = K.CRATE;
     else if (n.startsWith('AURA')) k = K.AURA;
     else if (n === 'USED') k = K.USED;
     else if (n === 'STONE') k = K.STONE;
@@ -79,10 +81,93 @@ function variant(x: number, y: number, weights: readonly number[]): number {
   return 0;
 }
 
+/** Rows of roof above a tile: 0 for a roof top. */
+function depthOf(level: Level, tx: number, ty: number): number {
+  let d = 0;
+  while (d < 8 && roofCovered(kindAt(level, tx, ty - d - 1))) d++;
+  return d;
+}
+
+const WINDOW_LIT = ['#d9965a', '#e0b070', '#6aa6c8'];
+
+/**
+ * The front of a building under its roof: darker the further down, the odd
+ * lit window, drainpipes, and a fire-escape door with a lamp. Roof tops get
+ * puddles. Glowing parts go on the chunk's glow layer.
+ */
+function facade(c: Chunk, level: Level, tx: number, ty: number, px: number, py: number, mono: boolean) {
+  const b = c.baseCtx, g = c.glowCtx;
+  const col = (s: string) => (mono ? toMonoCached(s) : s);
+  const depth = depthOf(level, tx, ty);
+  if (depth === 0) {
+    // a puddle on the roof top: a glossy dark strip that reflections light up live
+    if (hash2(tx * 17, 31) < 0.24) {
+      const w = 5 + Math.floor(hash2(tx, 77) * 7), x = px + Math.floor(hash2(tx, 78) * (16 - w));
+      b.fillStyle = col('#151129');
+      b.fillRect(x, py + 1, w, 2);
+      b.fillStyle = col('#221c3c');
+      b.fillRect(x + 1, py + 1, w - 2, 1);
+      c.puddles.push(x, py + 1, w);
+    }
+    return;
+  }
+  const below = roofCovered(kindAt(level, tx, ty + 1)) || ty + 1 >= ROWS;
+  const pipe = hash2(tx * 13, 401) < 0.07;
+  const door = depth === 1 && below && hash2(tx * 29, 503) < 0.045;
+  if (door) {
+    // a fire-escape door: frame, a lit pane, a tiny landing and a lamp above
+    b.fillStyle = col('#06040c'); b.fillRect(px + 4, py + 2, 9, 14);
+    b.fillStyle = col('#2a1a2a'); b.fillRect(px + 5, py + 3, 7, 13);
+    b.fillStyle = col('#3a2436'); b.fillRect(px + 5, py + 3, 1, 13);
+    g.fillStyle = col('#ffcf7a'); g.fillRect(px + 6, py + 5, 5, 4);
+    b.fillStyle = col('#ffcf7a'); b.fillRect(px + 6, py + 5, 5, 4);
+    b.fillStyle = col('#4a3a6a'); b.fillRect(px + 2, py + 16, 13, 1);
+    g.fillStyle = col('#fff1c2'); g.fillRect(px + 7, py, 3, 1);
+    c.lamps.push(px + 8, py + 1);
+  } else if (!pipe && depth >= 2 && below && hash2(tx * 7, ty * 11 + 5) < 0.07) {
+    // an apartment window, sometimes someone in it
+    const lit = hash2(tx, ty * 3) < 0.7;
+    b.fillStyle = col('#06040c'); b.fillRect(px + 4, py + 4, 8, 8);
+    b.fillStyle = col('#2a2040'); b.fillRect(px + 4, py + 12, 8, 1);
+    const wc = lit ? WINDOW_LIT[Math.floor(hash2(tx, ty) * WINDOW_LIT.length)] : '#0c0a18';
+    for (const k of lit ? [b, g] : [b]) {
+      k.fillStyle = col(wc); k.fillRect(px + 5, py + 5, 6, 6);
+      if (lit) { k.fillStyle = 'rgba(0,0,0,0.35)'; k.fillRect(px + 5, py + 5, 6, 1); }
+      if (lit && hash2(tx * 3, ty) < 0.35) { k.fillStyle = col('#07050c'); k.fillRect(px + 7, py + 7, 2, 1); k.fillRect(px + 6, py + 8, 4, 3); }
+    }
+  }
+  if (pipe) {
+    b.fillStyle = col('#1c2a40'); b.fillRect(px + 11, py, 2, 16);
+    b.fillStyle = col('#4a6684'); b.fillRect(px + 11, py, 1, 16);
+    b.fillStyle = col('#0f1828'); b.fillRect(px + 10, py + 8, 4, 1);
+  }
+  // deeper is darker: the street light never reaches the lower floors
+  b.fillStyle = 'rgba(3,2,9,1)';
+  b.globalAlpha = Math.min(0.6, 0.12 * depth);
+  b.fillRect(px, py, 16, 16);
+  b.globalAlpha = 1;
+}
+
+const monoMemo = new Map<string, string>();
+function toMonoCached(s: string): string {
+  let v = monoMemo.get(s);
+  if (!v) { v = toMono(s); monoMemo.set(s, v); }
+  return v;
+}
+
 const TOP_W = [0.6, 0.12, 0.28];
 const FILL_W = [0.62, 0.3, 0.08];
 
-export interface Chunk { base: Canvas; glow: Canvas; baseCtx: Ctx; glowCtx: Ctx }
+export interface Chunk {
+  base: Canvas; glow: Canvas; baseCtx: Ctx; glowCtx: Ctx;
+  /** Puddles on roof tops (chunk pixels: left, surface row, width), lit live by reflections. */
+  puddles: number[];
+  /** Lamps over doors (chunk pixels x, y), added to the lights when the chunk is on screen. */
+  lamps: number[];
+  /** Roof top edges for the blackout (x, y, edge: 0 inside, 1 left end, 2 right end) and spikes (x, y). */
+  rims: number[];
+  spikes: number[];
+}
 
 /**
  * Bake one chunk of static tiles and decor: base art plus its glowing
@@ -101,11 +186,12 @@ export function bakeChunkPart(reuse: Chunk | null, level: Level, decor: readonly
   let c = reuse;
   if (!c) {
     const b = makeCanvas(CHUNK_PX, H), g = makeCanvas(CHUNK_PX, H);
-    c = { base: b.canvas, glow: g.canvas, baseCtx: b.ctx, glowCtx: g.ctx };
+    c = { base: b.canvas, glow: g.canvas, baseCtx: b.ctx, glowCtx: g.ctx, puddles: [], lamps: [], rims: [], spikes: [] };
   } else if (from === 0) {
     resize(c.base, CHUNK_PX, H); resize(c.glow, CHUNK_PX, H);
     c.baseCtx.clearRect(0, 0, CHUNK_PX, H); c.glowCtx.clearRect(0, 0, CHUNK_PX, H);
   }
+  if (from === 0) { c.puddles.length = 0; c.lamps.length = 0; c.rims.length = 0; c.spikes.length = 0; }
   const ta = tileAtlas(mono);
   const x0 = index * CHUNK_COLS;
   const t0 = x0 + from - (from === 0 ? 1 : 0), t1 = x0 + to - 1 + (to >= CHUNK_COLS ? 1 : 0);
@@ -136,6 +222,13 @@ export function bakeChunkPart(reuse: Chunk | null, level: Level, decor: readonly
       const r = rectOf(ta, anim, frame);
       c.baseCtx.drawImage(ta.sheet, r.x, r.y, r.w, r.h, px, py, r.w, r.h);
       if (ta.glow) c.glowCtx.drawImage(ta.glow, r.x, r.y, r.w, r.h, px, py, r.w, r.h);
+      if (k === K.ROOF) facade(c, level, tx, ty, px, py, mono);
+      if (tx >= x0 && tx < x0 + CHUNK_COLS) {
+        if ((k === K.ROOF || k === K.STONE || k === K.ONEWAY) && !roofCovered(kindAt(level, tx, ty - 1))) {
+          const l = kindAt(level, tx - 1, ty) === K.EMPTY, r = kindAt(level, tx + 1, ty) === K.EMPTY;
+          c.rims.push(px, py, l ? 1 : r ? 2 : 0);
+        } else if (k === K.SPIKE) c.spikes.push(px, py);
+      }
       // exposed building sides: a dark seam and a faint rim, so walls read
       if (k === K.ROOF) {
         if (kindAt(level, tx - 1, ty) === K.EMPTY) { c.baseCtx.fillStyle = shade; c.baseCtx.fillRect(px, py + 1, 1, 15); c.baseCtx.fillStyle = rim; c.baseCtx.fillRect(px + 1, py + 2, 1, 14); }

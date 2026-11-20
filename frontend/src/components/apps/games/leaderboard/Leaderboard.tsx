@@ -12,8 +12,9 @@ import {
 
 const GAME_NAMES: Record<ArcadeGame, string> = {
   snake: 'Sigma Snake',
-  platformer: 'Baguettino Run',
+  platformer: 'Main Character',
   stacker: 'Aura Tower',
+  endless: 'Main Character: Endless',
 };
 
 // First place: a one-shot burst of cast-coloured confetti from the card.

@@ -1,32 +1,61 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronsRight } from 'lucide-react';
-import { TouchButton } from '../../shared/TouchButton';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tryCapture, type InputFrame } from './frame';
+import { ThumbArc } from './ThumbArc';
+import type { Owned } from './arc';
+import { buzzPress } from '../ui/controls';
+
+export interface ControlProps {
+  input: InputFrame;
+  mono: boolean;
+  /** Moves she has: Attack and Dash show only once owned. */
+  owned?: Owned;
+  haptics?: boolean;
+  /** Left-handed: the arc on the left, moving on the right. */
+  swap?: boolean;
+  /** First run: label the real buttons until she plays. */
+  intro?: boolean;
+  onPlayed?: () => void;
+  /** 0.3..1, from the pause card settings. */
+  opacity?: number;
+}
 
 /**
- * Portrait touch adapter: the control deck under the view. Writes the run
- * pad, Jump and Dash into the `input` latch the view reads once per step.
- * Each control tracks its own pointers, so both thumbs work at once.
+ * Portrait touch adapter: the control deck under the view. Run pad on one
+ * side, the thumb arc (Jump, Attack, Dash) on the other. Each control tracks
+ * its own pointers, so both thumbs work at once.
  */
-export function TouchDeck({ input, mono }: { input: InputFrame; mono: boolean }) {
+export function TouchDeck({ input, mono, owned = {}, haptics = true, swap = false, intro = false, onPlayed, opacity = 1 }: ControlProps) {
   const onRun = useCallback((left: boolean, right: boolean) => {
     input.move = (right ? 1 : 0) - (left ? 1 : 0);
   }, [input]);
-  const onJump = useCallback(() => { input.jumpHeld = true; input.jumpPressed = true; }, [input]);
-  const onJumpUp = useCallback(() => { input.jumpHeld = false; }, [input]);
-  const onDash = useCallback(() => { input.dashPressed = true; }, [input]);
-  return (
-    <div className="flex items-end justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-      <RunPad onChange={onRun} mono={mono} size={76} />
-      <div className="flex items-end gap-3">
-        <DashButton onPress={onDash} mono={mono} size={64} />
-        <div className="pb-8">
-          <JumpButton onPress={onJump} onRelease={onJumpUp} mono={mono} size={96} />
-        </div>
-      </div>
+  const played = useCallback(() => { if (intro) onPlayed?.(); }, [intro, onPlayed]);
+  const pad = (
+    <div className="relative">
+      {intro && <IntroLabel text="Move" />}
+      <RunPad onChange={onRun} mono={mono} size={76} haptics={haptics} onPress={played} />
     </div>
+  );
+  const arc = <ThumbArc input={input} mono={mono} owned={owned} hand={swap ? 'left' : 'right'} haptics={haptics} intro={intro} onPress={played} />;
+  return (
+    <div
+      style={{ opacity }}
+      className="flex items-end justify-between pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+    >
+      {swap ? arc : pad}
+      {swap ? pad : arc}
+    </div>
+  );
+}
+
+/** A first-run label sitting on a real control. */
+export function IntroLabel({ text }: { text: string }) {
+  return (
+    <span aria-hidden className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap z-30 border border-[#3df2ff] bg-[#06040f] px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-[#d8f8ff] shadow-[0_0_12px_rgba(61,242,255,0.35)]">
+      {text}
+    </span>
   );
 }
 
@@ -40,7 +69,7 @@ export function TouchDeck({ input, mono }: { input: InputFrame; mono: boolean })
  * Keyboard users press either button with Enter or Space (a click with
  * detail 0), which runs that way for a moment.
  */
-export function RunPad({ onChange, size = 76, mono }: { onChange: (left: boolean, right: boolean) => void; size?: number; mono: boolean }) {
+export function RunPad({ onChange, size = 76, mono, haptics = false, onPress }: { onChange: (left: boolean, right: boolean) => void; size?: number; mono: boolean; haptics?: boolean; onPress?: () => void }) {
   const padRef = useRef<HTMLDivElement>(null);
   const leftRef = useRef<HTMLButtonElement>(null);
   const rightRef = useRef<HTMLButtonElement>(null);
@@ -77,7 +106,7 @@ export function RunPad({ onChange, size = 76, mono }: { onChange: (left: boolean
 
   const btn = `flex items-center justify-center border text-text select-none touch-none [-webkit-touch-callout:none]
     [-webkit-tap-highlight-color:transparent] transition-[transform,background-color] duration-75 ease-out
-    data-[held=true]:scale-95 ${mono ? 'border-border data-[held=true]:bg-text/15' : 'border-[#3a2a5c] bg-[#1d1430] data-[held=true]:bg-[#3a2a5c]'}`;
+    data-[held=true]:scale-95 data-[held=true]:brightness-125 ${mono ? 'border-border data-[held=true]:bg-text/15' : 'border-[#3a2a5c] bg-[#1d1430] data-[held=true]:bg-[#3a2a5c]'}`;
 
   return (
     <div
@@ -88,6 +117,8 @@ export function RunPad({ onChange, size = 76, mono }: { onChange: (left: boolean
         pointers.current.set(e.pointerId, sideOf(e.clientX));
         publish();
         tryCapture(padRef.current, e.pointerId);
+        buzzPress(haptics, 6);
+        onPress?.();
       }}
       onPointerMove={(e) => {
         const cur = pointers.current.get(e.pointerId);
@@ -121,40 +152,5 @@ export function RunPad({ onChange, size = 76, mono }: { onChange: (left: boolean
         <ChevronRight size={30} aria-hidden />
       </button>
     </div>
-  );
-}
-
-/** The right thumb's big round Jump. Fires on pointerdown, lifts on release (variable height). */
-export function JumpButton({ onPress, onRelease, size = 92, mono }: { onPress: () => void; onRelease: () => void; size?: number; mono: boolean }) {
-  return (
-    <TouchButton
-      label="Jump"
-      size={size}
-      onPress={onPress}
-      onRelease={onRelease}
-      className={`rounded-full border-[3px] border-[#120b1f] flex-col gap-0.5 font-semibold text-[13px] ${
-        mono ? 'bg-text text-bg' : 'bg-[#ff5fa2] text-[#120b1f] data-[held=true]:bg-[#ff86b9]'
-      }`}
-    >
-      <ChevronUp size={30} aria-hidden strokeWidth={2.6} />
-      <span aria-hidden>Jump</span>
-    </TouchButton>
-  );
-}
-
-/** Dash: a press, no hold. Smaller than Jump so the right thumb finds Jump first. */
-export function DashButton({ onPress, size = 64, mono }: { onPress: () => void; size?: number; mono: boolean }) {
-  return (
-    <TouchButton
-      label="Dash"
-      size={size}
-      onPress={onPress}
-      className={`rounded-full border-2 flex-col gap-0 font-semibold text-[11px] ${
-        mono ? 'border-border text-text data-[held=true]:bg-text/15' : 'border-[#3a2a5c] bg-[#1d1430] text-text data-[held=true]:bg-[#3a2a5c]'
-      }`}
-    >
-      <ChevronsRight size={22} aria-hidden />
-      <span aria-hidden>Dash</span>
-    </TouchButton>
   );
 }

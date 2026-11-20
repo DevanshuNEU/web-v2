@@ -10,22 +10,24 @@ import {
   PHYS, contacts, moveBody, moveX, moveY, overlaps, stompOrHurt,
   type Body, type Contacts, type SolidFn,
 } from './physics';
-import { createHero, pressJump, setState, stepHero, stompBounce, tryDash, type Hero, type HeroInput } from './hero';
+import { ABILITIES, createHero, pressJump, setState, stepHero, stompBounce, tryDash, worldOwned, type Abilities, type Ability, type Hero, type HeroInput } from './hero';
 
-export type { Hero, HeroState } from './hero';
+export type { Abilities, Ability, Hero, HeroState } from './hero';
 import { consumeEdges, type InputFrame } from '../input/frame';
 import { DEFAULT_SEED, deriveSeed, mulberry32 } from './rand';
 import { MODIFIERS, gust, type ModifierId } from './modifiers';
-import { POWER_KINDS, POWERS, createPowers, modifiers, noModifiers, stepPowers, type Modifiers, type PowerKind, type Powers } from './powers';
+import { BLADE, SWING_KINDS, hitbox, isActive, isGroundSwing, pogo, startSwing, tickSwing, type Swing } from './blade';
+import { POWERS, POWER_KINDS, type PowerKind } from './powers';
+import { nextStoryId, storyEntry, storyLevelDef } from './story';
 import { createScarf, neckOf, resetScarf, stepScarf, torsoOf, type ScarfPoint } from './scarf';
-import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, mainLevel, SECRET_FALLBACK, TILE, isSolidTile, secretLevel, type Level } from './level';
+import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, mainLevel, SECRET_FALLBACK, TILE, isSolidTile, secretLevel, parseLevel, type DecorKind, type Level, type Light } from './level';
 import { ENEMY_KINDS, enemyFrom, type Enemy, type EnemyCtx } from './enemies';
 
 export type { Enemy, EnemyKind, EnemyMode } from './enemies';
 export { shouldTurnAtLedge } from './enemies';
 
 export const LIVES = 3;
-export const POINTS = { coin: 10, stomp: 50, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500 } as const;
+export const POINTS = { coin: 10, stomp: 50, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500, death: 50 } as const;
 /** Time bonus lost per whole second spent in a level. */
 export const TIME_DECAY = 5;
 /** Points per second the clear tally counts up at. */
@@ -41,11 +43,16 @@ export const HURT_LOOK = 0.35;
 export const SECRET_GATE = 2;
 export const SECRET_INDEX = 3;
 
-/** `bonus` holds points outside the counted items: Sigma coins and the Double Aura coin extra. */
-export interface Stats { coins: number; stomps: number; bricks: number; flag: number; clears: number; time: number; bonus: number }
+/**
+ * `bonus` holds points outside the counted items: Sigma coins and the Double
+ * Aura coin extra. `deaths` counts story deaths (Endless has lives instead).
+ */
+export interface Stats { coins: number; stomps: number; bricks: number; flag: number; clears: number; time: number; bonus: number; deaths: number }
 
+/** Every item's points, less 50 per story death, never below 0. */
 export function scoreOf(s: Stats): number {
-  return s.coins * POINTS.coin + s.stomps * POINTS.stomp + s.bricks * POINTS.brick + s.flag + s.clears * POINTS.clear + s.time + s.bonus;
+  const earned = s.coins * POINTS.coin + s.stomps * POINTS.stomp + s.bricks * POINTS.brick + s.flag + s.clears * POINTS.clear + s.time + s.bonus;
+  return Math.max(0, earned - s.deaths * POINTS.death);
 }
 
 /** 1000 at the start, 5 points less for each whole second, never below 0. */
@@ -94,8 +101,6 @@ const SHOT_POOL = 8;
 const SHOT_LIFE = 4;
 const SHOT_R = 0.18;
 
-export interface Pickup { kind: PowerKind; x: number; y: number; taken: boolean }
-
 export interface Camera { x: number; y: number; look: number; px: number; py: number }
 
 export type Phase = 'play' | 'dying' | 'pole' | 'walk' | 'tally' | 'finale' | 'done';
@@ -104,15 +109,21 @@ export type Result = 'lost' | 'won' | 'secret';
 export type EventType =
   | 'jump' | 'land' | 'skid' | 'coin' | 'stomp' | 'bump' | 'break' | 'crown' | 'power'
   | 'hurt' | 'die' | 'respawn' | 'checkpoint' | 'flag' | 'secret' | 'tick' | 'clear'
-  | 'level' | 'over' | 'win' | 'dash' | 'wallJump'
+  | 'level' | 'over' | 'win' | 'dash' | 'wallJump' | 'doubleJump'
+  /** A shrine unlocked an ability: n is its index in ABILITIES (0 wall jump, 1 dash). */
+  | 'unlock'
+  /** A memory was found: n is its index in world.memories. */
+  | 'memory'
+  /** A blade swing started (n: index in SWING_KINDS), hit an enemy (n: its hits left, 0 = killed), or bounced her (pogo). */
+  | 'swing' | 'hit' | 'pogo'
+  /** A drone dived at a decoy (x, y: the decoy), so the renderer can scatter the pigeon or knock the can. */
+  | 'decoyDive'
   /** The golden Sigma coin: n is its points. */
   | 'sigma'
   /** An elite drone fired. */
   | 'shot'
   /** A power started or ran out: n is its index in POWER_KINDS. */
-  | 'powerOn' | 'powerOff'
-  /** The music tempo should change: n is the multiplier (1.25 in Aura Mode, 1 after). */
-  | 'tempo';
+  | 'powerOn' | 'powerOff';
 
 export interface GameEvent { type: EventType; x: number; y: number; n: number }
 
@@ -140,7 +151,14 @@ export interface World {
   lives: number;
   crowned: boolean;
   invuln: number;
+  /** True once any checkpoint is passed (the renderers read it). */
   checkpointHit: boolean;
+  /** Index into level.checkpoints of the last one passed, -1 for none. */
+  checkpointIdx: number;
+  /** This level's memories; `taken` ones are found (now, or before on this device). */
+  memories: { id: string; x: number; y: number; taken: boolean }[];
+  /** Memory ids found before on this device. */
+  memoriesTaken: readonly string[];
   combo: number;
   stats: Stats;
   pendingTime: number;
@@ -178,13 +196,37 @@ export interface World {
   noFreeze: boolean;
   /** Scratch context handed to enemy behaviours. */
   ectx: EnemyCtx;
-  /** Seconds left per power (0 = off). */
-  power: Powers;
-  pickups: Pickup[];
-  /** The running powers folded together, refreshed every step. */
-  mods: Modifiers;
-  /** Tempo last told to the view. */
-  tempo: number;
+  /** Story: hand-made levels, no lives, deaths cost points. Endless: the seeded run with lives. */
+  mode: GameMode;
+  /** The story level being played ('1-1'), null in Endless. */
+  levelId: string | null;
+  /** After a story level is won: the id to play next (null after the last). */
+  next: string | null;
+  /** Moves unlocked so far; the hero shares this object. */
+  abilities: Abilities;
+  /** The sword that gives the blade, if this level has one. */
+  sword: { x: number; y: number; taken: boolean } | null;
+  /** The blade swing in progress, if any (see ./blade.ts). */
+  swing: Swing | null;
+  attackBuffer: number;
+  comboNext: number;
+  comboT: number;
+  /** Counts swings, so each swing hits a thing once. */
+  serial: number;
+  /** Seconds after a pogo during which enemy contact cannot hurt. */
+  pogoSafe: number;
+  /** Scenery from the level; a neon sign can be broken by the blade. */
+  decor: { kind: DecorKind; x: number; y: number; broken: boolean }[];
+  /** Light sources now (a broken sign's light goes out). */
+  lights: Light[];
+  /** Drone decoys from the level (tile x, y). */
+  decoys: { x: number; y: number }[];
+  shrines: { x: number; y: number; ability: Ability; taken: boolean }[];
+  /** The running power, if any: t seconds left of total. */
+  power: { kind: PowerKind; t: number; total: number } | null;
+  pickups: { kind: PowerKind; x: number; y: number; taken: boolean }[];
+  /** Coins flying to her (Taco Rush), a fixed pool: t > 0 is in flight. */
+  flyers: { x: number; y: number; t: number }[];
   /** Seconds of the hurt look after a shielded hit. */
   hurtT: number;
   shots: Shot[];
@@ -201,7 +243,8 @@ export interface World {
   coinMul: number;
 }
 
-const PLATFORM_AMP = 2.5;
+/** Moving platforms swing this many tiles each way from where the level puts them. */
+export const PLATFORM_AMP = 2.5;
 const PLATFORM_PERIOD = 4.2;
 const PLATFORM_H = 0.5;
 
@@ -215,7 +258,11 @@ function makeSolid(tiles: Uint8Array, cols: number): SolidFn {
   return solid;
 }
 
+export type GameMode = 'story' | 'endless';
+
 export interface WorldOptions {
+  /** 'endless' unless set. */
+  mode?: GameMode;
   levelIndex?: number;
   /** Seed for the world's generator. The view passes a fresh one per run. */
   seed?: number;
@@ -228,6 +275,18 @@ export interface WorldOptions {
   noFreeze?: boolean;
   /** Force world 1's modifier instead of the seeded pick. */
   modifier?: ModifierId;
+  /** Memory ids already found on this device: they start taken. */
+  memoriesTaken?: readonly string[];
+  /** Moves unlocked at the start (the view stores story unlocks). Story starts with none; Endless has all. */
+  abilities?: Partial<Abilities>;
+  /** Story level to load ('1-1'); story mode only. */
+  levelId?: string;
+}
+
+/** Story starts with no unlocks; Endless has every move. Options override either. */
+function abilitiesFor(o: WorldOptions): Abilities {
+  const all = (o.mode ?? 'endless') === 'endless';
+  return { wallJump: o.abilities?.wallJump ?? all, dash: o.abilities?.dash ?? all, blade: o.abilities?.blade ?? all };
 }
 
 export function createWorld(o: WorldOptions = {}): World {
@@ -237,23 +296,38 @@ export function createWorld(o: WorldOptions = {}): World {
     hero: createHero(level.start.x, level.start.y), heroPx: 0, heroPy: 0, hidden: false,
     enemies: [], platforms: [], crowns: [], pops: [], bumps: [], riding: null,
     phase: 'play', phaseT: 0, pitDeath: false, t: 0, levelTime: 0,
-    lives: LIVES, crowned: false, invuln: 0, checkpointHit: false, combo: 0,
-    stats: { coins: 0, stomps: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0 },
+    lives: LIVES, crowned: false, invuln: 0, checkpointHit: false, checkpointIdx: -1, memories: [], memoriesTaken: o.memoriesTaken ?? [], combo: 0,
+    stats: { coins: 0, stomps: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0, deaths: 0 },
     pendingTime: 0, pendingClear: false, flagDrop: 0,
     secretUnlocked: false, secret: o.secret ?? { ...SECRET_FALLBACK }, result: null,
     events: [], cam: { x: 0, y: 0, look: 0, px: 0, py: 0 },
     viewCols: o.viewCols ?? 17, viewRows: o.viewRows ?? 13,
     cardT: 0, landT: 0, jumpT: 0, seed: o.seed ?? DEFAULT_SEED, rand: o.rand ?? mulberry32(o.seed ?? DEFAULT_SEED), c: contacts(),
     hitFreeze: 0, slowMo: 0, noFreeze: !!o.noFreeze, scarf: [], trailT: 0, ectx: null as unknown as EnemyCtx,
-    power: createPowers(), pickups: [], mods: noModifiers(), tempo: 1, hurtT: 0,
+    power: null, pickups: [], hurtT: 0,
+    flyers: Array.from({ length: FLYER_POOL }, () => ({ x: 0, y: 0, t: 0 })),
+    mode: o.mode ?? 'endless', levelId: null, next: null,
+    abilities: abilitiesFor(o), shrines: [], sword: null,
+    swing: null, attackBuffer: 0, comboNext: 0, comboT: 99, serial: 0, pogoSafe: 0, decor: [], lights: [], decoys: [],
     shots: Array.from({ length: SHOT_POOL }, () => ({ x: 0, y: 0, vx: 0, vy: 0, t: 0 })),
     modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1,
     afterimages: Array.from({ length: AFTERIMAGE_POOL }, () => ({ x: 0, y: 0, facing: 1 as const, t: 0 })),
   };
   w.scarf = createScarf(neckOf(w.hero));
-  w.ectx = { solid: w.solid, c: contacts(), rand: w.rand, hero: w.hero, flee: 0, shoot: (x, y, vx, vy) => fire(w, x, y, vx, vy) };
-  loadLevel(w, o.levelIndex ?? 0);
+  w.ectx = { solid: w.solid, c: contacts(), rand: w.rand, hero: w.hero, shoot: (x, y, vx, vy) => fire(w, x, y, vx, vy),
+    decoys: w.decoys, decoyDive: (x, y) => emit(w, 'decoyDive', x, y) };
+  if (w.mode === 'story') loadStory(w, o.levelId ?? '1-1');
+  else loadLevel(w, o.levelIndex ?? 0);
   return w;
+}
+
+/** Load a story level by id ('1-1'): fixed, no modifier. */
+export function loadStory(w: World, id: string) {
+  const entry = storyEntry(id);
+  w.levelId = id;
+  w.next = null;
+  w.result = null;
+  enterLevel(w, entry.world - 1, parseLevel(storyLevelDef(id)), 'none');
 }
 
 /** The level for world `index` of this run (world 1 is built from the seed). */
@@ -283,10 +357,22 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
   w.platforms = level.platforms.map(p => ({ x0: p.x, y0: p.y, x: p.x, y: p.y, w: p.w, h: PLATFORM_H, axis: p.axis, px: p.x, py: p.y }));
   w.crowns = []; w.pops = []; w.bumps = [];
   for (const sh of w.shots) sh.t = 0;
+  w.sword = level.sword ? { x: level.sword.x, y: level.sword.y, taken: w.abilities.blade } : null;
+  w.swing = null; w.attackBuffer = 0; w.comboNext = 0; w.comboT = 99; w.pogoSafe = 0;
+  w.decor = level.decor.map(d => ({ kind: d.kind, x: d.x, y: d.y, broken: false }));
+  w.lights = level.lights.slice();
+  w.decoys = level.decoys.map(d => ({ x: d.x, y: d.y }));
+  if (w.ectx) w.ectx.decoys = w.decoys;
+  for (const f of w.flyers) f.t = 0;
+  w.power = null;
   w.pickups = level.pickups.map(p => ({ kind: p.kind, x: p.x, y: p.y, taken: false }));
-  w.power = createPowers();
-  modifiers(w.power, w.mods);
+  w.shrines = level.shrines.map(q => ({ x: q.x, y: q.y, ability: q.ability, taken: !!w.abilities[q.ability] }));
   w.checkpointHit = false;
+  w.checkpointIdx = -1;
+  w.memories = level.memories.map((m, i) => {
+    const id = `${w.levelId ?? 'endless'}-${String.fromCharCode(97 + i)}`;
+    return { id, x: m.x, y: m.y, taken: w.memoriesTaken.includes(id) };
+  });
   w.levelTime = 0;
   w.flagDrop = 0;
   w.pendingTime = 0; w.pendingClear = false;
@@ -300,6 +386,7 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
 function placeHero(w: World, at: { x: number; y: number }) {
   w.hero = createHero(at.x, at.y);
   w.hero.facing = w.level.goalDir;
+  w.hero.abilities = w.abilities;
   w.heroPx = w.hero.x; w.heroPy = w.hero.y;
   w.hidden = false;
   w.riding = null;
@@ -384,11 +471,18 @@ export function stepWorld(w: World, input: InputFrame, fixedDt: number) {
   const dt = fixedDt * (1 - Math.min(0.9, Math.max(0, w.slowMo)));
   const jump = input.jumpPressed;
   const dash = input.dashPressed;
+  // The Action button is the attack.
+  const attack = input.actionPressed;
   consumeEdges(input);
   if (w.phase === 'done') return;
-  if (jump && w.phase === 'play') pressJump(w.hero);
+  if (jump && w.phase === 'play') {
+    pressJump(w.hero);
+    if (w.swing && w.hero.coyote > 0) w.swing = null; // a jump cancels a swing
+  }
+  if (attack && w.phase === 'play' && w.abilities.blade) w.attackBuffer = BLADE.buffer;
   if (w.hitFreeze > 0) { holdStill(w, dt); return; }
   if (dash && w.phase === 'play' && tryDash(w.hero, input.move)) {
+    w.swing = null; // a dash cancels a swing
     emit(w, 'dash', w.hero.x + w.hero.w / 2, w.hero.y + w.hero.h / 2, w.hero.dashDir);
     spawnAfterimage(w);
     freeze(w, PHYS.dashFreeze);
@@ -431,7 +525,8 @@ function syncHeroState(w: World) {
   if (w.phase === 'dying' || (w.phase === 'done' && w.result === 'lost')) setState(h, 'dead');
   else if (w.phase !== 'play') setState(h, 'victory');
   else if (w.hurtT > 0) setState(h, 'hurt');
-  else if (h.state === 'hurt' || h.state === 'dead' || h.state === 'victory') setState(h, h.dashT > 0 ? 'dash' : h.onGround ? 'ground' : 'air');
+  else if (w.swing) setState(h, w.swing.kind);
+  else if (worldOwned(h.state)) setState(h, h.dashT > 0 ? 'dash' : h.onGround ? 'ground' : 'air');
 }
 
 /** Reuse the oldest pool entry for an afterimage at the hero. */
@@ -477,9 +572,7 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const c = w.c;
   w.levelTime += dt;
   if (w.invuln > 0) w.invuln = Math.max(0, w.invuln - dt);
-  stepPowers(w.power, dt, ENDED);
-  for (const k of ENDED) emit(w, 'powerOff', h.x + h.w / 2, h.y, POWER_KINDS.indexOf(k));
-  refreshMods(w);
+  stepPower(w, dt);
 
   // Ride a moving platform: carry the hero by its motion first.
   if (w.riding) {
@@ -489,9 +582,12 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
     moveY(h, p.y - p.py, w.solid, c);
   }
 
+  stepBlade(w, dt);
   const wasGround = h.onGround;
   const prevBottom = h.y + h.h;
-  const r = stepHero(h, input, dt, w.solid, c, w.gravityScale);
+  const rooted = w.swing !== null && isGroundSwing(w.swing.kind);
+  if (rooted) { ROOTED.jumpHeld = input.jumpHeld; }
+  const r = stepHero(h, rooted ? ROOTED : input, dt, w.solid, c, w.gravityScale);
   // Storm gusts drift the hero (half on a roof, never in a dash).
   const k = MODIFIERS[w.modifier.id].wind;
   w.wind = k > 0 ? k * gust(w.levelTime, w.windDir) : 0;
@@ -502,6 +598,7 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   }
   if (r.jumped) { emit(w, 'jump', h.x + h.w / 2, prevBottom); w.jumpT = 0.16; }
   if (r.dashEnded && c.wall !== 0 && tile(w, c.wallTx, c.wallTy) === TILE.CRACK) smash(w, c.wallTx, c.wallTy);
+  if (r.doubleJumped) emit(w, 'doubleJump', h.x + h.w / 2, h.y + h.h, h.facing);
   if (r.wallJumped) emit(w, 'wallJump', h.x + (h.facing > 0 ? 0 : h.w), h.y + h.h / 2, h.facing);
   if (r.skidded) emit(w, 'skid', h.x + h.w / 2, h.y + h.h, -h.facing);
 
@@ -529,15 +626,15 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   }
 
   collectCoins(w, h);
+  touchShrines(w);
+  takeSword(w);
   collectPickups(w);
+  pullCoins(w, dt);
 
   if (h.y > ROWS + 0.5) { die(w, true); return; }
 
-  const cp = w.level.checkpoint;
-  if (cp && !w.checkpointHit && h.x + h.w / 2 >= cp.x) {
-    w.checkpointHit = true;
-    emit(w, 'checkpoint', cp.x + 0.5, cp.y - 1);
-  }
+  passCheckpoints(w);
+  touchMemories(w);
 
   stepEnemies(w, dt, prevBottom, input.jumpHeld);
   if (w.phase !== 'play') return;
@@ -549,8 +646,6 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const zone = { x: pole.x + 0.4, y: pole.top, w: 0.2, h: pole.base + 1 - pole.top };
   if (overlaps(h, zone)) grabPole(w);
 }
-
-const ENDED: PowerKind[] = [];
 
 /** A dash into a cracked wall smashes its whole column of cracked tiles. */
 function smash(w: World, tx: number, ty: number) {
@@ -571,7 +666,7 @@ function fire(w: World, x: number, y: number, vx: number, vy: number) {
   emit(w, 'shot', x, y);
 }
 
-/** Shots fly straight, die on walls, and hurt the hero (Aura Mode just pops them). */
+/** Shots fly straight, die on walls, and hurt the hero. */
 function stepShots(w: World, dt: number) {
   const h = w.hero;
   for (const s of w.shots) {
@@ -587,30 +682,218 @@ function stepShots(w: World, dt: number) {
   }
 }
 
-/** Fold the running powers and tell the view when the tempo moves. */
-function refreshMods(w: World) {
-  modifiers(w.power, w.mods);
-  if (w.mods.tempo !== w.tempo) {
-    w.tempo = w.mods.tempo;
-    emit(w, 'tempo', w.hero.x, w.hero.y, w.tempo);
-  }
-}
-
 /** Scratch boxes reused every step (no allocation in the step). */
 const NECK = { x: 0, y: 0 };
 const TORSO = { x: 0, y: 0, w: 0, h: 0 };
-const ORB = { x: 0, y: 0, w: 0.7, h: 0.7 };
+
+/** A ground swing plants her feet: the stick is ignored. */
+const ROOTED: HeroInput = { move: 0, jumpHeld: false };
+const HITBOX = { x: 0, y: 0, w: 0, h: 0 };
+const SIGN_BOX = { x: 0, y: 0, w: 3, h: 1 };
+
+/** Start buffered swings, advance the current one, and land its hits. */
+function stepBlade(w: World, dt: number) {
+  const h = w.hero;
+  if (w.pogoSafe > 0) w.pogoSafe = Math.max(0, w.pogoSafe - dt);
+  tickSwing(w, h, dt);
+  if (w.attackBuffer > 0 && w.abilities.blade) {
+    const s = startSwing(w, h, !h.onGround && targetBelow(w));
+    if (s) emit(w, 'swing', h.x + h.w / 2, h.y + h.h / 2, SWING_KINDS.indexOf(s.kind));
+  }
+  const s = w.swing;
+  if (!s || !isActive(s)) return;
+  const box = hitbox(h, s, HITBOX);
+  const d = BLADE.swings[s.kind];
+  const down = s.kind === 'downStrike';
+  let hit = false, bounce = false;
+  for (const e of w.enemies) {
+    if (e.deadT !== -1 || e.lastHit === s.serial || !overlaps(box, e)) continue;
+    e.lastHit = s.serial;
+    e.hp -= d.damage;
+    hit = true; if (down) bounce = true;
+    if (e.hp <= 0) {
+      killEnemy(w, e);
+      emit(w, 'hit', e.x + e.w / 2, e.y + e.h / 2, 0);
+      continue;
+    }
+    const dir = down ? (e.x + e.w / 2 >= h.x + h.w / 2 ? 1 : -1) : s.dir;
+    e.vx = dir * d.knock;
+    e.vy = ENEMY_KINDS[e.kind].flies ? 0 : -3;
+    e.stunT = BLADE.stun;
+    emit(w, 'hit', e.x + e.w / 2, e.y + e.h / 2, e.hp);
+  }
+  // Crates and spikes in the box.
+  for (let ty = Math.floor(box.y); ty <= Math.floor(box.y + box.h - 1e-6); ty++) {
+    for (let tx = Math.floor(box.x); tx <= Math.floor(box.x + box.w - 1e-6); tx++) {
+      const t = tile(w, tx, ty);
+      if (t === TILE.CRATE) {
+        setTile(w, tx, ty, TILE.EMPTY);
+        for (let i = 0; i < BLADE.crateCoins; i++) { gainCoin(w); emit(w, 'coin', tx + 0.5, ty + 0.5); }
+        emit(w, 'break', tx + 0.5, ty + 0.5, 1);
+        hit = true; if (down) bounce = true;
+      } else if (t === TILE.SPIKE && down) {
+        bounce = true;
+      }
+    }
+  }
+  // Neon signs: scenery 3 tiles wide, one tall, standing on y.
+  for (const dc of w.decor) {
+    if (dc.kind !== 'neonSign' || dc.broken) continue;
+    SIGN_BOX.x = dc.x; SIGN_BOX.y = dc.y - 1;
+    if (!overlaps(box, SIGN_BOX)) continue;
+    dc.broken = true;
+    const li = w.lights.findIndex(l => l.x === dc.x + 0.5 && l.y === dc.y - 0.5);
+    if (li >= 0) w.lights.splice(li, 1);
+    for (let i = 0; i < BLADE.signCoins; i++) { gainCoin(w); emit(w, 'coin', dc.x + 1.5, dc.y - 0.5); }
+    emit(w, 'break', dc.x + 1.5, dc.y - 0.5, 2);
+    hit = true; if (down) bounce = true;
+  }
+  if (hit) freeze(w, d.stop);
+  if (bounce) {
+    pogo(h);
+    w.swing = null;
+    w.pogoSafe = BLADE.pogoSafe;
+    emit(w, 'pogo', h.x + h.w / 2, h.y + h.h);
+  }
+}
+
+/** Is an enemy, spikes, a crate or a sign right below her, within reach of a down-strike? */
+function targetBelow(w: World): boolean {
+  const h = w.hero;
+  const feet = h.y + h.h;
+  const x0 = h.x - 0.2, x1 = h.x + h.w + 0.2;
+  for (const e of w.enemies) {
+    if (e.deadT !== -1) continue;
+    if (e.x < x1 && e.x + e.w > x0 && e.y + e.h > feet - 0.2 && e.y <= feet + BLADE.downReach) return true;
+  }
+  for (let tx = Math.floor(x0); tx <= Math.floor(x1 - 1e-6); tx++) {
+    for (let ty = Math.floor(feet); ty <= Math.floor(feet + BLADE.downReach); ty++) {
+      const t = tile(w, tx, ty);
+      if (t === TILE.SPIKE || t === TILE.CRATE) return true;
+      if (isSolidTile(t) || t === TILE.ONEWAY) break;
+    }
+  }
+  for (const dc of w.decor) {
+    if (dc.kind !== 'neonSign' || dc.broken) continue;
+    if (dc.x < x1 && dc.x + 3 > x0 && dc.y - 1 >= feet - 0.2 && dc.y - 1 <= feet + BLADE.downReach) return true;
+  }
+  return false;
+}
+
+const FLYER_POOL = 16;
+const FLYER_SPEED = 14;
+const PICKUP_BOX = { x: 0, y: 0, w: 0.7, h: 0.7 };
+
+/** Tick the running power down and hand the hero its effects. */
+function stepPower(w: World, dt: number) {
+  const p = w.power;
+  if (p) {
+    p.t -= dt;
+    if (p.t <= 0) {
+      emit(w, 'powerOff', w.hero.x + w.hero.w / 2, w.hero.y, POWER_KINDS.indexOf(p.kind));
+      w.power = null;
+    }
+  }
+  const def = w.power ? POWERS[w.power.kind] : null;
+  w.hero.runMul = def ? def.runMul : 1;
+  w.hero.glideFall = def ? def.glideFall : 0;
+}
 
 function collectPickups(w: World) {
-  const h = w.hero;
   for (const p of w.pickups) {
     if (p.taken) continue;
-    ORB.x = p.x + 0.15; ORB.y = p.y + 0.15;
-    if (!overlaps(h, ORB)) continue;
+    PICKUP_BOX.x = p.x + 0.15; PICKUP_BOX.y = p.y + 0.15;
+    if (!overlaps(w.hero, PICKUP_BOX)) continue;
     p.taken = true;
-    w.power[p.kind] = POWERS[p.kind].duration;
+    if (w.power) emit(w, 'powerOff', p.x + 0.5, p.y + 0.5, POWER_KINDS.indexOf(w.power.kind));
+    const total = POWERS[p.kind].duration;
+    w.power = { kind: p.kind, t: total, total };
     emit(w, 'powerOn', p.x + 0.5, p.y + 0.5, POWER_KINDS.indexOf(p.kind));
-    refreshMods(w);
+  }
+}
+
+/** Taco Rush: coins within reach leave their tiles and fly to her; they count on arrival. */
+function pullCoins(w: World, dt: number) {
+  const h = w.hero;
+  const cx = h.x + h.w / 2, cy = h.y + h.h / 2;
+  const reach = w.power ? POWERS[w.power.kind].magnet : 0;
+  if (reach > 0) {
+    for (let ty = Math.floor(cy - reach); ty <= Math.floor(cy + reach); ty++) {
+      for (let tx = Math.floor(cx - reach); tx <= Math.floor(cx + reach); tx++) {
+        if (tile(w, tx, ty) !== TILE.COIN || Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy) > reach) continue;
+        setTile(w, tx, ty, TILE.EMPTY);
+        let f = w.flyers[0];
+        for (const g of w.flyers) if (g.t <= 0) { f = g; break; }
+        if (f.t > 0) { gainCoin(w); emit(w, 'coin', tx + 0.5, ty + 0.5); continue; }
+        f.x = tx + 0.5; f.y = ty + 0.5; f.t = 1;
+      }
+    }
+  }
+  for (const f of w.flyers) {
+    if (f.t <= 0) continue;
+    const dx = cx - f.x, dy = cy - f.y, d = Math.hypot(dx, dy);
+    const stepLen = FLYER_SPEED * dt;
+    if (d <= Math.max(0.4, stepLen)) {
+      f.t = 0;
+      gainCoin(w);
+      emit(w, 'coin', cx, cy);
+      continue;
+    }
+    f.x += (dx / d) * stepLen; f.y += (dy / d) * stepLen;
+  }
+}
+
+/** Checkpoints count in goal order, once he is past one toward the goal. */
+function passCheckpoints(w: World) {
+  const cps = w.level.checkpoints;
+  const cx = w.hero.x + w.hero.w / 2;
+  while (w.checkpointIdx + 1 < cps.length) {
+    const cp = cps[w.checkpointIdx + 1];
+    if (w.level.goalDir > 0 ? cx < cp.x : cx > cp.x + 1) break;
+    w.checkpointIdx++;
+    w.checkpointHit = true;
+    emit(w, 'checkpoint', cp.x + 0.5, cp.y - 1, w.checkpointIdx);
+  }
+}
+
+const MEMORY_BOX = { x: 0, y: 0, w: 0.8, h: 0.8 };
+
+function touchMemories(w: World) {
+  for (let i = 0; i < w.memories.length; i++) {
+    const m = w.memories[i];
+    if (m.taken) continue;
+    MEMORY_BOX.x = m.x + 0.1; MEMORY_BOX.y = m.y + 0.1;
+    if (!overlaps(w.hero, MEMORY_BOX)) continue;
+    m.taken = true;
+    emit(w, 'memory', m.x + 0.5, m.y + 0.5, i);
+  }
+}
+
+const SHRINE_BOX = { x: 0, y: 0, w: 0.8, h: 2 };
+const SWORD_BOX = { x: 0, y: 0, w: 0.8, h: 1 };
+
+/** The sword: the blade for good. */
+function takeSword(w: World) {
+  const sw = w.sword;
+  if (!sw || sw.taken) return;
+  SWORD_BOX.x = sw.x + 0.1; SWORD_BOX.y = sw.y;
+  if (!overlaps(w.hero, SWORD_BOX)) return;
+  sw.taken = true;
+  if (w.abilities.blade) return;
+  w.abilities.blade = true;
+  emit(w, 'unlock', sw.x + 0.5, sw.y, ABILITIES.indexOf('blade'));
+}
+
+/** A shrine gives its ability for good the first time he touches it. */
+function touchShrines(w: World) {
+  for (const q of w.shrines) {
+    if (q.taken) continue;
+    SHRINE_BOX.x = q.x + 0.1; SHRINE_BOX.y = q.y - 1;
+    if (!overlaps(w.hero, SHRINE_BOX)) continue;
+    q.taken = true;
+    if (w.abilities[q.ability]) continue;
+    w.abilities[q.ability] = true;
+    emit(w, 'unlock', q.x + 0.5, q.y, ABILITIES.indexOf(q.ability));
   }
 }
 
@@ -689,7 +972,7 @@ function killEnemy(w: World, e: Enemy) {
 }
 
 export function hurt(w: World) {
-  if (w.invuln > 0 || w.phase !== 'play' || w.mods.blocksDamage) return;
+  if (w.invuln > 0 || w.phase !== 'play') return;
   if (w.crowned) {
     w.crowned = false;
     w.invuln = INVULN_HIT;
@@ -701,6 +984,7 @@ export function hurt(w: World) {
 }
 
 function die(w: World, pit: boolean) {
+  if (w.mode === 'story') w.stats.deaths++;
   w.phase = 'dying';
   w.phaseT = 0;
   w.pitDeath = pit;
@@ -720,15 +1004,15 @@ function stepDying(w: World, dt: number) {
     h.y += h.vy * dt;
   }
   if (w.phaseT < DYING_SECONDS) return;
-  w.lives--;
-  if (w.lives <= 0) {
+  // Story has no lives: every death respawns.
+  if (w.mode === 'endless') w.lives--;
+  if (w.mode === 'endless' && w.lives <= 0) {
     w.phase = 'done';
     w.result = 'lost';
     emit(w, 'over', h.x, h.y);
     return;
   }
-  const cp = w.level.checkpoint;
-  placeHero(w, w.checkpointHit && cp ? cp : w.level.start);
+  placeHero(w, w.checkpointIdx >= 0 ? w.level.checkpoints[w.checkpointIdx] : w.level.start);
   w.invuln = INVULN_RESPAWN;
   w.phase = 'play';
   w.phaseT = 0;
@@ -748,27 +1032,27 @@ function stepEnemies(w: World, dt: number, prevBottom: number, jumpHeld: boolean
     }
     e.px = e.x; e.py = e.y;
     if (e.landT > 0) e.landT -= dt;
-    k.flee = 0;
-    if (w.mods.fleeRadius > 0) {
-      const dx = e.x + e.w / 2 - (h.x + h.w / 2), dy = e.y + e.h / 2 - (h.y + h.h / 2);
-      if (Math.hypot(dx, dy) < w.mods.fleeRadius) k.flee = dx >= 0 ? 1 : -1;
+    if (e.stunT > 0) {
+      // Knocked back by the blade: its behaviour waits.
+      e.stunT -= dt;
+      e.vx *= Math.pow(0.02, dt);
+      if (!ENEMY_KINDS[e.kind].flies) e.vy = Math.min(PHYS.terminal, e.vy + PHYS.gravity * dt);
+      else e.vy *= Math.pow(0.02, dt);
+      moveBody(e, dt, w.solid, k.c);
+    } else {
+      ENEMY_KINDS[e.kind].step(e, k, dt);
     }
-    ENEMY_KINDS[e.kind].step(e, k, dt);
     if (e.y > ROWS + 2) { e.deadT = 0; continue; }
 
     if (w.phase !== 'play') continue;
     const hit = stompOrHurt(h, prevBottom, e);
-    if (hit === 'hurt' && w.mods.killsOnTouch) {
-      // Aura Mode: a touch is a kill, scored as a stomp.
-      killEnemy(w, e);
-      emit(w, 'stomp', e.x + e.w / 2, e.y, 1);
-    } else if (hit === 'stomp' && !stomped) {
+    if (hit === 'stomp' && !stomped) {
       stomped = true;
       killEnemy(w, e);
       stompBounce(h, jumpHeld);
       w.combo++;
       emit(w, 'stomp', e.x + e.w / 2, e.y, w.combo);
-    } else if (hit === 'hurt' && !stomped) {
+    } else if (hit === 'hurt' && !stomped && w.pogoSafe <= 0) {
       hurt(w);
     }
   }
@@ -872,6 +1156,14 @@ function stepTally(w: World, dt: number) {
   if (!tallyStep(w, dt)) return;
   w.phaseT += dt;
   if (w.phaseT < 1.2) return;
+  if (w.mode === 'story') {
+    // The view shows the story card, then starts `next`.
+    w.phase = 'done';
+    w.result = 'won';
+    w.next = w.levelId ? nextStoryId(w.levelId) : null;
+    emit(w, 'win', 0, 0);
+    return;
+  }
   if (w.levelIndex === SECRET_GATE) {
     if (w.secretUnlocked) { loadLevel(w, SECRET_INDEX); return; }
     w.phase = 'done';

@@ -8,7 +8,7 @@ function alone(c: Chunk) {
   const rows = c.rows.map((r, y) => {
     const left = y === c.entry ? '===' : y > c.entry ? '###' : y === c.entry - 1 ? '.P.' : '...';
     const right = y === c.exit ? '====' : y > c.exit ? '####' : y === c.exit - 1 ? '..G.' : '....';
-    const mid = r.replace(/[*]/g, 'o').replace(/[?]/g, 'a').replace(/[$&]/g, '.').replace(/%/g, '#').replace(/D/g, 'd')
+    const mid = r.replace(/[*]/g, 'o').replace(/[$&]/g, '.').replace(/%/g, '#').replace(/D/g, 'd')
       .replace(/[PG]/g, '.');
     return left + mid + right;
   });

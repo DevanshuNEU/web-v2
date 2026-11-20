@@ -5,14 +5,20 @@
  * size of the view, then blitted to the screen at a whole number of device
  * pixels per art pixel with smoothing off (see ./camera.ts). Back to front:
  *
- *   sky (stars, moon) > clouds > 3 skyline strips > back rain
- *   > static tile chunks > blocks, decor, enemies, scarf, hero
- *   > light pass (darkness times additive lights, one multiply)
- *   > emissive pixels (neon, eyes, coins, orbs, afterimages)
+ *   background buffer: sky (stars, moon) > clouds > 3 skyline strips
+ *     > the close layer behind the roofs > back rain
+ *   playfield buffer (clear): static tile chunks > blocks, decor, enemies,
+ *     scarf, hero
+ *   > light pass: darkness plus additive lights, multiplied over the
+ *     background, then (masked to what the playfield drew) over the playfield
+ *   > background glow (lit rooms, neon, bulbs, drips, TVs, lightning bolt)
+ *   > playfield glow (neon, eyes, coins, orbs, afterimages, puddle
+ *     reflections), then the playfield over the background
  *   > glow halos (pre-baked light sprites, additive)
  *   > sparks, juice particles, front rain and splashes
- *   > screen effects (Aura Mode tint and edge glow, hit flash, lightning)
- *   > blit > floating words and level cards at full resolution.
+ *   > screen effects (hit flash, lightning)
+ *   > the pixel title card or level-clear tally
+ *   > blit > floating words at full resolution.
  *
  * World modifiers (per run, from the seed) change the weather and light:
  * blackout (near-black night, only the scarf, coins and orbs light it, neon
@@ -30,14 +36,17 @@ import { ROWS, type Level } from '../../sim/level';
 import type { World } from '../../sim/world';
 import { toMono } from '../bake';
 import { drawCards, type View } from '../pipeline';
-import { ENEMIES, HERO, HERO_NECK, PICKUPS, ROOFTOP_TILES, type HeroAnim, type SpriteSet } from '../sprites';
+import { CARD_SECONDS } from '../../sim/world';
+import { bakeTally, bakeTitle, cardWipe, drawCard, drawTallyNumbers, type CardArt, type Wipe } from './card';
+import { drawText, textWidth } from './font';
+import { BREAKABLES, ENEMIES, HERO, HERO_NECK, PICKUPS, POWERUPS, ROOFTOP_TILES, type HeroAnim, type SpriteSet } from '../sprites';
 import { pickHeroAnim, type AnimPick } from './anim';
 import { ART_TILE, blitOrigin, renderCam, viewMetrics, type BlitOrigin, type ViewMetrics } from './camera';
 import { makeCanvas, resize, type Canvas, type Ctx } from './canvas';
 import { CHUNK_COLS, CHUNK_PX, ChunkCache, chunkRange, type ChunkSpan } from './chunks';
 import { LightList, lightSprite, withAlpha } from './lights';
 import {
-  afterimagesOf, auraOf, dashReadyOf, decorOf, hitFreezeOf, lightsOf, modifierOf, pickupsOf, readHero, scarfOf, seedOf, windOf,
+  afterimagesOf, dashReadyOf, powerOf, decorOf, hitFreezeOf, lightsOf, modifierNameOf, modifierOf, pickupsOf, readHero, scarfOf, seedOf, windOf,
   type Decor, type HeroPose, type PickupKind,
 } from './read';
 import { signSet, signWord } from './signs';
@@ -45,13 +54,138 @@ import { STRIP_W, bakeSky, drawStrip, flicker, hash2, type Sky, type SkyLayer } 
 import { atlas, drawFrame, drawTinted, tinted, type Atlas } from './sprites';
 import { K, KIND, ROOF_GLOW, bakeChunk, bakeChunkPart, decorAtlas, decorBottom, tileAtlas, type Chunk } from './tiles';
 import { Motes, Rain, SLANT, Sparks, type RainOpts } from './weather';
+import { SKY_PRESETS, skyOf, type SkyPreset } from './timeofday';
+import {
+  StoryFx, drawFlights, drawLogo, drawMemories, drawNotice, drawPrompts, drawShrines, drawStoryCard, drawUnlockCard,
+  type Memory, type Prompt, type Shrine, type StoryCardView,
+} from './story';
+import { ActionFx, drawGlideCloak, drawPowerRing, drawSmear, drawSpeedLines } from './fx';
 
 export interface PixelView extends View {
   /** Device pixels per CSS pixel; the screen canvas is that much bigger. */
   dpr?: number;
+  /**
+   * A canvas under the screen canvas that shows the low-res frame, scaled up
+   * by CSS with pixelated sampling (the compositor does the upscale). Without
+   * it the frame is blitted, scaled, into the screen canvas.
+   */
+  pixel?: HTMLCanvasElement | null;
+  /** Title screen: the logo over the live scene. */
+  title?: boolean;
+  /** A story card being typed. */
+  story?: StoryCardView | null;
+  /** A one-line notice (a power's first pickup). */
+  notice?: { title: string; line: string; accent: string } | null;
+  /** Beginner and move prompts anchored in the world (text in capitals). */
+  prompts?: readonly Prompt[];
 }
 
 const LEVEL_H = ROWS * ART_TILE;
+const NO_LIGHT = () => {};
+function shrineLight(x: number, y: number, k: number) {
+  if (S) levelLight(S, x, y, 30, lightCol(COL.cyan, S.mono), k, 2, 0.6);
+}
+
+function memoriesOf(w: World): readonly Memory[] {
+  const m = (w as unknown as { memories?: readonly Memory[] }).memories;
+  return Array.isArray(m) ? m : [];
+}
+
+function shrinesOf(w: World): readonly Shrine[] {
+  const q = (w as unknown as { shrines?: readonly Shrine[] }).shrines;
+  return Array.isArray(q) ? q : [];
+}
+
+/** A 'bats' set piece on the level is live while she is inside its stretch. */
+function batsActive(w: World, heroX: number): boolean {
+  const list = (w.level as unknown as { setPieces?: readonly { kind: string; x0?: number; x1?: number; x?: number; w?: number }[] }).setPieces;
+  if (!Array.isArray(list)) return false;
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i];
+    if (p.kind !== 'bats') continue;
+    const a = p.x0 ?? p.x ?? 0, b = p.x1 ?? a + (p.w ?? 30);
+    if (heroX >= a - 4 && heroX <= b + 4) return true;
+  }
+  return false;
+}
+const RING_CAP = 4;
+const RING_LIFE = 0.3;
+const FLICK_LIFE = 0.25;
+/** Unit circle, 16 points, for the puff ring. */
+const RING_PTS = Array.from({ length: 16 }, (_, i) => [Math.cos((i / 16) * Math.PI * 2), Math.sin((i / 16) * Math.PI * 2)] as const);
+
+/**
+ * A game event the view forwards to the renderer (positions in tiles).
+ * `doubleJump`: a puff ring under the feet and a flick of the scarf.
+ */
+export function pixelEvent(type: string, x: number, y: number, n = 0) {
+  const s = state();
+  if (type === 'memory') { s.story.memory(x * ART_TILE, y * ART_TILE); return; }
+  if (type === 'unlock') { s.story.unlock(n); return; }
+  if (type === 'swing' || type === 'hit' || type === 'break' || type === 'coinPull' || type === 'pogo' || type === 'decoyDive') { s.action.event(type, x, y, n); return; }
+  if (type !== 'doubleJump') return;
+  let slot = s.rings[0];
+  for (const r of s.rings) {
+    if (r.t0 < 0 && !r.pending) { slot = r; break; }
+    if (r.t0 < slot.t0) slot = r;
+  }
+  slot.x = x * ART_TILE; slot.y = y * ART_TILE; slot.pending = true; slot.t0 = 0;
+  s.pendingFlick = true;
+}
+
+function drawRings(c: Ctx, s: State, t: number, mono: boolean): number {
+  let n = 0;
+  c.fillStyle = mono ? '#ffffff' : '#d8ecff';
+  for (const r of s.rings) {
+    if (r.pending) { r.t0 = t; r.pending = false; }
+    if (r.t0 < 0) continue;
+    const age = t - r.t0;
+    if (age > RING_LIFE || age < 0) { r.t0 = -1; continue; }
+    n++;
+    const k = age / RING_LIFE;
+    const rad = 3 + k * 9;
+    c.globalAlpha = 0.85 * (1 - k);
+    const cx = Math.round(r.x) - s.ox, cy = Math.round(r.y) - s.oy;
+    for (let i = 0; i < RING_PTS.length; i++) c.fillRect(Math.round(cx + RING_PTS[i][0] * rad), Math.round(cy + RING_PTS[i][1] * rad * 0.3), 1, 1);
+  }
+  c.globalAlpha = 1;
+  return n;
+}
+
+/** Blackout: the lights are out, but roof edges and spikes stay faintly readable. */
+function drawBlackoutRims(c: Ctx, s: State, ta: Atlas, lastChunk: number, mono: boolean): number {
+  let n = 0;
+  const rim = mono ? '#ffffff' : '#3df2ff';
+  for (let ci = s.span.first; ci <= Math.min(s.span.last, lastChunk); ci++) {
+    if (!s.chunks.has(ci)) continue;
+    const ch = s.chunks.get(ci);
+    const cx = ci * CHUNK_PX - s.ox;
+    c.fillStyle = rim;
+    for (let i = 0; i < ch.rims.length; i += 3) {
+      const x = cx + ch.rims[i], y = ch.rims[i + 1] - s.oy, e = ch.rims[i + 2];
+      if (x > s.bw || x + 16 < 0) continue;
+      n++;
+      c.globalAlpha = 0.16;
+      c.fillRect(x, y, 16, 1);
+      if (e) {
+        // the end of a roof before a gap: brighter, with a short drop down the wall
+        c.globalAlpha = 0.4;
+        const ex = e === 1 ? x : x + 15;
+        c.fillRect(ex, y, 1, 4);
+        c.fillRect(e === 1 ? x : x + 12, y, 4, 1);
+      }
+    }
+    for (let i = 0; i < ch.spikes.length; i += 2) {
+      const x = cx + ch.spikes[i], y = ch.spikes[i + 1] - s.oy;
+      if (x > s.bw || x + 16 < 0) continue;
+      n++;
+      c.globalAlpha = 0.4;
+      drawFrame(c, ta, 'spikes', 0, x, y, 1);
+    }
+  }
+  c.globalAlpha = 1;
+  return n;
+}
 const AFTERIMAGE_LIFE = 0.18;
 
 /** Night colours. Light colours become white under Mono. */
@@ -69,11 +203,15 @@ const COL = {
   magenta: '#ff3d9a', cyan: '#3df2ff', sodium: '#ffb347', violet: '#9a5cff', red: '#ff3b4f', screen: '#ffe14d',
 } as const;
 
-const ORB_OF: Readonly<Record<PickupKind, keyof typeof PICKUPS>> = {
-  aura: 'auraOrb', magnet: 'magnetOrb', boots: 'bootsOrb', pound: 'poundOrb', spark: 'sparkOrb',
-};
-const ORB_LIGHT: Readonly<Record<PickupKind, string>> = {
-  aura: '#9d62ff', magnet: '#ff5c95', boots: '#3df2ff', pound: '#ff8c3a', spark: '#d4ff3a',
+/** Pickup art per kind: the chapter 1 powers and the blade have their own; later powers use an orb for now. */
+function pickupSet(kind: string): SpriteSet<string> {
+  if (kind === 'batWings') return POWERUPS.batWings as SpriteSet<string>;
+  if (kind === 'tacoRush') return POWERUPS.tacoRush as SpriteSet<string>;
+  if (kind === 'blade') return POWERUPS.blade as SpriteSet<string>;
+  return PICKUPS.sparkOrb as SpriteSet<string>;
+}
+export const POWER_COLOR: Readonly<Record<PickupKind, string>> = {
+  batWings: '#9d62ff', tacoRush: '#ff8c3a', priorityBoarding: '#3df2ff', wickedFast: '#d4ff3a', encore: '#ff5c95',
 };
 /** Glowing keys per sprite set. */
 const HERO_GLOW = 'eE';
@@ -97,6 +235,17 @@ export interface FrameStats {
   coinGlow: number;
   skylineSeed: number;
   signText: string;
+  /** The modifier name on the title card while it shows, else ''. */
+  card: string;
+  /** Roof edges outlined for the blackout this frame. */
+  rims: number;
+  /** Double-jump puff rings showing. */
+  rings: number;
+  /** The time-of-day preset in use. */
+  sky: string;
+  /** Bats in the swarm on screen, memories flying to the corner. */
+  bats: number;
+  flights: number;
 }
 
 function luminance(hex: string): number {
@@ -108,11 +257,19 @@ const AMBIENT_DARK_LUM = luminance(COL.ambientDark);
 
 interface State {
   m: ViewMetrics;
+  /** The background, then the final frame. */
   main: Buffers | null;
+  /** The playfield: tiles, decor, actors, on clear. */
+  scene: Buffers | null;
   light: Buffers | null;
+  card: { art: CardArt | null; level: Level | null; mod: string; bw: number; mono: boolean };
+  skyOpts: { austin: boolean; neon: number; sky: SkyPreset };
+  /** A low fog band for the misty presets, baked per view size. */
+  fog: Canvas | null;
+  tally: { art: CardArt | null; title: string; bw: number; mono: boolean; t: number };
+  wipe: Wipe;
   lightBase: Canvas | null;
   lightBaseDark: Canvas | null;
-  auraEdge: Canvas | null;
   seed: number;
   motes: Motes;
   rainOpts: RainOpts;
@@ -141,6 +298,20 @@ interface State {
   sparkAcc: number;
   sx: Float32Array; sy: Float32Array;
   fonts: Map<number, string>;
+  /** The pixel canvas in use, its context and CSS size, and cached transform strings. */
+  pixel: HTMLCanvasElement | null;
+  pixelCtx: CanvasRenderingContext2D | null;
+  pixelW: number; pixelH: number;
+  transforms: Map<number, string>;
+  /** The screen canvas has floating words (or a card) on it that need clearing. */
+  overlayDirty: boolean;
+  /** Double-jump puffs (world art pixels, start time; t0 < 0 is free) and the scarf flick's start. */
+  rings: { x: number; y: number; t0: number; pending: boolean }[];
+  story: StoryFx;
+  action: ActionFx;
+  flickAt: number;
+  /** Events noted since the last frame, timed when that frame draws. */
+  pendingFlick: boolean;
 }
 
 let S: State | null = null;
@@ -154,9 +325,13 @@ function state(): State {
   if (S) return S;
   const s: State = {
     m: viewMetrics(320, 480, 1),
-    main: null, light: null, lightBase: null, lightBaseDark: null, auraEdge: null, sky: null,
+    main: null, scene: null, light: null, lightBase: null, lightBaseDark: null, sky: null,
+    card: { art: null, level: null, mod: '', bw: 0, mono: false },
+    skyOpts: { austin: true, neon: 1, sky: SKY_PRESETS.night }, fog: null,
+    tally: { art: null, title: '', bw: 0, mono: false, t: 0 },
+    wipe: { from: 0, to: 1 },
     seed: 0, motes: new Motes(lcg(19)), rainOpts: { density: 1, speed: 1, slant: SLANT },
-    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '' },
+    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '', card: '', rims: 0, rings: 0, bats: 0, flights: 0, sky: 'night' },
     blackout: false, flash: 0,
     bw: 0, bh: 0, mono: false,
     level: null, decor: null,
@@ -173,6 +348,9 @@ function state(): State {
     world: null, lastT: 0, lastRx: 0, lastRy: 0, sparkAcc: 0,
     sx: new Float32Array(SCARF_N), sy: new Float32Array(SCARF_N),
     fonts: new Map(),
+    pixel: null, pixelCtx: null, pixelW: 0, pixelH: 0, transforms: new Map(), overlayDirty: true,
+    rings: Array.from({ length: RING_CAP }, () => ({ x: 0, y: 0, t0: -1, pending: false })), flickAt: -9, pendingFlick: false,
+    story: new StoryFx(), action: new ActionFx(),
   };
   S = s;
   return s;
@@ -195,32 +373,52 @@ function roofHit(x: number, y: number): number {
 function col(c: string, mono: boolean): string { return mono ? toMono(c) : c; }
 function lightCol(c: string, mono: boolean): string { return mono ? '#ffffff' : c; }
 
-function ensureBuffers(s: State, m: ViewMetrics, mono: boolean, seed: number) {
+function ensureBuffers(s: State, m: ViewMetrics, mono: boolean, seed: number, neon: number, sky: SkyPreset) {
+  if (s.skyOpts.neon !== neon) { s.skyOpts.neon = neon; s.sky = null; }
+  if (s.skyOpts.sky !== sky) { s.skyOpts.sky = sky; s.sky = null; }
   if (!s.main) s.main = makeCanvas(m.bw, m.bh);
+  if (!s.scene) s.scene = makeCanvas(m.bw, m.bh);
   if (!s.light) s.light = makeCanvas(m.bw, m.bh);
   if (s.bw === m.bw && s.bh === m.bh && s.mono === mono && s.seed === seed && s.sky) return;
   resize(s.main.canvas, m.bw, m.bh);
+  resize(s.scene.canvas, m.bw, m.bh);
   resize(s.light.canvas, m.bw, m.bh);
   s.main.ctx.imageSmoothingEnabled = false;
+  s.scene.ctx.imageSmoothingEnabled = false;
   s.light.ctx.imageSmoothingEnabled = true;
-  s.sky = bakeSky(m.bw, m.bh, mono, seed);
+  s.sky = bakeSky(m.bw, m.bh, mono, seed, SKY_TEXT, s.skyOpts);
   s.seed = seed;
-  s.lightBase = bakeLightBase(m.bw, m.bh, mono, COL.ambient, 1);
+  s.lightBase = bakeLightBase(m.bw, m.bh, mono, sky.ambient, sky.glow, sky.cityGlow);
+  s.fog = sky.fog > 0 ? bakeFog(m.bw, m.bh, mono, sky) : null;
   s.lightBaseDark = bakeLightBase(m.bw, m.bh, mono, COL.ambientDark, 0.25);
-  s.auraEdge = bakeAuraEdge(m.bw, m.bh, mono);
   s.bw = m.bw; s.bh = m.bh;
   if (s.mono !== mono) { s.mono = mono; s.chunks.reset(); s.pre.index = -1; }
 }
 
 /** The darkness: ambient night, lifted by the city glow from below, darker at the edges. */
-function bakeLightBase(w: number, h: number, mono: boolean, ambient: string, glow: number): Canvas {
+/** A soft band of fog low over the city, for the misty presets. */
+function bakeFog(w: number, h: number, mono: boolean, sky: SkyPreset): Canvas {
+  const { canvas, ctx } = makeCanvas(w, h);
+  const g = ctx.createLinearGradient?.(0, h * 0.35, 0, h);
+  if (g) {
+    const c = col(sky.fogColor, mono);
+    g.addColorStop(0, withAlpha(c, 0));
+    g.addColorStop(0.55, withAlpha(c, 0.45 * sky.fog));
+    g.addColorStop(1, withAlpha(c, 0.75 * sky.fog));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  return canvas;
+}
+
+function bakeLightBase(w: number, h: number, mono: boolean, ambient: string, glow: number, cityGlow: string = COL.cityGlow): Canvas {
   const { canvas, ctx } = makeCanvas(w, h);
   ctx.fillStyle = col(ambient, mono);
   ctx.fillRect(0, 0, w, h);
   const up = ctx.createLinearGradient?.(0, h, 0, h * 0.35);
   if (up) {
-    up.addColorStop(0, withAlpha(col(COL.cityGlow, mono), glow));
-    up.addColorStop(1, withAlpha(col(COL.cityGlow, mono), 0));
+    up.addColorStop(0, withAlpha(col(cityGlow, mono), glow));
+    up.addColorStop(1, withAlpha(col(cityGlow, mono), 0));
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = up;
     ctx.fillRect(0, 0, w, h);
@@ -237,19 +435,7 @@ function bakeLightBase(w: number, h: number, mono: boolean, ambient: string, glo
   return canvas;
 }
 
-function bakeAuraEdge(w: number, h: number, mono: boolean): Canvas {
-  const { canvas, ctx } = makeCanvas(w, h);
-  const g = ctx.createRadialGradient?.(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.72);
-  const c = lightCol(COL.violet, mono);
-  if (g) {
-    g.addColorStop(0, withAlpha(c, 0));
-    g.addColorStop(0.7, withAlpha(c, 0.25));
-    g.addColorStop(1, withAlpha(c, 0.75));
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-  }
-  return canvas;
-}
+const SKY_TEXT = { draw: (c: Ctx, t: string, x: number, y: number) => drawText(c, t, x, y), width: (t: string) => textWidth(t) };
 
 function mod(a: number, m: number) { return ((a % m) + m) % m; }
 
@@ -324,7 +510,6 @@ function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, red
   }
   c.globalAlpha = 1;
 
-  if (s.flash > 0.5) drawBolt(c, s, t, s.flash, mono);
   const cl = sky.clouds;
   const drift = reduced ? 0 : t * (s.rainOpts.density > 1 ? 5 : 1.5);
   drawStrip(c, cl, -mod(Math.floor(rx * cl.f + drift), STRIP_W), Math.round(s.bh * 0.3), s.bw);
@@ -334,15 +519,82 @@ function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, red
     const x0 = -mod(Math.floor(rx * L.f), STRIP_W);
     const y0 = stripY(s, L, ry);
     drawStrip(c, L, x0, y0, s.bw);
-    drawLayerGlow(c, s, L, li, x0, y0, t, mono);
-    // a rare window flickering off, then back
+  }
+}
+
+/**
+ * What glows on the background, drawn after the darkness: lit rooms and
+ * bulbs (each layer's glow canvas), neon and antenna lights, TVs, drips
+ * from the cables, windows flickering off, and the storm's lightning bolt.
+ */
+function drawBackgroundGlow(c: Ctx, s: State, rx: number, ry: number, t: number, reduced: boolean, mono: boolean) {
+  const sky = s.sky as Sky;
+  if (s.flash > 0.5) drawBolt(c, s, t, s.flash, mono);
+  for (let li = 0; li < sky.layers.length; li++) {
+    const L = sky.layers[li];
+    const x0 = -mod(Math.floor(rx * L.f), STRIP_W);
+    const y0 = stripY(s, L, ry);
+    if (!s.blackout) {
+      if (L.glow) {
+        // lit rooms over the darkened facade: they glow, without burning to white
+        c.globalAlpha = (L.f > 0.5 ? 0.62 : 0.9) * s.skyOpts.sky.windows;
+        drawStripCanvas(c, L.glow, x0, y0, s.bw);
+        c.globalAlpha = 1;
+      }
+      drawLayerGlow(c, s, L, li, x0, y0, t, mono);
+      // a TV flickering blue in a dark room
+      c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < L.tvs.length; i++) {
+        const v = L.tvs[i];
+        c.globalAlpha = 0.25 + 0.45 * hash2(Math.floor(t * 9), Math.floor(v.seed * 100));
+        c.fillStyle = v.on;
+        for (let x = x0 + v.x; x < s.bw; x += STRIP_W) if (x >= -v.w) c.fillRect(x, y0 + v.y, v.w, v.h);
+      }
+      c.globalAlpha = 1;
+      c.globalCompositeOperation = 'source-over';
+    }
+    // a rare window (or billboard) flickering off, then back
     for (let i = 0; i < L.flick.length; i++) {
       const f = L.flick[i];
-      if (flicker(t * 0.6, f.seed) >= 1) continue;
+      if (!s.blackout && flicker(t * 0.6, f.seed) >= 1) continue;
       c.fillStyle = f.off;
       for (let x = x0 + f.x; x < s.bw; x += STRIP_W) if (x >= -f.w) c.fillRect(x, y0 + f.y, f.w, f.h);
     }
+    // Lady Bird Lake: the lights glint in the water
+    if (L.glints && !s.blackout) {
+      c.fillStyle = mono ? '#ffffff' : '#ffe9c9';
+      for (let i = 0; i < L.glints.length; i++) {
+        const g = L.glints[i];
+        const a = hash2(Math.floor(t * 3 + g.seed), i);
+        if (a < 0.55) continue;
+        c.globalAlpha = (a - 0.55) * 1.6;
+        for (let x = x0 + g.x; x < s.bw; x += STRIP_W) if (x >= 0) c.fillRect(x, y0 + g.y, a > 0.9 ? 2 : 1, 1);
+      }
+      c.globalAlpha = 1;
+    }
+    // drips falling from the cables' low points
+    c.fillStyle = mono ? '#d4d4d8' : '#b9c6ff';
+    for (let i = 0; i < L.drips.length; i++) {
+      const d = L.drips[i];
+      const period = 1.4 + (d.seed % 1.3);
+      const ph = mod(t * (reduced ? 0.5 : 1) + d.seed, period);
+      for (let x = x0 + d.x; x < s.bw; x += STRIP_W) {
+        if (x < -2) continue;
+        if (ph < 0.7) {
+          c.globalAlpha = 0.7;
+          c.fillRect(x, y0 + d.y + Math.round(ph * ph * 140), 1, ph > 0.1 ? 2 : 1);
+        } else if (ph > period - 0.5) {
+          c.globalAlpha = 0.5;
+          c.fillRect(x, y0 + d.y, 1, 1);
+        }
+      }
+    }
+    c.globalAlpha = 1;
   }
+}
+
+function drawStripCanvas(c: Ctx, canvas: Canvas, x: number, y: number, bw: number) {
+  for (let sx = x; sx < bw; sx += STRIP_W) c.drawImage(canvas, sx, y);
 }
 
 /**
@@ -352,7 +604,7 @@ function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, red
  */
 function drawLayerGlow(c: Ctx, s: State, L: SkyLayer, li: number, x0: number, y0: number, t: number, mono: boolean) {
   if (s.blackout) return;
-  const dim = 0.55 + 0.25 * li;
+  const dim = (0.4 + 0.15 * li) * s.skyOpts.sky.windows;
   c.globalCompositeOperation = 'lighter';
   for (let i = 0; i < L.neon.length; i++) {
     const n = L.neon[i];
@@ -433,6 +685,10 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
       }
       if (k === K.CRACK) {
         if (layer === 'base') drawCrack(c, ta, x, y, tx, ty, s.mono);
+        continue;
+      }
+      if (k === K.CRATE) {
+        if (layer === 'base') drawFrame(c, atlas(BREAKABLES.crate, s.mono), 'idle', (tx + ty) % 2, x + 8, y + 16, 1);
         continue;
       }
       const anim = k === K.BRICK ? 'brick' : k === K.AURA ? 'auraBlock' : 'auraBlockUsed';
@@ -625,12 +881,20 @@ function drawPickups(c: Ctx, s: State, w: World, t: number, reduced: boolean, la
   for (let i = 0; i < list.length; i++) {
     const p = list[i];
     if (p.taken) continue;
-    const set = PICKUPS[ORB_OF[p.kind] ?? 'auraOrb'] as SpriteSet<string>;
+    const set = pickupSet(p.kind);
     const x = Math.round((p.x + 0.5) * ART_TILE) - s.ox;
     const y = Math.round((p.y + 0.5) * ART_TILE + (reduced ? 0 : Math.sin(t * 2.6 + i) * 2)) - s.oy;
     if (x < -20 || x > s.bw + 20) continue;
-    if (layer === 'glow') drawFrame(c, atlas(set, s.mono), 'idle', t * 8, x, y, 1);
-    else s.lights.add(x, y, 34, lightCol(ORB_LIGHT[p.kind] ?? COL.violet, s.mono), 0.95, 1, 0.6);
+    if (layer === 'glow') { const a = atlas(set, s.mono); drawFrame(c, a, Object.keys(a.rects)[0], t * 8, x, y, 1); }
+    else s.lights.add(x, y, 34, lightCol(POWER_COLOR[p.kind] ?? COL.violet, s.mono), 0.95, 1, 0.6);
+  }
+  // the sword that gives the blade
+  const sword = (w as unknown as { sword?: { x: number; y: number; taken: boolean } | null }).sword;
+  if (sword && !sword.taken) {
+    const x = Math.round((sword.x + 0.5) * ART_TILE) - s.ox;
+    const y = Math.round((sword.y + 0.5) * ART_TILE + (reduced ? 0 : Math.sin(t * 2.2) * 2)) - s.oy;
+    if (layer === 'glow') drawFrame(c, atlas(POWERUPS.blade, s.mono), 'idle', t * 8, x, y, 1);
+    else s.lights.add(x, y, 36, lightCol(COL.cyan, s.mono), 1, 2, 0.7);
   }
   // the old Aura Crown power-up and coins popping out of blocks
   if (layer !== 'glow') return;
@@ -707,10 +971,14 @@ function scarfPoints(s: State, w: World, hd: HeroDraw, t: number, reduced: boole
     const floor = hd.y - 1;
     // a little flutter on top of the rope, stronger towards the tail and with speed
     const flap = reduced ? 0 : Math.min(1, Math.abs(s.pose.vx) / 6) * 1.4;
+    // a double jump flicks the scarf: the tail whips up and out
+    const fa = t - s.flickAt;
+    const wa = s.action.whipAge(t);
+    const flick = reduced ? 0 : fa >= 0 && fa < FLICK_LIFE ? Math.sin((fa / FLICK_LIFE) * Math.PI) : wa >= 0 ? -Math.sin((wa / 0.2) * Math.PI) * 0.8 : 0;
     for (let i = 1; i < n; i++) {
-      const k = 1 - i / n;
-      s.sx[i] = pts[i].x * ART_TILE - s.ox + dx * k;
-      s.sy[i] = Math.min(floor, pts[i].y * ART_TILE - s.oy + dy * k + Math.sin(t * 15 - i * 0.9) * flap * (i / n));
+      const k = 1 - i / n, f = i / n;
+      s.sx[i] = pts[i].x * ART_TILE - s.ox + dx * k - hd.facing * flick * 3 * f;
+      s.sy[i] = Math.min(floor, pts[i].y * ART_TILE - s.oy + dy * k + Math.sin(t * 15 - i * 0.9) * flap * f - flick * 7 * f);
     }
     return n;
   }
@@ -772,7 +1040,12 @@ function worldLights(s: State, w: World, t: number, reduced: boolean) {
   }
 }
 
-function lightPass(c: Ctx, s: State) {
+/**
+ * Darkness and lights: one light map, multiplied over the background (so
+ * neon spills on the buildings behind), then masked to the playfield's
+ * pixels and multiplied over the playfield.
+ */
+function lightPass(bg: Ctx, sc: Buffers, s: State) {
   const L = s.light as Buffers;
   const lc = L.ctx;
   lc.globalCompositeOperation = 'source-over';
@@ -788,14 +1061,97 @@ function lightPass(c: Ctx, s: State) {
   const slots = s.lights.slots;
   for (let i = 0; i < s.lights.count; i++) {
     const l = slots[i];
-    lc.globalAlpha = l.k;
+    lc.globalAlpha = l.k * s.skyOpts.sky.lightK;
     lc.drawImage(lightSprite(l.color), l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
   }
   lc.globalAlpha = 1;
+  bg.globalCompositeOperation = 'multiply';
+  bg.drawImage(L.canvas, 0, 0);
+  bg.globalCompositeOperation = 'source-over';
+  lc.globalCompositeOperation = 'destination-in';
+  lc.drawImage(sc.canvas, 0, 0);
   lc.globalCompositeOperation = 'source-over';
-  c.globalCompositeOperation = 'multiply';
-  c.drawImage(L.canvas, 0, 0);
-  c.globalCompositeOperation = 'source-over';
+  sc.ctx.globalCompositeOperation = 'multiply';
+  sc.ctx.drawImage(L.canvas, 0, 0);
+  sc.ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Puddles mirror the strongest light near them in a one or two pixel strip, shimmering. */
+function drawPuddles(c: Ctx, s: State, lastChunk: number, t: number, reduced: boolean, mono: boolean) {
+  const slots = s.lights.slots;
+  const sky = mono ? '#5a5a62' : '#3a3466';
+  for (let ci = s.span.first; ci <= Math.min(s.span.last, lastChunk); ci++) {
+    if (!s.chunks.has(ci)) continue;
+    const p = s.chunks.get(ci).puddles;
+    const cx = ci * CHUNK_PX - s.ox;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = cx + p[i], y = p[i + 1] - s.oy, w = p[i + 2];
+      if (x > s.bw || x + w < 0) continue;
+      let best = 0, color = sky;
+      for (let j = 0; j < s.lights.count; j++) {
+        const l = slots[j];
+        const dx = l.x - (x + w / 2), dy = l.y - y;
+        const d = Math.sqrt(dx * dx + dy * dy * 0.5);
+        const f = l.k * (1 - d / (l.r * 1.6));
+        if (f > best) { best = f; color = l.color; }
+      }
+      const shim = reduced ? 0 : Math.floor(hash2(Math.floor(t * 7), i) * 3) - 1;
+      c.globalAlpha = 0.3 + 0.6 * clamp01(best);
+      c.fillStyle = color;
+      c.fillRect(x + 1 + Math.max(0, shim), y, w - 2 - Math.abs(shim), 1);
+      c.globalAlpha *= 0.45;
+      c.fillRect(x + 2, y + 1, w - 4, 1);
+      // a raindrop ringing the puddle now and then
+      if (!reduced && hash2(Math.floor(t * 12), i * 7 + ci) < 0.06) {
+        c.globalAlpha = 0.8;
+        c.fillStyle = mono ? '#ffffff' : '#dfe6ff';
+        c.fillRect(x + 1 + Math.floor(hash2(i, Math.floor(t * 12)) * (w - 2)), y, 1, 1);
+      }
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+/** Door lamps baked into the chunks on screen. */
+function chunkLamps(s: State, lastChunk: number) {
+  const color = lightCol(COL.sodium, s.mono);
+  for (let ci = s.span.first; ci <= Math.min(s.span.last, lastChunk); ci++) {
+    if (!s.chunks.has(ci)) continue;
+    const L = s.chunks.get(ci).lamps;
+    const cx = ci * CHUNK_PX - s.ox;
+    for (let i = 0; i < L.length; i += 2) levelLight(s, cx + L[i], L[i + 1] - s.oy + 2, 30, color, 0.85, 1, 0.4);
+  }
+}
+
+/** The world title card, and the level-clear tally, pixel-native in the buffer. */
+function drawPixelCards(c: Ctx, s: State, w: World, dt: number, reduced: boolean, mono: boolean) {
+  s.stats.card = '';
+  if (w.cardT > 0 && w.phase === 'play') {
+    const k = s.card;
+    const mod = modifierNameOf(w);
+    s.stats.card = mod;
+    if (!k.art || k.level !== w.level || k.mod !== mod || k.bw !== s.bw || k.mono !== mono) {
+      k.art = bakeTitle(w.level.label, w.level.name, mod, modifierOf(w), s.bw, mono);
+      k.level = w.level; k.mod = mod; k.bw = s.bw; k.mono = mono;
+    }
+    const elapsed = CARD_SECONDS - w.cardT;
+    cardWipe(s.wipe, elapsed, w.cardT, reduced);
+    const top = Math.max(26, Math.round(s.bh * 0.3 - k.art.h / 2));
+    drawCard(c, k.art, s.bw, top, s.wipe, elapsed, w.t, reduced);
+  }
+  const tl = s.tally;
+  if (w.phase === 'tally') {
+    tl.t += dt;
+    const title = w.secretUnlocked && w.levelIndex === 2 ? 'SECRET UNLOCKED' : 'LEVEL CLEARED';
+    if (!tl.art || tl.title !== title || tl.bw !== s.bw || tl.mono !== mono) {
+      tl.art = bakeTally(title, s.bw, mono);
+      tl.title = title; tl.bw = s.bw; tl.mono = mono;
+    }
+    cardWipe(s.wipe, tl.t, 9, reduced);
+    const top = Math.max(26, Math.round(s.bh * 0.36 - tl.art.h / 2));
+    drawCard(c, tl.art, s.bw, top, s.wipe, tl.t, w.t, reduced);
+    if (s.wipe.to >= 1) drawTallyNumbers(c, tl.art, s.bw, top, Math.ceil(w.pendingTime), !w.pendingClear, mono);
+  } else tl.t = 0;
 }
 
 function haloPass(c: Ctx, s: State) {
@@ -860,20 +1216,6 @@ function drawFloaters(ctx: CanvasRenderingContext2D, s: State, juice: Juice, rx:
 }
 
 function screenEffects(c: Ctx, s: State, w: World, t: number, reduced: boolean) {
-  const aura = auraOf(w);
-  if (aura > 0) {
-    const fade = Math.min(1, aura / 0.4, (8 - aura) / 0.3 + 0.0001);
-    // the last two seconds pulse faster as a warning (steady under reduced motion)
-    const pulse = reduced ? 0.8 : aura < 2 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 0.75 + 0.25 * Math.sin(t * 3);
-    c.globalCompositeOperation = 'lighter';
-    c.globalAlpha = 0.08 * clamp01(fade);
-    c.fillStyle = lightCol(COL.violet, s.mono);
-    c.fillRect(0, 0, s.bw, s.bh);
-    c.globalAlpha = clamp01(fade) * pulse;
-    c.drawImage(s.auraEdge as Canvas, 0, 0);
-    c.globalAlpha = 1;
-    c.globalCompositeOperation = 'source-over';
-  }
   if (s.flash > 0) {
     c.globalCompositeOperation = 'lighter';
     c.globalAlpha = s.flash * 0.22;
@@ -883,7 +1225,8 @@ function screenEffects(c: Ctx, s: State, w: World, t: number, reduced: boolean) 
     c.globalCompositeOperation = 'source-over';
   }
   const freeze = hitFreezeOf(w);
-  if (freeze > 0 && !reduced) {
+  // only a real hit stop flashes (a few hundredths of a second), never a long hold
+  if (freeze > 0 && freeze <= 0.1 && !reduced) {
     c.globalCompositeOperation = 'lighter';
     c.globalAlpha = Math.min(0.16, freeze * 2.5);
     c.fillStyle = '#ffffff';
@@ -908,7 +1251,9 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   const m = viewMetrics(v.w, v.h, dpr, s.m);
   const mono = v.mono, reduced = v.reduced;
   const seed = seedOf(world);
-  ensureBuffers(s, m, mono, seed);
+  // Sixth Street (story 1-2) gets the dense neon
+  const sky = skyOf(world.level);
+  ensureBuffers(s, m, mono, seed, (world as unknown as { levelId?: string | null }).levelId === '1-2' ? 2.5 : 1, sky);
   const modifier = modifierOf(world);
   s.blackout = modifier === 'blackout';
   const storm = modifier === 'storm', lowG = modifier === 'lowGravity';
@@ -924,6 +1269,7 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   st.ambient = s.blackout ? AMBIENT_DARK_LUM : AMBIENT_LUM;
   st.lightning = s.flash;
   st.skylineSeed = seed;
+  st.sky = sky.id;
   st.signText = signWord(seed, world.levelIndex, 0);
   const level = world.level;
   const decor = decorOf(world);
@@ -950,10 +1296,16 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   const c = (s.main as Buffers).ctx;
   c.globalCompositeOperation = 'source-over';
   c.globalAlpha = 1;
+  const SC = s.scene as Buffers;
+  const sc = SC.ctx;
+  sc.globalCompositeOperation = 'source-over';
+  sc.globalAlpha = 1;
+  sc.clearRect(0, 0, s.bw, s.bh);
   s.lights.begin(0, 0, s.bw, s.bh, Math.round(anchorX) - s.ox, Math.round(anchorY) - s.oy - 12);
 
   // ── back to front ──
   drawBackground(c, s, rx, ry, t, reduced, mono);
+  if (s.fog) c.drawImage(s.fog, 0, 0);
   s.rain.update(dt, s.bw, s.bh, camDx, camDy, reduced, roofHit, ro);
   s.motes.update(dt, s.bw, s.bh, camDx, camDy, lowG, reduced);
   s.rain.draw(c, false, mono);
@@ -961,32 +1313,45 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   chunkRange(s.span, s.ox, s.bw);
   const lastChunk = Math.floor((level.cols - 1) / CHUNK_COLS);
   for (let i = s.span.first; i <= Math.min(s.span.last, lastChunk); i++) {
-    c.drawImage(s.chunks.get(i).base, i * CHUNK_PX - s.ox, -s.oy);
+    sc.drawImage(s.chunks.get(i).base, i * CHUNK_PX - s.ox, -s.oy);
   }
   prefetchChunk(s, level, h.vx >= 0 ? 1 : -1, lastChunk);
   const ta = tileAtlas(mono);
-  drawDynamicTiles(c, s, world, ta, 'base', t);
-  drawPlatforms(c, s, world, ta, a);
-  drawCheckpoint(c, s, world, 'base');
-  drawDecor(c, s, world, 'base', t, reduced);
+  drawDynamicTiles(sc, s, world, ta, 'base', t);
+  drawPlatforms(sc, s, world, ta, a);
+  drawCheckpoint(sc, s, world, 'base');
+  drawDecor(sc, s, world, 'base', t, reduced);
   decorLights(s, world, t);
-  drawEnemies(c, s, world, a, t, 'base');
-  drawShots(c, s, world, 'base');
-  drawPickups(c, s, world, t, reduced, 'base');
+  drawEnemies(sc, s, world, a, t, 'base');
+  drawShots(sc, s, world, 'base');
+  drawPickups(sc, s, world, t, reduced, 'base');
+  drawShrines(sc, shrinesOf(world), s.ox, s.oy, s.bw, t, reduced, mono, shrineLight);
+  const decoys = (world as unknown as { decoys?: readonly { x: number; y: number }[] }).decoys;
+  if (Array.isArray(decoys) && decoys.length) s.action.drawDecoys(sc, decoys, s.ox, s.oy, s.bw, t, mono);
+  const memories = memoriesOf(world);
+  for (let i = 0; i < memories.length; i++) {
+    const m = memories[i];
+    if (!m.taken) s.lights.add(m.x * ART_TILE + 8 - s.ox, m.y * ART_TILE + 8 - s.oy, 26, lightCol(COL.sodium, mono), 0.8, 2, 0);
+  }
 
   const hero = atlas(HERO, mono, HERO_GLOW);
   const hd = poseHero(s, world, Math.round(anchorX) - s.ox, Math.round(anchorY) - s.oy);
   const ready = dashReadyOf(world);
+  if (s.pendingFlick) { s.flickAt = t; s.pendingFlick = false; }
   const n = scarfPoints(s, world, hd, t, reduced);
+  const pw = powerOf(world);
+  const gliding = !!pw && pw.kind === 'batWings' && !world.hero.onGround && world.hero.vy > 0 && world.hero.vy < 4;
+  if (hd.visible && gliding) drawGlideCloak(sc, hd.x, hd.y, hd.facing, t, mono);
+  if (hd.visible && pw && pw.kind === 'tacoRush' && Math.abs(world.hero.vx) > 6 && !reduced) drawSpeedLines(sc, hd.x, hd.y, hd.facing, t, mono);
   if (hd.visible) {
-    drawScarf(c, s, n, col(ready ? COL.scarfEdge : COL.scarfDimEdge, mono), col(ready ? COL.scarfCore : COL.scarfDimCore, mono), false);
+    drawScarf(sc, s, n, col(ready ? COL.scarfEdge : COL.scarfDimEdge, mono), col(ready ? COL.scarfCore : COL.scarfDimCore, mono), false);
     // rim light from the city glow behind him: a one pixel edge on his back and hood
     const rim = tinted(hero, col(COL.heroRim, mono));
-    c.globalAlpha = 0.85;
-    drawTinted(c, hero, rim, hd.anim, hd.frame, hd.x - hd.facing, hd.y, hd.facing);
-    drawTinted(c, hero, rim, hd.anim, hd.frame, hd.x, hd.y - 1, hd.facing);
-    c.globalAlpha = 1;
-    drawFrame(c, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'base', hd.dw, hd.dh);
+    sc.globalAlpha = 0.6;
+    drawTinted(sc, hero, rim, hd.anim, hd.frame, hd.x - hd.facing, hd.y, hd.facing);
+    drawTinted(sc, hero, rim, hd.anim, hd.frame, hd.x, hd.y - 1, hd.facing);
+    sc.globalAlpha = 1;
+    drawFrame(sc, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'base', hd.dw, hd.dh);
   }
   // wall slide sparks at the hand on the wall
   s.sparkAcc += dt;
@@ -997,8 +1362,10 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   s.sparks.update(dt);
 
   // ── lights ──
-  const auraOn = auraOf(world) > 0;
-  if (!s.blackout || auraOn) s.lights.add(hd.x, hd.y - 12, auraOn ? 70 : 40, lightCol(auraOn ? COL.violet : COL.heroFill, mono), auraOn ? 1 : 0.7, 5, auraOn ? 0.4 : 0);
+  const unlockAge = s.story.unlockAge(t);
+  if (unlockAge >= 0) s.lights.add(hd.x, hd.y - 12, 60 + Math.sin(unlockAge * 6) * 8, lightCol(COL.magenta, mono), 1, 6, 0.6);
+  if (!s.blackout) s.lights.add(hd.x, hd.y - 12, 40, lightCol(COL.heroFill, mono), 0.7, 5, 0);
+  if (pw) s.lights.add(hd.x, hd.y - 12, 34, lightCol(POWER_COLOR[pw.kind] ?? COL.violet, mono), 0.6, 5, 0.25);
   if (hd.visible) {
     const mid = n >> 1;
     // in a blackout the scarf is the hero's lantern
@@ -1007,32 +1374,60 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   }
   worldLights(s, world, t, reduced);
   coinLights(s, world, modifier === 'doubleAura');
-  lightPass(c, s);
+  chunkLamps(s, lastChunk);
+  lightPass(c, SC, s);
+  drawBackgroundGlow(c, s, rx, ry, t, reduced, mono);
 
   // ── emissive: what glows stays bright through the darkness ──
   if (!s.blackout) {
     for (let i = s.span.first; i <= Math.min(s.span.last, lastChunk); i++) {
-      c.drawImage(s.chunks.get(i).glow, i * CHUNK_PX - s.ox, -s.oy);
+      sc.drawImage(s.chunks.get(i).glow, i * CHUNK_PX - s.ox, -s.oy);
     }
   }
-  drawDynamicTiles(c, s, world, ta, 'glow', t);
-  drawCheckpoint(c, s, world, 'glow');
-  drawDecor(c, s, world, 'glow', t, reduced);
-  drawEnemies(c, s, world, a, t, 'glow');
-  drawShots(c, s, world, 'glow');
-  drawPickups(c, s, world, t, reduced, 'glow');
-  drawAfterimages(c, s, world, hero);
+  drawPuddles(sc, s, lastChunk, t, reduced, mono);
+  st.rims = s.blackout ? drawBlackoutRims(sc, s, ta, lastChunk, mono) : 0;
+  drawDynamicTiles(sc, s, world, ta, 'glow', t);
+  drawCheckpoint(sc, s, world, 'glow');
+  drawDecor(sc, s, world, 'glow', t, reduced);
+  drawEnemies(sc, s, world, a, t, 'glow');
+  drawShots(sc, s, world, 'glow');
+  drawPickups(sc, s, world, t, reduced, 'glow');
+  drawAfterimages(sc, s, world, hero);
+  drawMemories(sc, memories, s.ox, s.oy, s.bw, t, reduced, mono, NO_LIGHT);
   if (hd.visible) {
-    if (ready) drawScarf(c, s, n, '', col(COL.scarfHot, mono), true);
-    drawFrame(c, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'glow', hd.dw, hd.dh);
+    if (ready || unlockAge >= 0) drawScarf(sc, s, n, '', col(COL.scarfHot, mono), true);
+    drawFrame(sc, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'glow', hd.dw, hd.dh);
+    drawSmear(sc, s.pose.state, s.pose.animT, hd.x, hd.y, hd.facing, mono);
+    if (pw) drawPowerRing(sc, hd.x, hd.y - 11, pw.t / pw.total, lightCol(POWER_COLOR[pw.kind] ?? COL.violet, mono), t, reduced);
   }
+  c.drawImage(SC.canvas, 0, 0);
   haloPass(c, s);
 
+  st.rings = drawRings(c, s, t, mono);
+  s.action.update(dt);
+  s.action.draw(c, s.ox, s.oy, t, mono);
+  if (pw && pw.kind === 'tacoRush') s.action.drawCoinArcs(c, anchorX, anchorY - 10, s.ox, s.oy, t, mono);
+  st.bats = s.action.drawBats(c, batsActive(world, hx), s.bw, s.bh, dt, t, reduced, mono);
+  st.flights = drawFlights(c, s.story, s.ox, s.oy, s.bw, t, mono);
   s.sparks.draw(c, s.ox, s.oy, mono);
   s.motes.draw(c, mono);
   drawParticles(c, s, juice, mono);
   s.rain.draw(c, true, mono);
   screenEffects(c, s, world, t, reduced);
+  if (s.action.flashAge(t) >= 0 && !reduced) {
+    c.globalCompositeOperation = 'lighter';
+    c.globalAlpha = 0.14;
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, s.bw, s.bh);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+  }
+  if (v.prompts && v.prompts.length) drawPrompts(c, v.prompts, hx + h.w / 2, s.ox, s.oy, s.bw, mono);
+  if (unlockAge >= 0) drawUnlockCard(c, s.story, unlockAge, s.bw, s.bh, mono);
+  if (!v.title && !v.story) drawPixelCards(c, s, world, dt, reduced, mono);
+  if (v.title) drawLogo(c, s.bw, s.bh, t, reduced, mono);
+  if (v.story) drawStoryCard(c, v.story, s.bw, s.bh, t, reduced, mono);
+  if (v.notice) drawNotice(c, v.notice.title, v.notice.line, lightCol(v.notice.accent, mono), s.bw, s.bh, mono);
   st.lights = s.lights.count;
   st.rain = s.rain.active;
   let sum = 0;
@@ -1047,18 +1442,63 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
     shakeX = (hash2(Math.floor(t * 60), 1) * 2 - 1) * mag;
     shakeY = (hash2(Math.floor(t * 60), 2) * 2 - 1) * mag;
   }
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.imageSmoothingEnabled = false;
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.drawImage((s.main as Buffers).canvas, s.bx.offset + Math.round(shakeX * dpr), s.by.offset + Math.round(shakeY * dpr), s.bw * m.k, s.bh * m.k);
-  ctx.restore();
+  const offX = s.bx.offset + Math.round(shakeX * dpr), offY = s.by.offset + Math.round(shakeY * dpr);
+  const finale = world.phase === 'finale' || (world.phase === 'done' && world.result === 'secret');
+  if (v.pixel) {
+    showOnPixelCanvas(s, v.pixel, m, offX, offY);
+    // the screen canvas above it only carries words: cleared when they go
+    const words = juice.floaters.length > 0 || finale;
+    if (words || s.overlayDirty) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, m.dw, m.dh);
+      ctx.restore();
+      s.overlayDirty = words;
+    }
+  } else {
+    s.pixel = null;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage((s.main as Buffers).canvas, offX, offY, s.bw * m.k, s.bh * m.k);
+    ctx.restore();
+  }
 
-  ctx.save();
-  drawFloaters(ctx, s, juice, rx, ry, shakeX, shakeY, mono);
-  ctx.restore();
-  drawCards(ctx, world, v, mono);
+  if (juice.floaters.length) {
+    ctx.save();
+    drawFloaters(ctx, s, juice, rx, ry, shakeX, shakeY, mono);
+    ctx.restore();
+  }
+  // the secret world's finale card stays the full-resolution one
+  if (finale) drawCards(ctx, world, v, mono);
+}
+
+/** Copy the frame into the pixel canvas; size it in CSS once per resize; offset it by a cached transform. */
+function showOnPixelCanvas(s: State, P: HTMLCanvasElement, m: ViewMetrics, offX: number, offY: number) {
+  if (s.pixel !== P) {
+    s.pixel = P; s.pixelCtx = P.getContext('2d'); s.pixelW = 0; s.pixelH = 0; s.overlayDirty = true;
+  }
+  if (P.width !== s.bw) P.width = s.bw;
+  if (P.height !== s.bh) P.height = s.bh;
+  const cssW = (s.bw * m.k) / m.dpr, cssH = (s.bh * m.k) / m.dpr;
+  if (cssW !== s.pixelW || cssH !== s.pixelH) {
+    P.style.width = `${cssW}px`;
+    P.style.height = `${cssH}px`;
+    s.pixelW = cssW; s.pixelH = cssH;
+    s.transforms.clear();
+  }
+  const pc = s.pixelCtx;
+  if (pc) {
+    pc.globalCompositeOperation = 'source-over';
+    pc.globalAlpha = 1;
+    pc.drawImage((s.main as Buffers).canvas, 0, 0);
+  }
+  const key = (offX + 1024) * 4096 + (offY + 1024);
+  let tr = s.transforms.get(key);
+  if (!tr) { tr = `translate(${offX / m.dpr}px, ${offY / m.dpr}px)`; s.transforms.set(key, tr); }
+  if (P.style.transform !== tr) P.style.transform = tr;
 }
 
 /** What the last frame drew. */

@@ -49,6 +49,9 @@ export function pickHeroAnim(out: AnimPick, p: HeroPose): AnimPick {
     case 'pound': return set(out, 'pound', p.animT, f);
     case 'hurt': case 'dead': return set(out, 'hurt', 0, f);
     case 'victory': return set(out, 'victory', p.animT, f);
+    // The blade: each attack plays its own frames once.
+    case 'attack1': case 'attack2': case 'attack3': case 'airSlash': case 'downStrike':
+      return set(out, p.state as HeroAnim, p.animT, f);
     default: return set(out, 'idle', p.animT, f);
   }
 }

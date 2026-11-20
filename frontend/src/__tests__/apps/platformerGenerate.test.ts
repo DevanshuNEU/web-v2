@@ -94,16 +94,15 @@ describe('Main Character generator: 500 seeds', () => {
     expect(same / pairs).toBeLessThan(0.05);
   });
 
-  it('places exactly one Aura Mode orb, at most one Sigma coin (about a quarter of runs), and sometimes a bonus room and an elite drone', () => {
+  it('places at most one Sigma coin (about a quarter of runs), and sometimes a bonus room and an elite drone', () => {
     let sigma = 0, rooms = 0, elites = 0;
     for (const def of levels) {
-      expect(count(def.rows, 'a')).toBe(1);
       const s = count(def.rows, '$');
       expect(s).toBeLessThanOrEqual(1);
       sigma += s;
       if (def.rows.join('').includes('%')) rooms++;
       elites += count(def.rows, 'e');
-      for (const slot of ['*', '?', '&', 'D']) expect(def.rows.join('').includes(slot)).toBe(false);
+      for (const slot of ['*', '&', 'D']) expect(def.rows.join('').includes(slot)).toBe(false);
     }
     expect(sigma / levels.length).toBeGreaterThan(0.18);
     expect(sigma / levels.length).toBeLessThan(0.32);

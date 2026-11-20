@@ -5,20 +5,20 @@
 
 import { createWorld, drainEvents, enterLevel, stepWorld, type EventType, type World } from '@/components/apps/games/platformer/sim/world';
 import { ROWS, parseLevel, type Level } from '@/components/apps/games/platformer/sim/level';
-import type { WorldTheme } from '@/components/apps/games/platformer/sim/levels';
+import type { LevelDef, WorldTheme } from '@/components/apps/games/platformer/sim/levels';
 import { emptyFrame, type InputFrame } from '@/components/apps/games/platformer/input/frame';
 
 export const DT = 1 / 120;
 
 /** A hand-made level: bottom-aligned rows, padded to 14 rows, a pole added at the right unless it has a goal. */
-export function custom(rows: string[], theme: WorldTheme = 'grass'): Level {
+export function custom(rows: string[], theme: WorldTheme = 'grass', extra: Partial<LevelDef> = {}): Level {
   const w = rows[0].length;
   const full = [...Array(ROWS - rows.length).fill('.'.repeat(w)), ...rows];
   if (!full.some(r => r.includes('F') || r.includes('G'))) {
     const x = w - 2;
     for (let y = 2; y <= 11; y++) full[y] = full[y].slice(0, x) + (y === 2 ? 'F' : '|') + full[y].slice(x + 1);
   }
-  return parseLevel({ id: 1, label: 'Test', name: 'Test', theme, rows: full });
+  return parseLevel({ id: 1, label: 'Test', name: 'Test', theme, ...extra, rows: full });
 }
 
 export function worldOn(rows: string[], index = 0, theme: WorldTheme = 'grass'): World {

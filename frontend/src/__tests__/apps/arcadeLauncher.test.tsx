@@ -45,7 +45,7 @@ describe('Arcade launcher', () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByRole('button', { name: /Leaderboards/ }));
     const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map(t => t.textContent)).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'This week', 'All time']);
+    expect(tabs.map(t => t.textContent)).toEqual(['Main Character', 'Endless', 'Sigma Snake', 'Aura Tower', 'This week', 'All time']);
     expect(await screen.findByText('No scores this week yet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Aura Tower' }));
     expect(screen.getByRole('tab', { name: 'Aura Tower' })).toHaveAttribute('aria-selected', 'true');

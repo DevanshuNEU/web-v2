@@ -1,118 +1,66 @@
 import { describe, it, expect } from 'vitest';
-import {
-  POWERS, POWER_KINDS, createPowers, grantPower, modifiers, noModifiers, stepPowers, type PowerKind,
-} from '@/components/apps/games/platformer/sim/powers';
-import { LIVES, drainEvents, score } from '@/components/apps/games/platformer/sim/world';
-import { G40, run, runUntil, worldOn } from '../setup/platformerWorld';
+import { POWERS, POWER_KINDS } from '@/components/apps/games/platformer/sim/powers';
+import { PHYS } from '@/components/apps/games/platformer/sim/physics';
+import { drainEvents } from '@/components/apps/games/platformer/sim/world';
+import { FLAT, G40, run, runUntil, worldOn } from '../setup/platformerWorld';
 
-describe('Main Character powers: one table', () => {
-  it('has the five powers, and only Aura Mode is live in phase 2', () => {
-    expect([...POWER_KINDS].sort()).toEqual(['aura', 'boots', 'magnet', 'pound', 'spark']);
-    expect(POWER_KINDS.filter(k => POWERS[k].live)).toEqual(['aura']);
+describe('Main Character powers: one table, optional, one at a time', () => {
+  it('has Bat Wings and Taco Rush live, the later chapters as rows marked later', () => {
+    expect([...POWER_KINDS]).toEqual(['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore']);
+    expect(POWER_KINDS.filter(k => POWERS[k].live)).toEqual(['batWings', 'tacoRush']);
+    expect(POWERS.batWings.duration).toBe(10);
+    expect(POWERS.tacoRush.duration).toBe(8);
+    expect(POWERS.tacoRush.runMul).toBeCloseTo(1.4, 9);
+    expect(POWERS.tacoRush.magnet).toBe(3);
   });
 
-  it('Aura Mode lasts 8 s, kills on touch, blocks damage, scatters enemies within 6 tiles and speeds the music up', () => {
-    const a = POWERS.aura;
-    expect(a.duration).toBe(8);
-    expect(a.killsOnTouch).toBe(true);
-    expect(a.blocksDamage).toBe(true);
-    expect(a.fleeRadius).toBe(6);
-    expect(a.tempo).toBe(1.25);
-  });
-
-  it('grant, tick down, expire, and fold the active rows into modifiers', () => {
-    const p = createPowers();
-    const m = noModifiers();
-    expect(modifiers(p, m)).toEqual({ killsOnTouch: false, blocksDamage: false, fleeRadius: 0, tempo: 1 });
-    grantPower(p, 'aura');
-    expect(p.aura).toBe(8);
-    expect(modifiers(p, m).killsOnTouch).toBe(true);
-    const ended: PowerKind[] = [];
-    stepPowers(p, 7.9, ended);
-    expect(ended).toEqual([]);
-    stepPowers(p, 0.2, ended);
-    expect(ended).toEqual(['aura']);
-    expect(p.aura).toBe(0);
-    expect(modifiers(p, m)).toEqual({ killsOnTouch: false, blocksDamage: false, fleeRadius: 0, tempo: 1 });
-  });
-});
-
-describe('Main Character powers: Aura Mode in the world', () => {
-  const PICKUP = ['.P..a.....c.............................', G40, G40];
-
-  it('running into the orb takes it: 8 s of aura, a power-on event and the faster tempo', () => {
-    const w = worldOn(PICKUP);
-    expect(w.pickups).toEqual([{ kind: 'aura', x: 4, y: 11, taken: false }]);
+  it('w is Bat Wings, t is Taco Rush: running into one starts it with a powerOn event, and it runs out with powerOff', () => {
+    const w = worldOn(['.P..w...................................', G40, G40]);
+    expect(w.power).toBeNull();
+    expect(w.pickups).toEqual([{ kind: 'batWings', x: 4, y: 11, taken: false }]);
     const seen: { type: string; n: number }[] = [];
-    expect(runUntil(w, ww => { seen.push(...drainEvents(ww)); return ww.power.aura > 0; }, { move: 1 }, 2)).toBe(true);
-    expect(w.power.aura).toBeGreaterThan(7.9);
-    expect(w.pickups[0].taken).toBe(true);
-    expect(seen.find(e => e.type === 'powerOn')?.n).toBe(POWER_KINDS.indexOf('aura'));
-    expect(seen.find(e => e.type === 'tempo')?.n).toBe(1.25);
+    expect(runUntil(w, ww => { seen.push(...drainEvents(ww)); return ww.power !== null; }, { move: 1 }, 2)).toBe(true);
+    expect(w.power).toEqual({ kind: 'batWings', t: expect.any(Number), total: 10 });
+    expect(seen.find(e => e.type === 'powerOn')?.n).toBe(POWER_KINDS.indexOf('batWings'));
+    run(w, 10.1, {}, ww => seen.push(...drainEvents(ww)));
+    expect(w.power).toBeNull();
+    expect(seen.filter(e => e.type === 'powerOff').map(e => e.n)).toEqual([0]);
   });
 
-  it('touching an enemy with aura kills it for 50 (a stomp) and costs nothing', () => {
-    const w = worldOn(['.P........c.............................', G40, G40]);
-    grantPower(w.power, 'aura');
-    run(w, 2, { move: 1 });
-    expect(w.stats.stomps).toBe(1);
-    expect(score(w)).toBe(50);
-    expect(w.lives).toBe(LIVES);
-    expect(w.phase).toBe('play');
-    expect(w.enemies.every(e => e.deadT !== -1)).toBe(true);
+  it('a new power replaces the running one', () => {
+    const w = worldOn(['.P..w..t................................', G40, G40]);
+    run(w, 1.5, { move: 1 });
+    expect(w.power?.kind).toBe('tacoRush');
+    expect(w.pickups.every(p => p.taken)).toBe(true);
   });
 
-  it('blocks damage from spikes while it lasts', () => {
-    const w = worldOn(['.P.....^^...............................', G40, G40]);
-    grantPower(w.power, 'aura');
-    let died = false;
-    run(w, 2, { move: 1 }, ww => { if (ww.phase !== 'play') died = true; });
-    expect(died).toBe(false);
+  it('Bat Wings: holding jump while falling glides at a slow capped fall', () => {
+    const fall = (wings: boolean, hold: boolean) => {
+      const w = worldOn(FLAT);
+      if (wings) w.power = { kind: 'batWings', t: 10, total: 10 };
+      w.hero.y = 1; w.hero.vy = 0; w.hero.onGround = false; w.hero.coyote = 0; w.hero.airJumps = 0;
+      let fastest = 0;
+      run(w, 0.6, { jumpHeld: hold }, ww => { fastest = Math.max(fastest, ww.hero.vy); });
+      return fastest;
+    };
+    expect(fall(true, true)).toBeLessThanOrEqual(POWERS.batWings.glideFall + 1e-9);
+    expect(fall(true, false)).toBeGreaterThan(POWERS.batWings.glideFall * 2);
+    expect(fall(false, true)).toBeGreaterThan(POWERS.batWings.glideFall * 2);
   });
 
-  it('expires after 8 s with a power-off event and the normal tempo, then enemies hurt again', () => {
-    const w = worldOn(['.P..............................c.......', G40, G40]);
-    grantPower(w.power, 'aura');
-    w.enemies = [];
-    const seen: { type: string; n: number }[] = [];
-    run(w, 8.1, {}, ww => seen.push(...drainEvents(ww)));
-    expect(w.power.aura).toBe(0);
-    expect(seen.some(e => e.type === 'powerOff')).toBe(true);
-    expect(seen.filter(e => e.type === 'tempo').map(e => e.n)).toEqual([1.25, 1]);
-    const v = worldOn(['.P....c.................................', G40, G40]);
-    grantPower(v.power, 'aura');
-    v.power.aura = 0.01;
-    expect(runUntil(v, ww => ww.phase === 'dying', { move: 1 })).toBe(true);
-  });
-
-  it('walkers within 6 tiles run away from an aura hero; farther ones carry on', () => {
-    const w = worldOn(['.P....c..............c..................', G40, G40]);
-    const [near, far] = w.enemies;
-    w.hero.x = 3;
-    near.dir = -1; far.dir = -1;
-    grantPower(w.power, 'aura');
-    run(w, 0.3);
-    expect(near.dir).toBe(1);
-    expect(near.vx).toBeGreaterThan(0);
-    expect(far.dir).toBe(-1);
-  });
-
-  it('drones within 6 tiles scatter away and do not dive', () => {
-    const w = worldOn([
-      '..........d.............................',
-      '........................................',
-      '........................................',
-      '........................................',
-      '.P......................................',
-      G40, G40,
-    ]);
-    const e = w.enemies[0];
-    run(w, 0.2);
-    w.hero.x = e.x - 1;
-    grantPower(w.power, 'aura');
-    const x0 = e.x;
-    run(w, 0.5);
-    expect(e.mode).not.toBe('dive');
-    expect(e.x).toBeGreaterThan(x0 + 1);
+  it('Taco Rush: runs 40 percent faster, and coins within 3 tiles fly to her', () => {
+    const w = worldOn(['.P......................................', G40, G40]);
+    w.power = { kind: 'tacoRush', t: 8, total: 8 };
+    run(w, 1, { move: 1 });
+    expect(w.hero.vx).toBeCloseTo(PHYS.runMax * 1.4, 5);
+    const m = worldOn(['.P.......................o..............', G40, G40]);
+    m.power = { kind: 'tacoRush', t: 8, total: 8 };
+    // The coin (25, 11) is 2.8 tiles from her centre; she hovers above, never touching it.
+    for (let i = 0; i < 60; i++) { m.hero.x = 23; m.hero.y = 9; m.hero.vy = 0; m.hero.onGround = false; run(m, 1 / 120); }
+    expect(m.stats.coins).toBe(1);
+    const far = worldOn(['.P..........................o...........', G40, G40]);
+    far.power = { kind: 'tacoRush', t: 8, total: 8 };
+    for (let i = 0; i < 60; i++) { far.hero.x = 23; far.hero.y = 9; far.hero.vy = 0; far.hero.onGround = false; run(far, 1 / 120); }
+    expect(far.stats.coins).toBe(0);
   });
 });

@@ -104,7 +104,7 @@ describe('plausibility rules', () => {
 
 describe('games and weeks', () => {
   it('knows the four games', () => {
-    expect(['snake', 'platformer', 'stacker'].every(isGame)).toBe(true);
+    expect(['snake', 'platformer', 'stacker', 'endless'].every(isGame)).toBe(true);
     // Brainrot Evolution was removed from the arcade.
     expect(isGame('merge')).toBe(false);
     expect(isGame('tetris')).toBe(false);
@@ -122,9 +122,19 @@ describe('score caps sit near what a perfect run can reach', () => {
   it('snake: a 20x20 board holds at most 399 snacks', () => {
     expect(RULES.snake.cap).toBe(399);
   });
-  it('platformer: covers the 23,760 bound for any seed, within 15 percent of the best of 500 seeds (22,000)', () => {
+  it('platformer: covers a perfect Story run (14,860 for chapter 1) and sits within 15 percent above it', () => {
     // Derived from the level data in src/__tests__/apps/platformerScore.test.ts.
-    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(23_760);
-    expect(RULES.platformer.cap).toBeLessThanOrEqual(22_000 * 1.15);
+    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(14_860);
+    expect(RULES.platformer.cap).toBeLessThanOrEqual(14_860 * 1.15);
+  });
+});
+
+describe('Endless has its own board', () => {
+  it('a great Endless run (22,000, about 4 minutes) passes on the endless board', () => {
+    expect(checkPlausible('endless', 22_000, 240_000)).toEqual({ ok: true });
+  });
+  it('the endless cap covers the best Endless run and stays within 15 percent of it', () => {
+    expect(RULES.endless.cap).toBeGreaterThanOrEqual(22_000);
+    expect(RULES.endless.cap).toBeLessThanOrEqual(22_000 * 1.15);
   });
 });

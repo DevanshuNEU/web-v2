@@ -8,15 +8,19 @@
 
 import type { World } from '../../sim/world';
 
-export type HeroState = 'ground' | 'air' | 'dash' | 'wallSlide' | 'pound' | 'hurt' | 'dead' | 'victory';
-export type PickupKind = 'aura' | 'magnet' | 'boots' | 'pound' | 'spark';
+/** Hero states; the blade adds attack1 to attack3, airSlash and downStrike. */
+export type HeroState = 'ground' | 'air' | 'dash' | 'wallSlide' | 'pound' | 'hurt' | 'dead' | 'victory'
+  | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike';
+/** Power kinds: chapter 1 places Bat Wings and Taco Rush; the rest come later. */
+export type PickupKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore';
 
 export interface Pt { x: number; y: number }
 export interface Afterimage { x: number; y: number; facing: 1 | -1; t: number }
 export interface Pickup { kind: PickupKind; x: number; y: number; taken: boolean }
 export interface Decor { kind: string; x: number; y: number }
 export interface Light { x: number; y: number; r: number; color: string; flicker: number }
-export interface Power { aura: number; magnet: number; boots: number; pound: number; spark: number }
+/** The running power: which, seconds left, and its full length. */
+export interface Power { kind: PickupKind; t: number; total: number }
 
 /** The section D fields, all optional here. */
 interface HeroD {
@@ -25,7 +29,7 @@ interface HeroD {
 interface WorldD {
   scarf?: readonly Pt[];
   afterimages?: readonly Afterimage[];
-  power?: Partial<Power>;
+  power?: Partial<Power> | null;
   pickups?: readonly Pickup[];
   decor?: readonly Decor[];
   lights?: readonly Light[];
@@ -51,7 +55,12 @@ export const pickupsOf = (w: World): readonly Pickup[] => arr(d(w).pickups);
 export const decorOf = (w: World): readonly Decor[] => arr(d(w).decor ?? (w.level as { decor?: readonly Decor[] }).decor);
 export const lightsOf = (w: World): readonly Light[] => arr(d(w).lights ?? (w.level as { lights?: readonly Light[] }).lights);
 export const hitFreezeOf = (w: World): number => num(d(w).hitFreeze);
-export const auraOf = (w: World): number => num(d(w).power?.aura);
+/** The running power, or null. */
+export function powerOf(w: World): Power | null {
+  const p = d(w).power;
+  if (!p || typeof p.kind !== 'string' || !(num(p.t) > 0)) return null;
+  return { kind: p.kind, t: num(p.t), total: Math.max(num(p.total), num(p.t), 0.001) };
+}
 export const seedOf = (w: World): number => num(d(w).seed);
 export const windOf = (w: World): number => num(d(w).wind);
 /** The run's world modifier id, or '' for none. */

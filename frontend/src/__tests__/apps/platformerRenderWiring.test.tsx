@@ -29,17 +29,12 @@ beforeEach(() => {
 });
 
 const dev = () => (window as unknown as { __baguettino: { world: () => World; start: (i: number) => void } }).__baguettino;
-const frames = (n = 4) => act(() => new Promise<void>(r => {
-  let i = 0;
-  const f = () => (++i >= n ? r() : requestAnimationFrame(f));
-  requestAnimationFrame(f);
-}));
 
 async function start() {
   render(<GamesApp variant="mobile" />);
   await userEvent.click(screen.getByText('Main Character'));
-  await screen.findByTestId('platformer-root');
-  await userEvent.click(screen.getByRole('button', { name: 'Start' }));
+  await screen.findByTestId('platformer-root', {}, { timeout: 10000 });
+  await userEvent.click(screen.getByRole('button', { name: 'Endless' }));
 }
 
 describe('Main Character view wiring', () => {
@@ -52,7 +47,7 @@ describe('Main Character view wiring', () => {
     const c = dev().world().seed;
     expect(Number.isInteger(a)).toBe(true);
     expect(new Set([a, b, c]).size).toBe(3);
-  });
+  }, 15000);
 
   it('reduced motion turns the hit freeze off', async () => {
     motion.reduced = true;
@@ -65,14 +60,11 @@ describe('Main Character view wiring', () => {
     expect(dev().world().noFreeze).toBe(false);
   });
 
-  it('world 1 plays the rooftops track at full intensity, follows tempo events, stops on pause', async () => {
+  it('world 1 plays the rooftops track at full intensity and stops on pause', async () => {
     await start();
     expect(dev().world().level.theme).toBe('rooftops');
     expect(music.play).toHaveBeenCalledWith('rooftops');
     expect(music.setIntensity).toHaveBeenCalledWith(1);
-    dev().world().events.push({ type: 'tempo', x: 0, y: 0, n: 1.25 });
-    await frames(3);
-    expect(music.setTempo).toHaveBeenCalledWith(1.25);
     await userEvent.click(screen.getByRole('button', { name: 'Pause' }));
     expect(music.stop).toHaveBeenCalled();
   });

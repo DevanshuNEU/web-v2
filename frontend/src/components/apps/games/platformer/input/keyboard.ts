@@ -11,8 +11,9 @@ import { emptyFrame, releaseAll, type InputFrame } from './frame';
 const LEFT = new Set(['ArrowLeft', 'a']);
 const RIGHT = new Set(['ArrowRight', 'd']);
 const JUMP = new Set([' ', 'w', 'ArrowUp']);
-const DASH = new Set(['Shift', 'x']);
-const ACTION = new Set(['z', 'c']);
+const DASH = new Set(['Shift', 'x', 'k']);
+/** Attack (the blade): Z or J; C kept for old habits. */
+const ACTION = new Set(['z', 'j', 'c']);
 
 const norm = (key: string) => (key.length === 1 ? key.toLowerCase() : key);
 /** Handled so the page does not scroll, with no rule yet. */

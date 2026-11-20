@@ -7,6 +7,15 @@ import { BoardView } from './leaderboard/Leaderboard';
 import { savedName, type ArcadeGame } from './leaderboard/api';
 import { BOARD_GAMES } from './registry';
 
+// One tab per board. Main Character has two: Story (the fixed levels) and
+// Endless (seeded runs), so the two kinds of score never compete.
+type Tab = { board: ArcadeGame; title: string };
+const TABS: Tab[] = BOARD_GAMES.flatMap((g): Tab[] =>
+  g.board === 'platformer'
+    ? [{ board: g.board, title: g.title }, { board: 'endless', title: 'Endless' }]
+    : [{ board: g.board, title: g.title }],
+);
+
 /** Every game's global leaderboard, one tab per game. */
 export default function BoardsScreen({ onBack, initial = 'platformer' }: { onBack: () => void; initial?: ArcadeGame }) {
   const [game, setGame] = useState<ArcadeGame>(initial);
@@ -20,7 +29,7 @@ export default function BoardsScreen({ onBack, initial = 'platformer' }: { onBac
       </div>
       <Hairline />
       <div role="tablist" aria-label="Game" className="flex gap-1 overflow-x-auto overscroll-contain px-3 py-2 [scrollbar-width:none]">
-        {BOARD_GAMES.map(g => (
+        {TABS.map(g => (
           <button
             key={g.board}
             role="tab"

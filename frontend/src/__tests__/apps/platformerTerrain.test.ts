@@ -59,12 +59,12 @@ describe('Main Character terrain: the rooftop legend', () => {
     '........................................',
     '........................................',
     '.....................................X..',
-    '.P..T..N..U..H..R...a...............XX..',
+    '.P..T..N..U..H..R...................XX..',
     '========================================',
     '########################################',
   ];
 
-  it('parses = as solid roof, decor at the tile they stand on, lights at tile centres', () => {
+  it('parses = as solid roof, scenery at the tile it stands on, lights at tile centres, R as a crate', () => {
     const level = custom(ROOF, 'rooftops');
     expect(level.theme).toBe('rooftops');
     expect(tileAt(level.tiles, level.cols, 5, 12)).toBe(TILE.GROUND);
@@ -76,8 +76,10 @@ describe('Main Character terrain: the rooftop legend', () => {
       { kind: 'acUnit', x: 10, y: 12 },
       { kind: 'chimney', x: 13, y: 12 },
       { kind: 'neonSign', x: 15, y: 8 },
-      { kind: 'crate', x: 16, y: 12 },
     ]);
+    // R is a crate tile now: solid until the blade breaks it.
+    expect(tileAt(level.tiles, level.cols, 16, 11)).toBe(TILE.CRATE);
+    expect(level.crates).toBe(1);
     const signs = level.lights.filter(l => l.y === 7.5);
     expect(signs.map(l => l.x)).toEqual([3.5, 15.5]);
     for (const l of level.lights) {
@@ -88,7 +90,6 @@ describe('Main Character terrain: the rooftop legend', () => {
     }
     // Decor is scenery: never solid.
     expect(isSolidTile(tileAt(level.tiles, level.cols, 4, 11))).toBe(false);
-    expect(level.pickups).toEqual([{ kind: 'aura', x: 20, y: 11 }]);
   });
 
   it('parses G as the goal beacon: its top tile, with the mast down to what it stands on', () => {

@@ -18,16 +18,17 @@ export type ScoreRule = {
 // start token and wait out the per-second rule, so the cap is what really
 // keeps a forged score from sitting above every honest one.
 //   snake: a 20x20 board holds at most 399 snacks.
-//   platformer: world 1 is generated per seed. Its perfect run is at most
-//     8,420 (8 of the richest chunks, every optional coin and drone, the
-//     bonus room, the Sigma coin, Double Aura); worlds 2, 3 and the secret
-//     world add 15,340: 23,760. The best of 500 seeds is 22,000.
-//     platformerScore.test.ts derives both.
+//   platformer: the leaderboard uses the fixed Story levels. A perfect run of
+//     chapter 1 (every coin, crate, sign and enemy, beacon tops, clears, full
+//     time bonuses, no deaths) is 14,860; platformerScore.test.ts derives it.
 //   stacker: one floor per drop; nobody honest drops 12 a second.
 export const RULES: Record<GameId, ScoreRule> = {
   snake: { maxPerSecond: 12, base: 10, cap: 399 },
-  platformer: { maxPerSecond: 600, base: 3000, cap: 24_000 },
+  platformer: { maxPerSecond: 600, base: 3000, cap: 15_000 },
   stacker: { maxPerSecond: 12, base: 10, cap: 3000 },
+  // Endless: seeded levels with modifiers, the Sigma coin and breakables; a
+  // perfect run reaches about 22,000 (platformerScore.test.ts).
+  endless: { maxPerSecond: 600, base: 3000, cap: 25_000 },
 };
 
 /** Runs shorter than this cannot post a non-zero score. */

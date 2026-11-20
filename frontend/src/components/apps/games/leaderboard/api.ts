@@ -5,7 +5,7 @@
  * plays and the local best still saves; the game-over card says so.
  */
 
-export type ArcadeGame = 'snake' | 'platformer' | 'stacker';
+export type ArcadeGame = 'snake' | 'platformer' | 'stacker' | 'endless';
 
 export interface BoardEntry { rank: number; name: string; score: number; crown: boolean }
 export interface BoardRank { rank: number; score: number }

@@ -10,7 +10,7 @@
  *   .  empty
  *   #  ground (solid; drawn as grass, cave rock or cloud by world)
  *   B  brick (solid; breaks when hit from below while wearing the Aura Crown)
- *   S  aura block (solid; pops a coin when hit from below, then turns dull)
+ *   ?  coin block (solid; pops a coin when hit from below, then turns dull)
  *   C  aura block holding the Aura Crown (one per level at most)
  *   X  stone block (solid, never breaks; stairs)
  *   ^  spikes (solid; touching them hurts)
@@ -29,19 +29,37 @@
  *   _  one-way platform (land from above, pass from below and the side)
  *   $  golden Sigma coin (500)
  *   %  cracked wall (solid; a dash smashes it)
- *   a  Aura Mode orb
  *   c  Doom Crawler (walks, turns at walls and ledges)
  *   d  Ad Drone (hovers, dives at a hero below it)
  *   e  elite drone (an Ad Drone that fires slow shots)
+ *   Q  shrine: touching it unlocks the level's `shrine` ability
+ *   M  memory (a glowing polaroid; 3 per story level)
  *   G  goal beacon top (its mast runs down to the roof; replaces F and |)
- *   L  neon sign with its light; T water tower, N antenna, U AC unit,
- *      H chimney, R crate (scenery, never solid)
+ *   L  neon sign with its light (the blade breaks it for coins); T water
+ *      tower, N antenna, U AC unit, H chimney (scenery, never solid)
+ *   R  crate (solid; the blade breaks it for coins)
+ *   S  the sword: gives the blade
+ *   w  Bat Wings, t Taco Rush (optional powers)
  */
 
-export type WorldTheme = 'grass' | 'rooftops' | 'cave' | 'sky' | 'stars';
+import type { Ability } from './hero';
+
+export type WorldTheme = 'grass' | 'rooftops' | 'austin' | 'cave' | 'sky' | 'stars';
+
+/**
+ * A moment the view or renderer stages over a stretch of columns: `bats`
+ * (the Congress Avenue bridge swarm), `prompt` (an on-screen hint, `id`
+ * names it, e.g. 'doubleJump').
+ */
+export interface SetPiece { kind: 'bats' | 'prompt'; x0: number; x1: number; id?: string }
 
 export interface LevelDef {
   id: number;
+  /** The ability its shrine (Q) unlocks, if it has one. */
+  shrine?: Ability;
+  setPieces?: readonly SetPiece[];
+  /** Decoys on a roof (a pigeon, a trash can) that drones dive at while the hero is out of reach: tile x, y. */
+  decoys?: readonly { x: number; y: number }[];
   /** Small line on the level card, e.g. "World 1". */
   label: string;
   /** Big line on the level card. */
@@ -66,7 +84,7 @@ export const LEVELS: readonly LevelDef[] = [
       '..................................############....................................................................##########............................................|.....................',
       '..................................############.............................................oo.....................##########............................................|.....................',
       '........................................................oo.....................................oo.......................................................................|.....................',
-      '..................S..BCB...oooo.....................oo..............BBSBBB.................##..................................BSBSB..................ooo..........XX...|.....................',
+      '..................?..BCB...oooo.....................oo..............BB?BBB.................##..................................B?B?B..................ooo..........XX...|.....................',
       '....................................oooooooo............##.............................oo......##.....................oo...............oooo.......................XXX...|.....................',
       '........ooooo.......................................##.................................##..........#.............................................................XXXX...|.....................',
       '...P............n..........^^^^.......n...f.....................f...^^^^^^......K.......................n..n...f....^^..^^....................f...f...^^^.......XXXXX...|.....................',
@@ -87,8 +105,8 @@ export const LEVELS: readonly LevelDef[] = [
       '.........................................................oooooo....................................................................................................................................|................',
       '............................................................f......................................................................................................................................|................',
       '........................................................########oo.................................................................................................................................|................',
-      '........................................................########..o......BBSBB........................oo.....................................BSBSB...............oooooo............................|................',
-      '.......S..C........................................................o..................................XX...........................---..........................########......................XX...|................',
+      '........................................................########..o......BB?BB........................oo.....................................B?B?B...............oooooo............................|................',
+      '.......?..C........................................................o..................................XX...........................---..........................########......................XX...|................',
       '................ooo.........................n.....!!!................................---..................................................................!!!...########.....................XXX...|................',
       '.....ooooo..............f.......---.....########......................K....n...n.............######..........................---............n.......f.......................................XXXX...|................',
       '...P................########............########....................#############............######.............f....f...................##############..........................n....f....XXXXX...|................',

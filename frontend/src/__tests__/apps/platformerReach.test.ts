@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { reachesGoal } from '../setup/platformerReach';
-import { DT, custom } from '../setup/platformerWorld';
+import { reach, reachesGoal } from '../setup/platformerReach';
+import { DT, G40, custom } from '../setup/platformerWorld';
 import { createWorld, drainEvents, enterLevel, stepWorld } from '@/components/apps/games/platformer/sim/world';
 import { emptyFrame } from '@/components/apps/games/platformer/input/frame';
 import type { Level } from '@/components/apps/games/platformer/sim/level';
@@ -109,5 +109,81 @@ describe('Main Character reachability check (the test oracle)', () => {
       '########################################',
     ], 'rooftops');
     expect(reachesGoal(level, { dash: false, wallJump: false })).toBe(true);
+  });
+});
+
+describe('reachability check: the double jump, moving platforms and targets', () => {
+  /** A ledge `up` rows above a flat roof, goal on it. */
+  function ledge(up: number) {
+    const rows: string[] = [];
+    for (let r = 0; r < 14; r++) {
+      const floor = 11, top = floor - up;
+      let left = r >= floor ? '#'.repeat(20) : '.'.repeat(20);
+      if (r === floor - 1) left = '.P' + '.'.repeat(18);
+      let right = r >= top ? '#'.repeat(20) : '.'.repeat(20);
+      if (r === top - 1) right = '..' + 'G' + '.'.repeat(17);
+      if (r === top) right = '='.repeat(20);
+      rows.push(left + right);
+    }
+    return parseLevelRows(rows);
+  }
+  const parseLevelRows = (rows: string[]) => custom(rows.slice(rows.length - 14), 'rooftops');
+
+  it('a 6 row ledge needs the double jump', () => {
+    expect(reachesGoal(ledge(6), { dash: false, wallJump: false, generous: true })).toBe(false);
+    expect(reachesGoal(ledge(6), { dash: false, wallJump: false, doubleJump: true })).toBe(true);
+  });
+
+  it('agrees with the real sim: a double jump lands her on that ledge', () => {
+    const level = ledge(6);
+    const w = createWorld({ seed: 1, abilities: { wallJump: false, dash: false, blade: false } });
+    enterLevel(w, 0, level);
+    drainEvents(w);
+    const f = emptyFrame();
+    f.move = 1;
+    let stage = 0;
+    for (let i = 0; i < 400; i++) {
+      f.jumpHeld = true;
+      // Jump 3.5 tiles before the ledge, jump again near the top of the first jump.
+      if (stage === 0 && w.hero.x + w.hero.w >= 16.5) { f.jumpPressed = true; stage = 1; }
+      else if (stage === 1 && w.hero.vy > -2) { f.jumpPressed = true; stage = 2; }
+      stepWorld(w, f, DT);
+      if (stage === 2 && w.hero.onGround) break;
+    }
+    expect(w.hero.y + w.hero.h).toBeCloseTo(5, 5);
+  });
+
+  it('rides a moving platform across a gap too wide to jump', () => {
+    const gap = (plat: boolean) => custom([
+      '.....................................G..',
+      '........................................',
+      plat ? '...................---..................' : '........................................',
+      '........................................',
+      '.P......................................',
+      '==========....................==========',
+      '##########....................##########',
+    ], 'rooftops');
+    expect(reachesGoal(gap(false), { dash: false, wallJump: false, doubleJump: true, generous: true })).toBe(false);
+    expect(reachesGoal(gap(true), { dash: false, wallJump: false, doubleJump: true })).toBe(true);
+  });
+
+  it('reports which targets she can touch', () => {
+    const level = custom(['.P......................................', G40, G40], 'rooftops');
+    const r = reach(level, { dash: false, wallJump: false, doubleJump: true, targets: [{ x: 10, y: 10, w: 1, h: 1 }, { x: 10, y: 1, w: 1, h: 1 }] });
+    expect(r.touched).toEqual([true, false]);
+  });
+});
+
+describe('reachability check: stomp bounces', () => {
+  it('climbs a chain of drones to a ledge no jump reaches, and only with the bounces', () => {
+    // Roof top at row 3: a frame-perfect double jump from the street tops out at row 3.5.
+    const rows = Array.from({ length: 14 }, () => '.'.repeat(40).split(''));
+    for (let x = 0; x < 40; x++) { rows[12][x] = '='; rows[13][x] = '#'; }
+    for (let x = 18; x <= 23; x++) rows[3][x] = '=';
+    rows[2][20] = 'G'; rows[11][1] = 'P';
+    rows[7][11] = 'd'; rows[5][15] = 'd';
+    const level = custom(rows.map(r => r.join('')), 'rooftops');
+    expect(reachesGoal(level, { dash: false, wallJump: false, doubleJump: true, generous: true })).toBe(false);
+    expect(reachesGoal(level, { dash: false, wallJump: false, doubleJump: true, bounces: true })).toBe(true);
   });
 });

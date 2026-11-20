@@ -198,12 +198,105 @@ describe('Main Character hero: wall slide and wall jump', () => {
     expect(w.hero.vx).toBeLessThan(0);
   });
 
-  it('far from any wall a mid-air jump does nothing', () => {
+  it('far from any wall, with the double jump spent, a mid-air jump does nothing', () => {
     const w = worldOn(WALL);
     midAir(w, 6, 6);
     w.hero.vy = 2;
+    w.hero.airJumps = 0;
     press(w, { jumpPressed: true, jumpHeld: true });
     expect(w.hero.vy).toBeGreaterThan(0);
+  });
+});
+
+describe('Main Character hero: the double jump', () => {
+  it('one fresh full jump in the air, with its own event; he stays in the air state', () => {
+    const w = worldOn(FLAT);
+    midAir(w, 10, 5);
+    w.hero.vy = 3;
+    expect(w.hero.airJumps).toBe(1);
+    press(w, { jumpPressed: true, jumpHeld: true });
+    expect(w.hero.vy).toBeCloseTo(-PHYS.jumpV + PHYS.gravityHold * DT, 6);
+    expect(w.hero.airJumps).toBe(0);
+    expect(w.hero.state).toBe('air');
+    const types = eventsOf(w);
+    expect(types).toContain('doubleJump');
+    expect(types).not.toContain('jump');
+    run(w, 0.2, { jumpHeld: true });
+    press(w, { jumpPressed: true, jumpHeld: true });
+    expect(eventsOf(w)).not.toContain('doubleJump');
+  });
+
+  it('has variable height like the first jump: a tap goes lower than a hold', () => {
+    const rise = (hold: boolean) => {
+      const w = worldOn(FLAT);
+      midAir(w, 10, 8);
+      const y0 = w.hero.y;
+      let top = y0;
+      press(w, { jumpPressed: true, jumpHeld: hold });
+      run(w, 0.6, { jumpHeld: hold }, ww => { top = Math.min(top, ww.hero.y); });
+      return y0 - top;
+    };
+    expect(rise(true)).toBeGreaterThan(rise(false) + 1.5);
+  });
+
+  it('comes back on landing, on wall contact and with a wall jump', () => {
+    const land = worldOn(FLAT);
+    midAir(land, 10, 9);
+    land.hero.airJumps = 0;
+    expect(runUntil(land, ww => ww.hero.onGround, {}, 2)).toBe(true);
+    run(land, DT);
+    expect(land.hero.airJumps).toBe(1);
+
+    const touch = worldOn(WALL);
+    onWallLeftFace(touch, 6, 2);
+    touch.hero.airJumps = 0;
+    run(touch, 0.05, { move: 1 });
+    expect(touch.hero.airJumps).toBe(1);
+
+    const kick = worldOn(WALL);
+    onWallLeftFace(kick, 6, 2);
+    kick.hero.airJumps = 0;
+    kick.hero.x -= 0.2; // in wall-jump reach, not touching
+    press(kick, { jumpPressed: true, jumpHeld: true });
+    expect(eventsOf(kick)).toContain('wallJump');
+    expect(kick.hero.airJumps).toBe(1);
+  });
+
+  it('neither uses nor refills the dash', () => {
+    const w = worldOn(FLAT);
+    midAir(w, 10, 5);
+    press(w, { jumpPressed: true, jumpHeld: true });
+    expect(w.hero.dashReady).toBe(true);
+    const v = worldOn(FLAT);
+    midAir(v, 10, 4);
+    press(v, { dashPressed: true, move: 1 });
+    thaw(v);
+    run(v, 0.2);
+    expect(v.hero.dashReady).toBe(false);
+    press(v, { jumpPressed: true, jumpHeld: true });
+    expect(v.hero.dashReady).toBe(false);
+    expect(v.hero.airJumps).toBe(0);
+  });
+
+  it('a dash does not give the double jump back', () => {
+    const w = worldOn(FLAT);
+    midAir(w, 10, 4);
+    w.hero.airJumps = 0;
+    press(w, { dashPressed: true, move: 1 });
+    thaw(w);
+    run(w, 0.2);
+    expect(w.hero.airJumps).toBe(0);
+  });
+
+  it('coyote time gives the ground jump first and keeps the double jump', () => {
+    const w = worldOn(['.P......................................', '########................................', '########................................']);
+    expect(runUntil(w, ww => !ww.hero.onGround, { move: 1 })).toBe(true);
+    run(w, 0.03, { move: 1 });
+    press(w, { jumpPressed: true, jumpHeld: true, move: 1 });
+    const types = eventsOf(w);
+    expect(types).toContain('jump');
+    expect(types).not.toContain('doubleJump');
+    expect(w.hero.airJumps).toBe(1);
   });
 });
 

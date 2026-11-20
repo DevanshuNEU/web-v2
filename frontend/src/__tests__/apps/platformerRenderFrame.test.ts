@@ -6,7 +6,7 @@ import { Juice } from '@/components/apps/games/shared/juice';
 import { createWorld, type World } from '@/components/apps/games/platformer/sim/world';
 import { TILE } from '@/components/apps/games/platformer/sim/level';
 import { tileFor } from '@/components/apps/games/platformer/render/pipeline';
-import { drawFrame, rendererFor, viewTile } from '@/components/apps/games/platformer/render/frame';
+import { drawFrame, noteEvent, rendererFor, viewTile } from '@/components/apps/games/platformer/render/frame';
 import { frameStats, resetWorld1 } from '@/components/apps/games/platformer/render/pixel/world1';
 import { viewMetrics } from '@/components/apps/games/platformer/render/pixel/camera';
 import { MAX_LIGHTS } from '@/components/apps/games/platformer/render/pixel/lights';
@@ -44,7 +44,12 @@ function rooftops(o: { modifier?: string | null; seed?: number } = {}): World {
     seed: o.seed ?? 1,
     wind: -0.5,
   });
-  w.power.aura = 5;
+  (w as unknown as { power: unknown }).power = { kind: 'batWings', t: 5, total: 10 };
+  Object.assign(extra, {
+    memories: [{ id: '1-1-a', x: hx + 2, y: hy - 1, taken: false }, { id: '1-1-b', x: hx + 5, y: hy, taken: true }],
+    shrines: [{ x: hx + 4, y: hy, ability: 'dash', taken: false }],
+  });
+  w.level = { ...w.level, setPieces: [{ kind: 'bats', x: Math.floor(hx) - 2, w: 20 }] } as unknown as World['level'];
   // phase 2 extras: drone shots, an elite drone, a cracked wall, a sigma coin, a tall beacon
   Object.assign(extra, { shots: [{ x: hx + 2, y: hy, vx: -3, vy: 1, t: 0.5 }, { x: 0, y: 0, vx: 0, vy: 0, t: 0 }] });
   if (w.enemies[0]) w.enemies.push({ ...w.enemies[0], kind: 'eliteDrone' as World['enemies'][number]['kind'], x: hx + 3, y: hy - 2 });
@@ -88,6 +93,34 @@ describe('render seam: routing by theme', () => {
     const b = screen();
     drawFrame(b as unknown as CanvasRenderingContext2D, createWorld({ levelIndex: 1 }), { w: 390, h: 520, mono: false, reduced: false, alpha: 1 }, new Juice());
     expect(b.imageSmoothingEnabled).not.toBe(false);
+  });
+});
+
+describe('the pixel canvas: the low-res frame scaled by CSS, not by a full-screen blit', () => {
+  it('draws the frame into the pixel canvas at buffer size, sized and offset in CSS', () => {
+    const scr = screen();
+    const pixel = document.createElement('canvas');
+    const w = rooftops();
+    const v = { w: 844, h: 390, mono: false, reduced: false, alpha: 1, dpr: 3, pixel };
+    drawFrame(scr as unknown as CanvasRenderingContext2D, w, v, new Juice());
+    const m = viewMetrics(844, 390, 3);
+    expect(pixel.width).toBe(m.bw);
+    expect(pixel.height).toBe(m.bh);
+    expect(pixel.style.width).toBe(`${(m.bw * m.k) / 3}px`);
+    expect(pixel.style.transform).toMatch(/^translate\(-?[\d.]+px, -?[\d.]+px\)$/);
+    // no full-screen scaled blit on the screen canvas
+    const big = (scr.drawImage as Mock).mock.calls.filter(c => c.length === 5 && Number(c[3]) > 844);
+    expect(big.length).toBe(0);
+  });
+
+  it('the same offset reuses the same transform string (no string per frame)', () => {
+    const pixel = document.createElement('canvas');
+    const w = rooftops();
+    const v = { w: 844, h: 390, mono: false, reduced: false, alpha: 1, dpr: 3, pixel };
+    drawFrame(screen() as unknown as CanvasRenderingContext2D, w, v, new Juice());
+    const a = pixel.style.transform;
+    drawFrame(screen() as unknown as CanvasRenderingContext2D, w, v, new Juice());
+    expect(pixel.style.transform).toBe(a);
   });
 });
 
@@ -180,6 +213,51 @@ describe('world 1 frame budget and modifiers', () => {
     expect(dbl.coinGlow).toBeGreaterThan(calm.coinGlow);
   });
 
+  it('blackout keeps roof edges and hazards faintly readable; normal nights do not need it', () => {
+    draw(rooftops());
+    expect(frameStats().rims).toBe(0);
+    resetWorld1();
+    draw(rooftops({ modifier: 'blackout' }));
+    expect(frameStats().rims).toBeGreaterThan(0);
+  });
+
+  it('the bat swarm sweeps across while she is inside its stretch, pooled', () => {
+    const w = rooftops();
+    for (let i = 0; i < 30; i++) { w.t += 1 / 30; draw(w); }
+    expect(frameStats().bats).toBeGreaterThan(20);
+    expect(frameStats().bats).toBeLessThanOrEqual(140);
+  });
+
+  it('a found memory flies to the corner', () => {
+    const w = rooftops();
+    draw(w);
+    noteEvent('memory', w.hero.x, w.hero.y);
+    draw(w);
+    expect(frameStats().flights).toBe(1);
+  });
+
+  it('blade events and the unlock moment draw without throwing', () => {
+    const w = rooftops();
+    (w.hero as unknown as { state: string; animT: number }).state = 'attack3';
+    (w.hero as unknown as { animT: number }).animT = 0.05;
+    for (const e of ['swing', 'hit', 'break', 'pogo', 'unlock', 'coinPull']) noteEvent(e, w.hero.x, w.hero.y, 1);
+    expect(() => draw(w)).not.toThrow();
+  });
+
+  it('a double jump leaves a puff ring under the feet; the rings are pooled', () => {
+    const w = rooftops();
+    draw(w);
+    noteEvent('doubleJump', w.hero.x, w.hero.y + w.hero.h);
+    draw(w);
+    expect(frameStats().rings).toBe(1);
+    for (let i = 0; i < 10; i++) noteEvent('doubleJump', w.hero.x, w.hero.y);
+    draw(w);
+    expect(frameStats().rings).toBeLessThanOrEqual(4);
+    w.t += 1;
+    draw(w);
+    expect(frameStats().rings).toBe(0);
+  });
+
   it('the seed changes the skyline and the neon sign text', () => {
     draw(rooftops({ seed: 1 }));
     const a = frameStats();
@@ -192,12 +270,13 @@ describe('world 1 frame budget and modifiers', () => {
     expect(texts.size).toBeGreaterThan(2);
   });
 
-  it('the world card shows the modifier name', () => {
+  it('the world card is pixel type in the buffer and shows the modifier name', () => {
     const w = rooftops({ modifier: 'storm' });
     w.cardT = 1.5;
     const { ctx } = draw(w);
-    const texts = (ctx.fillText as Mock).mock.calls.map(c => String(c[0]));
-    expect(texts).toContain('The storm');
+    expect(frameStats().card).toBe('The storm');
+    // no canvas text for world 1's card: it is drawn in the pixel font
+    expect((ctx.fillText as Mock).mock.calls.length).toBe(0);
   });
 });
 

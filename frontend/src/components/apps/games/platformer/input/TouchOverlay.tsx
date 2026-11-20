@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import { ChevronUp, ChevronsRight, Sparkles } from 'lucide-react';
-import { TouchButton } from '../../shared/TouchButton';
-import { tryCapture, type InputFrame } from './frame';
+import { tryCapture } from './frame';
+import { ThumbArc } from './ThumbArc';
+import { IntroLabel, type ControlProps } from './TouchDeck';
+import { buzzPress } from '../ui/controls';
 
 /** Thumb travel, CSS px: inside DEAD it stands still, at FULL it runs flat out. */
 export const DEAD_PX = 10;
@@ -32,7 +33,7 @@ interface Finger { anchor: number; x: number }
  * The zone is a touch surface only (it has no keyboard or screen reader
  * role); keyboard players have the keyboard adapter.
  */
-export function TouchOverlay({ input, mono }: { input: InputFrame; mono: boolean }) {
+export function TouchOverlay({ input, mono, owned = {}, haptics = true, swap = false, intro = false, onPlayed, opacity = 1 }: ControlProps) {
   const fingers = useRef(new Map<number, Finger>());
   const ringRef = useRef<HTMLDivElement>(null);
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -55,14 +56,7 @@ export function TouchOverlay({ input, mono }: { input: InputFrame; mono: boolean
 
   const end = (id: number) => { if (fingers.current.delete(id)) publish(); };
 
-  const onJump = useCallback(() => { input.jumpHeld = true; input.jumpPressed = true; }, [input]);
-  const onJumpUp = useCallback(() => { input.jumpHeld = false; }, [input]);
-  const onDash = useCallback(() => { input.dashPressed = true; }, [input]);
-  const onAction = useCallback(() => { input.actionPressed = true; }, [input]);
-
-  const glass = mono
-    ? 'border border-text/40 bg-text/10 text-text data-[held=true]:bg-text/25'
-    : 'border border-white/25 bg-[#120b1f]/35 text-white/90 data-[held=true]:bg-[#ff5fa2]/45';
+  const played = useCallback(() => { if (intro) onPlayed?.(); }, [intro, onPlayed]);
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none touch-none">
@@ -70,14 +64,16 @@ export function TouchOverlay({ input, mono }: { input: InputFrame; mono: boolean
         ref={zoneRef}
         data-testid="move-zone"
         aria-hidden
-        style={{ width: `${ZONE_SHARE * 100}%` }}
-        className="pointer-events-auto absolute bottom-0 left-0 top-0 touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
+        style={{ width: `${ZONE_SHARE * 100}%`, [swap ? 'right' : 'left']: 0 }}
+        className="pointer-events-auto absolute bottom-0 top-11 touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
         onPointerDown={(e) => {
           e.preventDefault();
           fingers.current.delete(e.pointerId);
           fingers.current.set(e.pointerId, { anchor: e.clientX, x: e.clientX });
           publish();
           tryCapture(zoneRef.current, e.pointerId);
+          buzzPress(haptics, 6);
+          played();
         }}
         onPointerMove={(e) => {
           const f = fingers.current.get(e.pointerId);
@@ -102,17 +98,18 @@ export function TouchOverlay({ input, mono }: { input: InputFrame; mono: boolean
         />
       </div>
 
-      <div className="pointer-events-auto absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] grid grid-cols-[auto_auto] grid-rows-[auto_auto] items-end justify-items-center gap-3">
-        <div />
-        <TouchButton label="Action" size={64} onPress={onAction} className={`rounded-full ${glass}`}>
-          <Sparkles size={20} aria-hidden />
-        </TouchButton>
-        <TouchButton label="Dash" size={64} onPress={onDash} className={`rounded-full ${glass}`}>
-          <ChevronsRight size={22} aria-hidden />
-        </TouchButton>
-        <TouchButton label="Jump" size={92} onPress={onJump} onRelease={onJumpUp} className={`rounded-full ${glass}`}>
-          <ChevronUp size={34} strokeWidth={2.6} aria-hidden />
-        </TouchButton>
+      {intro && (
+        <div className="pointer-events-none absolute bottom-24" style={{ [swap ? 'right' : 'left']: '18%' }}>
+          <div className="relative"><IntroLabel text="Move: slide your thumb" /></div>
+        </div>
+      )}
+      <div
+        style={{ opacity }}
+        className={`pointer-events-auto absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] ${
+          swap ? 'left-[max(0.75rem,env(safe-area-inset-left))]' : 'right-[max(0.75rem,env(safe-area-inset-right))]'
+        }`}
+      >
+        <ThumbArc input={input} mono={mono} owned={owned} hand={swap ? 'left' : 'right'} haptics={haptics} intro={intro} onPress={played} labelBeside />
       </div>
     </div>
   );

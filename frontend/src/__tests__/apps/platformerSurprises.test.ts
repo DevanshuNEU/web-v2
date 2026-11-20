@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { POINTS, drainEvents, score } from '@/components/apps/games/platformer/sim/world';
 import { TILE, tileAt } from '@/components/apps/games/platformer/sim/level';
-import { grantPower } from '@/components/apps/games/platformer/sim/powers';
 import { G40, press, run, runUntil, worldOn } from '../setup/platformerWorld';
 
 describe('Main Character surprises: the golden Sigma coin', () => {
@@ -69,14 +68,6 @@ describe('Main Character surprises: the elite drone', () => {
     expect(Math.hypot(s.vx, s.vy)).toBeLessThan(5);
     expect(w.shots).toBe(pool);
     expect(runUntil(w, ww => ww.phase === 'dying', {}, 6)).toBe(true);
-  });
-
-  it('in Aura Mode a shot just fizzles on the hero', () => {
-    const w = worldOn(ELITE);
-    w.hero.x = 9;
-    grantPower(w.power, 'aura');
-    run(w, 6, {}, ww => { if (ww.power.aura < 1) ww.power.aura = 8; });
-    expect(w.phase).toBe('play');
   });
 
   it('a stomp kills it', () => {

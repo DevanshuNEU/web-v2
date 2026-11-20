@@ -3,7 +3,7 @@
  * spawn lists, and builds the secret fourth level from a name.
  */
 
-import { LEVELS, type LevelDef, type WorldTheme } from './levels';
+import { LEVELS, type LevelDef, type SetPiece, type WorldTheme } from './levels';
 import { cleanName, textCells, textWidth } from './font';
 import { generateLevel } from './generate';
 import { DEFAULT_SEED, deriveSeed } from './rand';
@@ -28,24 +28,33 @@ export const TILE = {
   SIGMA: 10,
   /** Cracked wall: solid until a dash smashes it. */
   CRACK: 11,
+  /** Crate: solid until the blade breaks it (it drops coins). */
+  CRATE: 12,
 } as const;
 
 export function isSolidTile(t: number): boolean {
-  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK;
+  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK || t === TILE.CRATE;
 }
 
 import type { EnemyKind } from './enemies';
-import type { PowerKind } from './powers';
+import type { Ability } from './hero';
+import { POWER_CHARS, type PowerKind } from './powers';
 
 export type { EnemyKind };
 
+/** A power pickup at tile (x, y), top left. */
+export interface PickupSpawn { kind: PowerKind; x: number; y: number }
+
+/** A shrine at tile (x, y), top left, and the ability it unlocks. */
+export interface Shrine { x: number; y: number; ability: Ability }
+
 export interface Goal { x: number; top: number; base: number; kind: 'flag' | 'beacon' }
-export type DecorKind = 'waterTower' | 'antenna' | 'acUnit' | 'neonSign' | 'chimney' | 'crate';
+export type DecorKind = 'waterTower' | 'antenna' | 'acUnit' | 'neonSign' | 'chimney';
 export interface Decor { kind: DecorKind; x: number; y: number }
 export interface Light { x: number; y: number; r: number; color: string; flicker: number }
 
 /** Scenery chars: each stands on the roof below it, never solid. */
-const DECOR: Record<string, DecorKind> = { T: 'waterTower', N: 'antenna', U: 'acUnit', H: 'chimney', R: 'crate' };
+const DECOR: Record<string, DecorKind> = { T: 'waterTower', N: 'antenna', U: 'acUnit', H: 'chimney' };
 /** Neon magenta, neon cyan, sodium: colour and how much each flickers. */
 const NEON: readonly { color: string; flicker: number; r: number }[] = [
   { color: '#ff3d9a', flicker: 0.35, r: 4.5 },
@@ -56,8 +65,7 @@ const BEACON_LIGHT = { color: '#3df2ff', flicker: 0.1, r: 5 };
 
 export interface PlatformSpawn { x: number; y: number; w: number; axis: 'x' | 'y' }
 export interface EnemySpawn { kind: EnemyKind; x: number; y: number }
-/** A power pickup at tile (x, y), top left. */
-export interface PickupSpawn { kind: PowerKind; x: number; y: number }
+
 
 export interface Level {
   id: number;
@@ -70,7 +78,12 @@ export interface Level {
   tiles: Uint8Array;
   /** Column of the start tile and the y of its floor (the hero's feet). */
   start: { x: number; y: number };
+  /** Checkpoints in goal order: column and the y of their floor. */
+  checkpoints: { x: number; y: number }[];
+  /** The first checkpoint, kept for the cartoon renderer. */
   checkpoint: { x: number; y: number } | null;
+  /** Memories in goal order, tile (x, y) top left. */
+  memories: { x: number; y: number }[];
   /** The goal: column, top tile row, lowest row. A flagpole or the rooftop beacon. */
   goal: Goal;
   /** The goal's column and rows, kept under its old name for the cartoon renderer. */
@@ -81,9 +94,18 @@ export interface Level {
   decor: Decor[];
   /** Light sources in tiles; flicker is an amplitude 0..1. */
   lights: Light[];
+  shrines: Shrine[];
+  pickups: PickupSpawn[];
+  /** The sword (S) that gives the blade, tile top left. */
+  sword: { x: number; y: number } | null;
+  setPieces: SetPiece[];
+  /** Drone decoys, tile x, y (see LevelDef). */
+  decoys: { x: number; y: number }[];
+  /** Breakables: crate tiles and neon signs (each drops coins to the blade). */
+  crates: number;
+  signs: number;
   enemies: EnemySpawn[];
   platforms: PlatformSpawn[];
-  pickups: PickupSpawn[];
   /** Coins on the map plus coins inside aura blocks. */
   coinTotal: number;
   /** Bricks and cracked wall tiles. */
@@ -95,8 +117,8 @@ export interface Level {
 }
 
 const CODES: Record<string, number> = {
-  '#': TILE.GROUND, '=': TILE.GROUND, _: TILE.ONEWAY, B: TILE.BRICK, S: TILE.AURA, C: TILE.AURA_CROWN, X: TILE.STONE, '^': TILE.SPIKE, o: TILE.COIN,
-  $: TILE.SIGMA, '%': TILE.CRACK,
+  '#': TILE.GROUND, '=': TILE.GROUND, _: TILE.ONEWAY, B: TILE.BRICK, '?': TILE.AURA, C: TILE.AURA_CROWN, X: TILE.STONE, '^': TILE.SPIKE, o: TILE.COIN,
+  $: TILE.SIGMA, '%': TILE.CRACK, R: TILE.CRATE,
 };
 
 export function parseLevel(def: LevelDef, gravity = 1): Level {
@@ -111,10 +133,14 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   const goals: { x: number; y: number; kind: Goal['kind'] }[] = [];
   const decor: Decor[] = [];
   const lights: Light[] = [];
-  let checkpoint: Level['checkpoint'] = null;
+  const shrines: Shrine[] = [];
+  const pickups: PickupSpawn[] = [];
+  let sword: { x: number; y: number } | null = null;
+  let crates = 0;
+  const checkpoints: { x: number; y: number }[] = [];
+  const memories: { x: number; y: number }[] = [];
   const enemies: EnemySpawn[] = [];
   const platforms: PlatformSpawn[] = [];
-  const pickups: PickupSpawn[] = [];
   let coinTotal = 0;
   let bricks = 0;
   let sigmas = 0;
@@ -130,6 +156,7 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         if (code === TILE.COIN || code === TILE.AURA) coinTotal++;
         if (code === TILE.BRICK || code === TILE.CRACK) bricks++;
         if (code === TILE.SIGMA) sigmas++;
+        if (code === TILE.CRATE) crates++;
         if (code === TILE.AURA_CROWN) crowns++;
         continue;
       }
@@ -144,17 +171,25 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
           lights.push({ x: x + 0.5, y: y + 0.5, r: n.r, color: n.color, flicker: n.flicker });
           break;
         }
-        case 'T': case 'N': case 'U': case 'H': case 'R': decor.push({ kind: DECOR[ch], x, y: y + 1 }); break;
+        case 'T': case 'N': case 'U': case 'H': decor.push({ kind: DECOR[ch], x, y: y + 1 }); break;
+        case 'S':
+          if (sword) throw new Error(`${def.name}: more than one sword`);
+          sword = { x, y };
+          break;
         case 'K':
-          if (checkpoint) throw new Error(`${def.name}: more than one checkpoint`);
-          checkpoint = { x, y: y + 1 };
+          checkpoints.push({ x, y: y + 1 });
           break;
         case 'n': enemies.push({ kind: 'pebble', x, y }); break;
         case 'f': enemies.push({ kind: 'frog', x, y }); break;
         case 'c': enemies.push({ kind: 'doomCrawler', x, y }); break;
         case 'd': enemies.push({ kind: 'adDrone', x, y }); break;
         case 'e': enemies.push({ kind: 'eliteDrone', x, y }); break;
-        case 'a': pickups.push({ kind: 'aura', x, y }); break;
+        case 'M': memories.push({ x, y }); break;
+        case 'w': case 't': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
+        case 'Q':
+          if (!def.shrine) throw new Error(`${def.name}: a shrine (Q) needs the level's shrine ability`);
+          shrines.push({ x, y, ability: def.shrine });
+          break;
         case '-': case '!': {
           if (r[x - 1] === ch) break; // part of the run already recorded
           let w = 1;
@@ -179,13 +214,17 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
     lights.push({ x: f.x + 0.5, y: f.y + 0.5, ...BEACON_LIGHT });
   }
   decor.sort((a, b) => a.x - b.x || a.y - b.y);
+  const goalDir: 1 | -1 = f.x >= starts[0].x ? 1 : -1;
+  const along = (a: { x: number }, b: { x: number }) => (a.x - b.x) * goalDir;
+  checkpoints.sort(along);
+  memories.sort(along);
 
   return {
     id: def.id, label: def.label, name: def.name, theme: def.theme,
-    cols, rows: ROWS, tiles, start: starts[0], checkpoint,
+    cols, rows: ROWS, tiles, start: starts[0], checkpoints, checkpoint: checkpoints[0] ?? null, memories,
     goal: { x: f.x, top: f.y, base, kind: f.kind }, pole: { x: f.x, top: f.y, base },
-    goalDir: f.x >= starts[0].x ? 1 : -1, decor, lights,
-    enemies, platforms, pickups, coinTotal, bricks, sigmas, gravity,
+    goalDir, decor, lights, shrines, pickups, sword, setPieces: def.setPieces ? [...def.setPieces] : [], decoys: (def.decoys ?? []).map(d => ({ x: d.x, y: d.y })), crates, signs: decor.filter(d => d.kind === 'neonSign').length,
+    enemies, platforms, coinTotal, bricks, sigmas, gravity,
   };
 }
 

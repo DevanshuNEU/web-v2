@@ -137,10 +137,15 @@ describe('platformer physics: jumping', () => {
     expect(mid).toBeLessThan(hold - 0.3);
   });
 
-  it('cannot jump again in mid air', () => {
+  it('jumps once more in mid air (the double jump), and no more', () => {
     const h = heroOnFlat();
     pressJump(h);
     steps(h, 1, { ...NONE, jumpHeld: true });
+    steps(h, 30, { ...NONE, jumpHeld: true });
+    pressJump(h);
+    const [second] = steps(h, 1, { ...NONE, jumpHeld: true });
+    expect(second.doubleJumped).toBe(true);
+    expect(h.vy).toBeLessThan(-PHYS.jumpV + 1);
     steps(h, 30, { ...NONE, jumpHeld: true });
     const vy = h.vy;
     pressJump(h);
@@ -189,13 +194,44 @@ describe('platformer physics: coyote time and jump buffer', () => {
     expect(h.vy).toBeLessThan(0);
   });
 
-  it('a jump after the coyote window fails', () => {
+  it('after the coyote window the ground jump is gone: the press is the double jump, then nothing', () => {
     const { h, c } = walkOff();
     for (let i = 0; i < Math.ceil(0.12 / DT); i++) stepHero(h, RIGHT, DT, LEDGE, c);
     pressJump(h);
     const r = stepHero(h, { ...RIGHT, jumpHeld: true }, DT, LEDGE, c);
     expect(r.jumped).toBe(false);
-    expect(h.vy).toBeGreaterThan(0);
+    expect(r.doubleJumped).toBe(true);
+    const { h: h2, c: c2 } = walkOff();
+    h2.airJumps = 0;
+    for (let i = 0; i < Math.ceil(0.12 / DT); i++) stepHero(h2, RIGHT, DT, LEDGE, c2);
+    pressJump(h2);
+    const r2 = stepHero(h2, { ...RIGHT, jumpHeld: true }, DT, LEDGE, c2);
+    expect(r2.jumped || r2.doubleJumped).toBe(false);
+    expect(h2.vy).toBeGreaterThan(0);
+  });
+
+  it('a press just before landing waits for the ground jump and keeps the double jump', () => {
+    const h = createHero(5, 10 - 0.5);
+    h.onGround = false; h.coyote = 0; h.vy = 6;
+    const c = contacts();
+    pressJump(h);
+    let ground = false, air = false;
+    for (let i = 0; i < 60 && !ground; i++) {
+      const r = stepHero(h, { ...NONE, jumpHeld: true }, DT, FLAT, c);
+      if (r.doubleJumped) air = true;
+      if (r.jumped) ground = true;
+    }
+    expect(air).toBe(false);
+    expect(ground).toBe(true);
+    expect(h.airJumps).toBe(1);
+  });
+
+  it('a press high above the ground is the double jump at once', () => {
+    const h = createHero(5, 4);
+    h.onGround = false; h.coyote = 0; h.vy = 4;
+    pressJump(h);
+    const r = stepHero(h, { ...NONE, jumpHeld: true }, DT, FLAT, contacts());
+    expect(r.doubleJumped).toBe(true);
   });
 
   function fallFrom(height: number) {

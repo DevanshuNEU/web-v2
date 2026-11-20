@@ -54,6 +54,8 @@ export const PHYS = {
   wallJumpLock: 0.12,
   /** A jump this close to a wall (tiles) is a wall jump. */
   wallGrace: 0.35,
+  /** Extra jumps in the air (the double jump), back on landing or a wall. */
+  airJumps: 1,
 } as const;
 
 /**

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { LIVES, score } from '@/components/apps/games/platformer/sim/world';
+import { LIVES, drainEvents, enterLevel, score } from '@/components/apps/games/platformer/sim/world';
 import { ENEMY_KINDS } from '@/components/apps/games/platformer/sim/enemies';
 import { DYING_SECONDS } from '@/components/apps/games/platformer/sim/world';
-import { DT, G40, run, runUntil, worldOn } from '../setup/platformerWorld';
+import { DT, G40, custom, run, runUntil, worldOn } from '../setup/platformerWorld';
 
 const SKY = '........................................';
 
@@ -136,5 +136,55 @@ describe('Main Character enemies: the ad drone', () => {
     run(w, 0.2);
     expect(w.stats.stomps).toBe(1);
     expect(e.deadT).not.toBe(-1);
+  });
+});
+
+describe('Main Character enemies: the decoy dive', () => {
+  /** A drone over an empty roof with a pigeon (decoy) on it; the hero far off on a high roof. */
+  const ROOF = [
+    '..........................d.............',
+    '........................................',
+    '.................=======................',
+    '.................#######................',
+    '.P...............#######................',
+    '========================================',
+    G40,
+  ];
+
+  function decoyOn(rows: string[]) {
+    const w = worldOn(rows, 0, 'rooftops');
+    const level = custom(rows, 'rooftops', { decoys: [{ x: 27, y: 11 }] });
+    enterLevel(w, 0, level);
+    drainEvents(w);
+    return w;
+  }
+
+  it('a drone with a decoy in range dives at it, climbs back and does it again, while the hero is out of reach', () => {
+    const w = decoyOn(ROOF);
+    expect(w.decoys).toEqual([{ x: 27, y: 11 }]);
+    const e = w.enemies[0];
+    w.hero.x = 20; w.hero.y = 9 - w.hero.h; // on the high roof, above the drone's reach
+    let dives = 0, hurt = false, lowest = 0;
+    run(w, 10, {}, ww => {
+      for (const ev of drainEvents(ww)) { if (ev.type === 'decoyDive') dives++; if (ev.type === 'hurt' || ev.type === 'die') hurt = true; }
+      lowest = Math.max(lowest, e.y);
+      ww.hero.x = 20; ww.hero.y = 9 - ww.hero.h; ww.hero.vx = 0; ww.hero.vy = 0; ww.hero.onGround = true;
+    });
+    expect(dives).toBeGreaterThanOrEqual(2);
+    expect(lowest).toBeGreaterThan(9);
+    expect(hurt).toBe(false);
+    expect(w.phase).toBe('play');
+  });
+
+  it('a hero in its normal reach comes first', () => {
+    const w = decoyOn(ROOF);
+    const e = w.enemies[0];
+    run(w, 0.3);
+    w.invuln = 99;
+    w.hero.x = e.x - 1; w.hero.y = 12 - w.hero.h;
+    const seen: string[] = [];
+    expect(runUntil(w, ww => { seen.push(...drainEvents(ww).map(ev => ev.type)); return e.mode === 'dive'; }, {}, 3)).toBe(true);
+    expect(e.decoy).toBe(false);
+    expect(seen).not.toContain('decoyDive');
   });
 });

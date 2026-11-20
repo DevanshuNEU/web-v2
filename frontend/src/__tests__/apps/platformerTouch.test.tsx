@@ -11,8 +11,8 @@ const rect = (left: number, width: number) => () =>
   ({ left, width, top: 0, height: 80, right: left + width, bottom: 80, x: left, y: 0, toJSON: () => ({}) });
 
 describe('portrait touch deck adapter', () => {
-  it('has Run left, Run right, Jump and Dash, all thumb sized', () => {
-    render(<TouchDeck input={emptyFrame()} mono={false} />);
+  it('has Run left, Run right, Jump and (once owned) Dash, all thumb sized', () => {
+    render(<TouchDeck input={emptyFrame()} mono={false} owned={{ dash: true }} />);
     for (const name of ['Run left', 'Run right', 'Jump', 'Dash']) {
       const b = screen.getByRole('button', { name });
       expect(parseInt(b.style.width, 10)).toBeGreaterThanOrEqual(64);
@@ -45,7 +45,7 @@ describe('portrait touch deck adapter', () => {
 
   it('Dash is a press edge', () => {
     const f = emptyFrame();
-    render(<TouchDeck input={f} mono={false} />);
+    render(<TouchDeck input={f} mono={false} owned={{ dash: true }} />);
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Dash' }), { pointerId: 3 });
     expect(f.dashPressed).toBe(true);
   });
@@ -115,9 +115,16 @@ describe('landscape thumb overlay adapter', () => {
     expect(f.move).toBe(0);
   });
 
-  it('Jump, Dash and Action are named and at least 64 px', () => {
+  it('no Attack or Dash button until she has the move', () => {
     render(<TouchOverlay input={emptyFrame()} mono={false} />);
-    for (const name of ['Jump', 'Dash', 'Action']) {
+    expect(screen.queryByRole('button', { name: 'Attack' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Dash' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jump' })).toBeInTheDocument();
+  });
+
+  it('Jump, Dash and Attack are named and at least 64 px', () => {
+    render(<TouchOverlay input={emptyFrame()} mono={false} owned={{ attack: true, dash: true }} />);
+    for (const name of ['Jump', 'Dash', 'Attack']) {
       const b = screen.getByRole('button', { name });
       expect(parseInt(b.style.width, 10)).toBeGreaterThanOrEqual(64);
     }
@@ -125,15 +132,15 @@ describe('landscape thumb overlay adapter', () => {
       .toBeGreaterThan(parseInt(screen.getByRole('button', { name: 'Dash' }).style.width, 10));
   });
 
-  it('multitouch: a thumb in the zone and one on Jump, Dash and Action all reach the frame', () => {
+  it('multitouch: a thumb in the zone and one on Jump, Dash and Attack all reach the frame', () => {
     const f = emptyFrame();
-    render(<TouchOverlay input={f} mono={false} />);
+    render(<TouchOverlay input={f} mono={false} owned={{ attack: true, dash: true }} />);
     const zone = screen.getByTestId('move-zone');
     fireEvent.pointerDown(zone, { pointerId: 1, clientX: 100 });
     fireEvent.pointerMove(zone, { pointerId: 1, clientX: 150 });
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Jump' }), { pointerId: 2 });
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Dash' }), { pointerId: 3 });
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Action' }), { pointerId: 4 });
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Attack' }), { pointerId: 4 });
     expect(f).toEqual({ move: 1, jumpHeld: true, jumpPressed: true, dashPressed: true, actionPressed: true });
     fireEvent.pointerUp(screen.getByRole('button', { name: 'Jump' }), { pointerId: 2 });
     expect(f.jumpHeld).toBe(false);

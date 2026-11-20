@@ -9,8 +9,8 @@
  * a row), with stair bridges wherever one roof height does not meet the
  * next, then the fixed finale with the goal beacon. The checkpoint stands at
  * the start of the middle chunk. Slots in the chunks (see
- * ./chunks/rooftops.ts) are filled by the seed: coin trails, the one Aura
- * Mode orb, the rare Sigma coin, a hidden bonus room, optional drones and a
+ * ./chunks/rooftops.ts) are filled by the seed: coin trails, the rare Sigma
+ * coin, a hidden bonus room, optional drones and a
  * rare elite drone. The world's modifier is picked here too, because two of
  * them (mirror, droneSwarm) change the layout.
  */
@@ -109,10 +109,6 @@ function fillSlots(g: Grid, layout: Placed[], r: () => number, swarm: boolean): 
       while (x < g[y].length && g[y][x] === '*') g[y][x++] = on ? 'o' : '.';
     }
   }
-  // One Aura Mode orb.
-  const orbs = cells(g, '?');
-  const orb = orbs.length ? Math.floor(r() * orbs.length) : -1;
-  orbs.forEach((c, i) => { g[c.y][c.x] = i === orb ? 'a' : '.'; });
   // The Sigma coin: a marked spot, or any coin if no chunk here has one.
   const sigma = r() < CHANCE.sigma;
   const spots = cells(g, '$');

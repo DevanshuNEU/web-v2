@@ -1,85 +1,45 @@
 /**
- * Every power is one row of POWERS: how long it lasts and what it changes
- * while active. The world never switches on a power's name: it grants a
- * row when the hero takes its pickup, ticks them all down, and reads the
- * folded `modifiers` (kill on touch, block damage, scare radius, music
- * tempo). `w.power[kind]` is seconds left (0 = off).
+ * Every power is one row of POWERS: its name, how long it lasts, and what
+ * it changes while it runs. Powers are optional by design: a reward or a
+ * help before a hard spot, never a gate (tests prove every level and every
+ * memory can be reached without one). One runs at a time; taking another
+ * replaces it. The world reads the running row's fields every step and never
+ * switches on a power's name.
  *
- * Phase 2 wires Aura Mode only. The other four rows are here so the table
- * is the one place they will live; `live: false` until phase 3 gives them
- * their effects, and no level places their pickups yet.
+ * Chapter 1 (Austin) places Bat Wings and Taco Rush. The other rows belong
+ * to later chapters and stay `live: false` until their effects are built.
  */
 
-export type PowerKind = 'aura' | 'magnet' | 'boots' | 'pound' | 'spark';
-export const POWER_KINDS: readonly PowerKind[] = ['aura', 'magnet', 'boots', 'pound', 'spark'];
-
-export type Powers = Record<PowerKind, number>;
+export type PowerKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore';
+export const POWER_KINDS: readonly PowerKind[] = ['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore'];
 
 export interface PowerDef {
-  label: string;
-  /** Seconds it lasts once taken. */
+  /** Card and HUD name. */
+  name: string;
+  /** Seconds it lasts. */
   duration: number;
-  /** Touching an enemy kills it (scored as a stomp). */
-  killsOnTouch: boolean;
-  /** Enemies and spikes cannot hurt the hero (pits still can). */
-  blocksDamage: boolean;
-  /** Enemies within this many tiles run from the hero. */
-  fleeRadius: number;
-  /** Music tempo multiplier while it runs. */
-  tempo: number;
-  /** False until its effect is wired (phase 3). */
+  /** False until its effect is built (later chapters). */
   live: boolean;
+  /** Run speed multiplier. */
+  runMul: number;
+  /** Coins within this many tiles fly to her (0 = off). */
+  magnet: number;
+  /** Fastest fall while holding jump on the way down, tiles per second (0 = no glide). */
+  glideFall: number;
 }
 
-const NONE = { killsOnTouch: false, blocksDamage: false, fleeRadius: 0, tempo: 1 } as const;
+const BASE = { live: true, runMul: 1, magnet: 0, glideFall: 0 } as const;
 
 export const POWERS: Readonly<Record<PowerKind, PowerDef>> = {
-  aura: { label: 'AURA MODE', duration: 8, killsOnTouch: true, blocksDamage: true, fleeRadius: 6, tempo: 1.25, live: true },
-  // TODO(phase 3): pull coins within a radius toward the hero.
-  magnet: { label: 'RIZZ MAGNET', duration: 10, ...NONE, live: false },
-  // TODO(phase 3): one extra jump in the air, recharged on landing.
-  boots: { label: 'SKY BOOTS', duration: 12, ...NONE, live: false },
-  // TODO(phase 3): action in the air slams down, breaks bricks below, stuns nearby enemies.
-  pound: { label: 'GROUND POUND', duration: 12, ...NONE, live: false },
-  // TODO(phase 3): action fires a pooled energy orb that kills what it hits.
-  spark: { label: 'SPARK SHOT', duration: 12, ...NONE, live: false },
+  batWings: { ...BASE, name: 'Bat Wings', duration: 10, glideFall: 2.2 },
+  tacoRush: { ...BASE, name: 'Taco Rush', duration: 8, runMul: 1.4, magnet: 3 },
+  // TODO(chapter 2): enemies bounce off her and are knocked out.
+  priorityBoarding: { ...BASE, name: 'Priority Boarding', duration: 8, live: false },
+  // TODO(chapter 3): the dash recharges at once, so dashes chain.
+  wickedFast: { ...BASE, name: 'Wicked Fast', duration: 8, live: false },
+  // TODO(chapter 4): every landing sends a shockwave that stuns enemies nearby.
+  encore: { ...BASE, name: 'Encore', duration: 10, live: false },
 };
 
-export function createPowers(): Powers {
-  return { aura: 0, magnet: 0, boots: 0, pound: 0, spark: 0 };
-}
-
-/** Start (or refill) a power for its full duration. */
-export function grantPower(p: Powers, kind: PowerKind) {
-  p[kind] = POWERS[kind].duration;
-}
-
-/** Tick every running power down; push the ones that ran out into `ended` (cleared first). */
-export function stepPowers(p: Powers, dt: number, ended: PowerKind[]) {
-  ended.length = 0;
-  for (const k of POWER_KINDS) {
-    if (p[k] <= 0) continue;
-    p[k] = Math.max(0, p[k] - dt);
-    if (p[k] === 0) ended.push(k);
-  }
-}
-
-export interface Modifiers { killsOnTouch: boolean; blocksDamage: boolean; fleeRadius: number; tempo: number }
-
-export function noModifiers(): Modifiers {
-  return { ...NONE };
-}
-
-/** Fold the running rows into one set of modifiers, written into `out`. */
-export function modifiers(p: Powers, out: Modifiers): Modifiers {
-  out.killsOnTouch = false; out.blocksDamage = false; out.fleeRadius = 0; out.tempo = 1;
-  for (const k of POWER_KINDS) {
-    if (p[k] <= 0) continue;
-    const d = POWERS[k];
-    if (d.killsOnTouch) out.killsOnTouch = true;
-    if (d.blocksDamage) out.blocksDamage = true;
-    out.fleeRadius = Math.max(out.fleeRadius, d.fleeRadius);
-    out.tempo = Math.max(out.tempo, d.tempo);
-  }
-  return out;
-}
+/** The legend char of each placed power. */
+export const POWER_CHARS: Readonly<Record<string, PowerKind>> = { w: 'batWings', t: 'tacoRush' };

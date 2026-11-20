@@ -1,4 +1,4 @@
-import { isGame, type GameId } from './games';
+import { GAMES, isGame, type GameId } from './games';
 import { checkPlausible, MIN_DURATION_MS } from './rules';
 import { crownEnv, nameKey, resolveName } from './names';
 import { getStore, type ArcadeStore } from './store';
@@ -53,7 +53,7 @@ export const BAD_GAME = (game: unknown) =>
   fail(
     400,
     'bad_game',
-    `${typeof game === 'string' && game ? `"${game.slice(0, 20)}" is not` : 'That is not'} an arcade game. Use snake, platformer, stacker or merge.`,
+    `${typeof game === 'string' && game ? `"${game.slice(0, 20)}" is not` : 'That is not'} an arcade game. Use ${GAMES.slice(0, -1).join(', ')} or ${GAMES[GAMES.length - 1]}.`,
   );
 
 const UNCONFIGURED = fail(

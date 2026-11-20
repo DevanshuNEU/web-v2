@@ -15,11 +15,31 @@
 
 import { PHYS } from '@/components/apps/games/platformer/sim/physics';
 import { ROWS, TILE, isSolidTile, type Level } from '@/components/apps/games/platformer/sim/level';
+import { PLATFORM_AMP } from '@/components/apps/games/platformer/sim/world';
 
-export interface ReachOpts { dash: boolean; wallJump: boolean; generous?: boolean }
+interface Box { x: number; y: number; w: number; h: number }
+
+export interface ReachOpts {
+  dash: boolean;
+  wallJump: boolean;
+  /** The always-on double jump (off reproduces the phase 2 numbers). */
+  doubleJump?: boolean;
+  generous?: boolean;
+  /** Boxes to find out whether she can touch (memories, pickups). */
+  targets?: readonly Box[];
+  /** Start from this standing cell instead of the level start. */
+  from?: { x: number; y: number };
+  /**
+   * Model stomp bounces off the level's drones (at their hover spots): landing
+   * on one bounces her up as a held stomp bounce (no double jump after it).
+   */
+  bounces?: boolean;
+  /** Record every move as an edge (for "can she always get back to the goal" checks). */
+  graph?: boolean;
+}
 
 interface Template { pts: Float64Array }
-interface Spec { dir: number; vx0: number; vy0: number; hold: boolean; steerDelay: number; dashAt: number; lockT: number }
+interface Spec { dir: number; vx0: number; vy0: number; hold: boolean; steerDelay: number; dashAt: number; lockT: number; dj: number }
 
 const W = PHYS.heroW, H = PHYS.heroH;
 const EPS = 1e-6;
@@ -36,12 +56,14 @@ function simulate(s: Spec, generous: boolean): Template {
   const m = margins(generous);
   const out: number[] = [];
   const dt = 1 / 240;
-  let x = 0, y = 0, vx = s.vx0, vy = s.vy0, t = 0, dashLeft = 0, dashed = false;
+  let x = 0, y = 0, vx = s.vx0, vy = s.vy0, t = 0, dashLeft = 0, dashed = false, jumped2 = false;
   let lx = 0, ly = 0;
   const runMax = PHYS.runMax * m.mx;
   // Every landing in a 14 row level happens well inside 1.6 s.
   while (t < 1.6 && y < ROWS + 2) {
     if (!dashed && s.dashAt >= 0 && t >= s.dashAt) { dashed = true; dashLeft = PHYS.dashTime; }
+    // The double jump: a fresh full jump, held.
+    if (!jumped2 && s.dj >= 0 && t >= s.dj && dashLeft <= 0) { jumped2 = true; vy = -PHYS.jumpV * m.mv; }
     if (dashLeft > 0) {
       vx = s.dir * PHYS.dashSpeed * m.md; vy = 0;
       dashLeft -= dt;
@@ -52,7 +74,7 @@ function simulate(s: Spec, generous: boolean): Template {
         const a = PHYS.accelAir * m.air * dt;
         vx = vx < target ? Math.min(target, vx + a) : Math.max(target, vx - a);
       }
-      const g = vy < 0 && s.hold ? PHYS.gravityHold : PHYS.gravity;
+      const g = vy < 0 && (s.hold || jumped2) ? PHYS.gravityHold : PHYS.gravity;
       vy = Math.min(PHYS.terminal, vy + g * dt);
     }
     x += vx * dt; y += vy * dt; t += dt;
@@ -62,17 +84,31 @@ function simulate(s: Spec, generous: boolean): Template {
   return { pts: Float64Array.from(out) };
 }
 
-interface Templates { jump: Template[][][]; fall: Template[][][]; wall: Template[][] }
+interface Templates { jump: Template[][][]; fall: Template[][][]; wall: Template[][]; bounce: Template[][] }
 
 const cache = new Map<string, Templates>();
 
+/** (double jump time, dash time) pairs, -1 for none: coarse for ordinary timing, fine when generous. */
+function combos(dash: boolean, dj: boolean, dashes: number[], djs: number[]): [number, number][] {
+  const out: [number, number][] = dashes.map(d => [-1, d]);
+  if (!dj) return out;
+  for (const j of djs) out.push([j, -1]);
+  if (dash) for (const j of djs) out.push([j, j + 0.2], [j, j + 0.4], [j + 0.25, Math.max(0.05, j - 0.1)]);
+  return out;
+}
+
 /** Templates indexed [dir 0 = left, 1 = right][running 0/1][...]. */
-function templates(dash: boolean, generous: boolean): Templates {
-  const key = `${dash}${generous}`;
+function templates(dash: boolean, dj: boolean, generous: boolean): Templates {
+  const key = `${dash}${dj}${generous}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const m = margins(generous);
-  const dashes = dash ? [-1, 0.08, 0.2, 0.32, 0.45, 0.6] : [-1];
+  const fine = (a: number, b: number) => Array.from({ length: Math.round((b - a) / 0.05) + 1 }, (_, i) => +(a + i * 0.05).toFixed(2));
+  const dashes = dash ? (generous ? [-1, ...fine(0.05, 0.7)] : [-1, 0.08, 0.2, 0.32, 0.45, 0.6]) : [-1];
+  const djs = generous ? fine(0.05, 0.85) : [0.15, 0.3, 0.45, 0.6];
+  const jumpCombos = combos(dash, dj, dashes, djs);
+  const fallCombos = combos(dash, dj, dash ? [-1, 0.05, 0.2, 0.35] : [-1], generous ? fine(0.05, 0.6) : [0.05, 0.2, 0.4]);
+  const wallCombos = combos(dash, dj, dash ? [-1, 0.12, 0.25, 0.4] : [-1], generous ? fine(0.1, 0.7) : [0.3, 0.5]);
   const jump: Template[][][] = [[[], []], [[], []]];
   const fall: Template[][][] = [[[], []], [[], []]];
   const wall: Template[][] = [[], []];
@@ -82,31 +118,47 @@ function templates(dash: boolean, generous: boolean): Templates {
       const vx0 = dir * PHYS.runMax * m.mx * (run || generous ? 1 : 0);
       for (const hold of [true, false]) {
         for (const steerDelay of hold ? [0, 0.22] : [0]) {
-          for (const dashAt of dashes) {
+          for (const [dj2, dashAt] of jumpCombos) {
             const vy0 = -(hold ? PHYS.jumpV : PHYS.jumpCut) * m.mv;
-            jump[di][run].push(simulate({ dir, vx0: steerDelay > 0 ? 0 : vx0, vy0, hold, steerDelay, dashAt, lockT: 0 }, generous));
+            jump[di][run].push(simulate({ dir, vx0: steerDelay > 0 ? 0 : vx0, vy0, hold, steerDelay, dashAt, lockT: 0, dj: dj2 }, generous));
           }
         }
       }
-      for (const dashAt of dash ? [-1, 0.05, 0.2, 0.35] : [-1]) {
-        fall[di][run].push(simulate({ dir, vx0: vx0 || dir * PHYS.runMax * 0.4, vy0: 0, hold: false, steerDelay: 0, dashAt, lockT: 0 }, generous));
+      for (const [dj2, dashAt] of fallCombos) {
+        fall[di][run].push(simulate({ dir, vx0: vx0 || dir * PHYS.runMax * 0.4, vy0: 0, hold: false, steerDelay: 0, dashAt, lockT: 0, dj: dj2 }, generous));
       }
     }
     // Wall jumps off a wall on side `side` (di 0 = wall on the left, 1 = on the right).
     const side = dir;
     for (const steer of [-side, side]) {
-      for (const dashAt of dash ? [-1, 0.12, 0.25, 0.4] : [-1]) {
-        const s: Spec = { dir: steer, vx0: -side * PHYS.wallJumpX * m.mx, vy0: -PHYS.wallJumpY * m.mv, hold: true, steerDelay: 0, dashAt, lockT: PHYS.wallJumpLock };
-        wall[di].push(simulate(s, generous));
+      for (const [dj2, dashAt] of wallCombos) {
+        const sp: Spec = { dir: steer, vx0: -side * PHYS.wallJumpX * m.mx, vy0: -PHYS.wallJumpY * m.mv, hold: true, steerDelay: 0, dashAt, lockT: PHYS.wallJumpLock, dj: dj2 };
+        wall[di].push(simulate(sp, generous));
       }
     }
   }
-  const t = { jump, fall, wall };
+  // Off a stomp: a held bounce, either way, straight or steering late; no double jump left.
+  const bounce: Template[][] = [[], []];
+  for (const di of [0, 1]) {
+    const dir = di === 0 ? -1 : 1;
+    for (const steerDelay of [0, 0.15, 0.3]) {
+      for (const dashAt of dash ? [-1, 0.2, 0.4] : [-1]) {
+        bounce[di].push(simulate({ dir, vx0: 0, vy0: -PHYS.stompBounceHeld * m.mv, hold: true, steerDelay, dashAt, lockT: 0, dj: -1 }, generous));
+      }
+    }
+  }
+  const t = { jump, fall, wall, bounce };
   cache.set(key, t);
   return t;
 }
 
-/** 1 solid, 2 one-way, 0 open. Out of bounds: solid at the sides, open above and below. */
+/**
+ * 1 solid, 2 one-way, 0 open. Out of bounds: solid at the sides, open above
+ * and below. A horizontal moving platform is a one-way strip at each end of
+ * its swing (only the cells it fully covers there), linked: standing on one
+ * end, she can ride to the other. Vertical platforms are left out (never
+ * counted on).
+ */
 function grid(level: Level) {
   const cols = level.cols;
   const g = new Uint8Array(cols * ROWS);
@@ -114,26 +166,72 @@ function grid(level: Level) {
     const t = level.tiles[i];
     g[i] = isSolidTile(t) ? 1 : t === TILE.ONEWAY ? 2 : 0;
   }
+  const rides = new Map<number, number[]>();
+  for (const p of level.platforms) {
+    if (p.axis !== 'x') continue;
+    const span = (lo: number) => { const out: number[] = []; for (let c = Math.ceil(lo); c <= Math.floor(lo + p.w) - 1; c++) if (c >= 0 && c < cols) out.push(c); return out; };
+    const a = span(p.x - PLATFORM_AMP), b = span(p.x + PLATFORM_AMP);
+    for (const c of [...a, ...b]) if (g[p.y * cols + c] === 0) g[p.y * cols + c] = 2;
+    for (const c of a) rides.set(c * ROWS + (p.y - 1), b);
+    for (const c of b) rides.set(c * ROWS + (p.y - 1), a);
+  }
   const at = (x: number, y: number) => (x < 0 || x >= cols ? 1 : y < 0 || y >= ROWS ? 0 : g[y * cols + x]);
-  return { cols, at };
+  return { cols, at, rides };
 }
 
-export interface ReachResult { reached: boolean; nodes: number; maxX: number; minX: number }
+export interface ReachResult {
+  reached: boolean;
+  nodes: number;
+  maxX: number;
+  minX: number;
+  /** Per target: can she touch it? */
+  touched: boolean[];
+  /** Every standing cell found (all of them when targets were asked for). */
+  stands: { x: number; y: number }[];
+  /** With `graph`: every node found, the moves between them, and which nodes stand at the goal. */
+  graph?: { nodes: number[]; edges: [number, number][]; goal: Set<number>; cell: (id: number) => { x: number; y: number } };
+}
 
 export function reach(level: Level, opts: ReachOpts): ReachResult {
-  const { cols, at } = grid(level);
-  const T = templates(opts.dash, !!opts.generous);
+  const { cols, at, rides } = grid(level);
+  const T = templates(opts.dash, !!opts.doubleJump, !!opts.generous);
+  const targets = opts.targets ?? [];
+  const touched = targets.map(() => false);
+  let left = targets.length;
+  const touch = (x: number, f: number) => {
+    if (left === 0) return;
+    for (let i = 0; i < targets.length; i++) {
+      if (touched[i]) continue;
+      const b = targets[i];
+      if (x < b.x + b.w && x + W > b.x && f - H < b.y + b.h && f > b.y) { touched[i] = true; left--; }
+    }
+  };
+  const stands: { x: number; y: number }[] = [];
   const solid = (x: number, y: number) => at(x, y) === 1;
   const floorAt = (x: number, y: number) => at(x, y) !== 0;
   const clear = (x: number, y: number) => !solid(x, y) && !solid(x, y - 1);
   const standable = (x: number, y: number) => y >= 1 && y < ROWS && clear(x, y) && floorAt(x, y + 1);
 
   // Node id: (x * ROWS + y) * 3 + kind; kind 0 stand, 1 wall on the left, 2 wall on the right.
-  const seen = new Uint8Array(cols * ROWS * 3);
+  // Bounce nodes (one per drone) follow the cell nodes.
+  const drones = opts.bounces ? level.enemies.filter(e => e.kind === 'adDrone' || e.kind === 'eliteDrone') : [];
+  const cellNodes = cols * ROWS * 3;
+  const seen = new Uint8Array(cellNodes + drones.length);
+  const pushBounce = (i: number) => {
+    const id = cellNodes + i;
+    if (opts.graph && cur >= 0) edges.push([cur, id]);
+    if (seen[id]) return;
+    seen[id] = 1; queue.push(id);
+  };
+  /** A drone's body at its hover spot (see enemyFrom). */
+  const droneBox = (i: number) => ({ x: drones[i].x + 0.1, y: drones[i].y + 0.15, w: 0.8, h: 0.7 });
   const queue: number[] = [];
+  let cur = -1;
+  const edges: [number, number][] = [];
   const push = (x: number, y: number, kind: number) => {
     if (x < 0 || x >= cols || y < 0 || y >= ROWS) return;
     const id = (x * ROWS + y) * 3 + kind;
+    if (opts.graph && cur >= 0) edges.push([cur, id]);
     if (seen[id]) return;
     seen[id] = 1;
     queue.push(id);
@@ -160,6 +258,13 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       const c0 = Math.floor(x + EPS), c1 = Math.floor(x + W - EPS);
       const r1 = Math.floor(f - EPS);
       // Landing: the feet crossed into a row with a floor under the box.
+      if (f > pf && drones.length) {
+        // A stomp: falling onto a drone from above.
+        for (let k = 0; k < drones.length; k++) {
+          const b = droneBox(k);
+          if (x < b.x + b.w && x + W > b.x && f > b.y && pf <= b.y + 0.3) { pushBounce(k); return; }
+        }
+      }
       if (f > pf) {
         const rf = r1;
         if (pf <= rf + EPS) {
@@ -182,20 +287,32 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
         }
         return;
       }
+      touch(x, f);
       px = x; pf = f;
     }
   };
 
-  const s = level.start;
-  push(s.x, s.y - 1, 0);
+  if (opts.from) push(opts.from.x, opts.from.y, 0);
+  else push(level.start.x, level.start.y - 1, 0);
   let head = 0;
-  while (head < queue.length && !reached) {
+  const goalNodes = new Set<number>();
+  while (head < queue.length && !(reached && left === 0 && !opts.targets && !opts.graph)) {
     const id = queue[head++];
+    cur = id;
+    if (id >= cellNodes) {
+      const b = droneBox(id - cellNodes);
+      for (const di of [0, 1]) for (const tp of T.bounce[di]) sweep(tp, b.x + b.w / 2 - W / 2, b.y);
+      continue;
+    }
     const kind = id % 3, cell = (id - kind) / 3;
     const x = Math.floor(cell / ROWS), y = cell % ROWS;
-    if (atGoal(x, y)) { reached = true; break; }
+    if (atGoal(x, y)) { reached = true; goalNodes.add(id); if (!opts.targets && !opts.graph) break; }
     maxX = Math.max(maxX, x); minX = Math.min(minX, x);
     if (kind === 0) {
+      stands.push({ x, y });
+      touch(x + 0.5 - W / 2, y + 1);
+      const ride = rides.get(x * ROWS + y);
+      if (ride) for (const c of ride) if (standable(c, y)) push(c, y, 0);
       for (const d of [-1, 1]) {
         const di = d < 0 ? 0 : 1;
         const nx = x + d;
@@ -226,7 +343,9 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       }
     }
   }
-  return { reached, nodes: queue.length, maxX, minX };
+  const cell = (id: number) => { const c = Math.floor(id / 3); return { x: Math.floor(c / ROWS), y: c % ROWS }; };
+  const graph = opts.graph ? { nodes: queue.slice(), edges, goal: goalNodes, cell } : undefined;
+  return { reached, nodes: queue.length, maxX, minX, touched, stands, graph };
 }
 
 export function reachesGoal(level: Level, opts: ReachOpts): boolean {

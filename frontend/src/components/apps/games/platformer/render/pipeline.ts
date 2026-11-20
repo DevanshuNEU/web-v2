@@ -43,7 +43,7 @@ interface Pal {
   pole: string; flag: string; text: string;
 }
 
-const PALETTES: Record<WorldTheme, Pal> = {
+const PALETTES: Partial<Record<WorldTheme, Pal>> & { stars: Pal } = {
   grass: {
     skyTop: '#8fdcff', skyBottom: '#ffe4f1', far: '#ffc2dc', near: '#ff9cc8', deco: '#ffffff',
     ground: '#9a5a3a', groundTop: '#8cf25a', speck: '#7a4229',
@@ -85,7 +85,7 @@ const MONO: Pal = {
 };
 
 export function palette(theme: WorldTheme, mono: boolean): Pal {
-  return mono ? MONO : PALETTES[theme];
+  return mono ? MONO : PALETTES[theme] ?? PALETTES.stars;
 }
 
 // Deterministic star field, made once.
