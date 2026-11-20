@@ -9,6 +9,10 @@ import Launcher from './Launcher';
 import SnakeGame from './snake/SnakeGame';
 import TetrisGame from './tetris/TetrisGame';
 import TypeRacerGame from './typeracer/TypeRacerGame';
+import PlatformerGame from './platformer/PlatformerGame';
+import StackerGame from './stacker/StackerGame';
+import MergeGame from './merge/MergeGame';
+import BoardsScreen from './BoardsScreen';
 import type { GameId } from './registry';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +39,10 @@ export default function GamesApp({ variant = 'desktop' }: { variant?: 'desktop' 
     <div className="h-full flex flex-col overflow-hidden">
       <AnimatePresence mode="wait">
         {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} isMobile={isMobile} lastGame={lastGame} /></motion.div>}
+        {game === 'boards'     && <motion.div key="boards"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><BoardsScreen   onBack={back} /></motion.div>}
+        {game === 'platformer' && <motion.div key="platformer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><PlatformerGame onBack={back} isMobile={isMobile} /></motion.div>}
+        {game === 'stacker'    && <motion.div key="stacker"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><StackerGame    onBack={back} isMobile={isMobile} /></motion.div>}
+        {game === 'merge'      && <motion.div key="merge"      className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><MergeGame      onBack={back} isMobile={isMobile} /></motion.div>}
         {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGame onBack={back} isMobile={isMobile} /></motion.div>}
         {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={back} isMobile={isMobile} /></motion.div>}
         {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={back} isMobile={isMobile} /></motion.div>}

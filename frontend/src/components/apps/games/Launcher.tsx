@@ -2,54 +2,17 @@
 
 import { useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { Trophy } from 'lucide-react';
 import { Hairline, MetaLabel } from '@/components/editorial';
 import { Plotter } from '@/components/signature';
 import { strokeSet } from '@/lib/signature/plotter';
 import { reveal } from '@/lib/motion';
 import { bestScore } from './shared/chrome';
-import type { GameId } from './registry';
+import { GAMES, type GameCard, type GameId } from './registry';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SELECTOR - editorial numbered index
-//
-// Three games set as a ruled, numbered list: serif name + tiny uppercase mono
-// metadata (genre · controls · best). No gradients, no glow, no colored chrome.
-// hsKey / hsLabel feed the live best-score read from localStorage (rendered,
-// not animated). controls / genre are the mono caption line.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CARDS = [
-  {
-    id: 'snake' as GameId,
-    title: 'Snake',
-    subtitle: 'Nokia 3310 edition',
-    genre: 'Arcade',
-    controls: 'Arrow keys or WASD. Space pauses.',
-    controlsMobile: 'Swipe or tap controls',
-    hsKey: 'devos-snake-hs',
-    hsLabel: 'pts',
-  },
-  {
-    id: 'tetris' as GameId,
-    title: 'Tetris',
-    subtitle: "The programmer's meditation",
-    genre: 'Puzzle',
-    controls: 'Arrows move and rotate. Space drops. P pauses.',
-    controlsMobile: 'Tap controls',
-    hsKey: 'devos-tetris-hs',
-    hsLabel: 'pts',
-  },
-  {
-    id: 'typeracer' as GameId,
-    title: 'Type Racer',
-    subtitle: 'Code faster than your linter',
-    genre: 'Reflex',
-    controls: 'Type the snippet. The timer starts on your first key.',
-    controlsMobile: 'Tap to type',
-    hsKey: 'devos-typeracer-hs',
-    hsLabel: 'WPM',
-  },
-] as const;
+// Editorial numbered index: serif game names, a quiet caption line, the best
+// score on this device on the right. The games themselves go loud; this list
+// stays in the portfolio's voice.
 
 function SelectorEntry({
   card,
@@ -58,7 +21,7 @@ function SelectorEntry({
   autoFocus,
   onSelect,
 }: {
-  card: (typeof CARDS)[number];
+  card: GameCard;
   reduced: boolean | null;
   isMobile: boolean;
   /** Focus this row on mount (the game the visitor just left). */
@@ -102,6 +65,25 @@ function SelectorEntry({
   );
 }
 
+// Masthead button to every leaderboard, so "where do I stand" is answered on
+// the first screen instead of below the fold.
+function BoardsButton({ autoFocus, onSelect }: { autoFocus: boolean; onSelect: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (autoFocus) ref.current?.focus({ preventScroll: true }); }, [autoFocus]);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onSelect}
+      className="inline-flex min-h-11 shrink-0 items-center gap-2 border border-border px-3 text-sm text-text
+                 transition-[transform,border-color] duration-150 ease-out hover:border-text/45 active:scale-[0.97]"
+    >
+      <Trophy size={16} aria-hidden />
+      Leaderboards
+    </button>
+  );
+}
+
 export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (id: GameId) => void; isMobile: boolean; lastGame: GameId | null }) {
   const reduced = useReducedMotion();
 
@@ -116,9 +98,12 @@ export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (
       {/* ── Masthead ── serif title + mono spec line ── */}
       <div className="relative z-10 w-full max-w-3xl px-5 pt-6 pb-4 flex flex-col gap-3">
         <MetaLabel as="p">Arcade</MetaLabel>
-        <h1 className="editorial-head text-text leading-[1.05] text-[clamp(1.75rem,7cqi,3.25rem)] [overflow-wrap:normal] [text-wrap:balance]">
-          {isMobile ? 'Three small games.' : 'Three classics, one window.'}
-        </h1>
+        <div className="flex items-end justify-between gap-4">
+          <h1 className="editorial-head text-text leading-[1.05] text-[clamp(1.75rem,7cqi,3.25rem)] [overflow-wrap:normal] [text-wrap:balance]">
+            {isMobile ? 'Six small games.' : 'Six games, one window.'}
+          </h1>
+          <BoardsButton autoFocus={lastGame === 'boards'} onSelect={() => onSelect('boards')} />
+        </div>
       </div>
 
       <Hairline className="relative z-10 mx-5 max-w-[calc(48rem-2.5rem)]" />
@@ -131,7 +116,7 @@ export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (
           animate="show"
           className="flex w-full max-w-3xl flex-col"
         >
-          {CARDS.map((card, i) => (
+          {GAMES.map((card) => (
             <motion.div key={card.id} variants={reveal.item(reduced)}>
               <SelectorEntry
                 card={card}
@@ -140,9 +125,10 @@ export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (
                 autoFocus={lastGame === card.id}
                 onSelect={() => onSelect(card.id)}
               />
-              {i < CARDS.length - 1 && <Hairline className="mx-1" />}
+              <Hairline className="mx-1" />
             </motion.div>
           ))}
+
         </motion.div>
       </div>
     </div>
