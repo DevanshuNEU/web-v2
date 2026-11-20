@@ -12,7 +12,7 @@
  * mobileStore.currentPage in sync for PageDots.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMobileStore } from '@/store/mobileStore';
 import { getHomePages } from '@/lib/mobileAppRegistry';
 import HomePage from './HomePage';
@@ -27,22 +27,27 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ onOpenApp }: HomeScreenProps) {
-  const pages = getHomePages();
+  // Stable across renders, so a page change mid-swipe re-renders the dots and
+  // label without handing every HomePage new props.
+  const pages = useMemo(() => getHomePages(), []);
   const currentPage = useMobileStore((s) => s.currentPage);
-  const setPage = useMobileStore((s) => s.setPage);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
-  // Sync scroll position → store
+  // Sync scroll position → store. One listener for the component's life; it
+  // reads the current page from the store, so it writes (and re-renders) only
+  // when the rounded page actually changes.
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const onScroll = () => {
+      if (!el.clientWidth) return;
       const page = Math.round(el.scrollLeft / el.clientWidth);
-      if (page !== currentPage) setPage(page);
+      const { currentPage: shown, setPage } = useMobileStore.getState();
+      if (page !== shown) setPage(page);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
-  }, [currentPage, setPage]);
+  }, []);
 
   return (
     <div className="absolute inset-0 flex flex-col text-white touch-pan-x">
