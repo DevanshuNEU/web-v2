@@ -1,5 +1,5 @@
 /** The arcade games that have a leaderboard. */
-export const GAMES = ['snake', 'platformer', 'stacker', 'merge'] as const;
+export const GAMES = ['snake', 'platformer', 'stacker'] as const;
 
 export type GameId = (typeof GAMES)[number];
 

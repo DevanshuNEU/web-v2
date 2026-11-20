@@ -14,7 +14,6 @@ const GAME_NAMES: Record<ArcadeGame, string> = {
   snake: 'Sigma Snake',
   platformer: 'Baguettino Run',
   stacker: 'Aura Tower',
-  merge: 'Brainrot Evolution',
 };
 
 // First place: a one-shot burst of cast-coloured confetti from the card.

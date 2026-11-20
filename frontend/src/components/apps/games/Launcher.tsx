@@ -19,9 +19,12 @@ function SelectorEntry({
   reduced,
   isMobile,
   autoFocus,
+  featured,
   onSelect,
 }: {
   card: GameCard;
+  /** The first game: spans the full width and gets larger type in a wide window. */
+  featured: boolean;
   reduced: boolean | null;
   isMobile: boolean;
   /** Focus this row on mount (the game the visitor just left). */
@@ -38,7 +41,8 @@ function SelectorEntry({
       type="button"
       onClick={onSelect}
       data-testid="index-row"
-      className={`group relative flex w-full items-baseline gap-4 px-3 py-4 text-left
+      data-featured={featured}
+      className={`group relative flex h-full w-full items-baseline gap-4 px-3 py-4 text-left
                   transition-[transform,background-color] duration-150 ease-out
                   hover:bg-black/[0.035] dark:hover:bg-white/[0.05]
                   active:scale-[0.985]`}
@@ -46,7 +50,8 @@ function SelectorEntry({
       <span className="flex-1 min-w-0">
         <span
           className={`block font-display leading-tight truncate text-text
-                      transition-transform duration-150 ease-out text-[clamp(1.25rem,3.4cqi,1.9rem)]
+                      transition-transform duration-150 ease-out
+                      ${featured ? 'text-[clamp(1.5rem,4.2cqi,2.6rem)]' : 'text-[clamp(1.25rem,3.4cqi,1.9rem)]'}
                       ${reduced ? '' : 'group-hover:translate-x-0.5'}`}
         >
           {card.title}
@@ -96,17 +101,22 @@ export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (
       </div>
 
       {/* ── Masthead ── serif title + mono spec line ── */}
-      <div className="relative z-10 w-full max-w-3xl px-5 pt-6 pb-4 flex flex-col gap-3">
+      {/* One width for the masthead, the rule and the grid, so their edges
+          line up; it grows with the window up to about 72rem. */}
+      <div className="relative z-10 w-full max-w-3xl [@container(min-width:900px)]:mx-auto [@container(min-width:900px)]:max-w-[72rem] px-6 pt-6 pb-4 flex flex-col gap-3">
         <MetaLabel as="p">Arcade</MetaLabel>
         <div className="flex items-end justify-between gap-4">
           <h1 className="editorial-head text-text leading-[1.05] text-[clamp(1.75rem,7cqi,3.25rem)] [overflow-wrap:normal] [text-wrap:balance]">
-            {isMobile ? 'Six small games.' : 'Six games, one window.'}
+            {isMobile ? 'Five small games.' : 'Five games, one window.'}
           </h1>
           <BoardsButton autoFocus={lastGame === 'boards'} onSelect={() => onSelect('boards')} />
         </div>
       </div>
 
-      <Hairline className="relative z-10 mx-5 max-w-[calc(48rem-2.5rem)]" />
+      {/* Rules sit 12px in, the text 24px in, on both the masthead and the list. */}
+      <div className="relative z-10 w-full max-w-3xl [@container(min-width:900px)]:mx-auto [@container(min-width:900px)]:max-w-[72rem] px-3">
+        <Hairline />
+      </div>
 
       {/* ── Index ── staggers in ONCE on mount (never on scroll) ── */}
       <div className="relative z-10 flex-1 overflow-y-auto px-2 py-1">
@@ -114,18 +124,25 @@ export default function Launcher({ onSelect, isMobile, lastGame }: { onSelect: (
           variants={reveal.container(reduced)}
           initial="hidden"
           animate="show"
-          className="flex w-full max-w-3xl flex-col"
+          // One column in a narrow window; in a wide one the featured game
+          // spans the top and the rest sit in two columns, so the window is
+          // used instead of leaving its right half empty.
+          className="grid w-full max-w-3xl grid-cols-1 [@container(min-width:900px)]:mx-auto [@container(min-width:900px)]:max-w-[calc(72rem-1rem)] [@container(min-width:900px)]:grid-cols-2 [@container(min-width:900px)]:gap-x-6"
         >
-          {GAMES.map((card) => (
-            <motion.div key={card.id} variants={reveal.item(reduced)}>
+          {GAMES.map((card, i) => (
+            <motion.div
+              key={card.id}
+              variants={reveal.item(reduced)}
+              className={`mx-1 border-b border-border ${i === 0 ? '[@container(min-width:900px)]:col-span-2' : ''}`}
+            >
               <SelectorEntry
                 card={card}
                 reduced={reduced}
                 isMobile={isMobile}
+                featured={i === 0}
                 autoFocus={lastGame === card.id}
                 onSelect={() => onSelect(card.id)}
               />
-              <Hairline className="mx-1" />
             </motion.div>
           ))}
 

@@ -92,7 +92,6 @@ const SFX = {
   drop:   () => tone(240, 0, 0.07, 0.07, 'triangle', 180),
   perfect:() => { tone(784, 0, 0.07, 0.06); tone(1175, 0.06, 0.14, 0.06); },
   slice:  () => noise(0, 0.07, 0.05),
-  merge:  (level = 1) => { const f = 330 * Math.pow(1.12, level); tone(f, 0, 0.08, 0.07); tone(f * 1.5, 0.06, 0.12, 0.06); },
   slide:  () => tone(200, 0, 0.05, 0.03, 'triangle', 260),
   combo:  (n = 1) => tone(440 * Math.pow(1.06, Math.min(n, 16)), 0, 0.1, 0.06),
   over:   () => [392, 330, 262, 196].forEach((f, i) => tone(f, i * 0.12, 0.16, 0.07, 'triangle')),

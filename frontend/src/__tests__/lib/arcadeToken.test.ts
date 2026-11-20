@@ -42,13 +42,13 @@ describe('arcade run tokens', () => {
   });
 
   it('expires after two hours', () => {
-    const { token } = issueToken('merge', SECRET, T0);
+    const { token } = issueToken('stacker', SECRET, T0);
     expect(verifyToken(token, SECRET, T0 + TOKEN_TTL_MS).ok).toBe(true);
     expect(verifyToken(token, SECRET, T0 + TOKEN_TTL_MS + 1)).toEqual({ ok: false, reason: 'expired' });
   });
 
   it('rejects a start time in the future', () => {
-    const { token } = issueToken('merge', SECRET, T0 + 60_000);
+    const { token } = issueToken('stacker', SECRET, T0 + 60_000);
     expect(verifyToken(token, SECRET, T0)).toEqual({ ok: false, reason: 'future' });
   });
 });
@@ -104,7 +104,9 @@ describe('plausibility rules', () => {
 
 describe('games and weeks', () => {
   it('knows the four games', () => {
-    expect(['snake', 'platformer', 'stacker', 'merge'].every(isGame)).toBe(true);
+    expect(['snake', 'platformer', 'stacker'].every(isGame)).toBe(true);
+    // Brainrot Evolution was removed from the arcade.
+    expect(isGame('merge')).toBe(false);
     expect(isGame('tetris')).toBe(false);
     expect(isGame(undefined)).toBe(false);
   });
@@ -124,9 +126,5 @@ describe('score caps sit near what a perfect run can reach', () => {
     // Derived from the level data in src/__tests__/apps/platformerScore.test.ts.
     expect(RULES.platformer.cap).toBeGreaterThanOrEqual(23_760);
     expect(RULES.platformer.cap).toBeLessThanOrEqual(22_000 * 1.15);
-  });
-  it('merge: a fast honest player (6 moves a second, about 45k at the Moon Gigachad) passes', () => {
-    const seconds = 270 / 6;
-    expect(checkPlausible('merge', 45_000, seconds * 1000)).toEqual({ ok: true });
   });
 });

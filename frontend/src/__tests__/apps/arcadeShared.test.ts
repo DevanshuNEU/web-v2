@@ -165,21 +165,20 @@ describe('sound', () => {
   it('sfx never throws, with or without audio support', () => {
     setArcadeSound(true);
     expect(() => sfx('coin')).not.toThrow();
-    expect(() => sfx('merge', 4)).not.toThrow();
     setArcadeSound(false);
     expect(() => sfx('boom')).not.toThrow();
   });
 });
 
 describe('registry', () => {
-  it('lists six games with unique ids and best-score keys', () => {
-    expect(GAMES).toHaveLength(6);
-    expect(new Set(GAMES.map(g => g.id)).size).toBe(6);
-    expect(new Set(GAMES.map(g => g.hsKey)).size).toBe(6);
+  it('lists five games with unique ids and best-score keys', () => {
+    expect(GAMES).toHaveLength(5);
+    expect(new Set(GAMES.map(g => g.id)).size).toBe(5);
+    expect(new Set(GAMES.map(g => g.hsKey)).size).toBe(5);
   });
 
-  it('puts the four brainrot games on the global board, the platformer first', () => {
-    expect(BOARD_GAMES.map(g => g.board)).toEqual(['platformer', 'snake', 'stacker', 'merge']);
+  it('puts the three arcade games on the global board, the platformer first', () => {
+    expect(BOARD_GAMES.map(g => g.board)).toEqual(['platformer', 'snake', 'stacker']);
   });
 
   it('copy has no em or en dashes and no exclamation marks', () => {

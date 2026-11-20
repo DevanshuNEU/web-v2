@@ -18,12 +18,12 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('Arcade launcher', () => {
-  it('lists the six games, the platformer first, then the leaderboards', () => {
+  it('lists the five games, the platformer first, then the leaderboards', () => {
     render(<GamesApp variant="mobile" />);
     const rows = screen.getAllByTestId('index-row').map(r => r.querySelector('.font-display')?.textContent);
-    expect(rows).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'Tetris', 'Type Racer']);
+    expect(rows).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'Tetris', 'Type Racer']);
     expect(screen.getByRole('button', { name: /Leaderboards/ })).toBeInTheDocument();
-    expect(screen.getByText('Six small games.')).toBeInTheDocument();
+    expect(screen.getByText('Five small games.')).toBeInTheDocument();
   });
 
   it('shows the phone controls line on mobile and the keyboard line on desktop', () => {
@@ -31,7 +31,7 @@ describe('Arcade launcher', () => {
     expect(screen.getByText('Left thumb runs, right thumb jumps')).toBeInTheDocument();
     unmount();
     render(<GamesApp variant="desktop" />);
-    expect(screen.getByText('Arrows or A and D to run. Space or W to jump.')).toBeInTheDocument();
+    expect(screen.getByText('Arrows to run. Space to jump, again in the air to double jump.')).toBeInTheDocument();
   });
 
   it('shows the best score saved on this device', () => {
@@ -45,7 +45,7 @@ describe('Arcade launcher', () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByRole('button', { name: /Leaderboards/ }));
     const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map(t => t.textContent)).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'This week', 'All time']);
+    expect(tabs.map(t => t.textContent)).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'This week', 'All time']);
     expect(await screen.findByText('No scores this week yet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Aura Tower' }));
     expect(screen.getByRole('tab', { name: 'Aura Tower' })).toHaveAttribute('aria-selected', 'true');
@@ -170,5 +170,20 @@ describe('TouchButton when the browser refuses pointer capture', () => {
     b.setPointerCapture = () => { throw new DOMException('No active pointer', 'NotFoundError'); };
     fireEvent.pointerDown(b, { pointerId: 7 });
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Arcade launcher: Main Character is the featured game', () => {
+  it('tells the story and teaches the double jump in its copy', () => {
+    render(<GamesApp variant="desktop" />);
+    expect(screen.getByText('A night run across Boston, before sunrise.')).toBeInTheDocument();
+    expect(screen.getByText('Arrows to run. Space to jump, again in the air to double jump.')).toBeInTheDocument();
+  });
+
+  it('marks the first game as featured and the rest as the grid', () => {
+    render(<GamesApp variant="desktop" />);
+    const rows = screen.getAllByTestId('index-row');
+    expect(rows[0]).toHaveAttribute('data-featured', 'true');
+    expect(rows.slice(1).every(r => r.getAttribute('data-featured') === 'false')).toBe(true);
   });
 });

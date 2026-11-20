@@ -18,7 +18,6 @@ const { loaded, stub } = vi.hoisted(() => {
 vi.mock('@/components/apps/games/platformer/PlatformerGame', () => stub('platformer', 'Platformer'));
 vi.mock('@/components/apps/games/snake/SnakeGame', () => stub('snake', 'Snake'));
 vi.mock('@/components/apps/games/stacker/StackerGame', () => stub('stacker', 'Stacker'));
-vi.mock('@/components/apps/games/merge/MergeGame', () => stub('merge', 'Merge'));
 vi.mock('@/components/apps/games/tetris/TetrisGame', () => stub('tetris', 'Tetris'));
 vi.mock('@/components/apps/games/typeracer/TypeRacerGame', () => stub('typeracer', 'Type Racer'));
 
@@ -27,7 +26,7 @@ import GamesApp from '@/components/apps/GamesApp';
 describe('arcade lazy loading', () => {
   it('opening the launcher loads no game; picking one loads only that one', async () => {
     render(<GamesApp variant="mobile" />);
-    expect(screen.getAllByTestId('index-row')).toHaveLength(6);
+    expect(screen.getAllByTestId('index-row')).toHaveLength(5);
     expect([...loaded]).toEqual([]);
     await userEvent.click(screen.getByText('Sigma Snake'));
     expect(await screen.findByRole('heading', { name: 'Snake stub' })).toBeInTheDocument();

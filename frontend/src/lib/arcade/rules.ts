@@ -24,13 +24,10 @@ export type ScoreRule = {
 //     world add 15,340: 23,760. The best of 500 seeds is 22,000.
 //     platformerScore.test.ts derives both.
 //   stacker: one floor per drop; nobody honest drops 12 a second.
-//   merge: about 45k at the Moon Gigachad; past that, moon pairs add 10k.
-//     Fast swipers manage 6 to 8 moves a second early on.
 export const RULES: Record<GameId, ScoreRule> = {
   snake: { maxPerSecond: 12, base: 10, cap: 399 },
   platformer: { maxPerSecond: 600, base: 3000, cap: 24_000 },
   stacker: { maxPerSecond: 12, base: 10, cap: 3000 },
-  merge: { maxPerSecond: 2500, base: 5000, cap: 250_000 },
 };
 
 /** Runs shorter than this cannot post a non-zero score. */

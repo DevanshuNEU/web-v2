@@ -5,7 +5,7 @@
 
 import type { ArcadeGame } from './leaderboard/api';
 
-export type GameId = 'launcher' | 'boards' | 'platformer' | 'snake' | 'stacker' | 'merge' | 'tetris' | 'typeracer';
+export type GameId = 'launcher' | 'boards' | 'platformer' | 'snake' | 'stacker' | 'tetris' | 'typeracer';
 export type PlayableId = Exclude<GameId, 'launcher' | 'boards'>;
 
 export interface GameCard {
@@ -24,8 +24,8 @@ export const GAMES: readonly GameCard[] = [
   {
     id: 'platformer',
     title: 'Main Character',
-    subtitle: 'Three worlds, one flag, zero side quests.',
-    controls: 'Arrows or A and D to run. Space or W to jump.',
+    subtitle: 'A night run across Boston, before sunrise.',
+    controls: 'Arrows to run. Space to jump, again in the air to double jump.',
     controlsMobile: 'Left thumb runs, right thumb jumps',
     hsKey: 'devos-platformer-hs',
     hsLabel: 'pts',
@@ -50,16 +50,6 @@ export const GAMES: readonly GameCard[] = [
     hsKey: 'devos-stacker-hs',
     hsLabel: 'floors',
     board: 'stacker',
-  },
-  {
-    id: 'merge',
-    title: 'Brainrot Evolution',
-    subtitle: 'Merge two of a kind until the Moon Gigachad shows up.',
-    controls: 'Arrow keys or WASD to slide.',
-    controlsMobile: 'Swipe to slide',
-    hsKey: 'devos-merge-hs',
-    hsLabel: 'pts',
-    board: 'merge',
   },
   {
     id: 'tetris',

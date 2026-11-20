@@ -16,7 +16,6 @@ const GAME_VIEWS: Record<PlayableId, GameView> = {
   platformer: lazy(() => import('./platformer/PlatformerGame')),
   snake: lazy(() => import('./snake/SnakeGame')),
   stacker: lazy(() => import('./stacker/StackerGame')),
-  merge: lazy(() => import('./merge/MergeGame')),
   tetris: lazy(() => import('./tetris/TetrisGame')),
   typeracer: lazy(() => import('./typeracer/TypeRacerGame')),
 };

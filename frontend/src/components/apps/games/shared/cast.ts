@@ -3,8 +3,8 @@
  * with a thick dark outline. No image assets, so nothing to download on a
  * phone and every size stays sharp.
  *
- * Order matters: it is the evolution chain for Brainrot Evolution, smallest
- * to largest. The platformer hero is `baguette`.
+ * Order matters: smallest to largest. Snake serves them as snacks and Aura
+ * Tower uses their colours.
  */
 
 import { arcadeTheme } from './theme';

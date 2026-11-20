@@ -122,11 +122,11 @@ describe('submitScore', () => {
 
   it('keeps games apart', async () => {
     await play('Dev', 10, { game: 'snake' });
-    await play('Dev', 1000, { game: 'merge' });
+    await play('Dev', 200, { game: 'stacker' });
     const snake = await getBoard('snake');
-    const merge = await getBoard('merge');
+    const stacker = await getBoard('stacker');
     expect(snake.ok && snake.data.all[0].score).toBe(10);
-    expect(merge.ok && merge.data.all[0].score).toBe(1000);
+    expect(stacker.ok && stacker.data.all[0].score).toBe(200);
   });
 });
 
@@ -204,14 +204,14 @@ describe('getBoard', () => {
 describe('removeEntry', () => {
   it('removes a name from both boards of one game', async () => {
     await play('Cheater', 300, { ms: 3_600_000 });
-    await play('Cheater', 300, { game: 'merge', ms: 3_600_000 });
+    await play('Cheater', 300, { game: 'platformer', ms: 3_600_000 });
     const r = await removeEntry('snake', 'CHEATER');
     expect(r).toEqual({ ok: true, data: { ok: true, game: 'snake', name: 'CHEATER', removed: { all: true, week: true } } });
     const snake = await getBoard('snake');
     expect(snake.ok && snake.data.all).toEqual([]);
     expect(snake.ok && snake.data.week).toEqual([]);
-    const merge = await getBoard('merge');
-    expect(merge.ok && merge.data.all).toHaveLength(1);
+    const platformer = await getBoard('platformer');
+    expect(platformer.ok && platformer.data.all).toHaveLength(1);
   });
 });
 
