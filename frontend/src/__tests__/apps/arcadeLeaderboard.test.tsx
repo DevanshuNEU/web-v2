@@ -289,3 +289,32 @@ describe('BoardView', () => {
     await waitFor(() => expect(screen.getByText('P1')).toBeInTheDocument());
   });
 });
+
+describe('fetchSecret: personal only on the crowned device', () => {
+  it('without a crown code: asks only for the name and fills in the shared message', async () => {
+    const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
+    const f = mockFetch(() => ({ name: 'Her Name' }));
+    expect(await fetchSecret()).toEqual({ name: 'Her Name', message: 'Made for you.', story: {} });
+    expect(f.mock.calls[0][0]).toBe('/api/arcade/secret');
+    expect(f.mock.calls[0][1]?.method ?? 'GET').toBe('GET');
+  });
+
+  it('with the crown code saved: posts it and gets the message and story', async () => {
+    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
+    const f = mockFetch(() => ({ name: 'Her Name', message: 'hi you', story: { 'card-1': 'where we met' } }));
+    expect(await fetchSecret()).toEqual({ name: 'Her Name', message: 'hi you', story: { 'card-1': 'where we met' } });
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe('/api/arcade/secret');
+    expect(init!.method).toBe('POST');
+    expect(JSON.parse(init!.body as string)).toEqual({ code: 'secretcode' });
+  });
+
+  it('falls back to the shared version when the code is refused', async () => {
+    localStorage.setItem('devos-arcade-crown', 'stale');
+    const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
+    let n = 0;
+    mockFetch(() => (++n === 1 ? { error: { code: 'not_crowned', message: 'no' } } : { name: 'Her Name' }));
+    expect(await fetchSecret()).toEqual({ name: 'Her Name', message: 'Made for you.', story: {} });
+  });
+});

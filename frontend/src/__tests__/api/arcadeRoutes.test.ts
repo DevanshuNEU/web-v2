@@ -5,7 +5,7 @@ import { POST as start } from '@/app/api/arcade/start/route';
 import { POST as score } from '@/app/api/arcade/score/route';
 import { GET as board } from '@/app/api/arcade/board/route';
 import { DELETE as admin } from '@/app/api/arcade/admin/route';
-import { GET as secret } from '@/app/api/arcade/secret/route';
+import { GET as secret, POST as unlock } from '@/app/api/arcade/secret/route';
 
 let ipSeq = 0;
 const nextIp = () => `198.51.100.${++ipSeq}`;
@@ -38,6 +38,7 @@ beforeEach(() => {
   vi.stubEnv('ARCADE_CROWN_CODE', '');
   vi.stubEnv('ARCADE_HER_NAME', '');
   vi.stubEnv('ARCADE_SECRET_MESSAGE', '');
+  vi.stubEnv('ARCADE_STORY', '');
   resetStore();
   resetLimiter();
 });
@@ -140,20 +141,74 @@ describe('DELETE /api/arcade/admin', () => {
   });
 });
 
-describe('GET /api/arcade/secret', () => {
-  it('is 404 not_set until both values exist', async () => {
-    vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
+describe('GET /api/arcade/secret: the public part', () => {
+  it('is 404 not_set until her name exists', async () => {
     const res = await secret();
     expect(res.status).toBe(404);
     expect((await res.json()).error.code).toBe('not_set');
   });
 
-  it('returns the name and message, uncached', async () => {
+  it('returns only her name (already public on the board), never the message or story', async () => {
     vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
     vi.stubEnv('ARCADE_SECRET_MESSAGE', 'hello');
+    vi.stubEnv('ARCADE_STORY', JSON.stringify({ 'card-1': 'where we met' }));
     const res = await secret();
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(await res.json()).toEqual({ name: 'Juniper', message: 'hello' });
+    expect(await res.json()).toEqual({ name: 'Juniper' });
+  });
+});
+
+describe('POST /api/arcade/secret: only for the crowned device', () => {
+  beforeEach(() => {
+    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight');
+    vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
+    vi.stubEnv('ARCADE_SECRET_MESSAGE', 'hello');
+    vi.stubEnv('ARCADE_STORY', JSON.stringify({ 'card-1': 'where we met', 'mem-1-1-a': 'the first song' }));
+  });
+
+  it('opens the message and the personal story with the right code, any case and spacing', async () => {
+    const res = await unlock(post('/api/arcade/secret', { code: '  MoonLight ' }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({
+      name: 'Juniper', message: 'hello', story: { 'card-1': 'where we met', 'mem-1-1-a': 'the first song' },
+    });
+  });
+
+  it('refuses a wrong or missing code without saying anything about the real one', async () => {
+    for (const body of [{ code: 'moonlite' }, { code: '' }, {}, { code: 42 }]) {
+      const res = await unlock(post('/api/arcade/secret', body));
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error.code).toBe('not_crowned');
+      expect(JSON.stringify(json)).not.toContain('hello');
+      expect(JSON.stringify(json)).not.toContain('moonlight');
+    }
+  });
+
+  it('is 404 when no crown code is configured, so an empty code never matches', async () => {
+    vi.stubEnv('ARCADE_CROWN_CODE', '');
+    const res = await unlock(post('/api/arcade/secret', { code: '' }));
+    expect(res.status).toBe(404);
+  });
+
+  it('rate limits guesses from one network', async () => {
+    const ip = { 'x-real-ip': '203.0.113.77' };
+    let last = 0;
+    for (let i = 0; i < 12; i++) last = (await unlock(post('/api/arcade/secret', { code: `guess${i}` }, ip))).status;
+    expect(last).toBe(429);
+    // The right code is still refused while the network is limited.
+    expect((await unlock(post('/api/arcade/secret', { code: 'moonlight' }, ip))).status).toBe(429);
+  });
+
+  it('ignores a malformed story and caps long or non-string lines', async () => {
+    vi.stubEnv('ARCADE_STORY', '{not json');
+    expect((await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story).toEqual({});
+    vi.stubEnv('ARCADE_STORY', JSON.stringify({ a: 'x'.repeat(500), b: 7, c: 'ok' }));
+    const story = (await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story;
+    expect(story.a.length).toBe(280);
+    expect(story).not.toHaveProperty('b');
+    expect(story.c).toBe('ok');
   });
 });

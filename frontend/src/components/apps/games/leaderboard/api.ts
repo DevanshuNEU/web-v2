@@ -102,6 +102,29 @@ export function fetchBoard(game: ArcadeGame, name?: string | null) {
   return call<Board>(`/api/arcade/board?${q}`, { cache: 'no-store' });
 }
 
-export function fetchSecret() {
-  return call<{ name: string; message: string }>('/api/arcade/secret', { cache: 'no-store' });
+export interface Secret { name: string; message: string; story: Record<string, string> }
+
+/** What everyone sees at the end of the secret world. */
+export const SHARED_MESSAGE = 'Made for you.';
+
+/**
+ * The secret world's name and message, plus personal story lines. Only a
+ * device that holds the crown code gets his message and the story (the code
+ * goes in a POST body, never a URL); everyone else gets her name with the
+ * shared message. A refused or stale code falls back to the shared version.
+ */
+export async function fetchSecret(): Promise<Secret | ApiError> {
+  const code = savedCrown();
+  if (code) {
+    const r = await call<{ name: string | null; message: string | null; story?: Record<string, string> }>(
+      '/api/arcade/secret',
+      { method: 'POST', body: JSON.stringify({ code }), cache: 'no-store' },
+    );
+    if (!isError(r) && r.name) {
+      return { name: r.name, message: r.message || SHARED_MESSAGE, story: r.story ?? {} };
+    }
+  }
+  const pub = await call<{ name: string }>('/api/arcade/secret', { method: 'GET', cache: 'no-store' });
+  if (isError(pub)) return pub;
+  return { name: pub.name, message: SHARED_MESSAGE, story: {} };
 }
