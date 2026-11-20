@@ -4,8 +4,16 @@
 //
 // Pickups. Anchor is the centre. coin: 8 frame spin, warm gold with a
 // bright edge. Orbs: auraOrb is the Aura Mode pickup (violet core); the
-// others are the remaining powers.
+// others are the remaining powers. The chapter 1 pickups (batWings,
+// tacoRush, blade, memory) live in powerups.ts and are merged in here.
 import type { Palette, SpriteSet } from './types';
+import {
+  POWERUPS,
+  type BatWingsAnim,
+  type TacoRushAnim,
+  type BladeAnim,
+  type MemoryAnim,
+} from './powerups';
 
 export type CoinAnim = 'spin';
 export type AuraOrbAnim = 'idle';
@@ -614,4 +622,8 @@ export const PICKUPS: {
   bootsOrb: SpriteSet<BootsOrbAnim>;
   poundOrb: SpriteSet<PoundOrbAnim>;
   sparkOrb: SpriteSet<SparkOrbAnim>;
-} = { coin, auraOrb, magnetOrb, bootsOrb, poundOrb, sparkOrb };
+  batWings: SpriteSet<BatWingsAnim>;
+  tacoRush: SpriteSet<TacoRushAnim>;
+  blade: SpriteSet<BladeAnim>;
+  memory: SpriteSet<MemoryAnim>;
+} = { coin, auraOrb, magnetOrb, bootsOrb, poundOrb, sparkOrb, ...POWERUPS };

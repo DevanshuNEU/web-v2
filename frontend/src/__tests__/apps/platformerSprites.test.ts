@@ -3,9 +3,14 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { stubCanvas } from '../setup/canvas';
 import {
+  AUSTIN,
+  BLADE_TIP,
+  BREAKABLES,
   ENEMIES,
+  FX,
   HERO,
   HERO_ANIMS,
+  HERO_ATTACK_ANIMS,
   HERO_NECK,
   PICKUPS,
   ROOFTOP_TILES,
@@ -23,7 +28,19 @@ const SETS: [string, AnySet][] = [
   ...Object.entries(ROOFTOP_TILES.decor).map(([k, s]) => [`decor.${k}`, s as AnySet] as [string, AnySet]),
   ...Object.entries(ENEMIES).map(([k, s]) => [`ENEMIES.${k}`, s as AnySet] as [string, AnySet]),
   ...Object.entries(PICKUPS).map(([k, s]) => [`PICKUPS.${k}`, s as AnySet] as [string, AnySet]),
+  ...Object.entries(FX).map(([k, s]) => [`FX.${k}`, s as AnySet] as [string, AnySet]),
+  ...Object.entries(BREAKABLES).map(([k, s]) => [`BREAKABLES.${k}`, s as AnySet] as [string, AnySet]),
+  ...Object.entries(AUSTIN.far).map(([k, s]) => [`AUSTIN.far.${k}`, s as AnySet] as [string, AnySet]),
+  ...Object.entries(AUSTIN.near).map(([k, s]) => [`AUSTIN.near.${k}`, s as AnySet] as [string, AnySet]),
+  ['AUSTIN.bat', AUSTIN.bat as AnySet],
 ];
+
+/** Count of pixels in a grid whose key is one of `keys`. */
+function countKeys(grid: Grid, keys: string): number {
+  let n = 0;
+  for (const row of grid) for (const ch of row) if (keys.includes(ch)) n++;
+  return n;
+}
 
 function frameCounts(set: AnySet): Record<string, number> {
   return Object.fromEntries(Object.entries(set.anims).map(([k, a]) => [k, a.frames.length]));
@@ -69,6 +86,7 @@ describe('hero', () => {
   it('has the frame counts in the contract', () => {
     expect(frameCounts(HERO as AnySet)).toEqual({
       idle: 4, run: 8, rise: 1, apex: 1, fall: 2, land: 1, wallSlide: 2, dash: 2, pound: 2, hurt: 1, victory: 4,
+      attack1: 3, attack2: 3, attack3: 4, airSlash: 3, downStrike: 2,
     });
     expect([...HERO_ANIMS].sort()).toEqual(Object.keys(HERO.anims).sort());
   });
@@ -97,6 +115,148 @@ describe('hero', () => {
     const top = g.findIndex((r) => r.replace(/\./g, '').length > 0);
     expect(24 - top).toBeGreaterThanOrEqual(20);
     expect(24 - top).toBeLessThanOrEqual(22);
+  });
+});
+
+describe('hero attacks (the blade)', () => {
+  const BLADE = 'XZz';
+
+  it('lists the attack anims, all part of HERO', () => {
+    expect([...HERO_ATTACK_ANIMS]).toEqual(['attack1', 'attack2', 'attack3', 'airSlash', 'downStrike']);
+    for (const a of HERO_ATTACK_ANIMS) expect(HERO_ANIMS).toContain(a);
+  });
+
+  it('every attack frame shows the blade', () => {
+    for (const a of HERO_ATTACK_ANIMS) {
+      for (const grid of HERO.anims[a].frames) expect(countKeys(grid, BLADE), a).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('has a blade tip for every attack frame, on a blade pixel inside the frame', () => {
+    for (const a of HERO_ATTACK_ANIMS) {
+      const tips = BLADE_TIP[a];
+      expect(tips.length, a).toBe(HERO.anims[a].frames.length);
+      tips.forEach((p, i) => {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThan(24);
+        expect(p.y).toBeGreaterThanOrEqual(0);
+        expect(p.y).toBeLessThan(24);
+        expect(BLADE, `${a}[${i}] at ${p.x},${p.y}`).toContain(HERO.anims[a].frames[i][p.y][p.x]);
+      });
+    }
+  });
+
+  it('swings reach forward and the down-strike points under the feet', () => {
+    expect(BLADE_TIP.attack1[1].x).toBeGreaterThanOrEqual(21);
+    expect(BLADE_TIP.attack2[1].x).toBeGreaterThanOrEqual(21);
+    expect(BLADE_TIP.attack3[2].x).toBeGreaterThanOrEqual(21);
+    expect(BLADE_TIP.airSlash[1].x).toBeGreaterThanOrEqual(21);
+    for (const p of BLADE_TIP.downStrike) expect(p.y).toBe(23);
+    for (const grid of HERO.anims.downStrike.frames) expect(countKeys([grid[23]], BLADE)).toBeGreaterThan(0);
+  });
+
+  it('anticipation frames wind the blade back or up, away from the strike', () => {
+    expect(BLADE_TIP.attack1[0].y).toBeLessThan(6);
+    expect(BLADE_TIP.attack2[0].x).toBeLessThan(10);
+    expect(BLADE_TIP.attack3[0].x).toBeLessThan(10);
+  });
+});
+
+describe('fx', () => {
+  it('has the smears, the spark, the pogo ring and dust with their sizes and frames', () => {
+    const shape = Object.fromEntries(
+      Object.entries(FX).map(([k, s]) => [k, [s.size.w, s.size.h, s.anims.play.frames.length]]),
+    );
+    expect(shape).toEqual({
+      smear1: [32, 32, 3], smear2: [32, 32, 3], smear3: [32, 32, 3], smearAir: [32, 32, 3], smearDown: [32, 32, 2],
+      hitSpark: [16, 16, 4], pogoRing: [24, 8, 3], dust: [8, 8, 4],
+    });
+    for (const s of Object.values(FX)) expect(s.anims.play.loop).toBe(false);
+  });
+
+  it('smears start bright and fade out by the last frame', () => {
+    for (const k of ['smear1', 'smear2', 'smear3', 'smearAir', 'smearDown'] as const) {
+      const bright = FX[k].anims.play.frames.map((g) => countKeys(g, 'WX'));
+      expect(bright[0], k).toBeGreaterThan(10);
+      expect(bright[bright.length - 1], k).toBeLessThan(bright[0] / 2);
+    }
+  });
+
+  it('the finisher smear is the biggest', () => {
+    const area = (k: keyof typeof FX) => countKeys(FX[k].anims.play.frames[0], 'WXZzy');
+    expect(area('smear3')).toBeGreaterThan(area('smear1'));
+    expect(area('smear3')).toBeGreaterThan(area('smear2'));
+  });
+
+  it('anchors sit inside the frame', () => {
+    for (const s of Object.values(FX)) {
+      expect(s.anchor.x).toBeGreaterThanOrEqual(0);
+      expect(s.anchor.x).toBeLessThanOrEqual(s.size.w);
+      expect(s.anchor.y).toBeGreaterThanOrEqual(0);
+      expect(s.anchor.y).toBeLessThanOrEqual(s.size.h);
+    }
+  });
+});
+
+describe('breakables', () => {
+  it('has the crate, its debris, the sign and its shards', () => {
+    const shape = Object.fromEntries(
+      Object.entries(BREAKABLES).map(([k, s]) => [k, [s.size.w, s.size.h, frameCounts(s as AnySet)]]),
+    );
+    expect(shape).toEqual({
+      crate: [16, 16, { idle: 1 }],
+      crateDebris: [8, 8, { pieces: 4 }],
+      sign: [32, 16, { idle: 2, broken: 1 }],
+      signShards: [8, 8, { pieces: 4 }],
+    });
+  });
+
+  it('debris pieces differ from each other', () => {
+    for (const s of [BREAKABLES.crateDebris, BREAKABLES.signShards]) {
+      const f = s.anims.pieces.frames.map((g) => g.join('\n'));
+      expect(new Set(f).size).toBe(f.length);
+    }
+  });
+});
+
+describe('austin skyline', () => {
+  const NAMES = ['capitol', 'frostTower', 'austonian', 'towerFlat', 'towerStepped', 'towerSlant'];
+
+  it('has every building at both depths, 48 to 96 px tall, anchored bottom left', () => {
+    expect(Object.keys(AUSTIN.far).sort()).toEqual([...NAMES].sort());
+    expect(Object.keys(AUSTIN.near).sort()).toEqual([...NAMES].sort());
+    for (const depth of [AUSTIN.far, AUSTIN.near]) {
+      for (const s of Object.values(depth)) {
+        expect(s.size.h).toBeGreaterThanOrEqual(48);
+        expect(s.size.h).toBeLessThanOrEqual(96);
+        expect(s.anchor).toEqual({ x: 0, y: s.size.h });
+        for (const g of s.anims.idle.frames) expect(g[s.size.h - 1].replace(/\./g, '').length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('far variants are smaller than near ones, and near windows are lit', () => {
+    for (const n of NAMES) {
+      const k = n as keyof typeof AUSTIN.far;
+      expect(AUSTIN.far[k].size.h, n).toBeLessThan(AUSTIN.near[k].size.h);
+      expect(countKeys(AUSTIN.near[k].anims.idle.frames[0], 'wWvk'), n).toBeGreaterThan(5);
+    }
+  });
+
+  it('generic towers come in two window variants', () => {
+    for (const k of ['towerFlat', 'towerStepped', 'towerSlant'] as const) {
+      for (const depth of [AUSTIN.far, AUSTIN.near]) {
+        const f = depth[k].anims.idle.frames.map((g) => g.join('\n'));
+        expect(f.length).toBe(2);
+        expect(new Set(f).size).toBe(2);
+      }
+    }
+  });
+
+  it('the bat is 8 x 6 with a 4 frame flap', () => {
+    expect(AUSTIN.bat.size).toEqual({ w: 8, h: 6 });
+    expect(AUSTIN.bat.anims.flap.frames.length).toBe(4);
+    expect(AUSTIN.bat.anims.flap.loop).toBe(true);
   });
 });
 
@@ -143,10 +303,13 @@ describe('enemies and pickups', () => {
   it('pickups have their sizes and frames', () => {
     expect(PICKUPS.coin.size).toEqual({ w: 12, h: 12 });
     expect(frameCounts(PICKUPS.coin as AnySet)).toEqual({ spin: 8 });
-    for (const k of ['auraOrb', 'magnetOrb', 'bootsOrb', 'poundOrb', 'sparkOrb'] as const) {
+    for (const k of ['auraOrb', 'magnetOrb', 'bootsOrb', 'poundOrb', 'sparkOrb', 'batWings', 'tacoRush', 'blade'] as const) {
       expect(PICKUPS[k].size, k).toEqual({ w: 16, h: 16 });
       expect(frameCounts(PICKUPS[k] as AnySet), k).toEqual({ idle: 4 });
     }
+    expect(PICKUPS.memory.size).toEqual({ w: 12, h: 12 });
+    expect(frameCounts(PICKUPS.memory as AnySet)).toEqual({ idle: 4 });
+    for (const s of Object.values(PICKUPS)) expect(s.anchor).toEqual({ x: s.size.w / 2, y: s.size.h / 2 });
   });
 });
 
