@@ -266,6 +266,16 @@ const SMEAR: Readonly<Record<string, { set: SpriteSet<string>; from: number }>> 
  * true while one is showing.
  */
 export function drawSmear(c: Ctx, state: string, animT: number, x: number, y: number, facing: number, mono: boolean): boolean {
+  // The up swing: the down-strike's smear mirrored about her middle, so the
+  // arc sweeps over her head.
+  if (state === 'upSlash') {
+    c.save();
+    c.translate(0, 2 * (y - 12));
+    c.scale(1, -1);
+    const shown = drawSmear(c, 'downStrike', animT, x, y, facing, mono);
+    c.restore();
+    return shown;
+  }
   const sm = SMEAR[state];
   if (!sm) return false;
   const heroAnim = (HERO.anims as Record<string, { fps: number }>)[state];

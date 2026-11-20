@@ -16,7 +16,7 @@ export type { Abilities, Ability, Hero, HeroState } from './hero';
 import { consumeEdges, type InputFrame } from '../input/frame';
 import { DEFAULT_SEED, deriveSeed, mulberry32 } from './rand';
 import { MODIFIERS, gust, type ModifierId } from './modifiers';
-import { BLADE, SWING_KINDS, hitbox, isActive, isGroundSwing, pogo, startSwing, tickSwing, type Swing } from './blade';
+import { BLADE, type Aim, SWING_KINDS, hitbox, isActive, isGroundSwing, pogo, startSwing, tickSwing, type Swing } from './blade';
 import { POWERS, POWER_KINDS, type PowerKind } from './powers';
 import { nextStoryId, storyEntry, storyLevelDef } from './story';
 import { createScarf, neckOf, resetScarf, stepScarf, torsoOf, type ScarfPoint } from './scarf';
@@ -697,7 +697,9 @@ function stepBlade(w: World, dt: number) {
   if (w.pogoSafe > 0) w.pogoSafe = Math.max(0, w.pogoSafe - dt);
   tickSwing(w, h, dt);
   if (w.attackBuffer > 0 && w.abilities.blade) {
-    const s = startSwing(w, h, !h.onGround && targetBelow(w));
+    const aim: Aim = !h.onGround && targetBelow(w) ? 'down' : targetAbove(w) ? 'up' : 'forward';
+    if (aim === 'forward' && !w.swing) faceNearbyTarget(w);
+    const s = startSwing(w, h, aim);
     if (s) emit(w, 'swing', h.x + h.w / 2, h.y + h.h / 2, SWING_KINDS.indexOf(s.kind));
   }
   const s = w.swing;
@@ -755,6 +757,40 @@ function stepBlade(w: World, dt: number) {
     w.pogoSafe = BLADE.pogoSafe;
     emit(w, 'pogo', h.x + h.w / 2, h.y + h.h);
   }
+}
+
+/** Is a live enemy above her head, within reach of an up swing? */
+function targetAbove(w: World): boolean {
+  const h = w.hero;
+  const cx = h.x + h.w / 2;
+  const top = h.y + 0.3;
+  for (const e of w.enemies) {
+    if (e.deadT !== -1) continue;
+    const ex = e.x + e.w / 2;
+    if (Math.abs(ex - cx) > BLADE.upHalfWidth + e.w / 2) continue;
+    if (e.y + e.h <= top && e.y + e.h >= top - BLADE.upReach) return true;
+  }
+  return false;
+}
+
+/**
+ * Before a forward swing, turn to face a live enemy close behind her when
+ * none is in front, so a beginner never swings at empty air.
+ */
+function faceNearbyTarget(w: World) {
+  const h = w.hero;
+  const cx = h.x + h.w / 2;
+  let front = false, behind = false;
+  for (const e of w.enemies) {
+    if (e.deadT !== -1) continue;
+    if (e.y > h.y + h.h || e.y + e.h < h.y - 0.3) continue;
+    const dx = e.x + e.w / 2 - cx;
+    // The gap between her edge and theirs, the way the swing's reach is measured.
+    const gap = dx > 0 ? e.x - (h.x + h.w) : h.x - (e.x + e.w);
+    if (gap > BLADE.turnReach) continue;
+    if (Math.sign(dx) === h.facing || dx === 0) front = true; else behind = true;
+  }
+  if (behind && !front) h.facing = h.facing === 1 ? -1 : 1;
 }
 
 /** Is an enemy, spikes, a crate or a sign right below her, within reach of a down-strike? */

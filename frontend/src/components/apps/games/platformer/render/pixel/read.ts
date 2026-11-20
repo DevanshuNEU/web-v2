@@ -10,7 +10,7 @@ import type { World } from '../../sim/world';
 
 /** Hero states; the blade adds attack1 to attack3, airSlash and downStrike. */
 export type HeroState = 'ground' | 'air' | 'dash' | 'wallSlide' | 'pound' | 'hurt' | 'dead' | 'victory'
-  | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike';
+  | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike' | 'upSlash';
 /** Power kinds: chapter 1 places Bat Wings and Taco Rush; the rest come later. */
 export type PickupKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore';
 

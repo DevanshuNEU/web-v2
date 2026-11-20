@@ -52,6 +52,8 @@ export function pickHeroAnim(out: AnimPick, p: HeroPose): AnimPick {
     // The blade: each attack plays its own frames once.
     case 'attack1': case 'attack2': case 'attack3': case 'airSlash': case 'downStrike':
       return set(out, p.state as HeroAnim, p.animT, f);
+    // The up swing borrows the air slash pose until it has frames of its own.
+    case 'upSlash': return set(out, 'airSlash', p.animT, f);
     default: return set(out, 'idle', p.animT, f);
   }
 }

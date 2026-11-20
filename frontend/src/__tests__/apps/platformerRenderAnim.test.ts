@@ -72,6 +72,15 @@ describe('hero animation selection', () => {
   });
 });
 
+describe('the up swing', () => {
+  it('draws with the air slash pose until it has frames of its own', () => {
+    const o = out();
+    pickHeroAnim(o, pose({ state: 'upSlash', animT: 0.05, facing: -1 }));
+    expect(o.anim).toBe('airSlash');
+    expect(o.facing).toBe(-1);
+  });
+});
+
 describe('reading the hero from a world without the phase 2 fields', () => {
   it('falls back to ground or air from the body, and dead while dying', () => {
     const w = createWorld({ rand: () => 0.5 });

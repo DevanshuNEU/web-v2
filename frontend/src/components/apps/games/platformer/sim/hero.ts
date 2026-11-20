@@ -15,7 +15,7 @@ export type Ability = keyof Abilities;
 export const ABILITIES: readonly Ability[] = ['wallJump', 'dash', 'blade'];
 
 export type HeroState = 'ground' | 'air' | 'dash' | 'wallSlide' | 'pound' | 'hurt' | 'dead' | 'victory'
-  | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike';
+  | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike' | 'upSlash';
 
 export interface Hero extends Body {
   facing: 1 | -1;
@@ -95,7 +95,7 @@ export function setState(h: Hero, s: HeroState) {
 /** States the world sets (hurt, dead, victory, the blade swings) stay until the world lets go. */
 export function worldOwned(s: HeroState): boolean {
   return s === 'hurt' || s === 'dead' || s === 'victory'
-    || s === 'attack1' || s === 'attack2' || s === 'attack3' || s === 'airSlash' || s === 'downStrike';
+    || s === 'attack1' || s === 'attack2' || s === 'attack3' || s === 'airSlash' || s === 'downStrike' || s === 'upSlash';
 }
 
 /** The state the body's motion says, unless the world holds one. */

@@ -215,3 +215,59 @@ describe('Main Character blade: in the air', () => {
     for (const p of peaks) expect(p).toBeLessThan(12 - 2);
   });
 });
+
+/**
+ * Play-test feedback: jumping and slashing at the same moment to hit a
+ * hovering drone was too hard on a phone. The blade now aims itself: up
+ * when a target is above, down when one is below in the air, forward
+ * otherwise, and she turns to face a target close behind her.
+ */
+describe('Main Character blade: it aims itself', () => {
+  const pad = (s: string) => s.padEnd(40, '.');
+  const DRONE_ABOVE = [pad('.........d'), pad(''), pad('.........P'), G40, G40];
+
+  const swingFor = (w: World, seconds: number) => {
+    for (let t = 0; t < seconds; t += DT) stepWorld(w, emptyFrame(), DT);
+  };
+  const droneAlive = (w: World) => w.enemies.some(e => e.kind === 'adDrone' && e.deadT === -1);
+
+  it('standing under a hovering drone, one tap swings up and takes it out', () => {
+    const w = bladeOn(DRONE_ABOVE);
+    expect(droneAlive(w)).toBe(true);
+    attack(w);
+    expect(w.hero.state).toBe('upSlash');
+    swingFor(w, 0.3);
+    expect(droneAlive(w)).toBe(false);
+    expect(w.hero.onGround).toBe(true);
+  });
+
+  it('in the air, a target above gets the up slash too', () => {
+    const w = bladeOn([pad('.........d'), pad(''), pad(''), pad(''), pad('.........P'), G40, G40]);
+    stepWorld(w, { ...emptyFrame(), jumpPressed: true, jumpHeld: true }, DT);
+    for (let i = 0; i < 6; i++) stepWorld(w, { ...emptyFrame(), jumpHeld: true }, DT);
+    expect(w.hero.onGround).toBe(false);
+    attack(w, { jumpHeld: true });
+    expect(w.hero.state).toBe('upSlash');
+  });
+
+  it('with nothing above, the swing stays the forward combo', () => {
+    const w = bladeOn(FLAT);
+    attack(w);
+    expect(w.hero.state).toBe('attack1');
+  });
+
+  it('turns to face an enemy close behind her before swinging', () => {
+    const w = bladeOn([pad(''), pad('........c.P'), G40, G40]);
+    w.hero.facing = 1;
+    attack(w);
+    expect(w.hero.facing).toBe(-1);
+    swingFor(w, 0.3);
+    const crawler = w.enemies.find(e => e.kind === 'doomCrawler')!;
+    expect(crawler.hp).toBeLessThan(2);
+  });
+
+  it('the forward slash still reaches a target a little above her head', () => {
+    expect(BLADE.swings.attack1.height).toBeGreaterThanOrEqual(1.4);
+    expect(BLADE.swings.airSlash.height).toBeGreaterThanOrEqual(1.6);
+  });
+});
