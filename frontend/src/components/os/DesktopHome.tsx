@@ -13,6 +13,7 @@ import Spotlight from '@/components/os/Spotlight';
 import AppSwitcher from '@/components/os/AppSwitcher';
 import AssistantBubble from '@/components/assistant/AssistantBubble';
 import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
+import { currentPrefersPhoneShell } from '@/lib/shellChoice';
 
 /**
  * localStorage key that marks whether the user has ever visited devOS.
@@ -21,12 +22,10 @@ import { hasBootedThisSession, markBootedThisSession } from '@/lib/bootSession';
  */
 const FIRST_VISIT_KEY = 'devos-first-visit';
 
-/**
- * Screen width below which we show the phone shell instead of the
- * full macOS desktop simulation. 768px matches Tailwind's `md` breakpoint.
- * The desktop sim relies on hover/drag interactions that don't work on touch.
- */
-const MOBILE_BREAKPOINT = 768;
+// Phone shell or desktop is decided by lib/shellChoice.ts: narrow windows,
+// and touch-first devices with a short side under 500px (a phone held
+// sideways), get the phone shell. The desktop sim relies on hover and drag
+// interactions that don't work on touch.
 
 export default function DesktopHome() {
   const isBooted   = useOSStore(state => state.isBooted);
@@ -39,16 +38,20 @@ export default function DesktopHome() {
 
   useEffect(() => {
     // Detect mobile on mount and on resize
-    const check = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    const check = () => setIsMobile(currentPrefersPhoneShell());
     check();
     window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
 
     // The boot plays once per browser (lib/bootSession.ts), not once per tab.
     if (hasBootedThisSession()) setBooted();
 
     setMounted(true);
 
-    return () => window.removeEventListener('resize', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check);
+    };
   }, [setBooted]);
 
   // Re-check on a mobile-to-desktop switch: unlocking the phone shell marks
