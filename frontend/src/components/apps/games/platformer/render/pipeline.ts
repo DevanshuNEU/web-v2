@@ -4,13 +4,13 @@
  * here changes the world.
  */
 
-import { drawCreature } from '../shared/cast';
-import { arcadeTheme, hypeFont } from '../shared/theme';
-import type { Juice } from '../shared/juice';
-import { PHYS } from './physics';
-import { ROWS, TILE, isSolidTile, tileAt } from './level';
-import { CARD_SECONDS, type World } from './logic';
-import type { WorldTheme } from './levels';
+import { drawCreature } from '../../shared/cast';
+import { arcadeTheme, hypeFont } from '../../shared/theme';
+import type { Juice } from '../../shared/juice';
+import { PHYS } from '../sim/physics';
+import { ROWS, TILE, isSolidTile, tileAt } from '../sim/level';
+import { CARD_SECONDS, type World } from '../sim/world';
+import type { WorldTheme } from '../sim/levels';
 
 /** Rows of tiles the view shows; the tile size comes from the view height. */
 export const VIEW_ROWS = 13;

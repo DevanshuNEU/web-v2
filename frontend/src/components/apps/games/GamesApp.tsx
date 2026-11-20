@@ -1,19 +1,34 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { lazy, Suspense, useState, useCallback, type ComponentType, type LazyExoticComponent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { withReduced } from '@/lib/motion';
 import { OVERLAY_EASE } from './shared/chrome';
 
 import Launcher from './Launcher';
-import SnakeGame from './snake/SnakeGame';
-import TetrisGame from './tetris/TetrisGame';
-import TypeRacerGame from './typeracer/TypeRacerGame';
-import PlatformerGame from './platformer/PlatformerGame';
-import StackerGame from './stacker/StackerGame';
-import MergeGame from './merge/MergeGame';
 import BoardsScreen from './BoardsScreen';
-import type { GameId } from './registry';
+import type { GameId, PlayableId } from './registry';
+
+// Each game is its own chunk, fetched when the visitor picks it, so opening
+// the Arcade downloads the launcher and nothing else.
+type GameView = LazyExoticComponent<ComponentType<{ onBack: () => void; isMobile: boolean }>>;
+const GAME_VIEWS: Record<PlayableId, GameView> = {
+  platformer: lazy(() => import('./platformer/PlatformerGame')),
+  snake: lazy(() => import('./snake/SnakeGame')),
+  stacker: lazy(() => import('./stacker/StackerGame')),
+  merge: lazy(() => import('./merge/MergeGame')),
+  tetris: lazy(() => import('./tetris/TetrisGame')),
+  typeracer: lazy(() => import('./typeracer/TypeRacerGame')),
+};
+
+/** While a game's chunk loads: the empty game surface, nothing that flashes. */
+function GameLoading() {
+  return (
+    <div className="h-full" aria-busy="true">
+      <span className="sr-only">Loading the game</span>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root
@@ -40,13 +55,19 @@ export default function GamesApp({ variant = 'desktop' }: { variant?: 'desktop' 
       <AnimatePresence mode="wait">
         {game === 'launcher'  && <motion.div key="launcher"  className="h-full"               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={tx}><Launcher onSelect={setGame} isMobile={isMobile} lastGame={lastGame} /></motion.div>}
         {game === 'boards'     && <motion.div key="boards"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><BoardsScreen   onBack={back} /></motion.div>}
-        {game === 'platformer' && <motion.div key="platformer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><PlatformerGame onBack={back} isMobile={isMobile} /></motion.div>}
-        {game === 'stacker'    && <motion.div key="stacker"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><StackerGame    onBack={back} isMobile={isMobile} /></motion.div>}
-        {game === 'merge'      && <motion.div key="merge"      className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><MergeGame      onBack={back} isMobile={isMobile} /></motion.div>}
-        {game === 'snake'     && <motion.div key="snake"     className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><SnakeGame onBack={back} isMobile={isMobile} /></motion.div>}
-        {game === 'tetris'    && <motion.div key="tetris"    className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TetrisGame     onBack={back} isMobile={isMobile} /></motion.div>}
-        {game === 'typeracer' && <motion.div key="typeracer" className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}><TypeRacerGame  onBack={back} isMobile={isMobile} /></motion.div>}
+        {game !== 'launcher' && game !== 'boards' && (
+          <motion.div key={game} className="h-full flex flex-col" initial={slideIn} animate={{ opacity: 1, x: 0 }} exit={slideOut} transition={tx}>
+            <Suspense fallback={<GameLoading />}>
+              <GameScreen id={game} onBack={back} isMobile={isMobile} />
+            </Suspense>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
+}
+
+function GameScreen({ id, onBack, isMobile }: { id: PlayableId; onBack: () => void; isMobile: boolean }) {
+  const View = GAME_VIEWS[id];
+  return <View onBack={onBack} isMobile={isMobile} />;
 }

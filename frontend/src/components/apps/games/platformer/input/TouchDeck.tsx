@@ -1,8 +1,34 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
-import { TouchButton } from '../shared/TouchButton';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronsRight } from 'lucide-react';
+import { TouchButton } from '../../shared/TouchButton';
+import { tryCapture, type InputFrame } from './frame';
+
+/**
+ * Portrait touch adapter: the control deck under the view. Writes the run
+ * pad, Jump and Dash into the `input` latch the view reads once per step.
+ * Each control tracks its own pointers, so both thumbs work at once.
+ */
+export function TouchDeck({ input, mono }: { input: InputFrame; mono: boolean }) {
+  const onRun = useCallback((left: boolean, right: boolean) => {
+    input.move = (right ? 1 : 0) - (left ? 1 : 0);
+  }, [input]);
+  const onJump = useCallback(() => { input.jumpHeld = true; input.jumpPressed = true; }, [input]);
+  const onJumpUp = useCallback(() => { input.jumpHeld = false; }, [input]);
+  const onDash = useCallback(() => { input.dashPressed = true; }, [input]);
+  return (
+    <div className="flex items-end justify-between px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <RunPad onChange={onRun} mono={mono} size={76} />
+      <div className="flex items-end gap-3">
+        <DashButton onPress={onDash} mono={mono} size={64} />
+        <div className="pb-8">
+          <JumpButton onPress={onJump} onRelease={onJumpUp} mono={mono} size={96} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * The left thumb's run pad: Left and Right side by side, as one touch
@@ -59,9 +85,9 @@ export function RunPad({ onChange, size = 76, mono }: { onChange: (left: boolean
       className="flex gap-3 touch-none select-none"
       onPointerDown={(e) => {
         e.preventDefault();
-        padRef.current?.setPointerCapture?.(e.pointerId);
         pointers.current.set(e.pointerId, sideOf(e.clientX));
         publish();
+        tryCapture(padRef.current, e.pointerId);
       }}
       onPointerMove={(e) => {
         const cur = pointers.current.get(e.pointerId);
@@ -112,6 +138,23 @@ export function JumpButton({ onPress, onRelease, size = 92, mono }: { onPress: (
     >
       <ChevronUp size={30} aria-hidden strokeWidth={2.6} />
       <span aria-hidden>Jump</span>
+    </TouchButton>
+  );
+}
+
+/** Dash: a press, no hold. Smaller than Jump so the right thumb finds Jump first. */
+export function DashButton({ onPress, size = 64, mono }: { onPress: () => void; size?: number; mono: boolean }) {
+  return (
+    <TouchButton
+      label="Dash"
+      size={size}
+      onPress={onPress}
+      className={`rounded-full border-2 flex-col gap-0 font-semibold text-[11px] ${
+        mono ? 'border-border text-text data-[held=true]:bg-text/15' : 'border-[#3a2a5c] bg-[#1d1430] text-text data-[held=true]:bg-[#3a2a5c]'
+      }`}
+    >
+      <ChevronsRight size={22} aria-hidden />
+      <span aria-hidden>Dash</span>
     </TouchButton>
   );
 }

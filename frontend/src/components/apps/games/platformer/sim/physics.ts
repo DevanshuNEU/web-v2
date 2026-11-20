@@ -8,6 +8,8 @@
  * terminal velocity on a long frame cannot tunnel through a one-tile floor.
  */
 
+import type { InputFrame } from '../input/frame';
+
 export const PHYS = {
   /** Top run speed, tiles per second. */
   runMax: 8.5,
@@ -172,7 +174,8 @@ export interface Hero extends Body {
   cuttable: boolean;
 }
 
-export interface HeroInput { left: boolean; right: boolean; jump: boolean }
+/** The part of the input frame the hero's body reads each step. */
+export type HeroInput = Pick<InputFrame, 'move' | 'jumpHeld'>;
 
 export function createHero(x: number, feetY: number): Hero {
   return {
@@ -204,15 +207,17 @@ const STEP: StepResult = { jumped: false, landedAt: 0, skidded: false };
 export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, c: Contacts, gravityScale = 1): StepResult {
   const r = STEP;
   r.jumped = false; r.landedAt = 0; r.skidded = false;
-  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  // Analog: a thumb part way across its zone runs part speed.
+  const move = Math.max(-1, Math.min(1, input.move));
+  const dir = move > 0 ? 1 : move < 0 ? -1 : 0;
 
   // Run: acceleration and friction, never instant velocity.
   if (dir !== 0) {
     const against = h.vx !== 0 && Math.sign(h.vx) !== dir;
     if (against && h.onGround && Math.abs(h.vx) > PHYS.runMax * 0.5 && h.facing !== dir) r.skidded = true;
-    h.facing = dir as 1 | -1;
+    h.facing = dir;
     const a = h.onGround ? (against ? PHYS.skid : PHYS.accelGround) : PHYS.accelAir;
-    h.vx = approach(h.vx, dir * PHYS.runMax, a * dt);
+    h.vx = approach(h.vx, move * PHYS.runMax, a * dt);
   } else {
     h.vx = approach(h.vx, 0, (h.onGround ? PHYS.frictionGround : PHYS.frictionAir) * dt);
   }
@@ -230,13 +235,13 @@ export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, 
   h.buffer = Math.max(0, h.buffer - dt);
 
   // Variable height: letting go early caps the rise.
-  if (h.cuttable && !input.jump) {
+  if (h.cuttable && !input.jumpHeld) {
     if (h.vy < -PHYS.jumpCut) h.vy = -PHYS.jumpCut;
     h.cuttable = false;
   }
   if (h.vy >= 0) h.cuttable = false;
 
-  const g = (h.vy < 0 && input.jump ? PHYS.gravityHold : PHYS.gravity) * gravityScale;
+  const g = (h.vy < 0 && input.jumpHeld ? PHYS.gravityHold : PHYS.gravity) * gravityScale;
   h.vy = Math.min(PHYS.terminal, h.vy + g * dt);
 
   const vyBefore = h.vy;

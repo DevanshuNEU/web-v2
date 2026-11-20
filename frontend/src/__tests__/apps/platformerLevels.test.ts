@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { LEVELS } from '@/components/apps/games/platformer/levels';
+import { LEVELS } from '@/components/apps/games/platformer/sim/levels';
 import {
   MAIN_LEVELS, ROWS, SECRET_GRAVITY, TILE, isSolidTile, parseLevel, secretLevel, secretLevelDef, secretName, tileAt,
-} from '@/components/apps/games/platformer/level';
-import { FONT, MAX_NAME, textCells } from '@/components/apps/games/platformer/font';
+} from '@/components/apps/games/platformer/sim/level';
+import { FONT, MAX_NAME, textCells } from '@/components/apps/games/platformer/sim/font';
 
 const count = (rows: readonly string[], ch: string) => rows.join('').split(ch).length - 1;
 

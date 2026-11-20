@@ -22,6 +22,7 @@ describe('Snake — mobile touch controls', () => {
   it('on a phone: swipes only, no D-pad, and a pause button in the header', async () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
 
     for (const d of ['Move up', 'Move left', 'Move down', 'Move right']) {
       expect(screen.queryByLabelText(d)).not.toBeInTheDocument();
@@ -37,12 +38,14 @@ describe('Snake — mobile touch controls', () => {
   it('keeps the D-pad on desktop', async () => {
     render(<GamesApp variant="desktop" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     expect(screen.getByLabelText('Move up')).toBeInTheDocument();
   });
 
   it('shows keyboard hints (not touch) in the desktop variant', async () => {
     render(<GamesApp variant="desktop" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     expect(screen.getByText(/arrow keys or wasd to steer/i)).toBeInTheDocument();
   });
 });
@@ -63,7 +66,7 @@ describe('Snake: keys stay inside the game', () => {
       </>,
     );
     await userEvent.click(screen.getByText('Sigma Snake'));
-    return screen.getByTestId('snake-root');
+    return screen.findByTestId('snake-root');
   }
 
   it('takes focus when opened', async () => {
@@ -126,23 +129,27 @@ describe('Snake: speed picker', () => {
   it('defaults to Chill on a phone', async () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     expect(screen.getByRole('radio', { name: 'Chill' })).toBeChecked();
   });
 
   it('defaults to Classic on desktop', async () => {
     render(<GamesApp variant="desktop" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     expect(screen.getByRole('radio', { name: 'Classic' })).toBeChecked();
   });
 
   it('remembers the speed she picked', async () => {
     const { unmount } = render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     await userEvent.click(screen.getByRole('radio', { name: 'Fast' }));
     expect(localStorage.getItem('devos-snake-speed')).toBe('fast');
     unmount();
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByText('Sigma Snake'));
+    await screen.findByTestId('snake-root');
     expect(screen.getByRole('radio', { name: 'Fast' })).toBeChecked();
   });
 });

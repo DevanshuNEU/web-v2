@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FONT, GLYPH_SIZE, LETTER_PITCH, MAX_NAME, SPACE_PITCH, cleanName, textCells, textWidth } from '@/components/apps/games/platformer/font';
+import { FONT, GLYPH_SIZE, LETTER_PITCH, MAX_NAME, SPACE_PITCH, cleanName, textCells, textWidth } from '@/components/apps/games/platformer/sim/font';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 

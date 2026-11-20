@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   CARD_SECONDS, DYING_SECONDS, FINALE_SECONDS, LIVES, POINTS, SECRET_INDEX, TALLY_RATE,
-  createWorld, drainEvents, enterLevel, flagBonus, jumpPressed, score, scoreOf, setSecret, stepWorld,
+  createWorld, drainEvents, enterLevel, flagBonus, score, scoreOf, setSecret, stepWorld,
   timeBonus, touchesPoleTop, unlocksSecret, type World, type EventType,
-} from '@/components/apps/games/platformer/logic';
-import { MAIN_LEVELS, ROWS, TILE, parseLevel, secretLevel, tileAt } from '@/components/apps/games/platformer/level';
-import { PHYS } from '@/components/apps/games/platformer/physics';
+} from '@/components/apps/games/platformer/sim/world';
+import { MAIN_LEVELS, ROWS, TILE, parseLevel, secretLevel, tileAt } from '@/components/apps/games/platformer/sim/level';
+import { PHYS } from '@/components/apps/games/platformer/sim/physics';
 import { RULES } from '@/lib/arcade/rules';
+import { emptyFrame, type InputFrame } from '@/components/apps/games/platformer/input/frame';
 
 const DT = 1 / 120;
 
@@ -28,16 +29,20 @@ function worldOn(rows: string[], index = 0): World {
   return w;
 }
 
-function run(w: World, seconds: number, input: Partial<World['input']> = {}, onStep?: (w: World) => void) {
-  w.input = { left: false, right: false, jump: false, ...input };
+/**
+ * Step with one input frame held for `seconds`. Edges in it (jumpPressed and
+ * friends) are consumed by the first step, the way a real press is.
+ */
+function run(w: World, seconds: number, input: Partial<InputFrame> = {}, onStep?: (w: World) => void) {
+  const f: InputFrame = { ...emptyFrame(), ...input };
   const n = Math.round(seconds / DT);
-  for (let i = 0; i < n; i++) { stepWorld(w, DT); onStep?.(w); }
+  for (let i = 0; i < n; i++) { stepWorld(w, f, DT); onStep?.(w); }
 }
 
 /** Step until `done` is true (or `max` seconds pass). Returns whether it happened. */
-function runUntil(w: World, done: (w: World) => boolean, input: Partial<World['input']> = {}, max = 10): boolean {
-  w.input = { left: false, right: false, jump: false, ...input };
-  for (let i = 0; i < max / DT; i++) { stepWorld(w, DT); if (done(w)) return true; }
+function runUntil(w: World, done: (w: World) => boolean, input: Partial<InputFrame> = {}, max = 10): boolean {
+  const f: InputFrame = { ...emptyFrame(), ...input };
+  for (let i = 0; i < max / DT; i++) { stepWorld(w, f, DT); if (done(w)) return true; }
   return false;
 }
 
@@ -187,7 +192,7 @@ describe('platformer world: enemies', () => {
       const e = w.enemies[0];
       w.hero.x = e.x; w.hero.y = e.y - w.hero.h - 0.5; w.hero.vy = 2; w.hero.onGround = false;
       let top = 99;
-      run(w, 1.2, { jump: hold }, () => { top = Math.min(top, w.hero.y); });
+      run(w, 1.2, { jumpHeld: hold }, () => { top = Math.min(top, w.hero.y); });
       return 12 - top;
     };
     expect(peak(true)).toBeGreaterThan(peak(false) + 1);
@@ -209,7 +214,7 @@ describe('platformer world: enemies', () => {
 
   it('touching an enemy from the side costs a life, then respawns at the start', () => {
     const w = worldOn(['.P....n.................................', G40, G40]);
-    expect(runUntil(w, ww => ww.phase === 'dying', { right: true })).toBe(true);
+    expect(runUntil(w, ww => ww.phase === 'dying', { move: 1 })).toBe(true);
     run(w, DYING_SECONDS + 0.2);
     expect(w.lives).toBe(LIVES - 1);
     expect(w.phase).toBe('play');
@@ -220,7 +225,7 @@ describe('platformer world: enemies', () => {
   it('wearing the Aura Crown survives one hit, then flashes invulnerable', () => {
     const w = worldOn(['.P....n.................................', G40, G40]);
     w.crowned = true;
-    run(w, 0.6, { right: true });
+    run(w, 0.6, { move: 1 });
     expect(w.phase).toBe('play');
     expect(w.crowned).toBe(false);
     expect(w.lives).toBe(LIVES);
@@ -240,8 +245,7 @@ describe('platformer world: blocks, coins and the crown', () => {
 
   function jumpUnder(w: World) {
     w.hero.x = 3 + (1 - w.hero.w) / 2;
-    jumpPressed(w);
-    run(w, 0.8, { jump: true });
+    run(w, 0.8, { jumpPressed: true, jumpHeld: true });
   }
 
   it('an aura block hit from below pops one coin, then turns dull', () => {
@@ -296,14 +300,13 @@ describe('platformer world: blocks, coins and the crown', () => {
     ]);
     w.enemies[0].active = true;
     w.hero.x = 3 + (1 - w.hero.w) / 2;
-    jumpPressed(w);
-    run(w, 0.6, { jump: true });
+    run(w, 0.6, { jumpPressed: true, jumpHeld: true });
     expect(w.stats.stomps).toBe(1);
   });
 
   it('collects coins on contact for 10 each', () => {
     const w = worldOn(['.P..oooo................................', G40, G40]);
-    run(w, 1.5, { right: true });
+    run(w, 1.5, { move: 1 });
     expect(w.stats.coins).toBe(4);
     expect(score(w)).toBe(40);
   });
@@ -313,14 +316,14 @@ describe('platformer world: hazards, lives and checkpoints', () => {
   it('falling into a pit loses a life', () => {
     const w = worldOn(['.P......................................', '#######.....############################', '#######.....############################']);
     let died = false;
-    run(w, 3, { right: true }, (ww) => { if (ww.phase === 'dying') died = true; });
+    run(w, 3, { move: 1 }, (ww) => { if (ww.phase === 'dying') died = true; });
     expect(died).toBe(true);
     expect(w.lives).toBe(LIVES - 1);
   });
 
   it('respawns at the checkpoint once it has been passed', () => {
     const w = worldOn(['.P.......K..............................', '##################......################', '##################......################']);
-    expect(runUntil(w, ww => ww.phase === 'dying', { right: true })).toBe(true);
+    expect(runUntil(w, ww => ww.phase === 'dying', { move: 1 })).toBe(true);
     expect(w.checkpointHit).toBe(true);
     run(w, DYING_SECONDS + 0.5);
     expect(w.lives).toBe(LIVES - 1);
@@ -330,13 +333,13 @@ describe('platformer world: hazards, lives and checkpoints', () => {
   it('spikes hurt', () => {
     const w = worldOn(['.P.....^^...............................', G40, G40]);
     let died = false;
-    run(w, 2, { right: true }, (ww) => { if (ww.phase === 'dying') died = true; });
+    run(w, 2, { move: 1 }, (ww) => { if (ww.phase === 'dying') died = true; });
     expect(died).toBe(true);
   });
 
   it('running out of lives ends the run as lost', () => {
     const w = worldOn(['.P.....^^...............................', G40, G40]);
-    for (let i = 0; i < LIVES; i++) run(w, 1 + DYING_SECONDS + 0.2, { right: true });
+    for (let i = 0; i < LIVES; i++) run(w, 1 + DYING_SECONDS + 0.2, { move: 1 });
     expect(w.lives).toBe(0);
     expect(w.phase).toBe('done');
     expect(w.result).toBe('lost');
@@ -387,11 +390,11 @@ describe('platformer world: the flag, the tally and the next level', () => {
     w.hero.x = stairEdge - 1.9; w.hero.y = 8 - w.hero.h; w.hero.vx = 0; w.hero.onGround = true;
     w.enemies = [];
     let jumped = false;
-    w.input = { left: false, right: true, jump: false };
+    const f: InputFrame = { ...emptyFrame(), move: 1 };
     for (let i = 0; i < 400 && w.phase === 'play'; i++) {
-      if (!jumped && w.hero.x + w.hero.w > stairEdge - 0.4) { jumpPressed(w); jumped = true; }
-      w.input.jump = jumped;
-      stepWorld(w, DT);
+      if (!jumped && w.hero.x + w.hero.w > stairEdge - 0.4) { f.jumpPressed = true; jumped = true; }
+      f.jumpHeld = jumped;
+      stepWorld(w, f, DT);
     }
     expect(w.phase).toBe('pole');
     expect(w.secretUnlocked).toBe(true);
@@ -410,8 +413,7 @@ describe('platformer world: the flag, the tally and the next level', () => {
     const p = w.level.pole;
     w.hero.x = p.x - 2.5; w.hero.y = 12 - w.hero.h; w.hero.onGround = true;
     w.enemies = [];
-    jumpPressed(w);
-    run(w, 1, { right: true, jump: true });
+    run(w, 1, { move: 1, jumpHeld: true, jumpPressed: true });
     expect(w.phase === 'pole' || w.phase === 'walk' || w.phase === 'tally').toBe(true);
     expect(w.secretUnlocked).toBe(false);
   });
@@ -472,7 +474,7 @@ describe('platformer world: platforms and camera', () => {
     w.hero.x = 56; w.hero.facing = 1;
     run(w, 3);
     const right = w.cam.x;
-    run(w, 0.05, { left: true });
+    run(w, 0.05, { move: -1 });
     run(w, 3);
     const left = w.cam.x;
     expect(right).toBeGreaterThan(left + 2);
@@ -483,9 +485,66 @@ describe('platformer world: platforms and camera', () => {
 
   it('the same inputs give the same world (deterministic)', () => {
     const a = createWorld({ rand: () => 0.3 }), b = createWorld({ rand: () => 0.3 });
-    for (const w of [a, b]) { run(w, 2, { right: true }); jumpPressed(w); run(w, 1, { right: true, jump: true }); }
+    for (const w of [a, b]) { run(w, 2, { move: 1 }); run(w, 1, { move: 1, jumpHeld: true, jumpPressed: true }); }
     expect(a.hero.x).toBe(b.hero.x);
     expect(a.hero.y).toBe(b.hero.y);
     expect(a.stats).toEqual(b.stats);
+  });
+});
+
+describe('stepWorld takes the input frame as a value', () => {
+  const FLAT = ['.P......................................', G40, G40];
+
+  it('a jump press in the frame starts a jump and is consumed by that step', () => {
+    const w = worldOn(FLAT);
+    const f: InputFrame = { ...emptyFrame(), jumpPressed: true, jumpHeld: true };
+    stepWorld(w, f, DT);
+    expect(f.jumpPressed).toBe(false);
+    expect(w.hero.vy).toBeLessThan(0);
+    expect(eventsOf(w)).toContain('jump');
+  });
+
+  it('holding jump without a fresh press does not jump again after landing', () => {
+    const w = worldOn(FLAT);
+    let jumps = 0;
+    run(w, 2.5, { jumpPressed: true, jumpHeld: true }, (ww) => { for (const e of drainEvents(ww)) if (e.type === 'jump') jumps++; });
+    expect(jumps).toBe(1);
+    expect(w.hero.onGround).toBe(true);
+  });
+
+  it('move 1 runs right and move -1 runs left', () => {
+    const a = worldOn(FLAT), b = worldOn(FLAT);
+    b.hero.x = 20;
+    run(a, 0.5, { move: 1 });
+    run(b, 0.5, { move: -1 });
+    expect(a.hero.vx).toBeCloseTo(PHYS.runMax, 5);
+    expect(b.hero.vx).toBeCloseTo(-PHYS.runMax, 5);
+    expect(b.hero.facing).toBe(-1);
+  });
+
+  it('a half move from the thumb zone runs at half the top speed', () => {
+    const w = worldOn(FLAT);
+    run(w, 1, { move: 0.5 });
+    expect(w.hero.vx).toBeCloseTo(PHYS.runMax / 2, 5);
+  });
+
+  it('dash and action presses are consumed each step even before any rule uses them', () => {
+    const w = worldOn(FLAT);
+    const f: InputFrame = { ...emptyFrame(), dashPressed: true, actionPressed: true };
+    stepWorld(w, f, DT);
+    expect(f.dashPressed).toBe(false);
+    expect(f.actionPressed).toBe(false);
+  });
+
+  it('presses while the hero is not in play (dying) do not carry into the respawn', () => {
+    const w = worldOn(FLAT);
+    w.hero.y = 30;
+    runUntil(w, ww => ww.phase === 'dying');
+    const f: InputFrame = { ...emptyFrame(), jumpPressed: true };
+    stepWorld(w, f, DT);
+    expect(f.jumpPressed).toBe(false);
+    run(w, DYING_SECONDS + 0.1);
+    expect(w.phase).toBe('play');
+    expect(w.hero.vy).toBe(0);
   });
 });

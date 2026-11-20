@@ -23,8 +23,8 @@ export interface GameCard {
 export const GAMES: readonly GameCard[] = [
   {
     id: 'platformer',
-    title: 'Baguettino Run',
-    subtitle: 'A buff baguette, three worlds, one flag.',
+    title: 'Main Character',
+    subtitle: 'Three worlds, one flag, zero side quests.',
     controls: 'Arrows or A and D to run. Space or W to jump.',
     controlsMobile: 'Left thumb runs, right thumb jumps',
     hsKey: 'devos-platformer-hs',

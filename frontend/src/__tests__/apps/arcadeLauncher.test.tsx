@@ -21,7 +21,7 @@ describe('Arcade launcher', () => {
   it('lists the six games, the platformer first, then the leaderboards', () => {
     render(<GamesApp variant="mobile" />);
     const rows = screen.getAllByTestId('index-row').map(r => r.querySelector('.font-display')?.textContent);
-    expect(rows).toEqual(['Baguettino Run', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'Tetris', 'Type Racer']);
+    expect(rows).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'Tetris', 'Type Racer']);
     expect(screen.getByRole('button', { name: /Leaderboards/ })).toBeInTheDocument();
     expect(screen.getByText('Six small games.')).toBeInTheDocument();
   });
@@ -45,7 +45,7 @@ describe('Arcade launcher', () => {
     render(<GamesApp variant="mobile" />);
     await userEvent.click(screen.getByRole('button', { name: /Leaderboards/ }));
     const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map(t => t.textContent)).toEqual(['Baguettino Run', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'This week', 'All time']);
+    expect(tabs.map(t => t.textContent)).toEqual(['Main Character', 'Sigma Snake', 'Aura Tower', 'Brainrot Evolution', 'This week', 'All time']);
     expect(await screen.findByText('No scores this week yet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Aura Tower' }));
     expect(screen.getByRole('tab', { name: 'Aura Tower' })).toHaveAttribute('aria-selected', 'true');
@@ -159,5 +159,16 @@ describe('Sigma Snake, a full round', () => {
     act(() => { document.dispatchEvent(new Event('visibilitychange')); });
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
+  });
+});
+
+describe('TouchButton when the browser refuses pointer capture', () => {
+  it('still presses (capture is best effort)', () => {
+    const onPress = vi.fn();
+    render(<TouchButton label="Dash" onPress={onPress}>D</TouchButton>);
+    const b = screen.getByRole('button', { name: 'Dash' });
+    b.setPointerCapture = () => { throw new DOMException('No active pointer', 'NotFoundError'); };
+    fireEvent.pointerDown(b, { pointerId: 7 });
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

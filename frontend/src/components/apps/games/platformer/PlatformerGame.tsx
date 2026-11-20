@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { Pause } from 'lucide-react';
+import { ArrowLeft, Pause } from 'lucide-react';
 import { useIsMono } from '@/hooks/usePalette';
 import { Hairline, MetaLabel } from '@/components/editorial';
 import { bestScore, isButtonTarget, leftRoot, GameHeader, HudStat, OverlayButton, GameOverlay, ControlsHint, GameStatus } from '../shared/chrome';
@@ -13,25 +13,33 @@ import { Juice } from '../shared/juice';
 import { arcadeTheme } from '../shared/theme';
 import { hype, comboTier, auraText } from '../shared/slang';
 import { sfx, buzz } from '../shared/sound';
+import { useOrientation } from '../shared/useOrientation';
+import { useMobileStore } from '@/store/mobileStore';
 import { useRun } from '../leaderboard/useRun';
 import { RunResult, BoardSheet } from '../leaderboard/Leaderboard';
 import { fetchSecret, isError } from '../leaderboard/api';
-import { createWorld, drainEvents, jumpPressed, score as worldScore, setSecret, stepWorld, type GameEvent, type Result, type Secret, type World } from './logic';
-import { SECRET_FALLBACK } from './level';
-import { drawFrame, tileFor } from './draw';
-import { JumpButton, RunPad } from './Controls';
+import { createWorld, drainEvents, score as worldScore, setSecret, stepWorld, type GameEvent, type Result, type Secret, type World } from './sim/world';
+import { SECRET_FALLBACK } from './sim/level';
+import { drawFrame, tileFor } from './render/pipeline';
+import { emptyFrame, readInto, releaseAll } from './input/frame';
+import { createKeyboard } from './input/keyboard';
+import { TouchDeck } from './input/TouchDeck';
+import { TouchOverlay } from './input/TouchOverlay';
 
 const HS_KEY = 'devos-platformer-hs';
-const TITLE = 'Baguettino Run';
+const TITLE = 'Main Character';
 // Pink 700 / 800: white text on them passes 4.5:1.
 const ACCENT = { fill: '#be185d', hover: '#9d174d' };
 
 type Status = 'idle' | 'playing' | 'paused' | 'over';
 interface Hud { score: number; coins: number; lives: number; level: number; time: number }
 
-const KEYS_LEFT = new Set(['ArrowLeft', 'a', 'A']);
-const KEYS_RIGHT = new Set(['ArrowRight', 'd', 'D']);
-const KEYS_JUMP = new Set([' ', 'w', 'W', 'ArrowUp']);
+/**
+ * How the game is laid out. Desktop: a window with keyboard hints. Portrait
+ * phone: the view on top, the control deck under it. Landscape phone: the
+ * view full bleed, thumb overlay on top, the shell's chrome hidden.
+ */
+type Layout = 'desktop' | 'portrait' | 'landscape';
 
 function hudOf(w: World): Hud {
   return { score: worldScore(w), coins: w.stats.coins, lives: Math.max(0, w.lives), level: w.levelIndex, time: Math.floor(w.levelTime) };
@@ -53,12 +61,28 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   const worldRef = useRef<World>(createWorld());
   const juiceRef = useRef(new Juice(!!reduced));
   const hudRef = useRef<Hud>(hud);
-  const keys = useRef({ left: false, right: false, jump: false });
-  const touch = useRef({ left: false, right: false, jump: false });
+  // The input seam: each adapter writes its own latch, and every fixed step
+  // reads one InputFrame from all of them (see input/frame.ts).
+  const keyboard = useRef(createKeyboard());
+  const touchInput = useRef(emptyFrame());
+  const stepInput = useRef(emptyFrame());
+  const sources = useRef([keyboard.current.frame, touchInput.current]);
   const secretRef = useRef<Secret>({ ...SECRET_FALLBACK });
   const tickCount = useRef(0);
   const tileRef = useRef(24);
   const { containerRef, canvasRef, size, getCtx, style } = useCanvas();
+  const orientation = useOrientation(rootRef);
+  const layout: Layout = !isMobile ? 'desktop' : orientation;
+
+  // Immersive landscape on the phone: the shell hides its bar while this is
+  // set. Leaving landscape or unmounting the game drops it; the store also
+  // drops it if the app closes, so the shell can never be left without Done.
+  const setImmersive = useMobileStore((s) => s.setImmersive);
+  useEffect(() => {
+    if (layout !== 'landscape') return;
+    setImmersive(true);
+    return () => setImmersive(false);
+  }, [layout, setImmersive]);
 
   useEffect(() => { juiceRef.current.reduced = !!reduced; }, [reduced]);
 
@@ -76,8 +100,9 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   }, [size]);
 
   const clearInput = useCallback(() => {
-    keys.current = { left: false, right: false, jump: false };
-    touch.current = { left: false, right: false, jump: false };
+    keyboard.current.reset();
+    releaseAll(touchInput.current);
+    releaseAll(stepInput.current);
   }, []);
 
   // ── Events from the rules: sound, haptics and juice ──
@@ -169,11 +194,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
 
   const update = useCallback((dt: number) => {
     const w = worldRef.current;
-    const k = keys.current, tc = touch.current;
-    w.input.left = k.left || tc.left;
-    w.input.right = k.right || tc.right;
-    w.input.jump = k.jump || tc.jump;
-    stepWorld(w, dt);
+    stepWorld(w, readInto(stepInput.current, sources.current), dt);
     if (w.events.length) for (const e of drainEvents(w)) onEvent(e, w);
     juiceRef.current.update(dt);
   }, [onEvent]);
@@ -238,9 +259,9 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' || typeof window === 'undefined') return;
     const g = window as unknown as { __baguettino?: unknown };
-    g.__baguettino = { world: () => worldRef.current, start: (i: number) => startGame(i) };
+    g.__baguettino = { world: () => worldRef.current, start: (i: number) => startGame(i), layout };
     return () => { delete g.__baguettino; };
-  }, [startGame]);
+  }, [startGame, layout]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
@@ -250,14 +271,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       return;
     }
     if (s === 'playing') {
-      if (KEYS_LEFT.has(e.key)) { e.preventDefault(); keys.current.left = true; return; }
-      if (KEYS_RIGHT.has(e.key)) { e.preventDefault(); keys.current.right = true; return; }
-      if (KEYS_JUMP.has(e.key)) {
-        e.preventDefault();
-        if (!e.repeat) { keys.current.jump = true; jumpPressed(worldRef.current); }
-        return;
-      }
-      if (e.key === 'ArrowDown') e.preventDefault();
+      if (keyboard.current.down(e.key, e.repeat)) e.preventDefault();
       return;
     }
     if ((e.key === ' ' || e.key === 'Enter') && !isButtonTarget(e)) {
@@ -267,48 +281,62 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     }
   }, [togglePause, startGame, resume]);
 
-  const onKeyUp = useCallback((e: React.KeyboardEvent) => {
-    if (KEYS_LEFT.has(e.key)) keys.current.left = false;
-    else if (KEYS_RIGHT.has(e.key)) keys.current.right = false;
-    else if (KEYS_JUMP.has(e.key)) keys.current.jump = false;
-  }, []);
+  const onKeyUp = useCallback((e: React.KeyboardEvent) => { keyboard.current.up(e.key); }, []);
 
   const onBlur = useCallback((e: React.FocusEvent) => {
     if (leftRoot(e)) pause();
   }, [pause]);
 
-  const onRun = useCallback((left: boolean, right: boolean) => {
-    touch.current.left = left;
-    touch.current.right = right;
-  }, []);
-  const onJumpDown = useCallback(() => {
-    touch.current.jump = true;
-    if (statusRef.current === 'playing') jumpPressed(worldRef.current);
-  }, []);
-  const onJumpUp = useCallback(() => { touch.current.jump = false; }, []);
-
   const w = worldRef.current;
   const worldNo = Math.min(hud.level + 1, 4);
   const lvlName = w.level.name;
 
-  const statStrip = (
-    <div className="flex flex-shrink-0 items-center gap-5 px-4 py-2">
+  const pauseButton = status === 'playing' && (
+    <button
+      type="button"
+      onClick={pause}
+      onPointerDown={(e) => e.preventDefault()}
+      aria-label="Pause"
+      className="flex h-11 w-11 flex-shrink-0 items-center justify-center border border-border text-text-secondary transition-[color,transform] duration-100 ease-out hover:text-text active:scale-95"
+    >
+      <Pause size={18} aria-hidden />
+    </button>
+  );
+
+  const stats = (
+    <>
       <HudStat label="World" value={hud.level >= 3 ? 'Secret' : `${worldNo} of 3`} />
       <HudStat label="Coins" value={hud.coins} />
       <HudStat label="Lives" value={hud.lives} />
       <HudStat label="Time" value={hud.time} />
+    </>
+  );
+
+  const statStrip = (
+    <div className="flex flex-shrink-0 items-center gap-5 px-4 py-2">
+      {stats}
       <div className="flex-1" />
-      {status === 'playing' && (
-        <button
-          type="button"
-          onClick={pause}
-          onPointerDown={(e) => e.preventDefault()}
-          aria-label="Pause"
-          className="flex h-11 w-11 items-center justify-center border border-border text-text-secondary transition-[color,transform] duration-100 ease-out hover:text-text active:scale-95"
-        >
-          <Pause size={18} aria-hidden />
-        </button>
-      )}
+      {pauseButton}
+    </div>
+  );
+
+  // Landscape: one thin translucent strip over the view. It carries the
+  // game's own way out (the shell's Done is hidden) and sits above the
+  // start, pause and game over cards so Back is always reachable.
+  const hudStrip = (
+    <div className="dark absolute inset-x-0 top-0 z-20 flex h-11 items-center gap-4 bg-[#120b1f]/55 pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))]">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back to arcade"
+        className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center text-text-secondary transition-[color,transform] duration-150 ease-out hover:text-text active:scale-95"
+      >
+        <ArrowLeft size={16} aria-hidden />
+      </button>
+      {stats}
+      <HudStat label="Score" value={hud.score} />
+      <div className="flex-1" />
+      {pauseButton}
     </div>
   );
 
@@ -320,7 +348,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
         <>
           <h2 className={heading}>{TITLE}</h2>
           <p className="max-w-[18rem] text-[15px] text-text-secondary">
-            Run Baguettino Chadoni through three worlds to the flag. Stomp the NPCs and hit the aura blocks from below.
+            Run through three worlds to the flag. Stomp the NPCs and hit the aura blocks from below.
           </p>
           <MetaLabel className="text-text-secondary">{isMobile ? 'Left thumb runs, right thumb jumps' : 'Arrows to run, Space to jump'}</MetaLabel>
           <OverlayButton onClick={() => startGame()} mono={mono} accent={ACCENT.fill} accentHover={ACCENT.hover}>Start</OverlayButton>
@@ -373,6 +401,16 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     />
   );
 
+  const viewClass = {
+    // The view takes every pixel above the controls: on a portrait phone
+    // that is a tall window with sky above the level.
+    portrait: 'relative min-h-[45%] w-full flex-1',
+    landscape: 'absolute inset-0',
+    desktop: 'relative min-h-0 flex-1',
+  }[layout];
+
+  // One tree for every layout, so the view's element (which useCanvas
+  // measures) survives a rotation instead of remounting.
   return (
     <div
       ref={rootRef}
@@ -382,47 +420,40 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       onKeyUp={onKeyUp}
       onBlur={onBlur}
       data-testid="platformer-root"
+      data-layout={layout}
       className="h-full flex flex-col overflow-hidden overscroll-contain select-none [-webkit-touch-callout:none] focus-visible:[outline-offset:-2px]"
     >
       <GameStatus>{announce}</GameStatus>
-      <GameHeader title={TITLE} score={hud.score} best={best} onBack={onBack} onReset={() => startGame()} />
+      {layout !== 'landscape' && <GameHeader title={TITLE} score={hud.score} best={best} onBack={onBack} onReset={() => startGame()} />}
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {isMobile ? (
+        <div ref={containerRef} data-testid="platformer-view" className={`${viewClass} overflow-hidden bg-[#1d1430] touch-none`}>
+          {canvas}
+        </div>
+        {layout === 'landscape' ? (
           <>
-            {/* The view takes every pixel above the controls: on a portrait
-                phone that is a tall window with sky above the level. */}
-            <div ref={containerRef} className="relative min-h-[45%] w-full flex-1 overflow-hidden bg-[#1d1430] touch-none">
-              {canvas}
-            </div>
-            <Hairline />
-            {statStrip}
-            <div className="flex flex-shrink-0 flex-col touch-none">
-              <p className="px-8 pb-1 text-center text-sm text-text-tertiary">
-                Hold Jump longer to jump higher. Land on enemies to stomp them.
-              </p>
-              <div className="flex items-end justify-between px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-                <RunPad onChange={onRun} mono={mono} size={84} />
-                <div className="pb-8">
-                  <JumpButton onPress={onJumpDown} onRelease={onJumpUp} mono={mono} size={104} />
-                </div>
-              </div>
-            </div>
+            <TouchOverlay input={touchInput.current} mono={mono} />
+            {hudStrip}
           </>
         ) : (
           <>
-            <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden bg-[#1d1430] touch-none">
-              {canvas}
-            </div>
             <Hairline />
             {statStrip}
+            {layout === 'portrait' && (
+              <div className="flex flex-shrink-0 flex-col touch-none">
+                <p className="px-8 pb-1 text-center text-sm text-text-tertiary">
+                  Hold Jump longer to jump higher. Land on enemies to stomp them.
+                </p>
+                <TouchDeck input={touchInput.current} mono={mono} />
+              </div>
+            )}
           </>
         )}
         {overlay}
         {showBoard && <BoardSheet game="platformer" onClose={() => { setShowBoard(false); refocus(); }} />}
       </div>
 
-      {!isMobile && <ControlsHint>Arrows or A and D to run. Space, W or Up to jump. P pauses.</ControlsHint>}
+      {layout === 'desktop' && <ControlsHint>Arrows or A and D to run. Space, W or Up to jump. P pauses.</ControlsHint>}
     </div>
   );
 }

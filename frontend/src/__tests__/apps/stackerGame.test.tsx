@@ -28,7 +28,7 @@ async function openTower(variant: 'mobile' | 'desktop' = 'mobile') {
     </>,
   );
   await userEvent.click(screen.getByText('Aura Tower'));
-  return screen.getByTestId('stacker-root');
+  return screen.findByTestId('stacker-root');
 }
 
 const play = () => screen.getByTestId('stacker-play');

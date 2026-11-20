@@ -23,7 +23,7 @@ afterEach(() => {
 async function openMerge(variant: 'mobile' | 'desktop' = 'mobile') {
   render(<GamesApp variant={variant} />);
   await userEvent.click(screen.getByText('Brainrot Evolution'));
-  return screen.getByTestId('merge-root');
+  return screen.findByTestId('merge-root');
 }
 
 /** With rand pinned at 0 the game starts with two Pebble Rizzos in the top-left cells. */

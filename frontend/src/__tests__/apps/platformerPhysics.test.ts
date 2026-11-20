@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PHYS, contacts, createHero, moveBody, pressJump, stepHero, stompBounce, stompOrHurt,
   type Body, type Hero, type HeroInput, type SolidFn,
-} from '@/components/apps/games/platformer/physics';
+} from '@/components/apps/games/platformer/sim/physics';
 
 const DT = 1 / 120;
 
@@ -29,8 +29,8 @@ const FLAT = grid([
   '##############################',
 ]);
 
-const NONE: HeroInput = { left: false, right: false, jump: false };
-const RIGHT: HeroInput = { left: false, right: true, jump: false };
+const NONE: HeroInput = { move: 0, jumpHeld: false };
+const RIGHT: HeroInput = { move: 1, jumpHeld: false };
 
 function heroOnFlat(x = 5): Hero {
   // Feet on the floor at y = 10.
@@ -53,7 +53,7 @@ function jumpPeak(holdSteps: number, g = 1): number {
   pressJump(h);
   let top = h.y;
   for (let i = 0; i < 400; i++) {
-    stepHero(h, { left: false, right: false, jump: i < holdSteps }, DT, FLAT, c, g);
+    stepHero(h, { move: 0, jumpHeld: i < holdSteps }, DT, FLAT, c, g);
     top = Math.min(top, h.y);
     if (i > 5 && h.onGround) break;
   }
@@ -97,14 +97,14 @@ describe('platformer physics: standing and running', () => {
   it('skids to a turn faster than plain friction stops', () => {
     const a = heroOnFlat(), b = heroOnFlat();
     steps(a, 60, RIGHT); steps(b, 60, RIGHT);
-    steps(a, 6, { left: true, right: false, jump: false });
+    steps(a, 6, { move: -1, jumpHeld: false });
     steps(b, 6, NONE);
     expect(a.vx).toBeLessThan(b.vx);
   });
 
   it('turns the facing with the input', () => {
     const h = heroOnFlat();
-    steps(h, 1, { left: true, right: false, jump: false });
+    steps(h, 1, { move: -1, jumpHeld: false });
     expect(h.facing).toBe(-1);
     steps(h, 1, RIGHT);
     expect(h.facing).toBe(1);
@@ -142,11 +142,11 @@ describe('platformer physics: jumping', () => {
   it('cannot jump again in mid air', () => {
     const h = heroOnFlat();
     pressJump(h);
-    steps(h, 1, { ...NONE, jump: true });
-    steps(h, 30, { ...NONE, jump: true });
+    steps(h, 1, { ...NONE, jumpHeld: true });
+    steps(h, 30, { ...NONE, jumpHeld: true });
     const vy = h.vy;
     pressJump(h);
-    steps(h, 1, { ...NONE, jump: true });
+    steps(h, 1, { ...NONE, jumpHeld: true });
     expect(h.vy).toBeGreaterThan(vy);
   });
 
@@ -186,7 +186,7 @@ describe('platformer physics: coyote time and jump buffer', () => {
     const { h, c } = walkOff();
     for (let i = 0; i < Math.floor(0.05 / DT); i++) stepHero(h, RIGHT, DT, LEDGE, c);
     pressJump(h);
-    const r = stepHero(h, { ...RIGHT, jump: true }, DT, LEDGE, c);
+    const r = stepHero(h, { ...RIGHT, jumpHeld: true }, DT, LEDGE, c);
     expect(r.jumped).toBe(true);
     expect(h.vy).toBeLessThan(0);
   });
@@ -195,7 +195,7 @@ describe('platformer physics: coyote time and jump buffer', () => {
     const { h, c } = walkOff();
     for (let i = 0; i < Math.ceil(0.12 / DT); i++) stepHero(h, RIGHT, DT, LEDGE, c);
     pressJump(h);
-    const r = stepHero(h, { ...RIGHT, jump: true }, DT, LEDGE, c);
+    const r = stepHero(h, { ...RIGHT, jumpHeld: true }, DT, LEDGE, c);
     expect(r.jumped).toBe(false);
     expect(h.vy).toBeGreaterThan(0);
   });
@@ -213,7 +213,7 @@ describe('platformer physics: coyote time and jump buffer', () => {
     for (let i = 0; i < 300 && !jumped; i++) {
       // press when the feet are a few frames above the floor
       if (!pressed && h.y + h.h > 10 - h.vy * 0.08) { pressJump(h); pressed = true; }
-      const r = stepHero(h, { ...NONE, jump: pressed }, DT, FLAT, c);
+      const r = stepHero(h, { ...NONE, jumpHeld: pressed }, DT, FLAT, c);
       if (r.jumped) jumped = true;
     }
     expect(pressed).toBe(true);
@@ -271,7 +271,7 @@ describe('platformer physics: collisions', () => {
     const c = contacts();
     pressJump(h);
     let hit = false;
-    for (let i = 0; i < 120 && !hit; i++) { stepHero(h, { ...NONE, jump: true }, DT, ceil, c); if (c.ceiling) hit = true; }
+    for (let i = 0; i < 120 && !hit; i++) { stepHero(h, { ...NONE, jumpHeld: true }, DT, ceil, c); if (c.ceiling) hit = true; }
     expect(hit).toBe(true);
     expect(c.ceilTx).toBe(4);
     expect(c.ceilTy).toBe(1);
@@ -285,7 +285,7 @@ describe('platformer physics: collisions', () => {
     const c = contacts();
     pressJump(h);
     let minY = h.y;
-    for (let i = 0; i < 60; i++) { stepHero(h, { ...NONE, jump: true }, DT, ceil, c); minY = Math.min(minY, h.y); }
+    for (let i = 0; i < 60; i++) { stepHero(h, { ...NONE, jumpHeld: true }, DT, ceil, c); minY = Math.min(minY, h.y); }
     expect(minY).toBeLessThan(1);
     expect(h.x).toBeGreaterThanOrEqual(4 - 1e-6);
   });

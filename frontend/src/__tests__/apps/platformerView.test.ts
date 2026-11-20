@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createWorld, snapCamera } from '@/components/apps/games/platformer/logic';
-import { tileFor, VIEW_ROWS } from '@/components/apps/games/platformer/draw';
-import { ROWS } from '@/components/apps/games/platformer/level';
+import { createWorld, snapCamera } from '@/components/apps/games/platformer/sim/world';
+import { tileFor, VIEW_ROWS } from '@/components/apps/games/platformer/render/pipeline';
+import { ROWS } from '@/components/apps/games/platformer/sim/level';
 
 /**
  * Portrait phones get a tall game view. Tiles are sized from the width there

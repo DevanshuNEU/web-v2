@@ -47,7 +47,8 @@ export function TouchButton({
       onPointerDown={(e) => {
         e.preventDefault();
         pointer.current = e.pointerId;
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        // Best effort: a refused capture must never cost the press.
+        try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* keep going */ }
         e.currentTarget.dataset.held = 'true';
         onPress();
       }}

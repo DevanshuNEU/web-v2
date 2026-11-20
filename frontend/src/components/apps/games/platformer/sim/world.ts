@@ -1,7 +1,8 @@
 /**
- * Baguettino Run rules: the world, enemies, blocks, scoring, the flag, lives
- * and the secret level. Pure and deterministic (inject `rand`); the view only
- * feeds input, calls `stepWorld` at a fixed rate, drains `events` for sound
+ * Main Character rules: the world, enemies, blocks, scoring, the flag, lives
+ * and the secret level. Pure and deterministic (inject `rand`). This is the
+ * sim's external seam: the view builds one InputFrame per fixed step from its
+ * input adapter, calls `stepWorld(w, input, dt)`, drains `events` for sound
  * and juice, and draws.
  */
 
@@ -9,6 +10,7 @@ import {
   PHYS, contacts, createHero, moveBody, moveX, moveY, overlaps, pressJump, stepHero, stompBounce, stompOrHurt,
   type Body, type Contacts, type Hero, type HeroInput, type SolidFn,
 } from './physics';
+import { consumeEdges, type InputFrame } from '../input/frame';
 import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, SECRET_FALLBACK, TILE, isSolidTile, secretLevel, type EnemyKind, type Level } from './level';
 
 export const LIVES = 3;
@@ -99,7 +101,6 @@ export interface World {
   hero: Hero;
   heroPx: number; heroPy: number;
   hidden: boolean;
-  input: HeroInput;
   enemies: Enemy[];
   platforms: Platform[];
   crowns: Crown[];
@@ -167,7 +168,6 @@ export function createWorld(o: WorldOptions = {}): World {
   const w: World = {
     levelIndex: 0, level, tiles: level.tiles.slice(), solid: () => false,
     hero: createHero(level.start.x, level.start.y), heroPx: 0, heroPy: 0, hidden: false,
-    input: { left: false, right: false, jump: false },
     enemies: [], platforms: [], crowns: [], pops: [], bumps: [], riding: null,
     phase: 'play', phaseT: 0, pitDeath: false, t: 0, levelTime: 0,
     lives: LIVES, crowned: false, invuln: 0, checkpointHit: false, combo: 0,
@@ -235,11 +235,6 @@ export function score(w: World): number {
   return scoreOf(w.stats);
 }
 
-/** Register a jump press (keyboard down or thumb down). */
-export function jumpPressed(w: World) {
-  if (w.phase === 'play') pressJump(w.hero);
-}
-
 export function tile(w: World, x: number, y: number): number {
   if (x < 0 || x >= w.level.cols || y < 0 || y >= ROWS) return TILE.EMPTY;
   return w.tiles[y * w.level.cols + x];
@@ -291,8 +286,16 @@ export function stepCamera(w: World, dt: number) {
 // The step
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function stepWorld(w: World, dt: number) {
+/**
+ * Advance the world one fixed step with this step's input. The frame's edges
+ * are consumed here whatever the phase, so a press made while dying or during
+ * the tally never fires later.
+ */
+export function stepWorld(w: World, input: InputFrame, dt: number) {
+  const jump = input.jumpPressed;
+  consumeEdges(input);
   if (w.phase === 'done') return;
+  if (jump && w.phase === 'play') pressJump(w.hero);
   w.t += dt;
   if (w.cardT > 0) w.cardT = Math.max(0, w.cardT - dt);
   if (w.landT > 0) w.landT = Math.max(0, w.landT - dt);
@@ -306,7 +309,7 @@ export function stepWorld(w: World, dt: number) {
   if (w.pops.length && w.pops[0].t > 0.55) w.pops = w.pops.filter(p => p.t <= 0.55);
 
   switch (w.phase) {
-    case 'play': stepPlay(w, dt); break;
+    case 'play': stepPlay(w, input, dt); break;
     case 'dying': stepDying(w, dt); break;
     case 'pole': stepPole(w, dt); break;
     case 'walk': stepWalk(w, dt); break;
@@ -327,7 +330,7 @@ function stepPlatforms(w: World) {
   }
 }
 
-function stepPlay(w: World, dt: number) {
+function stepPlay(w: World, input: HeroInput, dt: number) {
   const h = w.hero;
   const c = w.c;
   w.levelTime += dt;
@@ -343,7 +346,7 @@ function stepPlay(w: World, dt: number) {
 
   const wasGround = h.onGround;
   const prevBottom = h.y + h.h;
-  const r = stepHero(h, w.input, dt, w.solid, c, w.level.gravity);
+  const r = stepHero(h, input, dt, w.solid, c, w.level.gravity);
   if (r.jumped) { emit(w, 'jump', h.x + h.w / 2, prevBottom); w.jumpT = 0.16; }
   if (r.skidded) emit(w, 'skid', h.x + h.w / 2, h.y + h.h, -h.facing);
 
@@ -380,7 +383,7 @@ function stepPlay(w: World, dt: number) {
     emit(w, 'checkpoint', cp.x + 0.5, cp.y - 1);
   }
 
-  stepEnemies(w, dt, prevBottom);
+  stepEnemies(w, dt, prevBottom, input.jumpHeld);
   if (w.phase !== 'play') return;
   stepCrowns(w, dt);
 
@@ -494,7 +497,7 @@ function stepDying(w: World, dt: number) {
   emit(w, 'respawn', w.hero.x, w.hero.y);
 }
 
-function stepEnemies(w: World, dt: number, prevBottom: number) {
+function stepEnemies(w: World, dt: number, prevBottom: number, jumpHeld: boolean) {
   const h = w.hero;
   const c = w.c;
   let stomped = false;
@@ -537,7 +540,7 @@ function stepEnemies(w: World, dt: number, prevBottom: number) {
     if (hit === 'stomp' && !stomped) {
       stomped = true;
       killEnemy(w, e);
-      stompBounce(h, w.input.jump);
+      stompBounce(h, jumpHeld);
       w.combo++;
       emit(w, 'stomp', e.x + e.w / 2, e.y, w.combo);
     } else if (hit === 'hurt' && !stomped) {
@@ -611,10 +614,13 @@ function stepPole(w: World, dt: number) {
   }
 }
 
+/** The walk off stage after the flag: the hero runs right on his own. */
+const WALK_OFF: HeroInput = { move: 1, jumpHeld: false };
+
 function stepWalk(w: World, dt: number) {
   w.phaseT += dt;
   const h = w.hero;
-  stepHero(h, { left: false, right: true, jump: false }, dt, w.solid, w.c, w.level.gravity);
+  stepHero(h, WALK_OFF, dt, w.solid, w.c, w.level.gravity);
   if (h.x > w.level.pole.x + 6.6 || w.phaseT > 3) {
     w.hidden = true;
     w.phase = 'tally';
