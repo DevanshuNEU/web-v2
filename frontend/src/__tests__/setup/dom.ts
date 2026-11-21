@@ -9,8 +9,13 @@
 
 import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { MotionGlobalConfig } from 'framer-motion';
+
+// Every arcade game is a lazy chunk, so tests wait for it with findBy. The
+// default 1 s wait was too short when the whole suite runs in parallel on a
+// busy machine; findBy still resolves the moment the element appears.
+configure({ asyncUtilTimeout: 5000 });
 
 // Framer Motion animations rely on requestAnimationFrame, which JSDom
 // supplies but does not drive deterministically. Skipping animations
