@@ -43,13 +43,33 @@ export function clearName() {
 }
 
 // The crown code is kept apart from the display name. It is only ever sent
-// to the score route (rate limited); the board is looked up by the name the
-// board shows, so the code never sits in a URL.
+// in a POST body to /score and /secret (rate limited, and wrong codes are
+// capped per day); the board is looked up by the name the board shows, so
+// the code never sits in a URL.
 const CROWN_KEY = 'devos-arcade-crown';
 
+// Crown codes are 16+ characters and names at most 12, so anything this
+// long can only be a code. The server checks it; the client only routes it.
+export const CODE_MIN = 16;
+const NAME_MAX = 12;
+
+/** True when a typed name is long enough that it can only be a crown code. */
+export function isCrownCode(raw: string): boolean {
+  return Array.from(raw.trim()).length >= CODE_MIN;
+}
+
+/**
+ * The saved crown code. An old code from before codes had to be 16+
+ * characters is dropped: posted now it would be an ordinary name, and the
+ * old code would show on the public board.
+ */
 export function savedCrown(): string | null {
   if (typeof window === 'undefined') return null;
-  try { return localStorage.getItem(CROWN_KEY); } catch { return null; }
+  try {
+    const code = localStorage.getItem(CROWN_KEY);
+    if (code && !isCrownCode(code)) { localStorage.removeItem(CROWN_KEY); return null; }
+    return code;
+  } catch { return null; }
 }
 
 export function saveCrown(code: string) {
@@ -60,12 +80,16 @@ export function clearCrown() {
   try { localStorage.removeItem(CROWN_KEY); } catch { /* private mode */ }
 }
 
-/** Same rule the server applies, so most mistakes are caught before a round trip. */
+/**
+ * Same rule the server applies, so most mistakes are caught before a round
+ * trip. A crown code (16+ characters) passes through for the server to check.
+ */
 export function checkName(raw: string): string | null {
   const name = raw.trim();
   const length = Array.from(name).length;
+  if (isCrownCode(name)) return null;
   if (length < 2) return 'Use at least 2 characters.';
-  if (length > 12) return 'Use 12 characters or fewer.';
+  if (length > NAME_MAX) return `Use ${NAME_MAX} characters or fewer.`;
   if (!/^[\p{L}\p{M}\p{N} _]+$/u.test(name)) return 'Use letters, numbers, spaces or underscores.';
   return null;
 }

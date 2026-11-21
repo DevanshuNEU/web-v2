@@ -93,18 +93,21 @@ export type NameCheck =
 
 const TAKEN = 'That name is taken. Pick another.';
 
-export function crownEnv(): { code: string | null; herName: string | null } {
-  return {
-    code: process.env.ARCADE_CROWN_CODE?.trim() || null,
-    herName: process.env.ARCADE_HER_NAME?.trim() || null,
-  };
+export function crownEnv(): { herName: string | null } {
+  return { herName: process.env.ARCADE_HER_NAME?.trim() || null };
+}
+
+/** Her name as stored on the board, when the crown code resolves to it. */
+export function crownedName(herName: string): Extract<NameCheck, { ok: true }> {
+  const display = herName.normalize('NFC');
+  return { ok: true, display, key: nameKey(display), crowned: true };
 }
 
 /**
  * Turn a submitted name into the stored display name and key, or say what to
- * change. The crown code is checked first so it may be any string, and it
- * never reaches the board: it stores under ARCADE_HER_NAME instead. Typing
- * her name without the code is refused so nobody can wear her crown.
+ * change. Typing her name is refused so nobody can wear her crown; only the
+ * crown code (lib/arcade/crown.ts, checked by the service before this) posts
+ * under it.
  */
 export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
   if (typeof raw !== 'string') {
@@ -115,13 +118,6 @@ export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
     return { ok: false, code: 'bad_name', message: 'That name has an invisible character in it. Type it again without it.' };
   }
   const trimmed = raw.normalize('NFC').trim();
-
-  if (env.code && trimmed.toLowerCase() === env.code.toLowerCase()) {
-    // A code with no name to store under would leak the code onto the board.
-    if (!env.herName) return { ok: false, code: 'name_taken', message: TAKEN };
-    const display = env.herName.normalize('NFC');
-    return { ok: true, display, key: nameKey(display), crowned: true };
-  }
 
   const display = trimmed.replace(/ {2,}/g, ' ');
   const length = Array.from(display).length;

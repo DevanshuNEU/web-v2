@@ -6,7 +6,7 @@ import { Crown, X } from 'lucide-react';
 import { OverlayButton } from '../shared/chrome';
 import { sfx, buzz } from '../shared/sound';
 import {
-  checkName, clearCrown, clearName, fetchBoard, isError, saveCrown, saveName, savedCrown, savedName, submitScore,
+  checkName, clearCrown, clearName, fetchBoard, isCrownCode, isError, saveCrown, saveName, savedCrown, savedName, submitScore,
   type ArcadeGame, type Board, type BoardEntry, type SubmitOk,
 } from './api';
 
@@ -231,6 +231,13 @@ export function RunResult({
         setPhase({ kind: 'name' });
         return;
       }
+      if (r.error.code === 'not_crowned') {
+        // The code was refused and the server used up this round's token,
+        // so there is nothing to retry. The server message says what happened.
+        clearCrown();
+        setPhase({ kind: 'error', message: r.error.message, retryable: false });
+        return;
+      }
       setPhase({ kind: 'error', message: r.error.message, retryable: r.error.code === 'offline' || r.error.code === 'rate_limited' });
       return;
     }
@@ -260,8 +267,9 @@ export function RunResult({
     if (err) return;
     if (phase.kind === 'rename') {
       // This round is already on the board; the new name applies from the next one.
-      saveName(draft.trim());
-      clearCrown();
+      // A crown code is kept apart from the name, so it never reaches a board URL.
+      if (isCrownCode(draft)) saveCrown(draft.trim());
+      else { saveName(draft.trim()); clearCrown(); }
       setPhase({ kind: 'done', result: phase.previous });
       return;
     }
@@ -320,7 +328,7 @@ export function RunResult({
               id={`arcade-name-${game}`}
               value={draft}
               onChange={(e) => { setDraft(e.target.value); setNameError(null); }}
-              maxLength={12}
+              maxLength={128}
               autoComplete="nickname"
               autoCapitalize="words"
               enterKeyHint="send"

@@ -11,6 +11,9 @@ import type { Board } from '@/components/apps/games/leaderboard/api';
 
 type Handler = (url: string, init?: RequestInit) => unknown;
 
+// Crown codes are 16+ characters, longer than any name.
+const CODE = 'moonlight over the bay';
+
 function mockFetch(handler: Handler) {
   const fn = vi.fn(async (url: string, init?: RequestInit) => {
     const body = handler(url, init);
@@ -53,6 +56,9 @@ describe('checkName (client side, mirrors the server)', () => {
     ['D', 'Use at least 2 characters.'],
     ['ThirteenChars', 'Use 12 characters or fewer.'],
     ['no!pe', 'Use letters, numbers, spaces or underscores.'],
+    // 16+ characters can only be a crown code: the server decides.
+    [CODE, null],
+    ['Fifteen chars!!', 'Use 12 characters or fewer.'],
   ])('%s', (name, expected) => {
     expect(checkName(name)).toBe(expected);
   });
@@ -146,22 +152,55 @@ describe('RunResult', () => {
   it('keeps the crown code apart from her name: the code posts, the name shows', async () => {
     const f = mockFetch(() => ok({ name: 'Her Name', crowned: true, week: 2, all: 2 }));
     renderResult();
-    await userEvent.type(screen.getByLabelText('Name on the board'), 'secretcode');
+    await userEvent.type(screen.getByLabelText('Name on the board'), CODE);
     await userEvent.click(screen.getByRole('button', { name: 'Post score' }));
     await screen.findByText('#2 this week');
     expect(screen.getAllByLabelText('Crowned').length).toBeGreaterThan(0);
     expect(savedName()).toBe('Her Name');
-    expect(savedCrown()).toBe('secretcode');
-    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe('secretcode');
+    expect(savedCrown()).toBe(CODE);
+    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe(CODE);
   });
 
   it('next round posts with the saved crown code, without asking', async () => {
     localStorage.setItem('devos-arcade-name', 'Her Name');
-    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    localStorage.setItem('devos-arcade-crown', CODE);
     const f = mockFetch(() => ok({ name: 'Her Name', crowned: true }));
     renderResult();
     await screen.findByText('#3 this week');
-    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe('secretcode');
+    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe(CODE);
+  });
+
+  it('never posts an old short crown code, which would now be an ordinary name on the board', async () => {
+    localStorage.setItem('devos-arcade-name', 'Her Name');
+    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    const f = mockFetch(() => ok({ name: 'Her Name' }));
+    renderResult();
+    await screen.findByText('#3 this week');
+    expect(JSON.parse(f.mock.calls[0][1]!.body as string).name).toBe('Her Name');
+    expect(savedCrown()).toBeNull();
+  });
+
+  it('says so clearly when the server refuses a code, and forgets it', async () => {
+    localStorage.setItem('devos-arcade-name', 'Her Name');
+    localStorage.setItem('devos-arcade-crown', CODE);
+    const message = 'That is too long for a name (12 characters at most) and it did not work as a code, so this round was not posted. Play another round to post under a name.';
+    mockFetch(() => ({ error: { code: 'not_crowned', message } }));
+    renderResult();
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Post again' })).not.toBeInTheDocument();
+    expect(savedCrown()).toBeNull();
+    expect(savedName()).toBe('Her Name');
+  });
+
+  it('a crown code typed as a new name is kept as the code, never as the board name', async () => {
+    localStorage.setItem('devos-arcade-name', 'Dev');
+    mockFetch(() => ok());
+    renderResult();
+    await userEvent.click(await screen.findByRole('button', { name: 'Change name' }));
+    await userEvent.type(screen.getByLabelText('Name on the board'), CODE);
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(savedCrown()).toBe(CODE);
+    expect(savedName()).toBe('Dev');
   });
 
   it('posts once even when the effect runs twice (React strict mode)', async () => {
@@ -300,18 +339,27 @@ describe('fetchSecret: personal only on the crowned device', () => {
   });
 
   it('with the crown code saved: posts it and gets the message and story', async () => {
-    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    localStorage.setItem('devos-arcade-crown', CODE);
     const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
     const f = mockFetch(() => ({ name: 'Her Name', message: 'hi you', story: { 'card-1': 'where we met' } }));
     expect(await fetchSecret()).toEqual({ name: 'Her Name', message: 'hi you', story: { 'card-1': 'where we met' } });
     const [url, init] = f.mock.calls[0];
     expect(url).toBe('/api/arcade/secret');
     expect(init!.method).toBe('POST');
-    expect(JSON.parse(init!.body as string)).toEqual({ code: 'secretcode' });
+    expect(JSON.parse(init!.body as string)).toEqual({ code: CODE });
+  });
+
+  it('does not send an old code that is too short to be one', async () => {
+    localStorage.setItem('devos-arcade-crown', 'secretcode');
+    const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
+    const f = mockFetch(() => ({ name: 'Her Name' }));
+    expect(await fetchSecret()).toEqual({ name: 'Her Name', message: 'Made for you.', story: {} });
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(f.mock.calls[0][1]?.method ?? 'GET').toBe('GET');
   });
 
   it('falls back to the shared version when the code is refused', async () => {
-    localStorage.setItem('devos-arcade-crown', 'stale');
+    localStorage.setItem('devos-arcade-crown', 'a stale code from last year');
     const { fetchSecret } = await import('@/components/apps/games/leaderboard/api');
     let n = 0;
     mockFetch(() => (++n === 1 ? { error: { code: 'not_crowned', message: 'no' } } : { name: 'Her Name' }));

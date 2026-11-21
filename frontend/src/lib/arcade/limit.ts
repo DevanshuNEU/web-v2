@@ -12,13 +12,31 @@ export const SUBMITS_PER_WINDOW = 40;
 export const WINDOW_MS = 10 * 60 * 1000;
 
 // Crown code guesses: a person who knows the code needs one try; ten in ten
-// minutes leaves room for typos and makes guessing a decent code hopeless.
+// minutes leaves room for typos. The code is 16+ characters and wrong codes
+// are also capped per day across every network (lib/arcade/crown.ts).
 export const SECRET_TRIES_PER_WINDOW = 10;
 
 type Bucket = 'score' | 'secret';
 const MAX: Record<Bucket, number> = { score: SUBMITS_PER_WINDOW, secret: SECRET_TRIES_PER_WINDOW };
 
 const hits = new Map<string, number[]>();
+
+/**
+ * The key an address is limited under. One IPv6 host usually holds a whole
+ * /64 and can rotate through it at will, so IPv6 counts per /64. IPv4, and
+ * IPv4 written as IPv6 (::ffff:a.b.c.d), counts per address.
+ */
+export function ipBucket(ip: string): string {
+  const addr = ip.trim().toLowerCase().replace(/%.*$/, '');
+  if (!addr.includes(':')) return addr;
+  const mapped = /^[0:]*:ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(addr);
+  if (mapped) return mapped[1];
+  const [head, tail] = addr.split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const groups = tail === undefined ? left : [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+  return `${groups.slice(0, 4).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`;
+}
 
 function inMemoryLimit(bucket: Bucket, ip: string): boolean {
   const key = `${bucket}:${ip}`;
@@ -53,7 +71,8 @@ async function getDurable(bucket: Bucket): Promise<Durable | null> {
   return limiter;
 }
 
-async function limited(bucket: Bucket, ip: string): Promise<boolean> {
+async function limited(bucket: Bucket, rawIp: string): Promise<boolean> {
+  const ip = ipBucket(rawIp);
   try {
     const limiter = await getDurable(bucket);
     if (limiter) return !(await limiter.limit(ip)).success;

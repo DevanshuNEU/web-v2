@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { resolveName, isProfane } from '@/lib/arcade/names';
 
-const noCrown = { code: null, herName: null };
-const crown = { code: 'moonlight', herName: 'Juniper' };
+const noCrown = { herName: null };
+const crown = { herName: 'Juniper' };
 
 describe('arcade name filter', () => {
   it('accepts and trims a valid name', () => {
@@ -52,18 +52,14 @@ describe('arcade name filter', () => {
 });
 
 describe('crown', () => {
-  it('stores the crown code under her name with a crown', () => {
-    expect(resolveName(' MoonLight ', crown)).toEqual({ ok: true, display: 'Juniper', key: 'juniper', crowned: true });
+  it('is never a name: the crown code is too long for one (the service checks codes, see arcadeCrown.test.ts)', () => {
+    expect(resolveName('moonlight over the bay', crown)).toMatchObject({ ok: false, code: 'bad_name' });
   });
 
   it('refuses her name without the code', () => {
     for (const fake of ['Juniper', 'juniper', 'JUNIPER', 'jun1per', 'Juni_per']) {
       expect(resolveName(fake, crown), fake).toEqual({ ok: false, code: 'name_taken', message: 'That name is taken. Pick another.' });
     }
-  });
-
-  it('refuses the code when there is no name to store it under', () => {
-    expect(resolveName('moonlight', { code: 'moonlight', herName: null })).toMatchObject({ ok: false, code: 'name_taken' });
   });
 
   it('treats her name as an ordinary name when no crown is configured', () => {
@@ -74,13 +70,13 @@ describe('crown', () => {
 describe('invisible characters', () => {
   it('refuses zero-width and other invisible characters in any name', () => {
     for (const n of ['Dev\u200B', 'De\u034Fv', 'Dev\uFEFF', 'D\u2060ev', 'Dev\uFE0F']) {
-      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: false, code: 'bad_name' });
+      expect(resolveName(n, { herName: null })).toMatchObject({ ok: false, code: 'bad_name' });
     }
   });
 
   it('still allows real accented and non-Latin names', () => {
     for (const n of ['Zoë', 'José', 'देव', 'Ана', '小明']) {
-      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: true });
+      expect(resolveName(n, { herName: null })).toMatchObject({ ok: true });
     }
   });
 });
