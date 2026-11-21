@@ -28,8 +28,13 @@ function topRow(l: Level, x: number): number {
   return ROWS;
 }
 
-/** The prompt spots for a level: its hints, else the first gap and the first wide gap. */
-export function promptSpots(l: Level): PromptSpot[] {
+/**
+ * The prompt spots for a level: its hints, else the first gap and the first
+ * wide gap. `teachHold: false` (every level after the first) keeps only the
+ * moves a level marks, so a later level never repeats the hold Jump tip.
+ */
+export function promptSpots(l: Level, opts: { teachHold?: boolean } = {}): PromptSpot[] {
+  const teachHold = opts.teachHold ?? true;
   // the sim's prompt set pieces: { kind: 'prompt', id, x0, x1 }
   const pieces = (l as unknown as { setPieces?: { kind: string; id?: string; x0: number }[] }).setPieces;
   if (Array.isArray(pieces) && pieces.some(p => p.kind === 'prompt')) {
@@ -37,7 +42,7 @@ export function promptSpots(l: Level): PromptSpot[] {
     const marked = pieces.filter(p => p.kind === 'prompt' && p.id && ID[p.id])
       .map(p => ({ x: p.x0 + 0.5, y: Math.max(1, topRow(l, Math.max(0, Math.min(l.cols - 1, Math.floor(p.x0))))), move: ID[p.id as string] }));
     // the first gap still teaches holding Jump when the level does not mark it
-    if (!marked.some(m => m.move === 'hold')) {
+    if (teachHold && !marked.some(m => m.move === 'hold')) {
       const hold = derived(l).find(d => d.move === 'hold');
       if (hold && hold.x < Math.min(...marked.map(m => m.x))) marked.unshift(hold);
     }

@@ -4,16 +4,17 @@
  * last node of each note is disconnected when its source ends.
  *
  * Bus, per track:
- *   pad notes  -> lowpass (slow LFO sway) -> pad -+-> room send
+ *   pad notes  -> lowpass (slow LFO sway, optional bloom) -> pad -+-> room send
  *   bass notes -> bass ------------------------+
- *   drum notes -> drums / hats (pan) -> drum layer
+ *   drum notes -> drums / hats (pan) -> drum layer (vinyl crackle rides the hats)
  *   lead notes -> lead layer -> pan ------------+-> echo send, room send
+ *   arp notes  -> arp layer -> pan -------------+-> echo send, room send
  *   echo: delay -> lowpass -> feedback, return
  *   room: generated impulse response convolver
  *   mix -> highpass 28 Hz (no DC, no rumble) -> gentle compressor -> out -> master
  */
 
-import type { LeadStyle, TrackDef } from './tracks';
+import type { LeadStyle, TrackDef, VoiceSpec } from './tracks';
 
 type Ctx = BaseAudioContext;
 
@@ -63,6 +64,31 @@ function noiseBuffer(ctx: Ctx): AudioBuffer {
   }
   return b;
 }
+/** Vinyl crackle: sparse clicks of random size over a faint hiss, two seconds that loop. */
+const crackleCache = new WeakMap<Ctx, AudioBuffer>();
+function crackleBuffer(ctx: Ctx): AudioBuffer {
+  let b = crackleCache.get(ctx);
+  if (!b) {
+    const sr = ctx.sampleRate;
+    const len = sr * 2;
+    b = ctx.createBuffer(1, len, sr);
+    const d = b.getChannelData(0);
+    const r = rng(23);
+    let click = 0, size = 0;
+    for (let i = 0; i < len; i++) {
+      if (click <= 0 && r() < 18 / sr) { click = 1; size = 0.2 + 0.8 * r() * r(); }
+      const pop = click > 0.01 ? (r() * 2 - 1) * size * click : 0;
+      click *= 0.86;
+      d[i] = pop + (r() * 2 - 1) * 0.015;
+    }
+    // fade the ends so the loop seam is silent
+    const edge = Math.min(len >> 1, Math.floor(sr * 0.005));
+    for (let i = 0; i < edge; i++) { const k = i / edge; d[i] *= k; d[len - 1 - i] *= k; }
+    crackleCache.set(ctx, b);
+  }
+  return b;
+}
+
 let noiseAt = 0;
 function noiseOffset(): number { noiseAt = (noiseAt + 0.3819) % 0.7; return noiseAt; }
 
@@ -102,12 +128,16 @@ export interface Bus {
   ctx: Ctx;
   out: GainNode;
   pad: AudioNode;
+  padFilter: BiquadFilterNode;
   bass: AudioNode;
   drums: AudioNode;
   hats: AudioNode;
   lead: AudioNode;
+  /** The arpeggio input, null for a track with no arpeggio. */
+  arp: AudioNode | null;
   drumLayer: GainNode;
   leadLayer: GainNode;
+  arpLayer: GainNode | null;
   delay: DelayNode;
   nodes: AudioNode[];
   lfo: OscillatorNode;
@@ -179,7 +209,19 @@ export function createBus(ctx: Ctx, dest: AudioNode, track: TrackDef, stepSecond
   leadLayer.connect(leadPan); leadPan.connect(mix);
   leadLayer.connect(echoSend); leadLayer.connect(roomSend);
 
-  return { ctx, out, pad: padFilter, bass, drums, hats, lead: leadLayer, drumLayer, leadLayer, delay, nodes, lfo };
+  let arpLayer: GainNode | null = null;
+  if (track.arp) {
+    arpLayer = keep(gain(ctx, 0));
+    const arpPan = keep(pan(ctx, 0.3));
+    const arpSend = keep(gain(ctx, 0.6));
+    arpLayer.connect(arpPan); arpPan.connect(mix);
+    arpLayer.connect(arpSend); arpSend.connect(echoSend); arpSend.connect(roomSend);
+  }
+
+  return {
+    ctx, out, pad: padFilter, padFilter, bass, drums, hats, lead: leadLayer, arp: arpLayer,
+    drumLayer, leadLayer, arpLayer, delay, nodes, lfo,
+  };
 }
 
 export function disposeBus(bus: Bus) {
@@ -207,6 +249,7 @@ function ahr(p: AudioParam, t: number, attack: number, peak: number, holdEnd: nu
 
 /** Two detuned oscillators, slow attack, long release, through the bus lowpass. */
 export function padNote(bus: Bus, spec: TrackDef['pad'], midi: number, t: number, dur: number, vel: number) {
+  if (spec.voice === 'keys') { keysNote(bus, spec, midi, t, dur, vel); return; }
   const c = bus.ctx;
   const env = c.createGain(); env.gain.value = 0;
   const a = Math.min(spec.attack, dur * 0.8);
@@ -214,6 +257,35 @@ export function padNote(bus: Bus, spec: TrackDef['pad'], midi: number, t: number
   const f = hz(midi);
   const o = osc(c, spec.wave, f, -spec.detune, env, t, end);
   osc(c, spec.wave, f, spec.detune, env, t, end);
+  env.connect(bus.pad);
+  release(o, env);
+}
+
+/**
+ * An FM electric piano: a sine carrier, a sine modulator at the same pitch
+ * whose depth starts bright and settles (the bark of the tine), and an
+ * amplitude that strikes, decays toward a soft sustain, and lets go.
+ */
+function keysNote(bus: Bus, spec: TrackDef['pad'], midi: number, t: number, dur: number, vel: number) {
+  const c = bus.ctx;
+  const f = hz(midi);
+  const peak = spec.gain * vel;
+  const env = c.createGain(); env.gain.value = 0;
+  const p = env.gain;
+  const atk = Math.max(0.003, spec.attack);
+  p.setValueAtTime(0, t);
+  p.linearRampToValueAtTime(peak, t + atk);
+  const settle = Math.max(t + atk + 0.01, t + dur);
+  p.exponentialRampToValueAtTime(peak * Math.max(0.25, 1 - dur * 0.6), settle);
+  p.exponentialRampToValueAtTime(SILENT, settle + spec.release);
+  const end = settle + spec.release + 0.03;
+
+  const depth = c.createGain(); depth.gain.value = 0;
+  depth.gain.setValueAtTime(f * 1.6 * (0.6 + 0.4 * vel), t);
+  depth.gain.exponentialRampToValueAtTime(f * 0.18, t + 0.5);
+  const o = osc(c, 'sine', f, spec.detune, env, t, end);
+  osc(c, 'sine', f, -spec.detune, depth, t, end);
+  depth.connect(o.frequency);
   env.connect(bus.pad);
   release(o, env);
 }
@@ -246,7 +318,7 @@ export function bassNote(bus: Bus, spec: TrackDef['bass'], midi: number, t: numb
   lp.frequency.exponentialRampToValueAtTime(spec.cutoff, t + spec.decay);
   const upper = c.createGain(); upper.gain.value = 0.5;
   const o = osc(c, 'sine', f, 0, env, t, end);
-  osc(c, 'triangle', f * 2, 0, upper, t, end);
+  osc(c, spec.upper ?? 'triangle', f * 2, 0, upper, t, end);
   upper.connect(lp); lp.connect(env);
   env.connect(bus.bass);
   release(o, env);
@@ -282,9 +354,44 @@ function noiseBurst(bus: Bus, to: AudioNode, t: number, level: number, decay: nu
   release(src, env);
 }
 
-/** Bandpassed noise with a short triangle body. */
-export function snare(bus: Bus, t: number, level: number) {
-  noiseBurst(bus, bus.drums, t, level, 0.2, 'bandpass', 1800, 0.9);
+/** A hollow tom (or a chest beat): a sine that drops in pitch, a touch of skin noise. */
+export function tom(bus: Bus, t: number, level: number) {
+  const c = bus.ctx;
+  const env = c.createGain(); env.gain.value = 0;
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(level, t + 0.003);
+  env.gain.exponentialRampToValueAtTime(SILENT, t + 0.3);
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(82, t + 0.16);
+  o.connect(env); env.connect(bus.drums);
+  o.start(t); o.stop(t + 0.32);
+  release(o, env);
+  noiseBurst(bus, bus.drums, t, level * 0.18, 0.05, 'bandpass', 900, 1.2);
+}
+
+/** Vinyl crackle for one bar: the shared loop, faded in and out so bar seams are silent. */
+export function crackle(bus: Bus, t: number, dur: number, level: number) {
+  const c = bus.ctx;
+  const src = c.createBufferSource();
+  src.buffer = crackleBuffer(c);
+  src.loop = true;
+  const f = filter(c, 'highpass', 1200, 0.5);
+  const env = c.createGain(); env.gain.value = 0;
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(level, t + 0.02);
+  env.gain.setValueAtTime(level, t + dur);
+  env.gain.linearRampToValueAtTime(0, t + dur + 0.02);
+  src.connect(f); f.connect(env); env.connect(bus.hats);
+  src.start(t, noiseOffset() * 2);
+  src.stop(t + dur + 0.03);
+  release(src, env);
+}
+
+/** Bandpassed noise with a short triangle body. `tone` below 1 is dustier. */
+export function snare(bus: Bus, t: number, level: number, tone = 1) {
+  noiseBurst(bus, bus.drums, t, level, 0.2 + 0.08 * (1 - tone), 'bandpass', 1800 * tone, 0.9);
   const c = bus.ctx;
   const env = c.createGain(); env.gain.value = 0;
   env.gain.setValueAtTime(0, t);
@@ -299,13 +406,17 @@ export function snare(bus: Bus, t: number, level: number) {
   release(o, env);
 }
 
-/** Highpassed noise, closed or open. */
-export function hat(bus: Bus, t: number, level: number, open: boolean) {
-  noiseBurst(bus, bus.hats, t, level, open ? 0.24 : 0.05, 'highpass', 7200, 0.7);
+/** Highpassed noise, closed or open. `tone` below 1 is dustier. */
+export function hat(bus: Bus, t: number, level: number, open: boolean, tone = 1) {
+  noiseBurst(bus, bus.hats, t, level, open ? 0.24 : 0.05, tone < 1 ? 'bandpass' : 'highpass', 7200 * tone, tone < 1 ? 0.9 : 0.7);
 }
 
-/** The lead: soft (triangle plus a little saw, delayed vibrato), bell (music box) or pluck (cave drip). */
-export function leadNote(bus: Bus, spec: TrackDef['lead'], midi: number, t: number, dur: number, vel: number) {
+/**
+ * A melodic note into `to` (the lead or the arpeggio layer): soft (triangle
+ * plus a little saw, delayed vibrato), bell (music box), pluck (cave drip),
+ * chime (a round terminal chime) or stab (synth brass).
+ */
+export function leadNote(bus: Bus, spec: VoiceSpec, midi: number, t: number, dur: number, vel: number, to: AudioNode = bus.lead) {
   const c = bus.ctx;
   const f = hz(midi);
   const peak = spec.gain * vel;
@@ -324,7 +435,40 @@ export function leadNote(bus: Bus, spec: TrackDef['lead'], midi: number, t: numb
     const o = osc(c, 'sine', f, 0, env, t, end);
     osc(c, 'sine', f * 4, 0, tine, t, end);
     tine.connect(env);
-    env.connect(bus.lead);
+    env.connect(to);
+    release(o, env);
+    return;
+  }
+
+  if (style === 'chime') {
+    // a sine and a quiet octave-and-a-fifth that fades first: an announcement chime
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(peak, t + 0.006);
+    env.gain.exponentialRampToValueAtTime(peak * 0.4, t + 0.35);
+    env.gain.exponentialRampToValueAtTime(SILENT, t + 2.4);
+    const end = t + 2.45;
+    const over = c.createGain(); over.gain.value = 0;
+    over.gain.setValueAtTime(0, t);
+    over.gain.linearRampToValueAtTime(0.22, t + 0.004);
+    over.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    const o = osc(c, 'sine', f, 0, env, t, end);
+    osc(c, 'sine', f * 3, 0, over, t, end);
+    over.connect(env);
+    env.connect(to);
+    release(o, env);
+    return;
+  }
+
+  if (style === 'stab') {
+    // two detuned saws, a filter that snaps shut, short release: brass with attitude
+    const end = ahr(env.gain, t, 0.005, peak, t + dur, 0.12) + 0.03;
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 2;
+    lp.frequency.setValueAtTime(3400, t);
+    lp.frequency.exponentialRampToValueAtTime(950, t + 0.16);
+    const o = osc(c, 'sawtooth', f, -10, lp, t, end);
+    osc(c, 'sawtooth', f, 10, lp, t, end);
+    lp.connect(env); env.connect(to);
     release(o, env);
     return;
   }
@@ -339,7 +483,7 @@ export function leadNote(bus: Bus, spec: TrackDef['lead'], midi: number, t: numb
     lp.frequency.setValueAtTime(3200, t);
     lp.frequency.exponentialRampToValueAtTime(700, t + 0.3);
     const o = osc(c, 'triangle', f, 0, lp, t, end);
-    lp.connect(env); env.connect(bus.lead);
+    lp.connect(env); env.connect(to);
     release(o, env);
     return;
   }
@@ -349,7 +493,7 @@ export function leadNote(bus: Bus, spec: TrackDef['lead'], midi: number, t: numb
   const saw = c.createGain(); saw.gain.value = 0.22;
   const o = osc(c, 'triangle', f, 0, lp, t, end);
   const o2 = osc(c, 'sawtooth', f, 6, saw, t, end);
-  saw.connect(lp); lp.connect(env); env.connect(bus.lead);
+  saw.connect(lp); lp.connect(env); env.connect(to);
   if (spec.vibrato > 0) {
     const vib = c.createOscillator();
     vib.type = 'sine'; vib.frequency.value = 5.3;

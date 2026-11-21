@@ -25,6 +25,12 @@ describe('beginner prompts', () => {
     expect(s).toEqual([{ x: 7, y: 10, move: 'double' }, { x: 3, y: 10, move: 'hold' }]);
   });
 
+  it('a later level that marks a new move shows only that move, not the hold Jump tip again', () => {
+    const l = { ...level([[10, 12], [30, 33]]), setPieces: [{ kind: 'prompt', id: 'wallJump', x0: 29, x1: 33 }] } as unknown as Level;
+    expect(promptSpots(l).map(p => p.move)).toEqual(['hold', 'climb']);
+    expect(promptSpots(l, { teachHold: false }).map(p => p.move)).toEqual(['climb']);
+  });
+
   it('desktop and touch wording', () => {
     expect(promptText('hold', false)).toBe('HOLD SPACE TO JUMP HIGHER');
     expect(promptText('hold', true)).toBe('HOLD JUMP TO JUMP HIGHER');

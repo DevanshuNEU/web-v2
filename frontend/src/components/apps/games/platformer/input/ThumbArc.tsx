@@ -97,7 +97,8 @@ function ArcButton({ label, rect, face, kind, mono, onPress, onRelease, intro, h
           className={`pointer-events-none absolute z-30 border border-[#3df2ff] bg-[#06040f] px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-[#d8f8ff] shadow-[0_0_12px_rgba(61,242,255,0.35)] ${
             beside
               ? `top-1/2 -translate-y-1/2 w-max max-w-[9.5rem] text-center leading-snug ${hand === 'right' ? 'right-full mr-2' : 'left-full ml-2'}`
-              : `bottom-full mb-1 whitespace-nowrap ${hand === 'right' ? 'right-0' : 'left-0'}`
+              // above the button; Jump's long label sits a row higher so it clears Attack's
+              : `bottom-full ${kind === 'jump' ? 'mb-10' : 'mb-1'} whitespace-nowrap ${hand === 'right' ? 'right-0' : 'left-0'}`
           }`}
         >
           {intro}

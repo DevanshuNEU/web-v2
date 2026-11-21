@@ -3,7 +3,7 @@
  * spawn lists, and builds the secret fourth level from a name.
  */
 
-import { LEVELS, type LevelDef, type SetPiece, type WorldTheme } from './levels';
+import { LEVELS, type LevelDef, type SetPiece, type SkyId, type WorldTheme } from './levels';
 import { cleanName, textCells, textWidth } from './font';
 import { generateLevel } from './generate';
 import { DEFAULT_SEED, deriveSeed } from './rand';
@@ -30,13 +30,25 @@ export const TILE = {
   CRACK: 11,
   /** Crate: solid until the blade breaks it (it drops coins). */
   CRATE: 12,
+  /** Moving walkway carrying right (solid like ground). */
+  WALK_R: 13,
+  /** Moving walkway carrying left (solid like ground). */
+  WALK_L: 14,
+  /** Thin cloud: one-way; puffs away a moment after she lands on it, then comes back. */
+  PUFF: 15,
 } as const;
 
 export function isSolidTile(t: number): boolean {
-  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK || t === TILE.CRATE;
+  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK || t === TILE.CRATE || t === TILE.WALK_R || t === TILE.WALK_L;
+}
+
+/** Tiles that only stop a body falling onto them from above. */
+export function isOneWayTile(t: number): boolean {
+  return t === TILE.ONEWAY || t === TILE.PUFF;
 }
 
 import type { EnemyKind } from './enemies';
+import type { VehicleDef } from './vehicles';
 import type { Ability } from './hero';
 import { POWER_CHARS, type PowerKind } from './powers';
 
@@ -49,18 +61,46 @@ export interface PickupSpawn { kind: PowerKind; x: number; y: number }
 export interface Shrine { x: number; y: number; ability: Ability }
 
 export interface Goal { x: number; top: number; base: number; kind: 'flag' | 'beacon' }
-export type DecorKind = 'waterTower' | 'antenna' | 'acUnit' | 'neonSign' | 'chimney';
+export type DecorKind = 'waterTower' | 'antenna' | 'acUnit' | 'neonSign' | 'chimney'
+  | 'departureBoard' | 'plant' | 'seats' | 'kiosk' | 'cloudTower' | 'wingLight'
+  | 'tree' | 'lampPost' | 'bench' | 'bikeRack' | 'ladder' | 'studyLamp' | 'studyTable' | 'cart' | 'gantry' | 'stationLamp';
 export interface Decor { kind: DecorKind; x: number; y: number }
 export interface Light { x: number; y: number; r: number; color: string; flicker: number }
 
-/** Scenery chars: each stands on the roof below it, never solid. */
-const DECOR: Record<string, DecorKind> = { T: 'waterTower', N: 'antenna', U: 'acUnit', H: 'chimney' };
+type SceneryChar = 'T' | 'N' | 'U' | 'H';
+const ROOFTOP_DECOR: Readonly<Record<SceneryChar, DecorKind>> = { T: 'waterTower', N: 'antenna', U: 'acUnit', H: 'chimney' };
+/**
+ * Scenery chars by theme: each stands on the floor below it, never solid. A
+ * char a theme leaves out is an error in that theme's levels.
+ */
+export const DECOR_BY_THEME: Readonly<Record<WorldTheme, Readonly<Partial<Record<SceneryChar, DecorKind>>>>> = {
+  austin: ROOFTOP_DECOR, rooftops: ROOFTOP_DECOR, grass: ROOFTOP_DECOR, cave: ROOFTOP_DECOR, sky: ROOFTOP_DECOR, stars: ROOFTOP_DECOR,
+  airport: { T: 'departureBoard', N: 'plant', U: 'seats', H: 'kiosk' },
+  clouds: { T: 'cloudTower', N: 'wingLight' },
+  campus: { T: 'tree', N: 'lampPost', U: 'bench', H: 'bikeRack' },
+  library: { T: 'ladder', N: 'studyLamp', U: 'studyTable', H: 'cart' },
+  tracks: { T: 'gantry', N: 'stationLamp', U: 'bench' },
+};
+
+type SignLight = { color: string; flicker: number; r: number };
 /** Neon magenta, neon cyan, sodium: colour and how much each flickers. */
-const NEON: readonly { color: string; flicker: number; r: number }[] = [
+const NEON: readonly SignLight[] = [
   { color: '#ff3d9a', flicker: 0.35, r: 4.5 },
   { color: '#3df2ff', flicker: 0.2, r: 4.5 },
   { color: '#ffb347', flicker: 0.06, r: 5 },
 ];
+/**
+ * The light of a sign (L) by theme: neon on the roofs, fluorescent and amber
+ * gate signs in the terminal, moonlight in the clouds, warm lamps on the
+ * campus, green and warm study lamps in the library, amber and cold at the tracks.
+ */
+const SIGN_LIGHTS: Readonly<Partial<Record<WorldTheme, readonly SignLight[]>>> = {
+  airport: [{ color: '#bfe6ff', flicker: 0.04, r: 5 }, { color: '#ffb347', flicker: 0.02, r: 4.5 }, { color: '#7ad0ff', flicker: 0.06, r: 4.5 }],
+  clouds: [{ color: '#cfd8ff', flicker: 0, r: 6 }],
+  campus: [{ color: '#ffcf8a', flicker: 0.03, r: 5 }, { color: '#fff1c2', flicker: 0.02, r: 4.5 }],
+  library: [{ color: '#9fe0a0', flicker: 0, r: 4.5 }, { color: '#ffd59a', flicker: 0.02, r: 5 }],
+  tracks: [{ color: '#ffb347', flicker: 0.05, r: 5 }, { color: '#bfe6ff', flicker: 0.04, r: 5 }],
+};
 const BEACON_LIGHT = { color: '#3df2ff', flicker: 0.1, r: 5 };
 
 export interface PlatformSpawn { x: number; y: number; w: number; axis: 'x' | 'y' }
@@ -72,6 +112,8 @@ export interface Level {
   label: string;
   name: string;
   theme: WorldTheme;
+  /** The level's sky preset, if it sets one (the renderer defaults to night). */
+  sky?: SkyId;
   cols: number;
   rows: number;
   /** Row-major tile codes, `cols * rows`. Copy it before mutating. */
@@ -114,11 +156,15 @@ export interface Level {
   sigmas: number;
   /** Gravity multiplier: 1, except the calm secret level. */
   gravity: number;
+  /** Vehicle lanes and timetables (the trolley, the trains), copied from the level. */
+  vehicles: VehicleDef[];
+  /** Signals (s) in goal order: tile x, y top left. Each watches the nearest lane over its column. */
+  signals: { x: number; y: number }[];
 }
 
 const CODES: Record<string, number> = {
   '#': TILE.GROUND, '=': TILE.GROUND, _: TILE.ONEWAY, B: TILE.BRICK, '?': TILE.AURA, C: TILE.AURA_CROWN, X: TILE.STONE, '^': TILE.SPIKE, o: TILE.COIN,
-  $: TILE.SIGMA, '%': TILE.CRACK, R: TILE.CRATE,
+  $: TILE.SIGMA, '%': TILE.CRACK, R: TILE.CRATE, '>': TILE.WALK_R, '<': TILE.WALK_L, '~': TILE.PUFF,
 };
 
 export function parseLevel(def: LevelDef, gravity = 1): Level {
@@ -141,10 +187,13 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   const memories: { x: number; y: number }[] = [];
   const enemies: EnemySpawn[] = [];
   const platforms: PlatformSpawn[] = [];
+  const signals: { x: number; y: number }[] = [];
   let coinTotal = 0;
   let bricks = 0;
   let sigmas = 0;
   let crowns = 0;
+  const sceneryKinds = DECOR_BY_THEME[def.theme];
+  const signLights = SIGN_LIGHTS[def.theme] ?? NEON;
 
   for (let y = 0; y < ROWS; y++) {
     const r = rows[y];
@@ -166,12 +215,17 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         case 'F': goals.push({ x, y, kind: 'flag' }); break;
         case 'G': goals.push({ x, y, kind: 'beacon' }); break;
         case 'L': {
-          const n = NEON[(x * 7 + y * 3) % NEON.length];
+          const n = signLights[(x * 7 + y * 3) % signLights.length];
           decor.push({ kind: 'neonSign', x, y: y + 1 });
           lights.push({ x: x + 0.5, y: y + 0.5, r: n.r, color: n.color, flicker: n.flicker });
           break;
         }
-        case 'T': case 'N': case 'U': case 'H': decor.push({ kind: DECOR[ch], x, y: y + 1 }); break;
+        case 'T': case 'N': case 'U': case 'H': {
+          const kind = sceneryKinds[ch];
+          if (!kind) throw new Error(`${def.name}: scenery "${ch}" has no prop in the ${def.theme} theme`);
+          decor.push({ kind, x, y: y + 1 });
+          break;
+        }
         case 'S':
           if (sword) throw new Error(`${def.name}: more than one sword`);
           sword = { x, y };
@@ -185,7 +239,8 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         case 'd': enemies.push({ kind: 'adDrone', x, y }); break;
         case 'e': enemies.push({ kind: 'eliteDrone', x, y }); break;
         case 'M': memories.push({ x, y }); break;
-        case 'w': case 't': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
+        case 's': signals.push({ x, y }); break;
+        case 'w': case 't': case 'b': case 'k': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
         case 'Q':
           if (!def.shrine) throw new Error(`${def.name}: a shrine (Q) needs the level's shrine ability`);
           shrines.push({ x, y, ability: def.shrine });
@@ -218,13 +273,15 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   const along = (a: { x: number }, b: { x: number }) => (a.x - b.x) * goalDir;
   checkpoints.sort(along);
   memories.sort(along);
+  signals.sort((a, b) => along(a, b) || a.y - b.y);
 
   return {
-    id: def.id, label: def.label, name: def.name, theme: def.theme,
+    id: def.id, label: def.label, name: def.name, theme: def.theme, ...(def.sky ? { sky: def.sky } : {}),
     cols, rows: ROWS, tiles, start: starts[0], checkpoints, checkpoint: checkpoints[0] ?? null, memories,
     goal: { x: f.x, top: f.y, base, kind: f.kind }, pole: { x: f.x, top: f.y, base },
     goalDir, decor, lights, shrines, pickups, sword, setPieces: def.setPieces ? [...def.setPieces] : [], decoys: (def.decoys ?? []).map(d => ({ x: d.x, y: d.y })), crates, signs: decor.filter(d => d.kind === 'neonSign').length,
     enemies, platforms, coinTotal, bricks, sigmas, gravity,
+    vehicles: (def.vehicles ?? []).map(v => ({ ...v })), signals,
   };
 }
 

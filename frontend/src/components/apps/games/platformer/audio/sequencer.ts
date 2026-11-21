@@ -6,7 +6,7 @@
  */
 
 import { TRACKS, type DrumBar, type Note, type TrackDef, type TrackId, type Chord } from './tracks';
-import { bassNote, createBus, disposeBus, hat, kick, leadNote, padNote, snare, type Bus } from './voices';
+import { bassNote, crackle, createBus, disposeBus, hat, kick, leadNote, padNote, snare, tom, type Bus } from './voices';
 
 const BAR = 16;
 const RING = 32;
@@ -16,13 +16,14 @@ const TEMPO_STEP = 0.25 / 8;
 const LAYER_TAIL = 1.5;
 const EMPTY: readonly Note[] = [];
 
-interface Kit { kick: Float32Array; snare: Float32Array; hat: Float32Array; open: Uint8Array }
+interface Kit { kick: Float32Array; snare: Float32Array; hat: Float32Array; tom: Float32Array; open: Uint8Array }
 interface Compiled {
   steps: number;
   chords: (Chord | undefined)[];
   bass: (readonly Note[])[];
   bassFill: (readonly Note[])[] | null;
   lead: (readonly Note[])[][];
+  arp: (readonly Note[])[] | null;
   beat: Kit | null;
   fills: Kit[];
 }
@@ -30,11 +31,14 @@ interface Compiled {
 const VEL: Record<string, number> = { x: 1, o: 0.55, '-': 0.3, O: 0.8 };
 
 function kit(bar: DrumBar): Kit {
-  const k: Kit = { kick: new Float32Array(BAR), snare: new Float32Array(BAR), hat: new Float32Array(BAR), open: new Uint8Array(BAR) };
+  const k: Kit = {
+    kick: new Float32Array(BAR), snare: new Float32Array(BAR), hat: new Float32Array(BAR), tom: new Float32Array(BAR), open: new Uint8Array(BAR),
+  };
   for (let s = 0; s < BAR; s++) {
     k.kick[s] = VEL[bar.kick[s]] ?? 0;
     k.snare[s] = VEL[bar.snare[s]] ?? 0;
     k.hat[s] = VEL[bar.hat[s]] ?? 0;
+    k.tom[s] = bar.tom ? VEL[bar.tom[s]] ?? 0 : 0;
     k.open[s] = bar.hat[s] === 'O' ? 1 : 0;
   }
   return k;
@@ -57,6 +61,7 @@ function compile(t: TrackDef): Compiled {
     bass: byStep(t.bass.notes, steps),
     bassFill: t.bass.fill ? byStep(t.bass.fill, BAR) : null,
     lead: t.lead.phrases.map(p => byStep(p, steps)),
+    arp: t.arp ? byStep(t.arp.notes, steps) : null,
     beat: t.drums ? kit(t.drums.beat) : null,
     fills: t.drums ? t.drums.fills.map(kit) : [],
   };
@@ -106,8 +111,8 @@ export function createPlayer(ctx: BaseAudioContext, dest: AudioNode, id: TrackId
   let step = 0;
   let loop = 0;
 
-  let drumLevel = 0, leadLevel = 0;
-  let drumUntil = -Infinity, leadUntil = -Infinity;
+  let drumLevel = 0, leadLevel = 0, arpLevel = 0;
+  let drumUntil = -Infinity, leadUntil = -Infinity, arpUntil = -Infinity;
 
   const ringTime = new Float64Array(RING).fill(Infinity);
   const ringDur = new Float64Array(RING);
@@ -117,15 +122,19 @@ export function createPlayer(ctx: BaseAudioContext, dest: AudioNode, id: TrackId
   function applyIntensity(x: number, now: number, instant: boolean) {
     const d = track.drums ? layerLevel(x, track.drums.enter) : 0;
     const l = layerLevel(x, track.lead.enter);
+    const a = track.arp ? layerLevel(x, track.arp.enter) : 0;
     if (drumLevel > 0 && d === 0) drumUntil = now + LAYER_TAIL;
     if (leadLevel > 0 && l === 0) leadUntil = now + LAYER_TAIL;
-    drumLevel = d; leadLevel = l;
+    if (arpLevel > 0 && a === 0) arpUntil = now + LAYER_TAIL;
+    drumLevel = d; leadLevel = l; arpLevel = a;
     if (instant) {
       bus.drumLayer.gain.value = d;
       bus.leadLayer.gain.value = l;
+      if (bus.arpLayer) bus.arpLayer.gain.value = a;
     } else {
       bus.drumLayer.gain.setTargetAtTime(d, now, 0.25);
       bus.leadLayer.gain.setTargetAtTime(l, now, 0.25);
+      bus.arpLayer?.gain.setTargetAtTime(a, now, 0.25);
     }
   }
   applyIntensity(clamp01(opts.intensity ?? 1), opts.startAt, true);
@@ -145,10 +154,20 @@ export function createPlayer(ctx: BaseAudioContext, dest: AudioNode, id: TrackId
     const last = bar === track.bars - 1;
     const tt = s & 1 ? t + track.swing * sd : t;
 
+    // the pad filter opens over the loop and closes again in the last bar
+    const bloom = track.pad.bloom;
+    if (i === 0 && bloom && bloom !== 1) {
+      const f = bus.padFilter.frequency, cut = track.pad.cutoff, span = c.steps * sd;
+      f.cancelScheduledValues(t);
+      f.setValueAtTime(cut, t);
+      f.linearRampToValueAtTime(cut * bloom, t + span * (track.bars - 1) / track.bars);
+      f.linearRampToValueAtTime(cut, t + span);
+    }
+
     const chord = c.chords[i];
     if (chord) {
-      const notes = chord[1];
-      for (let k = 0; k < notes.length; k++) padNote(bus, track.pad, notes[k], t, chord[2] * sd, 1);
+      const notes = chord[1], vel = chord[3] ?? 1;
+      for (let k = 0; k < notes.length; k++) padNote(bus, track.pad, notes[k], t, chord[2] * sd, vel);
     }
 
     const bl = last && c.bassFill && loop % 2 === 1 ? c.bassFill[s] : c.bass[i];
@@ -160,9 +179,21 @@ export function createPlayer(ctx: BaseAudioContext, dest: AudioNode, id: TrackId
     const drums = track.drums;
     if (drums && c.beat && (drumLevel > 0 || t < drumUntil) && !dropped(bar)) {
       const k = last && c.fills.length ? c.fills[loop % c.fills.length] : c.beat;
+      const tone = drums.tone ?? 1;
       if (k.kick[s]) kick(bus, tt, drums.kick * k.kick[s]);
-      if (k.snare[s]) snare(bus, tt, drums.snare * k.snare[s]);
-      if (k.hat[s]) hat(bus, tt, drums.hat * k.hat[s], k.open[s] === 1);
+      if (k.snare[s]) snare(bus, tt, drums.snare * k.snare[s], tone);
+      if (k.hat[s]) hat(bus, tt, drums.hat * k.hat[s], k.open[s] === 1, tone);
+      if (k.tom[s] && drums.tom) tom(bus, tt, drums.tom * k.tom[s]);
+      if (s === 0 && drums.crackle) crackle(bus, t, BAR * sd, drums.crackle);
+    }
+
+    const arp = track.arp;
+    if (arp && c.arp && (arpLevel > 0 || t < arpUntil)) {
+      const an = c.arp[i];
+      for (let k = 0; k < an.length; k++) {
+        const n = an[k];
+        leadNote(bus, arp, n[1], tt, n[2] * sd * 0.9, n[3] ?? 1, bus.arp!);
+      }
     }
 
     if (c.lead.length && (leadLevel > 0 || t < leadUntil)) {

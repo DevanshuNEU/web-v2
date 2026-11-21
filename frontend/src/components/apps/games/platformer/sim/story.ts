@@ -1,17 +1,19 @@
 /**
  * Story mode's running order: one row per level, in play order. `world` is
- * the chapter. Chapter 1 (Austin) is built; the rest are placeholders until
- * their levels exist. `cardId` names the story card the view shows before
- * the level.
+ * the chapter. Chapters 1 (Austin), 2 (the trip) and 3 (Northeastern) are
+ * built; the rest are placeholders until their levels exist. `cardId` names
+ * the story card the view shows after the level (see story/text.ts).
  */
 
 import type { LevelDef, WorldTheme } from './levels';
 import { AUSTIN } from './story/austin';
+import { TRIP } from './story/trip';
+import { CAMPUS } from './story/campus';
 
 export interface StoryEntry {
   id: string;
   world: number;
-  /** Level number in its world (the boss is the 4th of world 3). */
+  /** Level number in its world (the gorilla is the 5th of world 4). */
   level: number;
   name: string;
   theme: WorldTheme;
@@ -20,30 +22,40 @@ export interface StoryEntry {
   built: boolean;
 }
 
-const entry = (id: string, world: number, level: number, name: string, theme: WorldTheme, built = false): StoryEntry =>
-  ({ id, world, level, name, theme, cardId: `card-${id}`, built });
+const entry = (id: string, world: number, level: number, name: string, theme: WorldTheme, built = false, cardId = `card-${id}`): StoryEntry =>
+  ({ id, world, level, name, theme, cardId, built });
 
-/** Season 1: her trip from Austin to Boston. Only chapter 1 is built. */
+/** Season 1: her trip from Austin to Boston, then home. Chapters 1 to 3 are built. */
 export const STORY: readonly StoryEntry[] = [
   entry('1-1', 1, 1, 'First Steps on Congress', 'austin', true),
   entry('1-2', 1, 2, 'Sixth Street', 'austin', true),
   entry('1-3', 1, 3, 'Bat Bridge', 'austin', true),
-  // Chapter 2, the trip (wall jump shrine). Themes are placeholders until their tilesets exist.
-  entry('2-1', 2, 1, 'Departures', 'sky'),
-  entry('2-2', 2, 2, 'The Flight', 'sky'),
-  // Chapter 3, Boston (dash shrine), and the boss.
-  entry('3-1', 3, 1, 'Back Bay', 'rooftops'),
-  entry('3-2', 3, 2, 'The Charles', 'rooftops'),
-  entry('3-3', 3, 3, 'Seaport', 'rooftops'),
-  entry('3-boss', 3, 4, 'The Ex-Bestie', 'rooftops'),
-  // Chapter 4, the concert, then the season boss.
-  entry('4-1', 4, 1, 'The Headliner', 'stars'),
-  entry('season-boss', 5, 1, 'Job Hunting', 'stars'),
+  // Chapter 2, the trip (wall jump shrine in 2-1).
+  entry('2-1', 2, 1, 'Departures', 'airport', true),
+  entry('2-2', 2, 2, 'Red-Eye', 'clouds', true),
+  // Chapter 3, Northeastern (dash shrine in 3-1).
+  entry('3-1', 3, 1, 'Huntington Avenue', 'campus', true),
+  entry('3-2', 3, 2, 'Snell After Midnight', 'library', true),
+  entry('3-3', 3, 3, 'Over the Tracks', 'tracks', true),
+  // Chapter 4, Boston nights, and the gorilla.
+  entry('4-1', 4, 1, 'Newbury Street', 'rooftops'),
+  entry('4-2', 4, 2, 'The Charles', 'rooftops'),
+  entry('4-3', 4, 3, 'Seaport Sunrise', 'rooftops'),
+  entry('4-4', 4, 4, 'Revere Beach', 'rooftops'),
+  entry('4-boss', 4, 5, 'The Ex-Bestie', 'rooftops', false, 'card-boss'),
+  // Chapter 5, Jamaica Plain.
+  entry('5-1', 5, 1, 'Jamaica Pond', 'rooftops'),
+  entry('5-2', 5, 2, 'Home', 'rooftops'),
+  // Chapter 6, the concert, then the season boss.
+  entry('6-1', 6, 1, 'The Headliner', 'stars'),
+  entry('season-boss', 7, 1, 'Job Hunting', 'stars'),
 ];
+
+const BUILT: Readonly<Record<string, LevelDef>> = { ...AUSTIN, ...TRIP, ...CAMPUS };
 
 /** The level data of a built story level. */
 export function storyLevelDef(id: string): LevelDef {
-  const def = (AUSTIN as Readonly<Record<string, LevelDef>>)[id];
+  const def = BUILT[id];
   if (!def) throw new Error(`story level ${id} is not built yet`);
   return def;
 }

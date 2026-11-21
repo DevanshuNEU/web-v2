@@ -27,9 +27,9 @@ export function PixelButton({ children, onClick, primary = false, disabled = fal
   );
 }
 
-export function PixelPanel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function PixelPanel({ children, className = '', ...rest }: { children: React.ReactNode; className?: string; 'data-testid'?: string }) {
   return (
-    <div className={`border-2 border-[#3df2ff]/60 bg-[#06040f]/90 shadow-[0_0_24px_rgba(61,242,255,0.15)] ${className}`}>
+    <div {...rest} className={`border-2 border-[#3df2ff]/60 bg-[#06040f]/90 shadow-[0_0_24px_rgba(61,242,255,0.15)] ${className}`}>
       {children}
     </div>
   );

@@ -7,7 +7,7 @@
  */
 
 import {
-  PHYS, contacts, moveBody, moveX, moveY, overlaps, stompOrHurt,
+  PHYS, approach, contacts, moveBody, moveX, moveY, overlaps, stompOrHurt,
   type Body, type Contacts, type SolidFn,
 } from './physics';
 import { ABILITIES, createHero, pressJump, setState, stepHero, stompBounce, tryDash, worldOwned, type Abilities, type Ability, type Hero, type HeroInput } from './hero';
@@ -20,10 +20,12 @@ import { BLADE, type Aim, SWING_KINDS, hitbox, isActive, isGroundSwing, pogo, st
 import { POWERS, POWER_KINDS, type PowerKind } from './powers';
 import { nextStoryId, storyEntry, storyLevelDef } from './story';
 import { createScarf, neckOf, resetScarf, stepScarf, torsoOf, type ScarfPoint } from './scarf';
-import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, mainLevel, SECRET_FALLBACK, TILE, isSolidTile, secretLevel, parseLevel, type DecorKind, type Level, type Light } from './level';
+import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, mainLevel, SECRET_FALLBACK, TILE, isOneWayTile, isSolidTile, secretLevel, parseLevel, type DecorKind, type Level, type Light } from './level';
 import { ENEMY_KINDS, enemyFrom, type Enemy, type EnemyCtx } from './enemies';
+import { SIGNAL_LEAD, arrivalIn, createVehicle, placeVehicle, type Vehicle } from './vehicles';
 
 export type { Enemy, EnemyKind, EnemyMode } from './enemies';
+export type { Vehicle, VehicleDef, VehicleKind } from './vehicles';
 export { shouldTurnAtLedge } from './enemies';
 
 export const LIVES = 3;
@@ -86,6 +88,10 @@ export function unlocksSecret(levelIndex: number, heroTop: number, pole: Pole): 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface Platform { x0: number; y0: number; x: number; y: number; w: number; h: number; axis: 'x' | 'y'; px: number; py: number }
+/** Something she can stand on that moves: a platform or a vehicle roof. */
+export interface Ride { x: number; y: number; px: number; py: number }
+/** A signal (s) by a vehicle lane: green for SIGNAL_LEAD seconds before a vehicle reaches it. `watch` indexes `vehicles`. */
+export interface Signal { x: number; y: number; green: boolean; watch: readonly number[] }
 export interface Crown extends Body { dir: 1 | -1; emerge: number; baseY: number }
 export interface Pop { x: number; y: number; t: number }
 export interface Bump { tx: number; ty: number; t: number }
@@ -142,7 +148,8 @@ export interface World {
   crowns: Crown[];
   pops: Pop[];
   bumps: Bump[];
-  riding: Platform | null;
+  /** The platform or vehicle roof she stands on, if any. */
+  riding: Ride | null;
   phase: Phase;
   phaseT: number;
   pitDeath: boolean;
@@ -241,7 +248,28 @@ export interface World {
   gravityScale: number;
   /** Coin value multiplier (Double Aura). */
   coinMul: number;
+  /**
+   * One per thin cloud (~) in the level. Solid with t = 0: still. Solid with
+   * t > 0: wobbling, t seconds since she first stood on it (gone at
+   * PUFF.wobble). Not solid: gone for t seconds (its tile is EMPTY), back
+   * after PUFF.gone once she is out of its tile.
+   */
+  puffs: { x: number; y: number; t: number; solid: boolean }[];
+  /**
+   * The trolley and trains, one per lane in the level, in its order. Tile
+   * units: x the left edge, y the roof top. Placed from world time every step
+   * (see ./vehicles.ts); `active` is false while one waits between runs.
+   */
+  vehicles: Vehicle[];
+  /** Signals by the lanes, green for SIGNAL_LEAD seconds before a vehicle reaches them. */
+  signals: Signal[];
 }
+
+/** Thin clouds: seconds from her first landing to the puff, and seconds gone. */
+export const PUFF = { wobble: 0.4, gone: 3 } as const;
+
+/** A moving walkway (> or <) adds this many tiles per second to whatever stands on it. */
+export const WALKWAY_SPEED = 4;
 
 /** Moving platforms swing this many tiles each way from where the level puts them. */
 export const PLATFORM_AMP = 2.5;
@@ -254,7 +282,7 @@ function makeSolid(tiles: Uint8Array, cols: number): SolidFn {
     if (ty < 0 || ty >= ROWS) return false;
     return isSolidTile(tiles[ty * cols + tx]);
   };
-  solid.oneWay = (tx, ty) => tx >= 0 && tx < cols && ty >= 0 && ty < ROWS && tiles[ty * cols + tx] === TILE.ONEWAY;
+  solid.oneWay = (tx, ty) => tx >= 0 && tx < cols && ty >= 0 && ty < ROWS && isOneWayTile(tiles[ty * cols + tx]);
   return solid;
 }
 
@@ -310,7 +338,7 @@ export function createWorld(o: WorldOptions = {}): World {
     abilities: abilitiesFor(o), shrines: [], sword: null,
     swing: null, attackBuffer: 0, comboNext: 0, comboT: 99, serial: 0, pogoSafe: 0, decor: [], lights: [], decoys: [],
     shots: Array.from({ length: SHOT_POOL }, () => ({ x: 0, y: 0, vx: 0, vy: 0, t: 0 })),
-    modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1,
+    modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1, puffs: [], vehicles: [], signals: [],
     afterimages: Array.from({ length: AFTERIMAGE_POOL }, () => ({ x: 0, y: 0, facing: 1 as const, t: 0 })),
   };
   w.scarf = createScarf(neckOf(w.hero));
@@ -353,7 +381,14 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
   w.level = level;
   w.tiles = level.tiles.slice();
   w.solid = makeSolid(w.tiles, level.cols);
+  w.puffs = [];
+  for (let i = 0; i < w.tiles.length; i++) {
+    if (w.tiles[i] === TILE.PUFF) w.puffs.push({ x: i % level.cols, y: Math.floor(i / level.cols), t: 0, solid: true });
+  }
   w.enemies = level.enemies.map(e => enemyFrom(e.kind, e.x, e.y));
+  w.vehicles = level.vehicles.map(createVehicle);
+  w.signals = level.signals.map(sg => ({ x: sg.x, y: sg.y, green: false, watch: lanesOf(level, sg) }));
+  stepVehicles(w);
   w.platforms = level.platforms.map(p => ({ x0: p.x, y0: p.y, x: p.x, y: p.y, w: p.w, h: PLATFORM_H, axis: p.axis, px: p.x, py: p.y }));
   w.crowns = []; w.pops = []; w.bumps = [];
   for (const sh of w.shots) sh.t = 0;
@@ -496,6 +531,8 @@ export function stepWorld(w: World, input: InputFrame, fixedDt: number) {
   w.heroPx = w.hero.x; w.heroPy = w.hero.y;
 
   stepPlatforms(w);
+  stepVehicles(w);
+  stepPuffs(w, dt);
   for (const b of w.bumps) b.t += dt;
   if (w.bumps.length && w.bumps[0].t > 0.18) w.bumps = w.bumps.filter(b => b.t <= 0.18);
   for (const p of w.pops) p.t += dt;
@@ -556,6 +593,7 @@ function holdStill(w: World, dt: number) {
   w.cam.px = w.cam.x; w.cam.py = w.cam.y;
   for (const e of w.enemies) { e.px = e.x; e.py = e.y; }
   for (const p of w.platforms) { p.px = p.x; p.py = p.y; }
+  for (const v of w.vehicles) { v.px = v.x; v.py = v.y; }
 }
 
 function stepPlatforms(w: World) {
@@ -564,6 +602,67 @@ function stepPlatforms(w: World) {
     p.px = p.x; p.py = p.y;
     if (p.axis === 'x') p.x = p.x0 + PLATFORM_AMP * k;
     else p.y = p.y0 + PLATFORM_AMP * k;
+  }
+}
+
+/**
+ * The vehicles a signal watches: those on the lane nearest its row among the
+ * lanes that run over its column.
+ */
+function lanesOf(level: Level, sg: { x: number; y: number }): number[] {
+  let best = Infinity;
+  const out: number[] = [];
+  level.vehicles.forEach((d, i) => {
+    if (sg.x < d.x0 || sg.x > d.x1) return;
+    const k = Math.abs(d.row - sg.y);
+    if (k < best) { best = k; out.length = 0; }
+    if (k === best) out.push(i);
+  });
+  return out;
+}
+
+/** Place every vehicle by the world clock, let go of one that left its lane, and set the signals. */
+function stepVehicles(w: World) {
+  const defs = w.level.vehicles;
+  for (let i = 0; i < w.vehicles.length; i++) {
+    const v = w.vehicles[i];
+    placeVehicle(v, defs[i], w.t);
+    if (!v.active && w.riding === v) w.riding = null;
+  }
+  for (const sg of w.signals) {
+    let green = false;
+    for (const i of sg.watch) {
+      const a = arrivalIn(defs[i], w.t, sg.x);
+      if (a > 0 && a <= SIGNAL_LEAD) { green = true; break; }
+    }
+    sg.green = green;
+  }
+}
+
+const PUFF_BOX = { x: 0, y: 0, w: 1, h: 1 };
+
+/** Thin clouds: one she stands on wobbles, then puffs away; a gone one comes back when she is clear of it. */
+function stepPuffs(w: World, dt: number) {
+  if (w.puffs.length === 0) return;
+  const h = w.hero;
+  const feet = w.phase === 'play' && h.onGround && !w.riding ? Math.floor(h.y + h.h + 0.05) : -1;
+  const x0 = Math.floor(h.x + 1e-6), x1 = Math.floor(h.x + h.w - 1e-6);
+  for (const p of w.puffs) {
+    if (p.solid) {
+      if (p.t > 0) {
+        p.t += dt;
+        if (p.t >= PUFF.wobble) { p.solid = false; p.t = 0; setTile(w, p.x, p.y, TILE.EMPTY); }
+      } else if (p.y === feet && p.x >= x0 && p.x <= x1) {
+        p.t = dt;
+      }
+      continue;
+    }
+    p.t += dt;
+    if (p.t < PUFF.gone) continue;
+    PUFF_BOX.x = p.x; PUFF_BOX.y = p.y;
+    if (overlaps(h, PUFF_BOX)) continue;
+    p.solid = true; p.t = 0;
+    setTile(w, p.x, p.y, TILE.PUFF);
   }
 }
 
@@ -588,6 +687,8 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const rooted = w.swing !== null && isGroundSwing(w.swing.kind);
   if (rooted) { ROOTED.jumpHeld = input.jumpHeld; }
   const r = stepHero(h, rooted ? ROOTED : input, dt, w.solid, c, w.gravityScale);
+  if (r.dashEnded) rechargeDash(w);
+  carryHero(w, input.move, dt);
   // Storm gusts drift the hero (half on a roof, never in a dash).
   const k = MODIFIERS[w.modifier.id].wind;
   w.wind = k > 0 ? k * gust(w.levelTime, w.windDir) : 0;
@@ -602,16 +703,15 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   if (r.wallJumped) emit(w, 'wallJump', h.x + (h.facing > 0 ? 0 : h.w), h.y + h.h / 2, h.facing);
   if (r.skidded) emit(w, 'skid', h.x + h.w / 2, h.y + h.h, -h.facing);
 
-  // One-way landing on moving platforms.
+  // One-way landing on moving platforms and vehicle roofs.
   w.riding = null;
   if (h.vy >= 0) {
     for (const p of w.platforms) {
-      if (h.x + h.w <= p.x || h.x >= p.x + p.w) continue;
-      if (prevBottom <= p.y + 0.12 && h.y + h.h >= p.y) {
-        h.y = p.y - h.h; h.vy = 0; h.onGround = true;
-        w.riding = p;
-        if (!wasGround) landed(w, r.landedAt || 8);
-        break;
+      if (rideOn(w, p, p.w, prevBottom, wasGround, r.landedAt)) break;
+    }
+    if (!w.riding) {
+      for (const v of w.vehicles) {
+        if (v.active && rideOn(w, v, v.w, prevBottom, wasGround, r.landedAt)) break;
       }
     }
   }
@@ -645,6 +745,52 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const pole = w.level.pole;
   const zone = { x: pole.x + 0.4, y: pole.top, w: 0.2, h: pole.base + 1 - pole.top };
   if (overlaps(h, zone)) grabPole(w);
+}
+
+/** Land on (or keep standing on) a moving floor `width` tiles wide if her feet crossed its top this step. */
+function rideOn(w: World, p: Ride, width: number, prevBottom: number, wasGround: boolean, landedAt: number): boolean {
+  const h = w.hero;
+  if (h.x + h.w <= p.x || h.x >= p.x + width) return false;
+  if (prevBottom > p.y + 0.12 || h.y + h.h < p.y) return false;
+  h.y = p.y - h.h; h.vy = 0; h.onGround = true;
+  w.riding = p;
+  if (!wasGround) landed(w, landedAt || 8);
+  return true;
+}
+
+/**
+ * The way the walkway under a body's feet runs: 1 right, -1 left, 0 none.
+ * The tile under its centre decides; over a gap, the edge still on a tile.
+ */
+function walkwayUnder(w: World, b: Body): -1 | 0 | 1 {
+  const ty = Math.floor(b.y + b.h + 0.05);
+  let t = tile(w, Math.floor(b.x + b.w / 2), ty);
+  if (!isSolidTile(t)) t = tile(w, Math.floor(b.x + 0.02), ty);
+  if (!isSolidTile(t)) t = tile(w, Math.floor(b.x + b.w - 0.02), ty);
+  return t === TILE.WALK_R ? 1 : t === TILE.WALK_L ? -1 : 0;
+}
+
+/**
+ * Walkways: standing on one sets her carry; on plain floor it fades out
+ * fast; in the air it stays unless she steers against it. A wall stops it.
+ */
+function carryHero(w: World, move: number, dt: number) {
+  const h = w.hero;
+  if (h.dashT > 0) return;
+  if (h.onGround) {
+    const d = walkwayUnder(w, h);
+    h.carry = d !== 0 ? d * WALKWAY_SPEED : approach(h.carry, 0, PHYS.frictionGround * dt);
+  } else if (h.carry !== 0 && move !== 0 && Math.sign(move) !== Math.sign(h.carry)) {
+    h.carry = approach(h.carry, 0, PHYS.accelAir * dt);
+  }
+  if (h.carry === 0) return;
+  const c = w.c;
+  const wall = c.wall;
+  c.wall = 0;
+  const vx = h.vx;
+  moveX(h, h.carry * dt, w.solid, c);
+  if (c.wall !== 0) { h.carry = 0; h.vx = Math.sign(vx) === c.wall ? 0 : vx; }
+  else { c.wall = wall; h.vx = vx; }
 }
 
 /** A dash into a cracked wall smashes its whole column of cracked tiles. */
@@ -806,7 +952,7 @@ function targetBelow(w: World): boolean {
     for (let ty = Math.floor(feet); ty <= Math.floor(feet + BLADE.downReach); ty++) {
       const t = tile(w, tx, ty);
       if (t === TILE.SPIKE || t === TILE.CRATE) return true;
-      if (isSolidTile(t) || t === TILE.ONEWAY) break;
+      if (isSolidTile(t) || isOneWayTile(t)) break;
     }
   }
   for (const dc of w.decor) {
@@ -833,6 +979,12 @@ function stepPower(w: World, dt: number) {
   const def = w.power ? POWERS[w.power.kind] : null;
   w.hero.runMul = def ? def.runMul : 1;
   w.hero.glideFall = def ? def.glideFall : 0;
+  rechargeDash(w);
+}
+
+/** Wicked Fast: the dash is charged again the moment the last one is over. */
+function rechargeDash(w: World) {
+  if (w.power && POWERS[w.power.kind].chainDash && w.hero.dashT <= 0) w.hero.dashReady = true;
 }
 
 function collectPickups(w: World) {
@@ -1078,6 +1230,11 @@ function stepEnemies(w: World, dt: number, prevBottom: number, jumpHeld: boolean
     } else {
       ENEMY_KINDS[e.kind].step(e, k, dt);
     }
+    // A walker on a walkway rides it.
+    if (!ENEMY_KINDS[e.kind].flies && e.onGround) {
+      const d = walkwayUnder(w, e);
+      if (d !== 0) moveX(e, d * WALKWAY_SPEED * dt, w.solid, k.c);
+    }
     if (e.y > ROWS + 2) { e.deadT = 0; continue; }
 
     if (w.phase !== 'play') continue;
@@ -1088,6 +1245,10 @@ function stepEnemies(w: World, dt: number, prevBottom: number, jumpHeld: boolean
       stompBounce(h, jumpHeld);
       w.combo++;
       emit(w, 'stomp', e.x + e.w / 2, e.y, w.combo);
+    } else if (hit === 'hurt' && w.power && POWERS[w.power.kind].knockout) {
+      // Priority Boarding: it bounces off her and is out.
+      killEnemy(w, e);
+      emit(w, 'stomp', e.x + e.w / 2, e.y, 1);
     } else if (hit === 'hurt' && !stomped && w.pogoSafe <= 0) {
       hurt(w);
     }

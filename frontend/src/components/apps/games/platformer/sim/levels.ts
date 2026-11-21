@@ -39,19 +39,39 @@
  *      tower, N antenna, U AC unit, H chimney (scenery, never solid)
  *   R  crate (solid; the blade breaks it for coins)
  *   S  the sword: gives the blade
- *   w  Bat Wings, t Taco Rush (optional powers)
+ *   w  Bat Wings, t Taco Rush, b Priority Boarding, k Wicked Fast (optional powers)
+ *
+ * The trip (chapter 2)
+ *   >  moving walkway carrying right, <  carrying left (solid like ground;
+ *      standing on one adds WALKWAY_SPEED to her ground speed)
+ *   ~  thin cloud (one-way; puffs away a moment after she lands, comes back)
+ *   The scenery chars T N U H name a different prop per theme: see
+ *   DECOR_BY_THEME in ./level.ts.
+ *
+ * Northeastern (chapter 3)
+ *   s  a signal on a vehicle lane (scenery): green for SIGNAL_LEAD seconds
+ *      before a vehicle on the nearest lane reaches its column
+ *   k  Wicked Fast (optional power: dashes chain)
+ *   The trolley and trains are not drawn in the rows: `vehicles` in the
+ *   level lists their lanes and timetables.
  */
 
 import type { Ability } from './hero';
+import type { VehicleDef } from './vehicles';
 
-export type WorldTheme = 'grass' | 'rooftops' | 'austin' | 'cave' | 'sky' | 'stars';
+export type WorldTheme = 'grass' | 'rooftops' | 'austin' | 'cave' | 'sky' | 'stars' | 'airport' | 'clouds'
+  | 'campus' | 'library' | 'tracks';
+
+/** The sky a level is played under; the season moves it forward level by level. */
+export type SkyId = 'night' | 'lateNight' | 'preDawn' | 'sunrise' | 'morning';
 
 /**
  * A moment the view or renderer stages over a stretch of columns: `bats`
  * (the Congress Avenue bridge swarm), `prompt` (an on-screen hint, `id`
- * names it, e.g. 'doubleJump').
+ * names it, e.g. 'doubleJump'), `descent` (the cloud floor fades into the
+ * night view of the city below), `planes` (the far plane layer is busy).
  */
-export interface SetPiece { kind: 'bats' | 'prompt'; x0: number; x1: number; id?: string }
+export interface SetPiece { kind: 'bats' | 'prompt' | 'descent' | 'planes'; x0: number; x1: number; id?: string }
 
 export interface LevelDef {
   id: number;
@@ -65,6 +85,10 @@ export interface LevelDef {
   /** Big line on the level card. */
   name: string;
   theme: WorldTheme;
+  /** The sky preset; the renderer picks night when unset. */
+  sky?: SkyId;
+  /** The trolley and trains: lanes and timetables (see ./vehicles.ts). */
+  vehicles?: readonly VehicleDef[];
   rows: readonly string[];
 }
 

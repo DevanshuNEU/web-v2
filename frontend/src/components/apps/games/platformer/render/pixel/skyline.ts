@@ -20,6 +20,8 @@ export interface Blink { x: number; y: number; seed: number }
 export interface Neon { x: number; y: number; w: number; h: number; color: string; seed: number }
 
 export interface Drip { x: number; y: number; seed: number }
+/** A coloured light on a strip: a nav light blinks, a strobe double-flashes. */
+export interface Beacon { x: number; y: number; color: string; strobe: boolean; seed: number }
 
 export interface SkyLayer {
   canvas: Canvas;
@@ -30,6 +32,8 @@ export interface SkyLayer {
   tvs: Flick[];
   /** Water glints that twinkle (Lady Bird Lake). */
   glints?: Drip[];
+  /** Coloured lights that blink or strobe (a wing's nav lights). */
+  beacons?: Beacon[];
   /** Strip height, px; the strip's bottom sits on the horizon. */
   h: number;
   /** Parallax factor: 0 still, 1 moves with the world. */
@@ -48,7 +52,7 @@ export interface Sky {
   layers: SkyLayer[];
 }
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -377,7 +381,7 @@ function bakeClose(seed: number, col: (c: string) => string, drawText: (c: Ctx, 
   return { canvas: base.canvas, glow: glow.canvas, drips, tvs, h: H, f: 0.6, flick, blinks: [], neon: [] };
 }
 
-function bakeClouds(seed: number, col: (c: string) => string): SkyLayer {
+export function bakeClouds(seed: number, col: (c: string) => string): SkyLayer {
   const r = rng(seed);
   const H = 48;
   const { canvas, ctx } = makeCanvas(STRIP_W, H);
@@ -469,7 +473,7 @@ function rgba(hexOrRgb: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: string) => string, sky: SkyPreset): { canvas: Canvas; twinkles: Twinkle[] } {
+export function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: string) => string, sky: SkyPreset): { canvas: Canvas; twinkles: Twinkle[] } {
   const r = rng(seed);
   const { canvas, ctx } = makeCanvas(w, h);
   const g = ctx.createLinearGradient?.(0, 0, 0, h);

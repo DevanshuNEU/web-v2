@@ -47,6 +47,12 @@ export interface Hero extends Body {
   runMul: number;
   /** Fastest fall while holding jump on the way down (0 = no glide). */
   glideFall: number;
+  /**
+   * Speed a moving walkway gives her, tiles per second, signed, on top of vx.
+   * The world sets it while she stands on one; it stays through a jump until
+   * she lands on plain floor or steers against it.
+   */
+  carry: number;
 }
 
 /** The part of the input frame the hero's body reads each step. */
@@ -57,7 +63,7 @@ export function createHero(x: number, feetY: number): Hero {
     x: x + (1 - PHYS.heroW) / 2, y: feetY - PHYS.heroH, w: PHYS.heroW, h: PHYS.heroH,
     vx: 0, vy: 0, onGround: true, facing: 1, coyote: PHYS.coyote, buffer: 0, cuttable: false,
     state: 'ground', dashReady: true, dashT: 0, dashDir: 1, wallDir: 0, landT: 1, animT: 0, lockT: 0, airJumps: PHYS.airJumps,
-    abilities: { wallJump: true, dash: true, blade: true }, runMul: 1, glideFall: 0,
+    abilities: { wallJump: true, dash: true, blade: true }, runMul: 1, glideFall: 0, carry: 0,
   };
 }
 

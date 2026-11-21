@@ -1,5 +1,8 @@
 /**
- * World 1, the neon rooftops: the pixel-art pipeline.
+ * The pixel-art pipeline, for every pixel theme (the rooftops, Austin, the
+ * trip). What differs per theme (tiles, facades, the parallax, weather,
+ * enemy and goal art, the sign, decor lights, extra layers) comes from the
+ * level's PixelTheme (./themes.ts); this file never branches on a theme name.
  *
  * Everything is drawn at 16 art pixels per tile into a low-res buffer the
  * size of the view, then blitted to the screen at a whole number of device
@@ -38,10 +41,9 @@ import { toMono } from '../bake';
 import { drawCards, type View } from '../pipeline';
 import { CARD_SECONDS } from '../../sim/world';
 import { bakeTally, bakeTitle, cardWipe, drawCard, drawTallyNumbers, type CardArt, type Wipe } from './card';
-import { drawText, textWidth } from './font';
-import { BREAKABLES, ENEMIES, HERO, HERO_NECK, PICKUPS, POWERUPS, ROOFTOP_TILES, type HeroAnim, type SpriteSet } from '../sprites';
+import { BREAKABLES, HERO, HERO_NECK, PICKUPS, POWERUPS, type HeroAnim, type SpriteSet } from '../sprites';
 import { pickHeroAnim, type AnimPick } from './anim';
-import { ART_TILE, blitOrigin, renderCam, viewMetrics, type BlitOrigin, type ViewMetrics } from './camera';
+import { ART_TILE, blitOrigin, placeFrame, snapTo, viewMetrics, type Placement, type BlitOrigin, type ViewMetrics } from './camera';
 import { makeCanvas, resize, type Canvas, type Ctx } from './canvas';
 import { CHUNK_COLS, CHUNK_PX, ChunkCache, chunkRange, type ChunkSpan } from './chunks';
 import { LightList, lightSprite, withAlpha } from './lights';
@@ -49,10 +51,11 @@ import {
   afterimagesOf, dashReadyOf, powerOf, decorOf, hitFreezeOf, lightsOf, modifierNameOf, modifierOf, pickupsOf, readHero, scarfOf, seedOf, windOf,
   type Decor, type HeroPose, type PickupKind,
 } from './read';
-import { signSet, signWord } from './signs';
-import { STRIP_W, bakeSky, drawStrip, flicker, hash2, type Sky, type SkyLayer } from './skyline';
+import { signWord } from './signs';
+import { STRIP_W, drawStrip, flicker, hash2, type Sky, type SkyLayer } from './skyline';
 import { atlas, drawFrame, drawTinted, tinted, type Atlas } from './sprites';
-import { K, KIND, ROOF_GLOW, bakeChunk, bakeChunkPart, decorAtlas, decorBottom, tileAtlas, type Chunk } from './tiles';
+import { K, KIND, bakeChunk, bakeChunkPart, decorAtlas, decorBottom, isStaticDecor, tileAtlas, type Chunk } from './tiles';
+import { loadTheme, themeFor, type PixelTheme, type ThemeFrame } from './themes';
 import { Motes, Rain, SLANT, Sparks, type RainOpts } from './weather';
 import { SKY_PRESETS, skyOf, type SkyPreset } from './timeofday';
 import {
@@ -215,7 +218,6 @@ export const POWER_COLOR: Readonly<Record<PickupKind, string>> = {
 };
 /** Glowing keys per sprite set. */
 const HERO_GLOW = 'eE';
-const ENEMY_GLOW = 'YZXRFEW6GH';
 const SCARF_N = 10;
 
 interface Buffers { canvas: Canvas; ctx: Ctx }
@@ -246,6 +248,8 @@ export interface FrameStats {
   /** Bats in the swarm on screen, memories flying to the corner. */
   bats: number;
   flights: number;
+  /** The theme's rumble shake this frame (0 under reduced motion). */
+  rumble: number;
 }
 
 function luminance(hex: string): number {
@@ -262,8 +266,13 @@ interface State {
   /** The playfield: tiles, decor, actors, on clear. */
   scene: Buffers | null;
   light: Buffers | null;
+  /** The light map at playfield resolution, masked to what the playfield drew. */
+  lightQ: Buffers | null;
   card: { art: CardArt | null; level: Level | null; mod: string; bw: number; mono: boolean };
-  skyOpts: { austin: boolean; neon: number; sky: SkyPreset };
+  skyOpts: { neon: number; sky: SkyPreset };
+  /** The level's theme (null before the first themed frame) and what its layers get each frame. */
+  theme: PixelTheme | null;
+  tf: ThemeFrame;
   /** A low fog band for the misty presets, baked per view size. */
   fog: Canvas | null;
   tally: { art: CardArt | null; title: string; bw: number; mono: boolean; t: number };
@@ -279,8 +288,14 @@ interface State {
   flash: number;
   sky: Sky | null;
   bw: number; bh: number; mono: boolean;
+  /** Buffer sub-pixels per art pixel (see camera.ts). */
+  q: number;
   level: Level | null;
+  /** What the chunks bake: the level's decor plus the theme's dressing; `decorSrc` is the level list it came from. */
   decor: readonly Decor[] | null;
+  decorSrc: readonly Decor[] | null;
+  /** Memories not hidden inside front decor, rewritten each frame. */
+  memShown: Memory[];
   chunks: ChunkCache<Chunk>;
   span: ChunkSpan;
   /** The chunk being baked ahead, a slice per frame: index (-1 none), next column, canvases. */
@@ -325,17 +340,22 @@ function state(): State {
   if (S) return S;
   const s: State = {
     m: viewMetrics(320, 480, 1),
-    main: null, scene: null, light: null, lightBase: null, lightBaseDark: null, sky: null,
+    main: null, scene: null, light: null, lightQ: null, lightBase: null, lightBaseDark: null, sky: null,
     card: { art: null, level: null, mod: '', bw: 0, mono: false },
-    skyOpts: { austin: true, neon: 1, sky: SKY_PRESETS.night }, fog: null,
+    skyOpts: { neon: 1, sky: SKY_PRESETS.night }, fog: null,
+    theme: null,
+    tf: {
+      world: null as unknown as World, t: 0, dt: 0, alpha: 1, shake: 0, ox: 0, oy: 0, bw: 0, bh: 0, rx: 0, ry: 0, camDx: 0, camDy: 0, heroX: 0, heroY: 0, mono: false, reduced: false,
+      light: (x, y, r, color, k, halo) => { if (S) levelLight(S, x, y, r, lightCol(color, S.mono), k, 2, halo); },
+    },
     tally: { art: null, title: '', bw: 0, mono: false, t: 0 },
     wipe: { from: 0, to: 1 },
     seed: 0, motes: new Motes(lcg(19)), rainOpts: { density: 1, speed: 1, slant: SLANT },
-    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '', card: '', rims: 0, rings: 0, bats: 0, flights: 0, sky: 'night' },
+    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '', card: '', rims: 0, rings: 0, bats: 0, flights: 0, rumble: 0, sky: 'night' },
     blackout: false, flash: 0,
-    bw: 0, bh: 0, mono: false,
-    level: null, decor: null,
-    chunks: new ChunkCache<Chunk>(4, (index, reuse) => bakeChunk(reuse, s.level as Level, s.decor ?? [], index, s.mono)),
+    bw: 0, bh: 0, mono: false, q: 1,
+    level: null, decor: null, decorSrc: null, memShown: [],
+    chunks: new ChunkCache<Chunk>(4, (index, reuse) => bakeChunk(reuse, s.theme as PixelTheme, s.level as Level, s.decor ?? [], index, s.mono)),
     span: { first: 0, last: 0 },
     pre: { index: -1, col: 0, chunk: null },
     rain: new Rain(lcg(7)),
@@ -373,22 +393,27 @@ function roofHit(x: number, y: number): number {
 function col(c: string, mono: boolean): string { return mono ? toMono(c) : c; }
 function lightCol(c: string, mono: boolean): string { return mono ? '#ffffff' : c; }
 
-function ensureBuffers(s: State, m: ViewMetrics, mono: boolean, seed: number, neon: number, sky: SkyPreset) {
+function ensureBuffers(s: State, m: ViewMetrics, mono: boolean, seed: number, neon: number, sky: SkyPreset, theme: PixelTheme) {
+  if (s.theme !== theme) { s.theme = theme; s.sky = null; s.chunks.reset(); s.pre.index = -1; }
   if (s.skyOpts.neon !== neon) { s.skyOpts.neon = neon; s.sky = null; }
   if (s.skyOpts.sky !== sky) { s.skyOpts.sky = sky; s.sky = null; }
-  if (!s.main) s.main = makeCanvas(m.bw, m.bh);
-  if (!s.scene) s.scene = makeCanvas(m.bw, m.bh);
+  if (!s.main) s.main = makeCanvas(m.bw * m.q, m.bh * m.q);
+  if (!s.scene) s.scene = makeCanvas(m.bw * m.q, m.bh * m.q);
   if (!s.light) s.light = makeCanvas(m.bw, m.bh);
-  if (s.bw === m.bw && s.bh === m.bh && s.mono === mono && s.seed === seed && s.sky) return;
-  resize(s.main.canvas, m.bw, m.bh);
-  resize(s.scene.canvas, m.bw, m.bh);
+  if (!s.lightQ) s.lightQ = makeCanvas(m.bw * m.q, m.bh * m.q);
+  if (s.bw === m.bw && s.bh === m.bh && s.q === m.q && s.mono === mono && s.seed === seed && s.sky) return;
+  // the frame and the playfield hold q sub-pixels per art pixel; the light map stays at art resolution
+  resize(s.main.canvas, m.bw * m.q, m.bh * m.q);
+  resize(s.scene.canvas, m.bw * m.q, m.bh * m.q);
   resize(s.light.canvas, m.bw, m.bh);
+  resize(s.lightQ.canvas, m.bw * m.q, m.bh * m.q);
+  s.q = m.q;
   s.main.ctx.imageSmoothingEnabled = false;
   s.scene.ctx.imageSmoothingEnabled = false;
   s.light.ctx.imageSmoothingEnabled = true;
-  s.sky = bakeSky(m.bw, m.bh, mono, seed, SKY_TEXT, s.skyOpts);
+  s.sky = theme.sky(m.bw, m.bh, mono, seed, s.skyOpts);
   s.seed = seed;
-  s.lightBase = bakeLightBase(m.bw, m.bh, mono, sky.ambient, sky.glow, sky.cityGlow);
+  s.lightBase = bakeLightBase(m.bw, m.bh, mono, theme.ambient ?? sky.ambient, sky.glow, theme.cityGlow ?? sky.cityGlow);
   s.fog = sky.fog > 0 ? bakeFog(m.bw, m.bh, mono, sky) : null;
   s.lightBaseDark = bakeLightBase(m.bw, m.bh, mono, COL.ambientDark, 0.25);
   s.bw = m.bw; s.bh = m.bh;
@@ -434,8 +459,6 @@ function bakeLightBase(w: number, h: number, mono: boolean, ambient: string, glo
   ctx.globalCompositeOperation = 'source-over';
   return canvas;
 }
-
-const SKY_TEXT = { draw: (c: Ctx, t: string, x: number, y: number) => drawText(c, t, x, y), width: (t: string) => textWidth(t) };
 
 function mod(a: number, m: number) { return ((a % m) + m) % m; }
 
@@ -488,7 +511,7 @@ function clamp01(x: number) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 function stripY(s: State, layer: SkyLayer, ry: number): number {
   const viewH = s.m.dh / s.m.k;
   const ry0 = LEVEL_H - viewH;
-  return Math.round(viewH + (ry0 - ry) * layer.f + layer.f * 18) - layer.h;
+  return Math.round((viewH + (ry0 - ry) * layer.f + layer.f * 18) * s.q) / s.q - layer.h;
 }
 
 function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, reduced: boolean, mono: boolean) {
@@ -512,11 +535,11 @@ function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, red
 
   const cl = sky.clouds;
   const drift = reduced ? 0 : t * (s.rainOpts.density > 1 ? 5 : 1.5);
-  drawStrip(c, cl, -mod(Math.floor(rx * cl.f + drift), STRIP_W), Math.round(s.bh * 0.3), s.bw);
+  drawStrip(c, cl, -mod(Math.floor((rx * cl.f + drift) * s.q) / s.q, STRIP_W), Math.round(s.bh * 0.3), s.bw);
 
   for (let li = 0; li < sky.layers.length; li++) {
     const L = sky.layers[li];
-    const x0 = -mod(Math.floor(rx * L.f), STRIP_W);
+    const x0 = -mod(Math.floor(rx * L.f * s.q) / s.q, STRIP_W);
     const y0 = stripY(s, L, ry);
     drawStrip(c, L, x0, y0, s.bw);
   }
@@ -532,7 +555,7 @@ function drawBackgroundGlow(c: Ctx, s: State, rx: number, ry: number, t: number,
   if (s.flash > 0.5) drawBolt(c, s, t, s.flash, mono);
   for (let li = 0; li < sky.layers.length; li++) {
     const L = sky.layers[li];
-    const x0 = -mod(Math.floor(rx * L.f), STRIP_W);
+    const x0 = -mod(Math.floor(rx * L.f * s.q) / s.q, STRIP_W);
     const y0 = stripY(s, L, ry);
     if (!s.blackout) {
       if (L.glow) {
@@ -631,6 +654,23 @@ function drawLayerGlow(c: Ctx, s: State, L: SkyLayer, li: number, x0: number, y0
       c.drawImage(lightSprite(lightCol(COL.red, mono)), x - 4, y0 + b.y - 4, 9, 9);
     }
   }
+  const bs = L.beacons;
+  if (bs) {
+    for (let i = 0; i < bs.length; i++) {
+      const b = bs[i];
+      const ph = mod(t + b.seed, b.strobe ? 1.3 : 1);
+      if (b.strobe ? !(ph < 0.06 || (ph > 0.14 && ph < 0.2)) : ph >= 0.5) continue;
+      const color = lightCol(b.color, mono);
+      for (let x = x0 + b.x; x < s.bw; x += STRIP_W) {
+        if (x < -6) continue;
+        c.globalAlpha = 1;
+        c.fillStyle = color;
+        c.fillRect(x, y0 + b.y, 1, 1);
+        c.globalAlpha = b.strobe ? 0.8 : 0.55;
+        c.drawImage(lightSprite(color), x - 6, y0 + b.y - 6, 13, 13);
+      }
+    }
+  }
   c.globalAlpha = 1;
   c.globalCompositeOperation = 'source-over';
 }
@@ -644,7 +684,7 @@ function prefetchChunk(s: State, level: Level, dir: number, lastChunk: number) {
   const p = s.pre;
   if (p.index !== next) { p.index = next; p.col = 0; }
   const to = Math.min(CHUNK_COLS, p.col + PREFETCH_COLS);
-  p.chunk = bakeChunkPart(p.chunk, level, s.decor ?? [], next, s.mono, p.col, to);
+  p.chunk = bakeChunkPart(p.chunk, s.theme as PixelTheme, level, s.decor ?? [], next, s.mono, p.col, to);
   p.col = to;
   if (to < CHUNK_COLS) return;
   p.chunk = s.chunks.adopt(next, p.chunk);
@@ -665,7 +705,8 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
   for (let ty = r0; ty <= r1; ty++) {
     for (let tx = c0; tx <= c1; tx++) {
       const k = KIND[w.tiles[ty * cols + tx]];
-      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY) continue;
+      // walkways and thin clouds belong to the theme's own tile layer
+      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY || k === K.WALK || k === K.PUFF) continue;
       const x = tx * ART_TILE - s.ox, y = ty * ART_TILE - s.oy;
       if (k === K.COIN || k === K.SIGMA) {
         if (!coin) continue;
@@ -684,7 +725,7 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
         continue;
       }
       if (k === K.CRACK) {
-        if (layer === 'base') drawCrack(c, ta, x, y, tx, ty, s.mono);
+        if (layer === 'base' && !(s.theme as PixelTheme).drawsCracks) drawCrack(c, ta, x, y, tx, ty, s.mono);
         continue;
       }
       if (k === K.CRATE) {
@@ -736,34 +777,77 @@ function drawShots(c: Ctx, s: State, w: World, layer: 'base' | 'glow') {
   }
 }
 
-/** Animated decor (neon signs, the goal beacon), base or glow layer, and their lights. */
-function drawDecor(c: Ctx, s: State, w: World, layer: 'base' | 'glow', t: number, reduced: boolean) {
+/** Animated decor (the breakable sign, the goal, anything whose art moves), base or glow layer, and their lights. */
+function drawDecor(c: Ctx, s: State, w: World, th: PixelTheme, layer: 'base' | 'glow', t: number, reduced: boolean) {
   const list = decorOf(w);
-  let beacon = false;
+  const goalKind = th.goal.kind;
+  let goal = false;
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
-    if (d.kind === 'goalBeacon') beacon = true;
-    if (d.kind !== 'neonSign' && d.kind !== 'goalBeacon') continue;
-    const a = d.kind === 'neonSign' ? atlas(signSet(signWord(s.seed, w.levelIndex, i)), s.mono, ROOF_GLOW) : decorAtlas(d.kind, s.mono);
+    if (d.kind === goalKind) goal = true;
+    if (th.frontDecor?.[d.kind]) continue;
+    const sign = d.kind === 'neonSign';
+    if (!sign && d.kind !== goalKind && isStaticDecor(th, d.kind)) continue;
+    const a = sign ? atlas(th.sign(s.seed, w.levelIndex, i), s.mono, th.glow) : decorAtlas(th, d.kind, s.mono);
     if (!a) continue;
     const x = Math.round(d.x * ART_TILE) - s.ox;
     const bottom = Math.round(decorBottom(d) * ART_TILE) - s.oy;
     if (x > s.bw || x + a.w < 0) continue;
-    drawDecorPiece(c, s, a, d.kind, x, bottom, i, layer, t, reduced);
+    if (sign) drawSign(c, s, th, a, x, bottom, i, layer, t, reduced);
+    else if (d.kind === goalKind) drawGoalPiece(c, s, w, th, a, x, bottom, layer, t, reduced);
+    else drawFrame(c, a, 'idle', decorFrame(th, d.kind, i, reduced ? 0 : t), x, bottom, 1, layer);
   }
-  // A level without a beacon in its decor ends at the flag pole: put the beacon there.
-  if (!beacon) {
+  // A level without its goal in the decor ends at the goal (or the flag pole): put it there.
+  if (!goal) {
     const g = (w.level as { goal?: { x: number; top: number; base: number } }).goal ?? w.level.pole;
-    const a = decorAtlas('goalBeacon', s.mono);
+    const a = decorAtlas(th, goalKind, s.mono);
     if (!a) return;
     const x = g.x * ART_TILE - s.ox, floor = (g.base + 1) * ART_TILE - s.oy;
     if (x > s.bw || x + a.w < 0) return;
-    // The lamp sits at the goal's top; a taller goal gets a longer mast down to the roof.
-    const top = Math.min(g.top * ART_TILE - s.oy, floor - a.h);
-    const bottom = top + a.h;
-    if (layer === 'base' && floor > bottom) drawMast(c, x, bottom - 2, floor, s.mono);
-    drawDecorPiece(c, s, a, 'goalBeacon', x, bottom, 99, layer, t, reduced);
+    if (th.goal.mast) {
+      // The lamp sits at the goal's top; a taller goal gets a longer mast down to the roof.
+      const top = Math.min(g.top * ART_TILE - s.oy, floor - a.h);
+      const bottom = top + a.h;
+      if (layer === 'base' && floor > bottom) drawMast(c, x, bottom - 2, floor, s.mono);
+      drawGoalPiece(c, s, w, th, a, x, bottom, layer, t, reduced);
+    } else drawGoalPiece(c, s, w, th, a, x, floor, layer, t, reduced);
   }
+}
+
+/** Decor she passes behind (a cloud that only looks solid): drawn over her, lit like the playfield. */
+function drawFrontDecor(c: Ctx, s: State, w: World, th: PixelTheme, layer: 'base' | 'glow') {
+  const list = decorOf(w);
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i];
+    if (!th.frontDecor?.[d.kind]) continue;
+    const a = decorAtlas(th, d.kind, s.mono);
+    if (!a) continue;
+    const x = Math.round(d.x * ART_TILE) - s.ox, bottom = Math.round(decorBottom(d) * ART_TILE) - s.oy;
+    if (x > s.bw || x + a.w < 0) continue;
+    drawFrame(c, a, 'idle', decorFrame(th, d.kind, i, 0), x, bottom, 1, layer);
+  }
+}
+
+/** Memories not tucked inside front decor (those show only their warm light through it). */
+function unhidden(s: State, w: World, th: PixelTheme, list: readonly Memory[]): readonly Memory[] {
+  const out = s.memShown;
+  out.length = 0;
+  const decor = decorOf(w);
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i];
+    const mx = (m.x + 0.5) * ART_TILE, my = (m.y + 0.5) * ART_TILE;
+    let hidden = false;
+    for (let j = 0; j < decor.length && !hidden; j++) {
+      const d = decor[j];
+      if (!th.frontDecor?.[d.kind]) continue;
+      const set = th.decor[d.kind];
+      if (!set) continue;
+      const left = d.x * ART_TILE, bottom = decorBottom(d) * ART_TILE;
+      hidden = mx >= left + 2 && mx <= left + set.size.w - 2 && my <= bottom && my >= bottom - set.size.h + 2;
+    }
+    if (!hidden) out.push(m);
+  }
+  return out;
 }
 
 /** The beacon's lattice mast, continued below the sprite: three tones and a rung every 6 px. */
@@ -780,58 +864,83 @@ function drawMast(c: Ctx, x: number, from: number, to: number, mono: boolean) {
   c.fillStyle = l; c.fillRect(x + 1, to - 1, 7, 1);
 }
 
-function drawDecorPiece(c: Ctx, s: State, a: Atlas, kind: string, x: number, bottom: number, seed: number, layer: 'base' | 'glow', t: number, reduced: boolean) {
-  if (kind === 'neonSign') {
-    // In a blackout the sign is dead but for a rare sputter.
-    const k = s.blackout ? (flicker(t * 0.5, seed + 0.9) < 1 ? 0.6 : 0) : reduced ? 1 : flicker(t * 0.8, seed + 0.37);
-    drawFrame(c, a, 'idle', k < 1 ? 1 : 0, x, bottom, 1, layer);
-    if (s.blackout && k === 0) return;
-    if (layer === 'base') {
-      // the level's own light sits at the sign's left end; this one fills the middle
-      levelLight(s, x + 24, bottom - 8, 40, lightCol(COL.magenta, s.mono), 0.6 * Math.max(0.25, k), 2, 0);
-    } else if (k > 0) {
-      c.globalCompositeOperation = 'lighter';
-      c.globalAlpha = 0.32 * k;
-      c.drawImage(lightSprite(lightCol(COL.magenta, s.mono)), x - 14, bottom - 30, 76, 44);
-      c.globalAlpha = 1;
-      c.globalCompositeOperation = 'source-over';
-    }
-  } else {
-    drawFrame(c, a, 'idle', reduced ? 0 : t * 6, x, bottom, 1, layer);
-    if (layer === 'base') {
-      // the lamp's light comes from the level; the flag adds a magenta wash and the lamp a halo
-      levelLight(s, x + 4, bottom - 61, 10, lightCol(COL.cyan, s.mono), 0.8, 3, 0.8);
-      levelLight(s, x + 12, bottom - 52, 34, lightCol(COL.magenta, s.mono), 0.8, 2, 0.35);
-    }
+/**
+ * The frame of animated decor: its own timeline, or (a theme's animDecor)
+ * a cycle of `frames` at `fps`, the decoration's index picking the cycle.
+ */
+function decorFrame(th: PixelTheme, kind: string, i: number, t: number): number {
+  const cyc = th.animDecor?.[kind];
+  const phase = t + i * 0.37;
+  if (!cyc) return phase * (th.decor[kind]?.anims.idle.fps ?? 0);
+  const total = th.decor[kind]?.anims.idle.frames.length ?? cyc.frames;
+  const cycles = Math.max(1, Math.floor(total / cyc.frames));
+  return (i % cycles) * cyc.frames + (Math.floor(phase * cyc.fps) % cyc.frames);
+}
+
+function drawSign(c: Ctx, s: State, th: PixelTheme, a: Atlas, x: number, bottom: number, seed: number, layer: 'base' | 'glow', t: number, reduced: boolean) {
+  // In a blackout the sign is dead but for a rare sputter.
+  const k = s.blackout ? (flicker(t * 0.5, seed + 0.9) < 1 ? 0.6 : 0) : reduced ? 1 : flicker(t * 0.8, seed + 0.37);
+  drawFrame(c, a, 'idle', k < 1 ? 1 : 0, x, bottom, 1, layer);
+  if (s.blackout && k === 0) return;
+  const color = lightCol(th.signLight, s.mono);
+  if (layer === 'base') {
+    // the level's own light sits at the sign's left end; this one fills the middle
+    levelLight(s, x + 24, bottom - 8, 40, color, 0.6 * Math.max(0.25, k), 2, 0);
+  } else if (k > 0) {
+    c.globalCompositeOperation = 'lighter';
+    c.globalAlpha = 0.32 * k;
+    c.drawImage(lightSprite(color), x - 14, bottom - 30, 76, 44);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
   }
 }
 
-/** Static decor still casts light: water tower lamps, antenna beacons. */
-function decorLights(s: State, w: World, t: number) {
+/** The goal: looping, or (fps 0) its frames played once as she comes near; plus its lights. */
+function drawGoalPiece(c: Ctx, s: State, w: World, th: PixelTheme, a: Atlas, x: number, bottom: number, layer: 'base' | 'glow', t: number, reduced: boolean) {
+  const g = th.goal;
+  let frame = 0;
+  if (g.fps > 0) frame = reduced ? 0 : t * g.fps;
+  else {
+    const n = a.rects.idle ? a.rects.idle.length : 1;
+    const dist = Math.abs(x + a.w / 2 - (w.hero.x + w.hero.w / 2) * ART_TILE + s.ox) / ART_TILE;
+    frame = Math.max(0, Math.min(n - 1, Math.floor(((14 - dist) / 10) * n)));
+  }
+  drawFrame(c, a, 'idle', frame, x, bottom, 1, layer);
+  if (layer !== 'base') return;
+  for (let i = 0; i < g.lights.length; i++) {
+    const L = g.lights[i];
+    levelLight(s, x + L.dx, bottom + L.dy, L.r, lightCol(L.color, s.mono), L.k, L.priority, L.halo);
+  }
+}
+
+/** Static decor still casts light: water tower lamps, antenna beacons, wing lights. */
+function decorLights(s: State, w: World, th: PixelTheme, t: number) {
   const list = decorOf(w);
+  const table = th.decorLights;
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
+    const L = table[d.kind];
+    if (!L) continue;
     const x = d.x * ART_TILE - s.ox;
     if (x > s.bw + 40 || x < -80) continue;
     const bottom = decorBottom(d) * ART_TILE - s.oy;
-    if (d.kind === 'antenna') {
-      const on = mod(t * 0.8 + i * 0.37, 1) < 0.5;
-      levelLight(s, x + 7.5, bottom - 47, on ? 20 : 10, lightCol(COL.red, s.mono), on ? 0.9 : 0.35, 1, on ? 0.6 : 0.15);
-    } else if (d.kind === 'waterTower') {
-      levelLight(s, x + 13, bottom - 46, 18, lightCol(COL.sodium, s.mono), 0.7, 1, 0.4);
-    }
+    const color = lightCol(L.colors[i % L.colors.length], s.mono);
+    if (L.blink > 0) {
+      const on = mod(t * L.blink + i * 0.37, 1) < 0.5;
+      levelLight(s, x + L.dx, bottom + L.dy, on ? L.r : L.r * 0.5, color, on ? L.k : 0.35, 1, on ? L.halo : L.halo * 0.25);
+    } else levelLight(s, x + L.dx, bottom + L.dy, L.r, color, L.k, 1, L.halo);
   }
 }
 
-function drawCheckpoint(c: Ctx, s: State, w: World, layer: 'base' | 'glow') {
+function drawCheckpoint(c: Ctx, s: State, w: World, th: PixelTheme, layer: 'base' | 'glow') {
   const cp = w.level.checkpoint;
   if (!cp) return;
-  const a = decorAtlas('antenna', s.mono);
+  const a = decorAtlas(th, th.checkpoint, s.mono);
   if (!a) return;
   const x = cp.x * ART_TILE - s.ox, bottom = cp.y * ART_TILE - s.oy;
   if (x > s.bw || x + a.w < 0) return;
   drawFrame(c, a, 'idle', 0, x, bottom, 1, layer);
-  if (layer === 'base') levelLight(s, x + 7.5, bottom - 46, w.checkpointHit ? 40 : 16, lightCol(w.checkpointHit ? COL.cyan : COL.red, s.mono), w.checkpointHit ? 1 : 0.5, 2, 0.5);
+  if (layer === 'base') levelLight(s, x + a.w / 2 - 0.5, bottom - (a.h - 2), w.checkpointHit ? 40 : 16, lightCol(w.checkpointHit ? COL.cyan : COL.red, s.mono), w.checkpointHit ? 1 : 0.5, 2, 0.5);
 }
 
 function drawPlatforms(c: Ctx, s: State, w: World, ta: Atlas, a: number) {
@@ -843,9 +952,10 @@ function drawPlatforms(c: Ctx, s: State, w: World, ta: Atlas, a: number) {
   }
 }
 
-function drawEnemies(c: Ctx, s: State, w: World, a: number, t: number, layer: 'base' | 'glow') {
-  const drone = atlas(ENEMIES.adDrone, s.mono, ENEMY_GLOW);
-  const crawler = atlas(ENEMIES.doomCrawler, s.mono, ENEMY_GLOW);
+function drawEnemies(c: Ctx, s: State, w: World, th: PixelTheme, a: number, t: number, layer: 'base' | 'glow') {
+  const fly = th.enemies.flyer, walk = th.enemies.walker;
+  const drone = atlas(fly.set, s.mono, fly.glow);
+  const crawler = atlas(walk.set, s.mono, walk.glow);
   for (let i = 0; i < w.enemies.length; i++) {
     const e = w.enemies[i];
     const ex = Math.round((e.px + (e.x - e.px) * a + e.w / 2) * ART_TILE) - s.ox;
@@ -858,7 +968,7 @@ function drawEnemies(c: Ctx, s: State, w: World, a: number, t: number, layer: 'b
     if (dead) c.globalAlpha = clamp01(e.deadT / 0.45);
     if (isDrone) {
       const mode = (e as { mode?: string }).mode;
-      const anim = dead ? 'dead' : (mode ? mode === 'dive' : e.vy > 2) ? 'dive' : 'hover';
+      const anim = dead ? fly.dead : (mode ? mode === 'dive' : e.vy > 2) ? 'dive' : fly.move;
       drawFrame(c, drone, anim, t * 12 + i, ex, ey, e.dir, layer);
       if (elite && layer === 'base') {
         // the rare gold drone: the same body washed in gold
@@ -867,10 +977,10 @@ function drawEnemies(c: Ctx, s: State, w: World, a: number, t: number, layer: 'b
         drawTinted(c, drone, tinted(drone, col(COL.elite, s.mono)), anim, t * 12 + i, ex, ey, e.dir);
         c.globalCompositeOperation = 'source-over';
       }
-      if (layer === 'base' && !dead) levelLight(s, ex, ey - 8, elite ? 28 : 20, lightCol(elite ? COL.elite : COL.screen, s.mono), elite ? 0.9 : 0.7, elite ? 1 : 0, elite ? 0.6 : 0.45);
+      if (layer === 'base' && !dead) levelLight(s, ex, ey - 8, elite ? 28 : 20, lightCol(elite ? COL.elite : fly.light, s.mono), elite ? 0.9 : 0.7, elite ? 1 : 0, elite ? 0.6 : 0.45);
     } else {
-      drawFrame(c, crawler, dead ? 'squashed' : 'walk', t * 8 + i * 0.5, ex, ey, e.dir, layer);
-      if (layer === 'base' && !dead) levelLight(s, ex + e.dir * 3, ey - 6, 14, lightCol(COL.red, s.mono), 0.8, 0, 0.5);
+      drawFrame(c, crawler, dead ? walk.dead : walk.move, t * 8 + i * 0.5, ex, ey, e.dir, layer);
+      if (layer === 'base' && !dead) levelLight(s, ex + e.dir * 3, ey - 6, 14, lightCol(walk.light, s.mono), 0.8, 0, 0.5);
     }
     c.globalAlpha = 1;
   }
@@ -936,6 +1046,7 @@ function coinLights(s: State, w: World, double: boolean) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface HeroDraw { x: number; y: number; neckX: number; neckY: number; facing: 1 | -1; anim: string; frame: number; dw: number; dh: number; visible: boolean }
+const PLACE: Placement = { hx: 0, hy: 0, camX: 0, camY: 0, anchorX: 0, anchorY: 0, rx: 0, ry: 0 };
 const HD: HeroDraw = { x: 0, y: 0, neckX: 0, neckY: 0, facing: 1, anim: 'idle', frame: 0, dw: 0, dh: 0, visible: true };
 
 function poseHero(s: State, w: World, feetX: number, feetY: number): HeroDraw {
@@ -1068,16 +1179,26 @@ function lightPass(bg: Ctx, sc: Buffers, s: State) {
   bg.globalCompositeOperation = 'multiply';
   bg.drawImage(L.canvas, 0, 0);
   bg.globalCompositeOperation = 'source-over';
-  lc.globalCompositeOperation = 'destination-in';
-  lc.drawImage(sc.canvas, 0, 0);
-  lc.globalCompositeOperation = 'source-over';
+  // The playfield mask is cut at the playfield's own resolution: the light map
+  // is blown up to it first, so a sprite edge on a sub-pixel never lets the
+  // light colour leak round it as a pale outline.
+  const Q = s.lightQ as Buffers;
+  const qc = Q.ctx;
+  qc.setTransform?.(1, 0, 0, 1, 0, 0);
+  qc.imageSmoothingEnabled = false;
+  qc.globalAlpha = 1;
+  qc.globalCompositeOperation = 'copy';
+  qc.drawImage(L.canvas, 0, 0, Q.canvas.width, Q.canvas.height);
+  qc.globalCompositeOperation = 'destination-in';
+  qc.drawImage(sc.canvas, 0, 0);
+  qc.globalCompositeOperation = 'source-over';
   sc.ctx.globalCompositeOperation = 'multiply';
-  sc.ctx.drawImage(L.canvas, 0, 0);
+  sc.ctx.drawImage(Q.canvas, 0, 0, s.bw, s.bh);
   sc.ctx.globalCompositeOperation = 'source-over';
 }
 
-/** Puddles mirror the strongest light near them in a one or two pixel strip, shimmering. */
-function drawPuddles(c: Ctx, s: State, lastChunk: number, t: number, reduced: boolean, mono: boolean) {
+/** Puddles (and polished floors) mirror the strongest light near them in a one or two pixel strip, shimmering. */
+function drawPuddles(c: Ctx, s: State, lastChunk: number, t: number, reduced: boolean, mono: boolean, rainy: boolean) {
   const slots = s.lights.slots;
   const sky = mono ? '#5a5a62' : '#3a3466';
   for (let ci = s.span.first; ci <= Math.min(s.span.last, lastChunk); ci++) {
@@ -1102,7 +1223,7 @@ function drawPuddles(c: Ctx, s: State, lastChunk: number, t: number, reduced: bo
       c.globalAlpha *= 0.45;
       c.fillRect(x + 2, y + 1, w - 4, 1);
       // a raindrop ringing the puddle now and then
-      if (!reduced && hash2(Math.floor(t * 12), i * 7 + ci) < 0.06) {
+      if (rainy && !reduced && hash2(Math.floor(t * 12), i * 7 + ci) < 0.06) {
         c.globalAlpha = 0.8;
         c.fillStyle = mono ? '#ffffff' : '#dfe6ff';
         c.fillRect(x + 1 + Math.floor(hash2(i, Math.floor(t * 12)) * (w - 2)), y, 1, 1);
@@ -1251,9 +1372,17 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   const m = viewMetrics(v.w, v.h, dpr, s.m);
   const mono = v.mono, reduced = v.reduced;
   const seed = seedOf(world);
+  const th = themeFor(world.level.theme);
+  if (!th) {
+    // its art is still on the way: a plain dark frame until it lands
+    loadTheme(world.level.theme).catch(() => {});
+    drawPlain(ctx, s, m, v);
+    return;
+  }
   // Sixth Street (story 1-2) gets the dense neon
   const sky = skyOf(world.level);
-  ensureBuffers(s, m, mono, seed, (world as unknown as { levelId?: string | null }).levelId === '1-2' ? 2.5 : 1, sky);
+  ensureBuffers(s, m, mono, seed, (world as unknown as { levelId?: string | null }).levelId === '1-2' ? 2.5 : 1, sky, th);
+  const rainy = th.weather === 'rain';
   const modifier = modifierOf(world);
   s.blackout = modifier === 'blackout';
   const storm = modifier === 'storm', lowG = modifier === 'lowGravity';
@@ -1273,19 +1402,21 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   st.signText = signWord(seed, world.levelIndex, 0);
   const level = world.level;
   const decor = decorOf(world);
-  if (s.level !== level || s.decor !== decor) { s.level = level; s.decor = decor; s.chunks.reset(); s.pre.index = -1; }
+  if (s.level !== level || s.decorSrc !== decor) {
+    s.level = level; s.decorSrc = decor;
+    // the theme's set dressing (a carousel in the baggage hall) bakes with the level's decor
+    s.decor = th.dressing ? decor.concat(th.dressing(level)) : decor;
+    s.chunks.reset(); s.pre.index = -1;
+  }
   s.tiles = world.tiles; s.cols = level.cols;
 
   const a = clamp01(v.alpha);
   const t = world.t;
   const h = world.hero;
-  const hx = world.heroPx + (h.x - world.heroPx) * a, hy = world.heroPy + (h.y - world.heroPy) * a;
-  const cam = world.cam;
-  const camX = (cam.px + (cam.x - cam.px) * a) * ART_TILE, camY = (cam.py + (cam.y - cam.py) * a) * ART_TILE;
-  const anchorX = (hx + h.w / 2) * ART_TILE, anchorY = (hy + h.h) * ART_TILE;
-  const rx = renderCam(camX, anchorX, clamp01((Math.abs(h.vx) - 0.5) / 2));
-  const ry = renderCam(camY, anchorY, clamp01((Math.abs(h.vy) - 0.5) / 3));
-  blitOrigin(s.bx, rx, m.k); blitOrigin(s.by, ry, m.k);
+  const pl = placeFrame(world, a, PLACE, m.q);
+  const hx = pl.hx;
+  const anchorX = pl.anchorX, anchorY = pl.anchorY, rx = pl.rx, ry = pl.ry;
+  blitOrigin(s.bx, rx, m.k, m.q); blitOrigin(s.by, ry, m.k, m.q);
   s.ox = s.bx.origin; s.oy = s.by.origin;
 
   let dt = t - s.lastT;
@@ -1294,21 +1425,34 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   s.world = world; s.lastT = t; s.lastRx = rx; s.lastRy = ry;
 
   const c = (s.main as Buffers).ctx;
+  // everything below draws in art pixels; the transform lays them on q sub-pixels each
+  c.setTransform?.(s.q, 0, 0, s.q, 0, 0);
+  c.imageSmoothingEnabled = false;
   c.globalCompositeOperation = 'source-over';
   c.globalAlpha = 1;
   const SC = s.scene as Buffers;
   const sc = SC.ctx;
+  sc.setTransform?.(s.q, 0, 0, s.q, 0, 0);
+  sc.imageSmoothingEnabled = false;
   sc.globalCompositeOperation = 'source-over';
   sc.globalAlpha = 1;
   sc.clearRect(0, 0, s.bw, s.bh);
   s.lights.begin(0, 0, s.bw, s.bh, Math.round(anchorX) - s.ox, Math.round(anchorY) - s.oy - 12);
 
+  const tf = s.tf;
+  tf.world = world; tf.t = t; tf.dt = dt; tf.ox = s.ox; tf.oy = s.oy; tf.bw = s.bw; tf.bh = s.bh;
+  tf.rx = rx; tf.ry = ry; tf.camDx = camDx; tf.camDy = camDy; tf.mono = mono; tf.reduced = reduced;
+  tf.heroX = snapTo(anchorX, m.q) - s.ox; tf.heroY = snapTo(anchorY, m.q) - s.oy;
+  tf.shake = 0; tf.alpha = a;
+  const layers = th.layers;
+
   // ── back to front ──
   drawBackground(c, s, rx, ry, t, reduced, mono);
+  if (layers?.back) layers.back(c, tf);
   if (s.fog) c.drawImage(s.fog, 0, 0);
-  s.rain.update(dt, s.bw, s.bh, camDx, camDy, reduced, roofHit, ro);
-  s.motes.update(dt, s.bw, s.bh, camDx, camDy, lowG, reduced);
-  s.rain.draw(c, false, mono);
+  if (rainy) s.rain.update(dt, s.bw, s.bh, camDx, camDy, reduced, roofHit, ro);
+  s.motes.update(dt, s.bw, s.bh, camDx, camDy, lowG || th.weather === 'motes', reduced);
+  if (rainy) s.rain.draw(c, false, mono);
 
   chunkRange(s.span, s.ox, s.bw);
   const lastChunk = Math.floor((level.cols - 1) / CHUNK_COLS);
@@ -1316,13 +1460,14 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
     sc.drawImage(s.chunks.get(i).base, i * CHUNK_PX - s.ox, -s.oy);
   }
   prefetchChunk(s, level, h.vx >= 0 ? 1 : -1, lastChunk);
-  const ta = tileAtlas(mono);
+  const ta = tileAtlas(th, mono);
   drawDynamicTiles(sc, s, world, ta, 'base', t);
+  if (layers?.tiles) layers.tiles(sc, tf, 'base');
   drawPlatforms(sc, s, world, ta, a);
-  drawCheckpoint(sc, s, world, 'base');
-  drawDecor(sc, s, world, 'base', t, reduced);
-  decorLights(s, world, t);
-  drawEnemies(sc, s, world, a, t, 'base');
+  drawCheckpoint(sc, s, world, th, 'base');
+  drawDecor(sc, s, world, th, 'base', t, reduced);
+  decorLights(s, world, th, t);
+  drawEnemies(sc, s, world, th, a, t, 'base');
   drawShots(sc, s, world, 'base');
   drawPickups(sc, s, world, t, reduced, 'base');
   drawShrines(sc, shrinesOf(world), s.ox, s.oy, s.bw, t, reduced, mono, shrineLight);
@@ -1335,7 +1480,7 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   }
 
   const hero = atlas(HERO, mono, HERO_GLOW);
-  const hd = poseHero(s, world, Math.round(anchorX) - s.ox, Math.round(anchorY) - s.oy);
+  const hd = poseHero(s, world, snapTo(anchorX, m.q) - s.ox, snapTo(anchorY, m.q) - s.oy);
   const ready = dashReadyOf(world);
   if (s.pendingFlick) { s.flickAt = t; s.pendingFlick = false; }
   const n = scarfPoints(s, world, hd, t, reduced);
@@ -1353,6 +1498,7 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
     sc.globalAlpha = 1;
     drawFrame(sc, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'base', hd.dw, hd.dh);
   }
+  if (th.frontDecor) drawFrontDecor(sc, s, world, th, 'base');
   // wall slide sparks at the hand on the wall
   s.sparkAcc += dt;
   if (s.pose.state === 'wallSlide' && s.sparkAcc > 0.05 && !reduced) {
@@ -1377,6 +1523,7 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   chunkLamps(s, lastChunk);
   lightPass(c, SC, s);
   drawBackgroundGlow(c, s, rx, ry, t, reduced, mono);
+  if (layers?.backGlow) layers.backGlow(c, tf);
 
   // ── emissive: what glows stays bright through the darkness ──
   if (!s.blackout) {
@@ -1384,23 +1531,25 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
       sc.drawImage(s.chunks.get(i).glow, i * CHUNK_PX - s.ox, -s.oy);
     }
   }
-  drawPuddles(sc, s, lastChunk, t, reduced, mono);
+  drawPuddles(sc, s, lastChunk, t, reduced, mono, rainy);
   st.rims = s.blackout ? drawBlackoutRims(sc, s, ta, lastChunk, mono) : 0;
   drawDynamicTiles(sc, s, world, ta, 'glow', t);
-  drawCheckpoint(sc, s, world, 'glow');
-  drawDecor(sc, s, world, 'glow', t, reduced);
-  drawEnemies(sc, s, world, a, t, 'glow');
+  if (layers?.tiles) layers.tiles(sc, tf, 'glow');
+  drawCheckpoint(sc, s, world, th, 'glow');
+  drawDecor(sc, s, world, th, 'glow', t, reduced);
+  drawEnemies(sc, s, world, th, a, t, 'glow');
   drawShots(sc, s, world, 'glow');
   drawPickups(sc, s, world, t, reduced, 'glow');
   drawAfterimages(sc, s, world, hero);
-  drawMemories(sc, memories, s.ox, s.oy, s.bw, t, reduced, mono, NO_LIGHT);
+  drawMemories(sc, th.frontDecor ? unhidden(s, world, th, memories) : memories, s.ox, s.oy, s.bw, t, reduced, mono, NO_LIGHT);
+  if (th.frontDecor) drawFrontDecor(sc, s, world, th, 'glow');
   if (hd.visible) {
     if (ready || unlockAge >= 0) drawScarf(sc, s, n, '', col(COL.scarfHot, mono), true);
     drawFrame(sc, hero, hd.anim, hd.frame, hd.x, hd.y, hd.facing, 'glow', hd.dw, hd.dh);
     drawSmear(sc, s.pose.state, s.pose.animT, hd.x, hd.y, hd.facing, mono);
     if (pw) drawPowerRing(sc, hd.x, hd.y - 11, pw.t / pw.total, lightCol(POWER_COLOR[pw.kind] ?? COL.violet, mono), t, reduced);
   }
-  c.drawImage(SC.canvas, 0, 0);
+  c.drawImage(SC.canvas, 0, 0, s.bw, s.bh);
   haloPass(c, s);
 
   st.rings = drawRings(c, s, t, mono);
@@ -1412,7 +1561,8 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   s.sparks.draw(c, s.ox, s.oy, mono);
   s.motes.draw(c, mono);
   drawParticles(c, s, juice, mono);
-  s.rain.draw(c, true, mono);
+  if (rainy) s.rain.draw(c, true, mono);
+  if (layers?.front) layers.front(c, tf);
   screenEffects(c, s, world, t, reduced);
   if (s.action.flashAge(t) >= 0 && !reduced) {
     c.globalCompositeOperation = 'lighter';
@@ -1429,10 +1579,10 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   if (v.story) drawStoryCard(c, v.story, s.bw, s.bh, t, reduced, mono);
   if (v.notice) drawNotice(c, v.notice.title, v.notice.line, lightCol(v.notice.accent, mono), s.bw, s.bh, mono);
   st.lights = s.lights.count;
-  st.rain = s.rain.active;
+  st.rain = rainy ? s.rain.active : 0;
   let sum = 0;
-  for (let i = 0; i < s.rain.active; i++) sum += s.rain.streaks[i].speed;
-  st.rainSpeed = s.rain.active ? sum / s.rain.active : 0;
+  for (let i = 0; i < st.rain; i++) sum += s.rain.streaks[i].speed;
+  st.rainSpeed = st.rain ? sum / st.rain : 0;
   st.motes = s.motes.active;
 
   // ── blit: whole device pixels per art pixel, the camera fraction as an offset ──
@@ -1441,6 +1591,12 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
     const mag = juice.shakeMag * Math.min(1, juice.shakeTime / 0.18);
     shakeX = (hash2(Math.floor(t * 60), 1) * 2 - 1) * mag;
     shakeY = (hash2(Math.floor(t * 60), 2) * 2 - 1) * mag;
+  }
+  // a theme's rumble (a train passing close), never under reduced motion
+  st.rumble = reduced ? 0 : tf.shake;
+  if (tf.shake > 0 && !reduced) {
+    shakeX += (hash2(Math.floor(t * 40), 3) * 2 - 1) * tf.shake * 0.4;
+    shakeY += (hash2(Math.floor(t * 40), 4) * 2 - 1) * tf.shake;
   }
   const offX = s.bx.offset + Math.round(shakeX * dpr), offY = s.by.offset + Math.round(shakeY * dpr);
   const finale = world.phase === 'finale' || (world.phase === 'done' && world.result === 'secret');
@@ -1475,13 +1631,43 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   if (finale) drawCards(ctx, world, v, mono);
 }
 
+/** A plain dark frame (a theme still loading), on the pixel canvas or the screen. */
+function drawPlain(ctx: CanvasRenderingContext2D, s: State, m: ViewMetrics, v: PixelView) {
+  if (!s.main) s.main = makeCanvas(m.bw * m.q, m.bh * m.q);
+  if (s.bw !== m.bw || s.bh !== m.bh || s.q !== m.q) { resize(s.main.canvas, m.bw * m.q, m.bh * m.q); s.sky = null; }
+  s.bw = m.bw; s.bh = m.bh; s.q = m.q;
+  const c = s.main.ctx;
+  c.setTransform?.(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.fillStyle = '#05040b';
+  c.fillRect(0, 0, m.bw * m.q, m.bh * m.q);
+  if (v.pixel) {
+    showOnPixelCanvas(s, v.pixel, m, 0, 0);
+    if (s.overlayDirty) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, m.dw, m.dh);
+      ctx.restore();
+      s.overlayDirty = false;
+    }
+    return;
+  }
+  s.pixel = null;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(s.main.canvas, 0, 0, m.bw * m.k, m.bh * m.k);
+  ctx.restore();
+}
+
 /** Copy the frame into the pixel canvas; size it in CSS once per resize; offset it by a cached transform. */
 function showOnPixelCanvas(s: State, P: HTMLCanvasElement, m: ViewMetrics, offX: number, offY: number) {
   if (s.pixel !== P) {
     s.pixel = P; s.pixelCtx = P.getContext('2d'); s.pixelW = 0; s.pixelH = 0; s.overlayDirty = true;
   }
-  if (P.width !== s.bw) P.width = s.bw;
-  if (P.height !== s.bh) P.height = s.bh;
+  if (P.width !== s.bw * s.q) P.width = s.bw * s.q;
+  if (P.height !== s.bh * s.q) P.height = s.bh * s.q;
   const cssW = (s.bw * m.k) / m.dpr, cssH = (s.bh * m.k) / m.dpr;
   if (cssW !== s.pixelW || cssH !== s.pixelH) {
     P.style.width = `${cssW}px`;
@@ -1506,5 +1692,3 @@ export function frameStats(): FrameStats { return state().stats; }
 
 /** For tests: forget every buffer and cache. */
 export function resetWorld1() { S = null; }
-
-export { ROOFTOP_TILES };

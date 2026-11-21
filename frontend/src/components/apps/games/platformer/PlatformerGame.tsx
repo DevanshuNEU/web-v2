@@ -22,9 +22,13 @@ import { createWorld, drainEvents, score as worldScore, setSecret, stepWorld, ty
 import { POWERS, POWER_KINDS, type PowerKind } from './sim/powers';
 import { STORY, nextStoryId } from './sim/story';
 import { createMusic, type Music } from './audio/music';
+import { RELEASED_CHAPTERS, released } from './ui/release';
+import { mountMeter, pagePerf } from './ui/perf';
+import { trackForTheme } from './audio/themes';
 import { SECRET_FALLBACK } from './sim/level';
-import { drawFrame, noteEvent, rendererFor, viewTile } from './render/frame';
+import { drawFrame, noteEvent, preloadTheme, rendererFor, themeReady, viewTile } from './render/frame';
 import { POWER_COLOR } from './render/pixel/world1';
+import { viewMetrics } from './render/pixel/camera';
 import { emptyFrame, readInto, releaseAll } from './input/frame';
 import { createKeyboard } from './input/keyboard';
 import { keyboardHint } from './input/hints';
@@ -63,7 +67,7 @@ interface Hud { score: number; coins: number; lives: number; level: number; time
 type Layout = 'desktop' | 'portrait' | 'landscape';
 
 /** Story levels that exist, in play order. */
-const BUILT = STORY.filter(e => e.built).map(e => e.id);
+const BUILT = STORY.filter(released).map(e => e.id);
 const ABILITY_KEYS = ['wallJump', 'dash', 'blade'] as const;
 const POWER_LINE: Readonly<Record<PowerKind, string>> = {
   batWings: 'Hold Jump while falling to glide',
@@ -202,7 +206,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   useEffect(() => () => { musicRef.current?.dispose(); musicRef.current = null; }, []);
   const playMusic = useCallback((w: World) => {
     const m = music();
-    if (rendererFor(w.level.theme) === 'pixel') { m.play('rooftops'); m.setIntensity(1); } else m.stop();
+    if (rendererFor(w.level.theme) === 'pixel') { m.play(trackForTheme(w.level.theme)); m.setIntensity(1); } else m.stop();
   }, [music]);
   const seedRef = useRef(0);
 
@@ -266,7 +270,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     // beginner prompts: 1-1 always; other story levels where the level marks them
     const marks = (w.level as unknown as { setPieces?: { kind: string }[] }).setPieces;
     const marked = Array.isArray(marks) && marks.some(p => p.kind === 'prompt');
-    spots.current = m === 'story' && (rec.levelId === '1-1' || marked) ? promptSpots(w.level) : [];
+    spots.current = m === 'story' && (rec.levelId === '1-1' || marked) ? promptSpots(w.level, { teachHold: rec.levelId === '1-1' }) : [];
     prompts.current = [];
     setAnnounce(`${worldLine(w)} ${w.level.goal.kind === 'beacon' ? 'Run to the beacon.' : 'Run to the flag.'}`);
     setStatus('playing');
@@ -279,16 +283,25 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   }, [begin, reduced]);
 
   const startLevel = useCallback((id: string) => {
-    const p = progressRef.current;
-    const opts = {
-      mode: 'story', levelId: id, secret: secretRef.current, seed: 1, noFreeze: !!reduced,
-      abilities: p.abilities, memoriesTaken: p.memories,
-    } as WorldOptions;
-    begin(createWorld(opts), 'story', id);
+    const go = () => {
+      const p = progressRef.current;
+      const opts = {
+        mode: 'story', levelId: id, secret: secretRef.current, seed: 1, noFreeze: !!reduced,
+        abilities: p.abilities, memoriesTaken: p.memories,
+      } as WorldOptions;
+      begin(createWorld(opts), 'story', id);
+    };
+    // a chapter whose art is a lazy chunk waits for it (fetched when its card showed), so play never starts on a dark frame
+    const theme = STORY.find(e => e.id === id)?.theme;
+    if (theme && !themeReady(theme)) preloadTheme(theme).then(go, go);
+    else go();
   }, [begin, reduced]);
 
   /** Play a story level, with its chapter card first when it opens a chapter. */
   const playStory = useCallback((id: string) => {
+    // fetch the level's art while the card is read
+    const theme = STORY.find(e => e.id === id)?.theme;
+    if (theme) preloadTheme(theme).catch(() => {});
     const pre = cardIdBefore(id);
     if (pre) showCard(pre, () => startLevel(id));
     else startLevel(id);
@@ -505,6 +518,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   }, [onEvent, fitView, touch]);
 
   const render = useCallback((alpha: number) => {
+    const t0 = meterRef.current ? performance.now() : 0;
     const ctx = getCtx();
     const w = worldRef.current;
     const s = statusRef.current;
@@ -522,7 +536,21 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     const next = hudOf(w);
     if (!sameHud(next, hudRef.current)) { hudRef.current = next; setHud(next); }
     if (w.phase === 'done' && s === 'playing') finish();
+    if (meterRef.current) { const t1 = performance.now(); meterRef.current.frame(t1, t1 - t0); }
   }, [getCtx, size, mono, reduced, finish]);
+
+  // ?perf on the address: a corner speed meter for measuring on a real phone.
+  const meterRef = useRef<ReturnType<typeof mountMeter> | null>(null);
+  useEffect(() => {
+    const host = containerRef.current;
+    if (!host || !pagePerf().meter) return;
+    const m = mountMeter(host, () => {
+      const w = worldRef.current;
+      return `dpr ${size.dpr} ${size.w}x${size.h} q${viewMetrics(size.w, size.h, size.dpr).q} ${w.level.theme}${pagePerf().offscreen ? ' oc' : ''}`;
+    });
+    meterRef.current = m;
+    return () => { m.remove(); meterRef.current = null; };
+  }, [containerRef, size]);
 
   const pause = useCallback(() => {
     if (statusRef.current !== 'playing') return;
@@ -531,7 +559,9 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     setAnnounce('Paused.');
   }, [clearInput, setStatus]);
 
-  const looping = status === 'playing' || status === 'title' || status === 'map' || status === 'card';
+  // The chapter map is a scrolling list over the night: it gets a still frame,
+  // so scrolling it on a phone never competes with a 60 fps canvas behind it.
+  const looping = status === 'playing' || status === 'title' || status === 'card';
   useGameLoop({ running: looping, update, render, onHidden: pause });
 
   // Music plays only while playing: paused, cards, title and over are quiet.
@@ -678,6 +708,11 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       {status === 'over' && result && (
         <>
           <h2 className={heading}>{result.kind === 'lost' ? 'Out of lives' : result.mode === 'story' ? 'The story so far' : 'Run complete'}</h2>
+          {result.mode === 'story' && result.kind !== 'lost' && !!storyText(`chapter-${RELEASED_CHAPTERS + 1}`) && (
+            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#ffcf7a]">
+              Next: Chapter {RELEASED_CHAPTERS + 1}, {storyText(`chapter-${RELEASED_CHAPTERS + 1}`, overrides.current)}. Coming soon.
+            </p>
+          )}
           <div className="flex flex-col items-center gap-1">
             <span className="text-[clamp(1.6rem,6cqi,2.25rem)] font-semibold leading-none tabular-nums text-text">{result.score}</span>
             <span className="text-sm text-text-secondary">points{result.score > 0 && result.score >= best[result.mode] ? ', a new best' : ''}</span>

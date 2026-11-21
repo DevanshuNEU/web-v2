@@ -14,7 +14,7 @@
  */
 
 import { PHYS } from '@/components/apps/games/platformer/sim/physics';
-import { ROWS, TILE, isSolidTile, type Level } from '@/components/apps/games/platformer/sim/level';
+import { ROWS, TILE, isOneWayTile, isSolidTile, type Level } from '@/components/apps/games/platformer/sim/level';
 import { PLATFORM_AMP } from '@/components/apps/games/platformer/sim/world';
 
 interface Box { x: number; y: number; w: number; h: number }
@@ -36,6 +36,14 @@ export interface ReachOpts {
   bounces?: boolean;
   /** Record every move as an edge (for "can she always get back to the goal" checks). */
   graph?: boolean;
+  /**
+   * Ride the level's vehicles (on unless false). A lane's roof cells count as
+   * one-way floors (she can wait anywhere for the next one); standing on one
+   * she is carried to any cell further along the lane, never back.
+   */
+  vehicles?: boolean;
+  /** Cracked panels (%) count as open: a dash smashes them. Only with `dash`. */
+  smash?: boolean;
 }
 
 interface Template { pts: Float64Array }
@@ -159,12 +167,29 @@ function templates(dash: boolean, dj: boolean, generous: boolean): Templates {
  * end, she can ride to the other. Vertical platforms are left out (never
  * counted on).
  */
-function grid(level: Level) {
+function grid(level: Level, opts: ReachOpts) {
   const cols = level.cols;
   const g = new Uint8Array(cols * ROWS);
+  const smash = !!opts.smash && opts.dash;
   for (let i = 0; i < g.length; i++) {
     const t = level.tiles[i];
-    g[i] = isSolidTile(t) ? 1 : t === TILE.ONEWAY ? 2 : 0;
+    // Thin clouds count as one-way floors: she has PUFF.wobble seconds on one, plenty to jump on.
+    g[i] = smash && t === TILE.CRACK ? 0 : isSolidTile(t) ? 1 : isOneWayTile(t) ? 2 : 0;
+  }
+  /** Lane roof cells: cell index to lane number (+1); and each lane's direction. */
+  const lane = new Int16Array(cols * ROWS);
+  const laneDir: number[] = [];
+  if (opts.vehicles !== false) {
+    level.vehicles.forEach((d, i) => {
+      laneDir.push(d.dir);
+      if (d.row < 0 || d.row >= ROWS) return;
+      for (let x = Math.max(0, d.x0); x <= Math.min(cols - 1, d.x1); x++) {
+        const k = d.row * cols + x;
+        if (g[k] !== 0) continue;
+        g[k] = 2;
+        lane[k] = i + 1;
+      }
+    });
   }
   const rides = new Map<number, number[]>();
   for (const p of level.platforms) {
@@ -176,7 +201,9 @@ function grid(level: Level) {
     for (const c of b) rides.set(c * ROWS + (p.y - 1), a);
   }
   const at = (x: number, y: number) => (x < 0 || x >= cols ? 1 : y < 0 || y >= ROWS ? 0 : g[y * cols + x]);
-  return { cols, at, rides };
+  /** The lane whose roof is the cell (x, y), -1 for none. */
+  const laneAt = (x: number, y: number) => (x < 0 || x >= cols || y < 0 || y >= ROWS ? -1 : lane[y * cols + x] - 1);
+  return { cols, at, rides, laneAt, laneDir };
 }
 
 export interface ReachResult {
@@ -193,7 +220,7 @@ export interface ReachResult {
 }
 
 export function reach(level: Level, opts: ReachOpts): ReachResult {
-  const { cols, at, rides } = grid(level);
+  const { cols, at, rides, laneAt, laneDir } = grid(level, opts);
   const T = templates(opts.dash, !!opts.doubleJump, !!opts.generous);
   const targets = opts.targets ?? [];
   const touched = targets.map(() => false);
@@ -313,9 +340,17 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       touch(x + 0.5 - W / 2, y + 1);
       const ride = rides.get(x * ROWS + y);
       if (ride) for (const c of ride) if (standable(c, y)) push(c, y, 0);
+      // On a vehicle roof: carried along its lane to any cell further on.
+      const ln = laneAt(x, y + 1);
+      if (ln >= 0) {
+        const ld = laneDir[ln];
+        for (let c = x + ld; laneAt(c, y + 1) === ln; c += ld) if (standable(c, y)) push(c, y, 0);
+      }
       for (const d of [-1, 1]) {
         const di = d < 0 ? 0 : 1;
         const nx = x + d;
+        // Walking back along a moving roof only goes as far as the roof does: not modelled.
+        if (ln >= 0 && d !== laneDir[ln] && laneAt(nx, y + 1) === ln) continue;
         if (clear(nx, y)) {
           if (floorAt(nx, y + 1)) push(nx, y, 0);
           else {

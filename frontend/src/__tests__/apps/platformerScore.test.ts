@@ -23,7 +23,7 @@ const storyMax = built.reduce((s, l) => s + perfect(l), 0);
 
 describe('Main Character leaderboard cap (the leaderboard uses the fixed Story levels)', () => {
   it('covers a perfect run of every built story level and sits within 15 percent above it', () => {
-    expect(storyMax).toBe(14_860);
+    expect(storyMax).toBe(40_490);
     expect(RULES.platformer.cap).toBeGreaterThanOrEqual(storyMax);
     expect(RULES.platformer.cap).toBeLessThanOrEqual(storyMax * 1.15);
   });

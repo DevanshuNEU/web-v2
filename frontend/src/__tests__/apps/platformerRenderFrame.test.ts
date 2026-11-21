@@ -97,15 +97,16 @@ describe('render seam: routing by theme', () => {
 });
 
 describe('the pixel canvas: the low-res frame scaled by CSS, not by a full-screen blit', () => {
-  it('draws the frame into the pixel canvas at buffer size, sized and offset in CSS', () => {
+  it('draws the frame into the pixel canvas at buffer size (q sub-pixels per art pixel), sized and offset in CSS', () => {
     const scr = screen();
     const pixel = document.createElement('canvas');
     const w = rooftops();
     const v = { w: 844, h: 390, mono: false, reduced: false, alpha: 1, dpr: 3, pixel };
     drawFrame(scr as unknown as CanvasRenderingContext2D, w, v, new Juice());
     const m = viewMetrics(844, 390, 3);
-    expect(pixel.width).toBe(m.bw);
-    expect(pixel.height).toBe(m.bh);
+    expect(m.q).toBeGreaterThan(1);
+    expect(pixel.width).toBe(m.bw * m.q);
+    expect(pixel.height).toBe(m.bh * m.q);
     expect(pixel.style.width).toBe(`${(m.bw * m.k) / 3}px`);
     expect(pixel.style.transform).toMatch(/^translate\(-?[\d.]+px, -?[\d.]+px\)$/);
     // no full-screen scaled blit on the screen canvas

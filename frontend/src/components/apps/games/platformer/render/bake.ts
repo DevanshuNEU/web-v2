@@ -9,6 +9,8 @@
  */
 import type { Grid, Palette, SpriteSet } from './sprites/types';
 
+import { pagePerf } from '../ui/perf';
+
 export type BakeCanvas = HTMLCanvasElement | OffscreenCanvas;
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -26,7 +28,22 @@ export interface BakeOptions { mono?: boolean }
 
 const GUTTER = 1;
 
+/**
+ * Sheets are drawn into the frame on the main thread many times a frame, so
+ * they live on a detached <canvas> like the frame buffers: in Safari a
+ * main-thread OffscreenCanvas source can cost a copy per draw. OffscreenCanvas
+ * stays the fallback with no document, and `?perf&oc=1` forces it back, to
+ * compare on a phone.
+ */
 function makeCanvas(w: number, h: number): { canvas: BakeCanvas; ctx: Ctx2D } {
+  const offscreenFirst = typeof document === 'undefined' || pagePerf().offscreen;
+  if (!offscreenFirst) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) return { canvas, ctx };
+  }
   if (typeof OffscreenCanvas !== 'undefined') {
     const canvas = new OffscreenCanvas(w, h);
     const ctx = canvas.getContext('2d');

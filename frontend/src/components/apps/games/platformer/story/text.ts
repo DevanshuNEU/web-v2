@@ -4,9 +4,11 @@
  * holds the crown code gets personal lines from the server, passed in as
  * `overrides` (same ids), which replace these one by one.
  *
- * Season 1 is her trip from Austin to Boston. Ids: cards
- * `card-<chapter>-intro` (before a chapter's first level), `card-<level>`
- * (after it), `card-boss`, `card-season-boss`, `card-ending`; captions
+ * Season 1 is her trip from Austin to Boston and home: Austin, the trip,
+ * Northeastern, Boston nights (with the gorilla), Jamaica Plain, the concert,
+ * then the season boss. Ids: cards `card-<chapter>-intro` (before a
+ * chapter's first level), `card-<level>` (after it), `card-boss` (after the
+ * gorilla, level id `4-boss`), `card-season-boss`, `card-ending`; captions
  * `mem-<memory id>`; chapter titles `chapter-<n>`; names
  * `boss-gorilla-name`, `concert-headliner-name`. Cards are 2 or 3 lines,
  * captions one; every line fits the pixel font on a phone (28 characters).
@@ -21,20 +23,33 @@ export const STORY_TEXT: Readonly<Record<string, string>> = {
   'card-1-3': 'The bats rise like smoke.\nThe city waves goodbye.\nThe shuttle is waiting.',
   // Chapter 2, the trip
   'chapter-2': 'The trip',
-  'card-2-intro': 'Gate after gate,\nthe night gets longer.\nYou learn to climb.',
-  'card-2-1': 'The terminal sleeps.\nYou do not.',
-  'card-2-2': 'Clouds under the wing.\nSomewhere, he is awake too.',
-  // Chapter 3, Boston
-  'chapter-3': 'Boston',
-  'card-3-intro': 'Cold air, old bricks.\nThe river shines black.\nYou learn to move fast.',
-  'card-3-1': 'The streets bend in circles.\nYou find your own way.',
-  'card-3-2': 'The Charles keeps\nthe lights of the city.',
-  'card-3-3': 'Salt in the wind.\nAlmost there.',
+  'card-2-intro': 'The terminal sleeps.\nRain runs down the glass.\nWalls are for climbing.',
+  'card-2-1': 'The board says boarding.\nA window seat, a blanket,\nthe engines start to hum.',
+  'card-2-2': 'You dreamed of clouds.\nYou wake to Boston, gold\non black. Wheels down.',
+  // Chapter 3, Northeastern
+  'chapter-3': 'Northeastern',
+  'card-3-intro': 'Boston at last, and late.\nRed brick, cold air.\nThe fastest way is a dash.',
+  'card-3-1': 'The trolley sighs away.\nThe library is lit up,\nlike it never sleeps.',
+  'card-3-2': 'Quiet floors, warm lamps.\nA window full of campus.\nThe tracks shine below.',
+  'card-3-3': 'The bridge over the tracks.\nThe city glows ahead.\nKeep going.',
+  // Chapter 4, Boston nights, and the gorilla
+  'chapter-4': 'Boston nights',
+  'card-4-intro': 'Brownstones, bay windows.\nThe night is long here.\nThe river is close.',
+  'card-4-1': 'Awnings, stoops, gas lamps.\nThe garden waits ahead.',
+  'card-4-2': 'Fog on the Esplanade.\nBoats asleep on the river.',
+  'card-4-3': 'Planes over the harbor.\nThe sky turns pink.',
+  'card-4-4': 'Sand, gulls, a long beach.\nMorning is almost here.',
   'card-boss': 'Someone old and loud\nstands in the way.\nYou do not look away.',
-  // Chapter 4, the concert
-  'chapter-4': 'The concert',
-  'card-4-intro': 'A stadium hums at night.\nThe show cannot start\nuntil you get there.',
-  'card-4-1': 'The lights come up.\nSo does the crowd.',
+  // Chapter 5, Jamaica Plain
+  'chapter-5': 'Jamaica Plain',
+  'card-5-intro': 'Morning on the pond.\nGeese, rowboats, old trees.\nHome is close now.',
+  'card-5-1': 'Leaves on the water.\nA bench in the sun.',
+  'card-5-2': 'A porch light, still on.\nThe door opens.',
+  // Chapter 6, the concert, then the season boss
+  'chapter-6': 'The concert',
+  'card-6-intro': 'A stadium hums at night.\nThe show cannot start\nuntil you get there.',
+  'card-6-1': 'The lights come up.\nSo does the crowd.',
+  'chapter-7': 'Season end',
   'card-season-boss': 'Every inbox in the world\nrises into one shape.\nIt will be back.',
   'card-ending': 'The night was long.\nYou made it anyway.',
 
@@ -52,24 +67,42 @@ export const STORY_TEXT: Readonly<Record<string, string>> = {
   'mem-1-3-a': 'Watching the bats fly out.',
   'mem-1-3-b': 'A late walk by the lake.',
   'mem-1-3-c': 'The night we stayed up.',
-  'mem-2-1-a': 'A window seat, saved.',
-  'mem-2-1-b': 'Coffee at the gate.',
+  'mem-2-1-a': 'Coffee at the gate.',
+  'mem-2-1-b': 'Every board said delayed.',
   'mem-2-1-c': 'A text that said land safe.',
-  'mem-2-2-a': 'Clouds like a blanket.',
-  'mem-2-2-b': 'A movie with no sound.',
+  'mem-2-2-a': 'A window seat, saved.',
+  'mem-2-2-b': 'Clouds like a blanket.',
   'mem-2-2-c': 'Falling asleep mid sentence.',
-  'mem-3-1-a': 'The first cold breath.',
-  'mem-3-1-b': 'Two hands, one pocket.',
-  'mem-3-1-c': 'Snow that did not stick.',
-  'mem-3-2-a': 'A bench by the river.',
-  'mem-3-2-b': 'Rowers at sunrise.',
-  'mem-3-2-c': 'The long way home.',
-  'mem-3-3-a': 'Lobster rolls, too many.',
-  'mem-3-3-b': 'Boats with tiny lights.',
-  'mem-3-3-c': 'A promise by the water.',
-  'mem-4-1-a': 'Matching wristbands.',
-  'mem-4-1-b': 'Singing every word wrong.',
-  'mem-4-1-c': 'The last song, together.',
+  'mem-3-1-a': 'String lights on the Common.',
+  'mem-3-1-b': 'Riding the Green Line home.',
+  'mem-3-1-c': 'Coffee on the library steps.',
+  'mem-3-2-a': 'Notes in two colors of pen.',
+  'mem-3-2-b': 'Studying until it got light.',
+  'mem-3-2-c': 'A quiet corner, two chairs.',
+  'mem-3-3-a': 'Waiting for the last train.',
+  'mem-3-3-b': 'Every signal turned green.',
+  'mem-3-3-c': 'The city from the bridge.',
+  'mem-4-1-a': 'Window shopping in the cold.',
+  'mem-4-1-b': 'Hot chocolate, two spoons.',
+  'mem-4-1-c': 'A garden on a roof.',
+  'mem-4-2-a': 'A bench by the river.',
+  'mem-4-2-b': 'Rowers at sunrise.',
+  'mem-4-2-c': 'The long way home.',
+  'mem-4-3-a': 'Lobster rolls, too many.',
+  'mem-4-3-b': 'Boats with tiny lights.',
+  'mem-4-3-c': 'A promise by the water.',
+  'mem-4-4-a': 'Sand in every pocket.',
+  'mem-4-4-b': 'Fries stolen by a gull.',
+  'mem-4-4-c': 'The tide coming in.',
+  'mem-5-1-a': 'Geese with no manners.',
+  'mem-5-1-b': 'Leaves the color of fire.',
+  'mem-5-1-c': 'A lap around the pond.',
+  'mem-5-2-a': 'Keys on the hook.',
+  'mem-5-2-b': 'A kettle on the stove.',
+  'mem-5-2-c': 'The light left on.',
+  'mem-6-1-a': 'Matching wristbands.',
+  'mem-6-1-b': 'Singing every word wrong.',
+  'mem-6-1-c': 'The last song, together.',
 };
 
 /** The line for an id: a personal override when there is one, else the generic line, else ''. */
@@ -87,7 +120,7 @@ export function cardIdBefore(levelId: string): string | null {
 
 /** The card shown after a level. */
 export function cardIdAfter(levelId: string): string {
-  if (levelId === 'boss') return 'card-boss';
+  if (levelId === 'boss' || /^\d+-boss$/.test(levelId)) return 'card-boss';
   if (levelId === 'secret') return 'card-ending';
   return `card-${levelId}`;
 }
