@@ -161,14 +161,14 @@ describe('GET /api/arcade/secret: the public part', () => {
 
 describe('POST /api/arcade/secret: only for the crowned device', () => {
   beforeEach(() => {
-    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight');
+    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight over the bay');
     vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
     vi.stubEnv('ARCADE_SECRET_MESSAGE', 'hello');
     vi.stubEnv('ARCADE_STORY', JSON.stringify({ 'card-1': 'where we met', 'mem-1-1-a': 'the first song' }));
   });
 
   it('opens the message and the personal story with the right code, any case and spacing', async () => {
-    const res = await unlock(post('/api/arcade/secret', { code: '  MoonLight ' }));
+    const res = await unlock(post('/api/arcade/secret', { code: '  MoonLight Over The Bay ' }));
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(await res.json()).toEqual({
@@ -183,7 +183,7 @@ describe('POST /api/arcade/secret: only for the crowned device', () => {
       const json = await res.json();
       expect(json.error.code).toBe('not_crowned');
       expect(JSON.stringify(json)).not.toContain('hello');
-      expect(JSON.stringify(json)).not.toContain('moonlight');
+      expect(JSON.stringify(json)).not.toContain('moonlight over');
     }
   });
 
@@ -199,14 +199,14 @@ describe('POST /api/arcade/secret: only for the crowned device', () => {
     for (let i = 0; i < 12; i++) last = (await unlock(post('/api/arcade/secret', { code: `guess${i}` }, ip))).status;
     expect(last).toBe(429);
     // The right code is still refused while the network is limited.
-    expect((await unlock(post('/api/arcade/secret', { code: 'moonlight' }, ip))).status).toBe(429);
+    expect((await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }, ip))).status).toBe(429);
   });
 
   it('ignores a malformed story and caps long or non-string lines', async () => {
     vi.stubEnv('ARCADE_STORY', '{not json');
-    expect((await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story).toEqual({});
+    expect((await (await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }))).json()).story).toEqual({});
     vi.stubEnv('ARCADE_STORY', JSON.stringify({ a: 'x'.repeat(500), b: 7, c: 'ok' }));
-    const story = (await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story;
+    const story = (await (await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }))).json()).story;
     expect(story.a.length).toBe(280);
     expect(story).not.toHaveProperty('b');
     expect(story.c).toBe('ok');

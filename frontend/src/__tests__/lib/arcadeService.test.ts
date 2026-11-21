@@ -131,25 +131,26 @@ describe('submitScore', () => {
 });
 
 describe('crown', () => {
+  const CODE = 'moonlight over the bay';
   beforeEach(() => {
-    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight');
+    vi.stubEnv('ARCADE_CROWN_CODE', CODE);
     vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
   });
 
   it('stores the code under her name with a crown', async () => {
-    const r = await play('MOONLIGHT', 60);
+    const r = await play(CODE.toUpperCase(), 60);
     expect(r).toMatchObject({ ok: true, data: { name: 'Juniper', crowned: true, isTop: true } });
     const board = await getBoard('snake', 'Juniper');
     expect(board.ok && board.data.all).toEqual([{ rank: 1, name: 'Juniper', score: 60, crown: true }]);
     expect(board.ok && board.data.me).toEqual({ name: 'Juniper', all: { rank: 1, score: 60 }, week: { rank: 1, score: 60 } });
     const store = await getStore();
-    expect(await store.zscore(allKey('snake'), 'moonlight')).toBeNull();
+    expect(await store.zscore(allKey('snake'), CODE)).toBeNull();
   });
 
   it('the board lookup never confirms a guessed crown code', async () => {
-    await play('moonlight', 60);
-    const guess = await getBoard('snake', 'moonlight');
-    expect(guess.ok && guess.data.me).toEqual({ name: 'moonlight', all: null, week: null });
+    await play(CODE, 60);
+    const guess = await getBoard('snake', CODE);
+    expect(guess.ok && guess.data.me).toEqual({ name: CODE, all: null, week: null });
   });
 
   it('blocks look-alikes of her name: Cyrillic letters, invisible marks, accents', async () => {
