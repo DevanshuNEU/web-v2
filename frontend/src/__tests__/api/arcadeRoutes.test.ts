@@ -171,6 +171,19 @@ describe('DELETE /api/arcade/admin', () => {
     expect((await del({ game: 'snake', name: 'Dev' }, 'admin-secret')).status).toBe(401);
   });
 
+  it('rate limits one network to 10 admin calls in 10 minutes, before checking the token', async () => {
+    vi.stubEnv('ARCADE_ADMIN_TOKEN', 'admin-secret');
+    const ip = { 'x-real-ip': '203.0.113.60' };
+    const call = (auth: string) =>
+      admin(post('/api/arcade/admin', { game: 'snake', name: 'Dev' }, { ...ip, authorization: auth }, 'DELETE'));
+    for (let i = 0; i < 10; i++) expect((await call(`Bearer guess${i}`)).status).toBe(401);
+    const limited = await call('Bearer admin-secret');
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error.code).toBe('rate_limited');
+    vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1);
+    expect((await call('Bearer admin-secret')).status).toBe(200);
+  });
+
   it('removes a name from that game', async () => {
     vi.stubEnv('ARCADE_ADMIN_TOKEN', 'admin-secret');
     await run('snake', 'Dev', 42);
