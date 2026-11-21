@@ -103,3 +103,10 @@ describe('the story score in the header', () => {
     expect(bankedFor(run, next)).toBe(2000 + level);
   });
 });
+
+describe('par override', () => {
+  it('a level can set its own par (the boss fight is timed by the fight, not its length)', () => {
+    const boss = parseLevel(storyLevelDef('4-boss'));
+    expect(parTime(boss)).toBe(75);
+  });
+});

@@ -331,14 +331,14 @@ describe('Story: chapter 3 is built, chapters 5 and 6 wait their turn', () => {
     for (const id of IDS) expect(storyLevelDef(id)).toBe(CAMPUS[id]);
   });
 
-  it('the gorilla, Jamaica Plain, the concert and the season boss are placeholders, in that order', () => {
+  it('Jamaica Plain, the concert and the season boss are placeholders, in that order (the gorilla is built)', () => {
     expect(STORY.filter(s => !s.built).map(s => [s.id, s.world, s.name])).toEqual([
-      ['4-boss', 4, 'The Ex-Bestie'], ['5-1', 5, 'Jamaica Pond'], ['5-2', 5, 'Home'], ['6-1', 6, 'The Headliner'],
+      ['5-1', 5, 'Jamaica Pond'], ['5-2', 5, 'Home'], ['6-1', 6, 'The Headliner'],
       ['season-boss', 7, 'Job Hunting'],
     ]);
     expect(storyEntry('4-boss').cardId).toBe('card-boss');
     expect(storyEntry('5-2').cardId).toBe('card-5-2');
-    expect(() => storyLevelDef('4-boss')).toThrow(/not built/);
+    expect(() => storyLevelDef('5-1')).toThrow(/not built/);
   });
 
   it('createWorld loads each level under its sky, with its memories named by level', () => {

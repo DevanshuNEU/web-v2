@@ -3,6 +3,7 @@ import { difficultyOf, rawDifficulty, DIFFICULTY } from '@/components/apps/games
 import { parseLevel } from '@/components/apps/games/platformer/sim/level';
 import { STORY, storyLevelDef } from '@/components/apps/games/platformer/sim/story';
 import { custom } from '../setup/platformerWorld';
+import { BOSS } from '@/components/apps/games/platformer/sim/boss';
 
 /** A flat 100 column floor with these chars dropped on the walking row (row 11). */
 function flat(extra: Record<number, string> = {}) {
@@ -70,6 +71,11 @@ describe('difficultyOf: a score from the level data only', () => {
     const flatRows = [top, '#'.repeat(100), '#'.repeat(100)];
     expect(rawDifficulty(custom(flatRows, 'harbor', { gusts: [{ x0: 10, x1: 20, dir: -1, strength: 5, period: 4, blow: 1 }] }))).toBeCloseTo(DIFFICULTY.timed, 6);
     expect(rawDifficulty(custom(flatRows, 'beach', { waves: [{ x0: 10, x1: 20, row: 12, dir: -1, period: 6 }] }))).toBeCloseTo(DIFFICULTY.timed, 6);
+  });
+
+  it('a boss counts by his hit points (absolute, not per 100 columns)', () => {
+    const top = Array.from({ length: 100 }, (_, x) => (x === 2 ? 'P' : x === 50 ? 'Y' : x === 97 ? 'G' : '.')).join('');
+    expect(rawDifficulty(custom([top, '#'.repeat(100), '#'.repeat(100)], 'zakim'))).toBeCloseTo(BOSS.maxHp * DIFFICULTY.boss, 6);
   });
 
   it('scales per 100 columns: the same enemies over twice the length score half', () => {

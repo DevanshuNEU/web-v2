@@ -26,16 +26,19 @@ import { SIGNAL_LEAD, arrivalIn, createVehicle, placeVehicle, type Vehicle } fro
 import { createGust, gustPush, placeGust, type Gust } from './gusts';
 import { createHook, placeHook, type Hook } from './hooks';
 import { createWave, placeWave, wavePush, type Wave } from './waves';
+import { bossTarget, createFight, frameFight, lockCamera, resetFight, stepFight, strikeBoss, type Boss, type BossCtx, type Fight, type Projectile } from './boss';
 
 export type { Enemy, EnemyKind, EnemyMode } from './enemies';
 export type { Vehicle, VehicleDef, VehicleKind } from './vehicles';
 export type { Gust, GustDef } from './gusts';
 export type { Hook, HookDef } from './hooks';
 export type { Wave, WaveDef } from './waves';
+export type { Boss, BossState, Projectile, ProjectileKind } from './boss';
 export { shouldTurnAtLedge } from './enemies';
 
 export const LIVES = 3;
-export const POINTS = { coin: 10, stomp: 50, kill: 100, killMax: 500, timeTop: 3000, timeUnder: 25, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500, death: 50 } as const;
+/** Points. `boss`: beating the gorilla (scored with the kills). */
+export const POINTS = { coin: 10, stomp: 50, kill: 100, killMax: 500, timeTop: 3000, timeUnder: 25, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500, death: 50, boss: 3000 } as const;
 /** Old flat time decay, kept for reference: the bonus is now measured against par. */
 export const TIME_DECAY = 5;
 /** A kill chain carries on for this long after a kill even on the ground (a quick blade combo). */
@@ -75,8 +78,9 @@ export function timeBonus(seconds: number, par: number): number {
   return Math.max(0, Math.round(POINTS.timeMax * (1 - (t - par) / par)));
 }
 
-/** Par for a level: about 3 tiles a second from the start to the goal, at least 30 s. */
-export function parTime(level: Pick<Level, 'start' | 'goal'>): number {
+/** Par for a level: its own `par` if it sets one, else about 3 tiles a second from the start to the goal, at least 30 s. */
+export function parTime(level: Pick<Level, 'start' | 'goal' | 'par'>): number {
+  if (level.par && level.par > 0) return level.par;
   return Math.max(30, Math.ceil(Math.abs(level.goal.x - level.start.x) / 3));
 }
 
@@ -156,7 +160,12 @@ export type EventType =
   /** A power started or ran out: n is its index in POWER_KINDS. */
   | 'powerOn' | 'powerOff'
   /** An awning bounced her up (x, y: where her feet met it). */
-  | 'bounce';
+  | 'bounce'
+  /**
+   * The gorilla (see ./boss.ts): a line started (n: its number, 0 the beaten
+   * line), he took a hit (n: damage), a new phase began (n: phase), he is down.
+   */
+  | 'bossTaunt' | 'bossHit' | 'bossPhase' | 'bossDown';
 
 export interface GameEvent { type: EventType; x: number; y: number; n: number }
 
@@ -306,6 +315,14 @@ export interface World {
   hooks: Hook[];
   /** Waves now: the front column, `warn` while the water draws back, `on` while it covers sand (see ./waves.ts). */
   waves: Wave[];
+  /** The gorilla in a boss level, null elsewhere (see ./boss.ts). The same object as `fight.boss`. */
+  boss: Boss | null;
+  /** What he throws or shakes loose, live ones only (see ./boss.ts). The same array as `fight.projectiles`. */
+  projectiles: Projectile[];
+  /** The boss fight's own state (arena, timers); null in a level with no boss. */
+  fight: Fight | null;
+  /** What the fight may touch in the world (made once). */
+  bctx: BossCtx;
 }
 
 /** An awning's squash clock rests here until the first bounce. */
@@ -385,11 +402,15 @@ export function createWorld(o: WorldOptions = {}): World {
     swing: null, attackBuffer: 0, comboNext: 0, comboT: 99, serial: 0, pogoSafe: 0, decor: [], lights: [], decoys: [],
     shots: Array.from({ length: SHOT_POOL }, () => ({ x: 0, y: 0, vx: 0, vy: 0, t: 0 })),
     modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1, puffs: [], vehicles: [], signals: [], bounces: [], gusts: [], hooks: [], waves: [],
+    boss: null, projectiles: [], fight: null, bctx: null as unknown as BossCtx,
     afterimages: Array.from({ length: AFTERIMAGE_POOL }, () => ({ x: 0, y: 0, facing: 1 as const, t: 0 })),
   };
   w.scarf = createScarf(neckOf(w.hero));
   w.ectx = { solid: w.solid, c: contacts(), rand: w.rand, hero: w.hero, shoot: (x, y, vx, vy) => fire(w, x, y, vx, vy),
     decoys: w.decoys, decoyDive: (x, y) => emit(w, 'decoyDive', x, y) };
+  w.bctx = { hero: w.hero, emit: (type, x, y, n) => emit(w, type, x, y, n), setTile: (x, y, t) => setTile(w, x, y, t), hurt: () => hurt(w),
+    beaten: () => { w.stats.kills += POINTS.boss; emit(w, 'kill', w.boss ? w.boss.x + w.boss.w / 2 : 0, w.boss ? w.boss.y : 0, POINTS.boss); },
+    prevBottom: 0, jumpHeld: false, pogoSafe: false };
   if (w.mode === 'story') loadStory(w, o.levelId ?? '1-1');
   else loadLevel(w, o.levelIndex ?? 0);
   return w;
@@ -439,6 +460,10 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
   w.gusts = level.gusts.map(createGust);
   w.hooks = level.hooks.map(createHook);
   w.waves = level.waves.map(createWave);
+  w.fight = createFight(level);
+  w.slowMo = 0;
+  w.boss = w.fight ? w.fight.boss : null;
+  w.projectiles = w.fight ? w.fight.projectiles : [];
   stepVehicles(w);
   stepTimed(w);
   w.platforms = level.platforms.map(p => ({ x0: p.x, y0: p.y, x: p.x, y: p.y, w: p.w, h: PLATFORM_H, axis: p.axis, px: p.x, py: p.y }));
@@ -516,10 +541,15 @@ function cameraTarget(w: World) {
   const h = w.hero;
   const maxX = Math.max(0, w.level.cols - w.viewCols);
   const maxY = w.level.rows - w.viewRows;
-  const x = Math.min(maxX, Math.max(0, h.x + h.w / 2 + w.cam.look - w.viewCols / 2));
+  let x = Math.min(maxX, Math.max(0, h.x + h.w / 2 + w.cam.look - w.viewCols / 2));
+  if (w.fight) {
+    x = w.fight.on && w.boss ? frameFight(w.fight.arena, h.x, w.boss.x, w.viewCols) : lockCamera(w.fight, x, w.viewCols);
+  }
   // A view taller than the level (portrait phone) keeps the ground at the
   // bottom and shows sky above, so the camera sits above row 0.
-  const y = maxY < 0 ? maxY : Math.min(maxY, Math.max(0, h.y + h.h / 2 - w.viewRows * 0.55));
+  let y = maxY < 0 ? maxY : Math.min(maxY, Math.max(0, h.y + h.h / 2 - w.viewRows * 0.55));
+  // in the fight, keep the gorilla's head in view when he is up on a cable
+  if (w.fight?.on && w.boss && maxY > 0) y = Math.max(0, Math.min(y, w.boss.y - 0.5));
   return { x, y };
 }
 
@@ -820,6 +850,13 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   if (w.phase !== 'play') return;
   stepShots(w, dt);
   if (w.phase !== 'play') return;
+  if (w.fight) {
+    const k = w.bctx;
+    k.hero = h; k.prevBottom = prevBottom; k.jumpHeld = input.jumpHeld; k.pogoSafe = w.pogoSafe > 0;
+    stepFight(w.fight, k, dt);
+    w.slowMo = w.fight.slowMo;
+    if (w.phase !== 'play') return;
+  }
   stepCrowns(w, dt);
 
   const pole = w.level.pole;
@@ -970,6 +1007,8 @@ function stepBlade(w: World, dt: number) {
     e.stunT = BLADE.stun;
     emit(w, 'hit', e.x + e.w / 2, e.y + e.h / 2, e.hp);
   }
+  // The gorilla.
+  if (w.fight && strikeBoss(w.fight, w.bctx, box, s.serial, down)) { hit = true; if (down) bounce = true; }
   // Crates and spikes in the box.
   for (let ty = Math.floor(box.y); ty <= Math.floor(box.y + box.h - 1e-6); ty++) {
     for (let tx = Math.floor(box.x); tx <= Math.floor(box.x + box.w - 1e-6); tx++) {
@@ -1005,18 +1044,16 @@ function stepBlade(w: World, dt: number) {
   }
 }
 
-/** Is a live enemy above her head, within reach of an up swing? */
+/** Is a live enemy (or the boss) above her head, within reach of an up swing? */
 function targetAbove(w: World): boolean {
   const h = w.hero;
   const cx = h.x + h.w / 2;
   const top = h.y + 0.3;
-  for (const e of w.enemies) {
-    if (e.deadT !== -1) continue;
-    const ex = e.x + e.w / 2;
-    if (Math.abs(ex - cx) > BLADE.upHalfWidth + e.w / 2) continue;
-    if (e.y + e.h <= top && e.y + e.h >= top - BLADE.upReach) return true;
-  }
-  return false;
+  const above = (e: { x: number; y: number; w: number; h: number }) =>
+    Math.abs(e.x + e.w / 2 - cx) <= BLADE.upHalfWidth + e.w / 2 && e.y + e.h <= top && e.y + e.h >= top - BLADE.upReach;
+  for (const e of w.enemies) if (e.deadT === -1 && above(e)) return true;
+  const b = bossTarget(w.fight);
+  return b !== null && above(b);
 }
 
 /**
@@ -1036,6 +1073,12 @@ function faceNearbyTarget(w: World) {
     if (gap > BLADE.turnReach) continue;
     if (Math.sign(dx) === h.facing || dx === 0) front = true; else behind = true;
   }
+  const b = bossTarget(w.fight);
+  if (b && !(b.y > h.y + h.h || b.y + b.h < h.y - 0.3)) {
+    const dx = b.x + b.w / 2 - cx;
+    const gap = dx > 0 ? b.x - (h.x + h.w) : h.x - (b.x + b.w);
+    if (gap <= BLADE.turnReach) { if (Math.sign(dx) === h.facing || dx === 0) front = true; else behind = true; }
+  }
   if (behind && !front) h.facing = h.facing === 1 ? -1 : 1;
 }
 
@@ -1048,6 +1091,8 @@ function targetBelow(w: World): boolean {
     if (e.deadT !== -1) continue;
     if (e.x < x1 && e.x + e.w > x0 && e.y + e.h > feet - 0.2 && e.y <= feet + BLADE.downReach) return true;
   }
+  const b = bossTarget(w.fight);
+  if (b && b.x < x1 && b.x + b.w > x0 && b.y + b.h > feet - 0.2 && b.y <= feet + BLADE.downReach) return true;
   for (let tx = Math.floor(x0); tx <= Math.floor(x1 - 1e-6); tx++) {
     for (let ty = Math.floor(feet); ty <= Math.floor(feet + BLADE.downReach); ty++) {
       const t = tile(w, tx, ty);
@@ -1318,6 +1363,7 @@ function stepDying(w: World, dt: number) {
     emit(w, 'over', h.x, h.y);
     return;
   }
+  if (w.fight) { resetFight(w.fight); w.slowMo = 0; }
   placeHero(w, w.checkpointIdx >= 0 ? w.level.checkpoints[w.checkpointIdx] : w.level.start);
   w.invuln = INVULN_RESPAWN;
   w.phase = 'play';

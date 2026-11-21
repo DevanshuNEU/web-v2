@@ -5,7 +5,7 @@ import { stubCanvas } from '../setup/canvas';
 import { Juice } from '@/components/apps/games/shared/juice';
 import { createWorld, type World } from '@/components/apps/games/platformer/sim/world';
 import { TILE } from '@/components/apps/games/platformer/sim/level';
-import { drawFrame, preloadTheme, rendererFor, themeReady } from '@/components/apps/games/platformer/render/frame';
+import { drawFrame, noteEvent, preloadTheme, rendererFor, themeReady } from '@/components/apps/games/platformer/render/frame';
 import { frameStats, resetWorld1 } from '@/components/apps/games/platformer/render/pixel/world1';
 import { loadTheme, themeFor } from '@/components/apps/games/platformer/render/pixel/themes';
 import { K, KIND, WALK_DIR, isStaticDecor, isStaticKind } from '@/components/apps/games/platformer/render/pixel/tiles';
@@ -53,7 +53,7 @@ beforeEach(() => {
 
 describe('the theme seam', () => {
   it('every theme but the old cartoon worlds draws with the pixel renderer', () => {
-    for (const t of ['rooftops', 'austin', 'airport', 'clouds', 'campus', 'library', 'tracks', 'newbury', 'river', 'harbor', 'beach', 'backbay']) expect(rendererFor(t)).toBe('pixel');
+    for (const t of ['rooftops', 'austin', 'airport', 'clouds', 'campus', 'library', 'tracks', 'newbury', 'river', 'harbor', 'beach', 'zakim', 'backbay']) expect(rendererFor(t)).toBe('pixel');
     for (const t of ['grass', 'cave', 'sky', 'stars']) expect(rendererFor(t)).toBe('cartoon');
   });
 
@@ -312,6 +312,72 @@ describe('chapter 4: newbury, river, harbor, beach', () => {
           expect(saves).toBe(restores);
         });
       }
+    }
+  }
+});
+
+describe('4-boss: the gorilla on the bridge (zakim)', () => {
+  const STATES = ['idle', 'intro', 'pace', 'throwWarn', 'watch', 'chestBeat', 'lungeWarn', 'lunge', 'dazed', 'roar', 'poundWarn', 'pound', 'winded',
+    'climb', 'perch', 'slamWarn', 'slam', 'slumped', 'down', 'beaten'];
+
+  it('the chunk loads on its own; gates and cables are drawn by the theme, never baked', async () => {
+    expect(themeReady('zakim')).toBe(false);
+    const t = await loadTheme('zakim');
+    expect(t.id).toBe('zakim');
+    expect(KIND[TILE.GATE]).toBe(K.GATE);
+    expect(KIND[TILE.CABLE]).toBe(K.CABLE);
+    expect(isStaticKind(K.GATE)).toBe(false);
+    expect(isStaticKind(K.CABLE)).toBe(false);
+    expect(t.decor[t.goal.kind]).toBeTruthy();
+  });
+
+  it('every boss state picks an anim the art has, telegraphs held on their wind up frame', async () => {
+    const mod = await import('@/components/apps/games/platformer/render/pixel/themes/zakim');
+    const { GORILLA } = await import('@/components/apps/games/platformer/render/sprites/gorilla');
+    for (const st of STATES) expect(GORILLA.anims[mod.gorillaPose(st, 0.3).anim as keyof typeof GORILLA.anims]).toBeTruthy();
+    expect(mod.gorillaPose('lungeWarn', 0.5)).toEqual({ anim: 'lunge', frame: 0 });
+    expect(mod.gorillaPose('poundWarn', 0.2)).toEqual({ anim: 'pound', frame: 0 });
+    expect(mod.gorillaPose('pound', 0.05)).toEqual({ anim: 'pound', frame: 2 });
+    expect(mod.gorillaPose('down', 0.9)).toEqual({ anim: 'down', frame: 3 });
+  });
+
+  for (const v of VIEWS) {
+    for (const mono of [false, true]) {
+      it(`the fight draws in every state, ${v.name}, ${mono ? 'mono' : 'colour'}, with props, a line, the bar and a hit flash`, async () => {
+        await loadTheme('zakim');
+        const w = createWorld({ mode: 'story', levelId: '4-boss', abilities: { wallJump: true, blade: true, dash: true } } as Parameters<typeof createWorld>[0]);
+        const extra = w as unknown as Record<string, unknown>;
+        const b = extra.boss as Record<string, unknown> | null;
+        expect(b).toBeTruthy();
+        const fight = extra.fight as Record<string, unknown>;
+        fight.on = true;
+        const bx = b!.x as number, by = b!.y as number;
+        extra.projectiles = [
+          { kind: 'barrel', x: bx + 0.6, y: by - 0.9, w: 0.9, h: 0.9, vx: 0, vy: 0, warn: 0.5 },
+          { kind: 'barrel', x: bx - 4, y: by + 1.5, w: 0.9, h: 0.9, vx: -7, vy: 0, warn: 0 },
+          { kind: 'debris', x: bx - 6, y: 0, w: 0.9, h: 0.9, vx: 0, vy: 0, warn: 0.6 },
+          { kind: 'debris', x: bx - 8, y: 5, w: 0.9, h: 0.9, vx: 0, vy: 10, warn: 0 },
+          { kind: 'shockwave', x: bx + 3, y: by + 1.8, w: 0.8, h: 0.6, vx: 7, vy: 0, warn: 0 },
+        ];
+        w.hero.x = w.heroPx = bx - 3;
+        w.cam.x = w.cam.px = Math.max(0, bx - 8);
+        const ctx = screen();
+        for (const st of STATES) {
+          b!.state = st; b!.stateT = 0.1; b!.taunt = 'boss-taunt-3'; b!.tauntT = 0.5; b!.aimX = bx - 2; b!.punish = st === 'winded';
+          if (st === 'pound') noteEvent('bossHit', bx, by, 2);
+          w.t += 1 / 60;
+          expect(() => drawFrame(ctx as unknown as CanvasRenderingContext2D, w, { w: v.w, h: v.h, mono, reduced: st === 'slam', alpha: 1, dpr: v.dpr, text: (id: string) => `line ${id}` }, new Juice())).not.toThrow();
+        }
+        const saves = allContexts().reduce((n, c) => n + (c.save as Mock).mock.calls.length, 0);
+        const restores = allContexts().reduce((n, c) => n + (c.restore as Mock).mock.calls.length, 0);
+        expect(saves).toBe(restores);
+        // a pound landing shakes the view, never under reduced motion
+        b!.state = 'pound'; b!.stateT = 0.05;
+        drawFrame(ctx as unknown as CanvasRenderingContext2D, w, { w: v.w, h: v.h, mono, reduced: false, alpha: 1, dpr: v.dpr }, new Juice());
+        expect(frameStats().rumble).toBeGreaterThan(0);
+        drawFrame(ctx as unknown as CanvasRenderingContext2D, w, { w: v.w, h: v.h, mono, reduced: true, alpha: 1, dpr: v.dpr }, new Juice(true));
+        expect(frameStats().rumble).toBe(0);
+      });
     }
   }
 });

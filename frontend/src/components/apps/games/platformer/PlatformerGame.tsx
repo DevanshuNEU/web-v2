@@ -208,6 +208,9 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     return () => { live = false; };
   }, []);
 
+  /** Story text with this device's private lines, for the renderer (a boss's name and taunts). */
+  const resolveText = useCallback((id: string) => storyText(id, overrides.current) || id, []);
+
   // World music: made once, playing only while she plays.
   const musicRef = useRef<Music | null>(null);
   const music = useCallback(() => (musicRef.current ??= createMusic()), []);
@@ -349,6 +352,9 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     if (type === 'hit') { sfx('stomp'); buzz(14); noteEvent('hit', e.x, e.y, e.n); j.burst(x, y, '#fff6c8', 6, 120, 2); return; }
     if (type === 'pogo') { sfx('jump'); buzz(10); noteEvent('pogo', e.x, e.y); used.current.add('attack'); return; }
     if (type === 'decoyDive') { sfx('bump'); noteEvent('decoyDive', e.x, e.y); return; }
+    // the boss: the renderer flashes him on a hit and marks a new phase
+    if (type === 'bossHit') { sfx('stomp'); buzz(18); noteEvent('bossHit', e.x, e.y, e.n); j.burst(x, y, '#fff6c8', 10, 160, 3); return; }
+    if (type === 'bossPhase' || type === 'bossDown' || type === 'bossTaunt') { noteEvent(type, e.x, e.y, e.n); return; }
     switch (e.type) {
       case 'jump': sfx('jump'); j.burst(x, y, '#fff4e0', 5, 70, 3); break;
       case 'doubleJump':
@@ -549,13 +555,16 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
         story: s === 'card' && c ? { lines: c.lines, chars: c.chars, caption: c.caption, done: c.done } : null,
         notice: s === 'notice' ? notice.current : null,
         prompts: s === 'playing' ? prompts.current : undefined,
+        text: resolveText,
+        // the landscape HUD strip (h-11) lies over the top of the view
+        insetTop: layout === 'landscape' ? 44 : 0,
       }, juiceRef.current);
     }
     const next = hudOf(w, modeRef.current === 'story' ? bankedFor(storyRun.current, w) : 0);
     if (!sameHud(next, hudRef.current)) { hudRef.current = next; setHud(next); }
     if (w.phase === 'done' && s === 'playing') finish();
     if (meterRef.current) { const t1 = performance.now(); meterRef.current.frame(t1, t1 - t0); }
-  }, [getCtx, size, mono, reduced, finish]);
+  }, [getCtx, size, mono, reduced, finish, resolveText, layout]);
 
   // ?perf on the address: a corner speed meter for measuring on a real phone.
   const meterRef = useRef<ReturnType<typeof mountMeter> | null>(null);

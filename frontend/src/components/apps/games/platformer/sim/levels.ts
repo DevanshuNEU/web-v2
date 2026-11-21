@@ -65,6 +65,14 @@
  *   R  crates are sand sculptures on the beach (the blade breaks them)
  *   Boats (shell, sailboat) are vehicles in `vehicles`; wind gusts, crane
  *   hooks and waves are listed in the level's `gusts`, `hooks` and `waves`.
+ *
+ * The gorilla's arena (4-boss, theme zakim; see ./boss.ts)
+ *   Y  the gorilla (feet on the tile below; at most one per level)
+ *   z  entry gate: open until the fight starts, then shut behind her
+ *   Z  exit gate: shut (solid) until he is beaten, then open
+ *   /  bridge cable: a one-way ledge; a run of them climbs diagonally
+ *   :  debris spot: a loose clamp up top that a ground pound shakes down
+ *   T  is a bridge lamp in the zakim theme.
  */
 
 import type { Ability } from './hero';
@@ -74,7 +82,7 @@ import type { HookDef } from './hooks';
 import type { WaveDef } from './waves';
 
 export type WorldTheme = 'grass' | 'rooftops' | 'austin' | 'cave' | 'sky' | 'stars' | 'airport' | 'clouds'
-  | 'campus' | 'library' | 'tracks' | 'newbury' | 'river' | 'harbor' | 'beach';
+  | 'campus' | 'library' | 'tracks' | 'newbury' | 'river' | 'harbor' | 'beach' | 'zakim';
 
 /** The sky a level is played under; the season moves it forward level by level. */
 export type SkyId = 'night' | 'lateNight' | 'preDawn' | 'sunrise' | 'morning';
@@ -101,6 +109,8 @@ export interface LevelDef {
   theme: WorldTheme;
   /** The sky preset; the renderer picks night when unset. */
   sky?: SkyId;
+  /** Par time in seconds for the time bonus, when the level's length is the wrong measure (a boss fight). */
+  par?: number;
   /** The trolley and trains: lanes and timetables (see ./vehicles.ts). */
   vehicles?: readonly VehicleDef[];
   /** Harbor wind zones and their timetables (see ./gusts.ts). */

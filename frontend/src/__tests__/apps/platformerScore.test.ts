@@ -10,13 +10,14 @@ import { RULES } from '@/lib/arcade/rules';
 /**
  * A perfect story level: every coin (map, coin blocks, crates and signs the
  * blade breaks), every enemy, every brick and Sigma coin, the beacon top,
- * the clear, the top time bonus and no deaths. Every kill is counted at the
- * top of a chain (the most a kill can score), so this is an upper bound.
+ * the clear, the top time bonus, the boss beaten (POINTS.boss) and no
+ * deaths. Every kill is counted at the top of a chain (the most a kill can
+ * score), so this is an upper bound.
  */
 function perfect(l: Level): number {
   const coins = l.coinTotal + l.crates * BLADE.crateCoins + l.signs * BLADE.signCoins;
   return coins * POINTS.coin + l.sigmas * POINTS.sigma + l.enemies.length * POINTS.killMax + l.bricks * POINTS.brick
-    + POINTS.flagTop + POINTS.clear + POINTS.timeTop;
+    + (l.boss ? POINTS.boss : 0) + POINTS.flagTop + POINTS.clear + POINTS.timeTop;
 }
 
 const built = STORY.filter(s => s.built).map(s => parseLevel(storyLevelDef(s.id)));
@@ -24,7 +25,7 @@ const storyMax = built.reduce((s, l) => s + perfect(l), 0);
 
 describe('Main Character leaderboard cap (the leaderboard uses the fixed Story levels)', () => {
   it('covers a perfect run of every built story level and sits within 15 percent above it', () => {
-    expect(storyMax).toBe(128_230);
+    expect(storyMax).toBe(137_370);
     expect(RULES.platformer.cap).toBeGreaterThanOrEqual(storyMax);
     expect(RULES.platformer.cap).toBeLessThanOrEqual(storyMax * 1.15);
   });
