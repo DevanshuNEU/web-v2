@@ -22,7 +22,16 @@ export const BOARD_READS_PER_MINUTE = 120;
 // Run starts: one per round, and the shortest round is about 15 seconds.
 export const STARTS_PER_WINDOW = 60;
 
-type Bucket = 'score' | 'secret' | 'board' | 'start';
+// Admin calls: the owner removes a cheater now and then; 10 in ten minutes
+// is plenty, and it slows anyone guessing the admin token.
+export const ADMIN_CALLS_PER_WINDOW = 10;
+
+// How long an Upstash check may take. A slow Upstash must not stall a
+// route; on a timeout the check passes, except crown code tries, which are
+// blocked instead (see secretLimited).
+export const UPSTASH_TIMEOUT_MS = 1500;
+
+type Bucket = 'score' | 'secret' | 'board' | 'start' | 'admin';
 type Rule = { max: number; windowMs: number; window: '1 m' | '10 m' };
 const TEN_MINUTES: Pick<Rule, 'windowMs' | 'window'> = { windowMs: WINDOW_MS, window: '10 m' };
 const RULE: Record<Bucket, Rule> = {
@@ -30,6 +39,7 @@ const RULE: Record<Bucket, Rule> = {
   secret: { max: SECRET_TRIES_PER_WINDOW, ...TEN_MINUTES },
   board: { max: BOARD_READS_PER_MINUTE, windowMs: 60_000, window: '1 m' },
   start: { max: STARTS_PER_WINDOW, ...TEN_MINUTES },
+  admin: { max: ADMIN_CALLS_PER_WINDOW, ...TEN_MINUTES },
 };
 
 const hits = new Map<string, number[]>();
@@ -65,7 +75,7 @@ function inMemoryLimit(bucket: Bucket, ip: string): boolean {
   return false;
 }
 
-type Durable = { limit: (ip: string) => Promise<{ success: boolean }> };
+type Durable = { limit: (ip: string) => Promise<{ success: boolean; reason?: string }> };
 const durable: Partial<Record<Bucket, { url: string; limiter: Durable }>> = {};
 
 async function getDurable(bucket: Bucket): Promise<Durable | null> {
@@ -80,16 +90,20 @@ async function getDurable(bucket: Bucket): Promise<Durable | null> {
     redis: new Redis({ url, token }),
     limiter: Ratelimit.slidingWindow(RULE[bucket].max, RULE[bucket].window),
     prefix: `arcade:${bucket}:ip`,
+    timeout: UPSTASH_TIMEOUT_MS,
   });
   durable[bucket] = { url, limiter };
   return limiter;
 }
 
-async function limited(bucket: Bucket, rawIp: string): Promise<boolean> {
+async function limited(bucket: Bucket, rawIp: string, blockOnTimeout = false): Promise<boolean> {
   const ip = ipBucket(rawIp);
   try {
     const limiter = await getDurable(bucket);
-    if (limiter) return !(await limiter.limit(ip)).success;
+    if (limiter) {
+      const { success, reason } = await limiter.limit(ip);
+      return !success || (blockOnTimeout && reason === 'timeout');
+    }
   } catch (err) {
     // A dead Upstash must not take the leaderboard down: fall back.
     console.error('Arcade limiter failed, using in-memory fallback:', err);
@@ -102,9 +116,13 @@ export function submitLimited(ip: string): Promise<boolean> {
   return limited('score', ip);
 }
 
-/** True when this IP has used up its crown code tries for the window. */
+/**
+ * True when this IP has used up its crown code tries for the window. When
+ * Upstash times out the try is blocked: a guesser must not get free tries
+ * by making the limiter slow.
+ */
 export function secretLimited(ip: string): Promise<boolean> {
-  return limited('secret', ip);
+  return limited('secret', ip, true);
 }
 
 /** True when this IP has read the board too often this minute. */
@@ -115,6 +133,11 @@ export function boardLimited(ip: string): Promise<boolean> {
 /** True when this IP has started too many runs in the window. */
 export function startLimited(ip: string): Promise<boolean> {
   return limited('start', ip);
+}
+
+/** True when this IP has made too many admin calls in the window. */
+export function adminLimited(ip: string): Promise<boolean> {
+  return limited('admin', ip);
 }
 
 /** Tests: forget every IP. */
