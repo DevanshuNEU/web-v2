@@ -1,0 +1,156 @@
+'use client';
+
+import { useCallback, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { tryCapture, type InputFrame } from './frame';
+import { ThumbArc } from './ThumbArc';
+import type { Owned } from './arc';
+import { buzzPress } from '../ui/controls';
+
+export interface ControlProps {
+  input: InputFrame;
+  mono: boolean;
+  /** Moves she has: Attack and Dash show only once owned. */
+  owned?: Owned;
+  haptics?: boolean;
+  /** Left-handed: the arc on the left, moving on the right. */
+  swap?: boolean;
+  /** First run: label the real buttons until she plays. */
+  intro?: boolean;
+  onPlayed?: () => void;
+  /** 0.3..1, from the pause card settings. */
+  opacity?: number;
+}
+
+/**
+ * Portrait touch adapter: the control deck under the view. Run pad on one
+ * side, the thumb arc (Jump, Attack, Dash) on the other. Each control tracks
+ * its own pointers, so both thumbs work at once.
+ */
+export function TouchDeck({ input, mono, owned = {}, haptics = true, swap = false, intro = false, onPlayed, opacity = 1 }: ControlProps) {
+  const onRun = useCallback((left: boolean, right: boolean) => {
+    input.move = (right ? 1 : 0) - (left ? 1 : 0);
+  }, [input]);
+  const played = useCallback(() => { if (intro) onPlayed?.(); }, [intro, onPlayed]);
+  const pad = (
+    <div className="relative">
+      {intro && <IntroLabel text="Move" />}
+      <RunPad onChange={onRun} mono={mono} size={76} haptics={haptics} onPress={played} />
+    </div>
+  );
+  const arc = <ThumbArc input={input} mono={mono} owned={owned} hand={swap ? 'left' : 'right'} haptics={haptics} intro={intro} onPress={played} />;
+  return (
+    <div
+      style={{ opacity }}
+      className="flex items-end justify-between pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+    >
+      {swap ? arc : pad}
+      {swap ? pad : arc}
+    </div>
+  );
+}
+
+/** A first-run label sitting on a real control. */
+export function IntroLabel({ text }: { text: string }) {
+  return (
+    <span aria-hidden className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap z-30 border border-[#3df2ff] bg-[#06040f] px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-[#d8f8ff] shadow-[0_0_12px_rgba(61,242,255,0.35)]">
+      {text}
+    </span>
+  );
+}
+
+/**
+ * The left thumb's run pad: Left and Right side by side, as one touch
+ * surface. Each finger is tracked by pointer id, and the side it is on is
+ * read from its position on every move, so the thumb can rock from Left to
+ * Right without lifting. (The shared TouchButton captures its pointer, which
+ * is right for Jump but would pin a sliding thumb to the first button.)
+ *
+ * Keyboard users press either button with Enter or Space (a click with
+ * detail 0), which runs that way for a moment.
+ */
+export function RunPad({ onChange, size = 76, mono, haptics = false, onPress }: { onChange: (left: boolean, right: boolean) => void; size?: number; mono: boolean; haptics?: boolean; onPress?: () => void }) {
+  const padRef = useRef<HTMLDivElement>(null);
+  const leftRef = useRef<HTMLButtonElement>(null);
+  const rightRef = useRef<HTMLButtonElement>(null);
+  const pointers = useRef(new Map<number, -1 | 1>());
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const publish = useCallback(() => {
+    let l = false, r = false;
+    pointers.current.forEach(s => { if (s < 0) l = true; else r = true; });
+    if (leftRef.current) leftRef.current.dataset.held = String(l);
+    if (rightRef.current) rightRef.current.dataset.held = String(r);
+    onChange(l, r);
+  }, [onChange]);
+
+  useEffect(() => () => { if (tapTimer.current) clearTimeout(tapTimer.current); }, []);
+
+  const sideOf = (clientX: number): -1 | 1 => {
+    const el = padRef.current;
+    if (!el) return 1;
+    const r = el.getBoundingClientRect();
+    return clientX < r.left + r.width / 2 ? -1 : 1;
+  };
+
+  const end = (id: number) => {
+    if (!pointers.current.delete(id)) return;
+    publish();
+  };
+
+  const tap = (side: -1 | 1) => {
+    onChange(side < 0, side > 0);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(publish, 180);
+  };
+
+  const btn = `flex items-center justify-center border text-text select-none touch-none [-webkit-touch-callout:none]
+    [-webkit-tap-highlight-color:transparent] transition-[transform,background-color] duration-75 ease-out
+    data-[held=true]:scale-95 data-[held=true]:brightness-125 ${mono ? 'border-border data-[held=true]:bg-text/15' : 'border-[#3a2a5c] bg-[#1d1430] data-[held=true]:bg-[#3a2a5c]'}`;
+
+  return (
+    <div
+      ref={padRef}
+      className="flex gap-3 touch-none select-none"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        pointers.current.set(e.pointerId, sideOf(e.clientX));
+        publish();
+        tryCapture(padRef.current, e.pointerId);
+        buzzPress(haptics, 6);
+        onPress?.();
+      }}
+      onPointerMove={(e) => {
+        const cur = pointers.current.get(e.pointerId);
+        if (cur === undefined) return;
+        const s = sideOf(e.clientX);
+        if (s !== cur) { pointers.current.set(e.pointerId, s); publish(); }
+      }}
+      onPointerUp={(e) => end(e.pointerId)}
+      onPointerCancel={(e) => end(e.pointerId)}
+      onLostPointerCapture={(e) => { if (e.target === e.currentTarget) end(e.pointerId); }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <button
+        ref={leftRef}
+        type="button"
+        aria-label="Run left"
+        style={{ width: size, height: size }}
+        className={`${btn} rounded-l-[22px] rounded-r-md`}
+        onClick={(e) => { if (e.detail === 0) tap(-1); }}
+      >
+        <ChevronLeft size={30} aria-hidden />
+      </button>
+      <button
+        ref={rightRef}
+        type="button"
+        aria-label="Run right"
+        style={{ width: size, height: size }}
+        className={`${btn} rounded-r-[22px] rounded-l-md`}
+        onClick={(e) => { if (e.detail === 0) tap(1); }}
+      >
+        <ChevronRight size={30} aria-hidden />
+      </button>
+    </div>
+  );
+}

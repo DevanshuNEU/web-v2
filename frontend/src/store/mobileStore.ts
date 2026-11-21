@@ -41,6 +41,15 @@ interface MobileStore {
   // Overlays
   spotlightOpen: boolean;
   setSpotlight: (open: boolean) => void;
+
+  /**
+   * The open app asked for the whole screen (the platformer in landscape):
+   * AppView hides its bar. Only an open app can hold it, and it drops on its
+   * own whenever that app closes, another app opens or the phone locks, so a
+   * game that forgets to clear it can never strand another app without Done.
+   */
+  immersive: boolean;
+  setImmersive: (on: boolean) => void;
 }
 
 /** History state the phone shell writes. devosDepth 1 = an app's root view. */
@@ -115,7 +124,7 @@ export const useMobileStore = create<MobileStore>((set) => ({
   },
   lock: () => {
     popHistoryEntries();
-    set({ locked: true, lockedByUser: true, openAppType: null, openApps: [] });
+    set({ locked: true, lockedByUser: true, openAppType: null, openApps: [], immersive: false });
   },
   syncLockWithSession: () =>
     set((s) => (s.locked && !s.lockedByUser && hasBootedThisSession() ? { locked: false } : {})),
@@ -141,6 +150,7 @@ export const useMobileStore = create<MobileStore>((set) => ({
         // Move to front, dedupe
         openApps: [appType, ...state.openApps.filter((a) => a !== appType)],
         spotlightOpen: false,
+        immersive: state.openAppType === appType ? state.immersive : false,
       };
     }),
   closeApp: (appType) =>
@@ -153,7 +163,11 @@ export const useMobileStore = create<MobileStore>((set) => ({
       // Transitioning to "no app": pop every history entry the app pushed.
       if (newOpenAppType === null) popHistoryEntries();
       analytics().trackAppClose(target);
-      return { openApps: remaining, openAppType: newOpenAppType };
+      return {
+        openApps: remaining,
+        openAppType: newOpenAppType,
+        immersive: newOpenAppType === state.openAppType ? state.immersive : false,
+      };
     }),
   closeAppFromPopstate: () =>
     set((state) => {
@@ -165,10 +179,18 @@ export const useMobileStore = create<MobileStore>((set) => ({
       return {
         openApps: state.openApps.filter((a) => a !== target),
         openAppType: null,
+        immersive: false,
       };
     }),
 
   // Overlays
   spotlightOpen: false,
   setSpotlight: (spotlightOpen) => set({ spotlightOpen }),
+
+  immersive: false,
+  setImmersive: (on) =>
+    set((state) => {
+      const next = on && state.openAppType !== null;
+      return next === state.immersive ? state : { immersive: next };
+    }),
 }));
