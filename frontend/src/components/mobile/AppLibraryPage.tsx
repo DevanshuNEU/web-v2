@@ -63,7 +63,7 @@ export default function AppLibraryPage() {
 
   return (
     <section
-      className="snap-start w-full flex-shrink-0 flex flex-col"
+      className="snap-start snap-always w-full flex-shrink-0 flex flex-col"
       aria-label="App Library"
     >
       {/* Pinned header: the search field. (The 10px "Library" label was
@@ -130,7 +130,7 @@ export default function AppLibraryPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: reduced ? 1 : 0 }}
               transition={{ duration: reduced ? 0 : 0.14 }}
-              className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-4"
+              className="flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-5 pt-5 pb-4"
             >
               <div className="grid grid-cols-4 gap-x-3 gap-y-5">
                 {apps.map((app) => (
