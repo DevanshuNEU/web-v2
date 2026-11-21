@@ -19,7 +19,7 @@ function post(path: string, body: unknown, headers: Record<string, string> = {},
   }) as any;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const get = (path: string) => new Request(`http://localhost${path}`) as any;
+const get = (path: string, ip?: string) => new Request(`http://localhost${path}`, ip ? { headers: { 'x-real-ip': ip } } : {}) as any;
 
 async function run(game: string, name: string, points: number) {
   const res = await start(post('/api/arcade/start', { game }));
@@ -54,6 +54,21 @@ describe('POST /api/arcade/start', () => {
     const json = await res.json();
     expect(typeof json.token).toBe('string');
     expect(json.expiresAt).toBe(Date.now() + 2 * 60 * 60 * 1000);
+  });
+
+  it('is never cached', async () => {
+    expect((await start(post('/api/arcade/start', { game: 'snake' }))).headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rate limits one network to 60 run starts in 10 minutes', async () => {
+    const ip = { 'x-real-ip': '203.0.113.50' };
+    for (let i = 0; i < 60; i++) expect((await start(post('/api/arcade/start', { game: 'snake' }, ip))).status).toBe(200);
+    const limited = await start(post('/api/arcade/start', { game: 'snake' }, ip));
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error.code).toBe('rate_limited');
+    expect((await start(post('/api/arcade/start', { game: 'snake' }))).status).toBe(200);
+    vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1);
+    expect((await start(post('/api/arcade/start', { game: 'snake' }, ip))).status).toBe(200);
   });
 
   it('rejects an unknown game or a missing body', async () => {
@@ -112,6 +127,32 @@ describe('GET /api/arcade/board', () => {
   it('rejects an unknown game', async () => {
     const res = await board(get('/api/arcade/board?game=pong'));
     expect(res.status).toBe(400);
+  });
+  it('lets the CDN cache the public board for 10 seconds, with nothing personal in it', async () => {
+    await run('snake', 'Dev', 42);
+    const res = await board(get('/api/arcade/board?game=snake'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, s-maxage=10, stale-while-revalidate=30');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    const json = await res.json();
+    expect(json.me).toBeNull();
+    expect(Object.keys(json).sort()).toEqual(['all', 'game', 'me', 'week']);
+  });
+
+  it('never caches a board asked for with a name, or an error', async () => {
+    expect((await board(get('/api/arcade/board?game=snake&name=Dev'))).headers.get('cache-control')).toBe('no-store');
+    expect((await board(get('/api/arcade/board?game=pong'))).headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rate limits one network to 120 board reads a minute', async () => {
+    const ip = '203.0.113.40';
+    for (let i = 0; i < 120; i++) expect((await board(get('/api/arcade/board?game=snake', ip))).status).toBe(200);
+    const limited = await board(get('/api/arcade/board?game=snake', ip));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('cache-control')).toBe('no-store');
+    expect((await board(get('/api/arcade/board?game=snake', '203.0.113.41'))).status).toBe(200);
+    vi.setSystemTime(Date.now() + 61_000);
+    expect((await board(get('/api/arcade/board?game=snake', ip))).status).toBe(200);
   });
 });
 

@@ -2,7 +2,7 @@
  * Per-IP limits for the arcade routes, following lib/rateLimit.ts: an
  * always-on in-memory sliding window, plus a durable Upstash window when the
  * Upstash env is set. The shared helper only does per-minute windows, and
- * these need ten minutes, so they live here. Each bucket counts separately,
+ * most of these need ten minutes, so they live here. Each bucket counts separately,
  * so guessing the crown code never uses up a player's score posts.
  */
 
@@ -16,8 +16,21 @@ export const WINDOW_MS = 10 * 60 * 1000;
 // are also capped per day across every network (lib/arcade/crown.ts).
 export const SECRET_TRIES_PER_WINDOW = 10;
 
-type Bucket = 'score' | 'secret';
-const MAX: Record<Bucket, number> = { score: SUBMITS_PER_WINDOW, secret: SECRET_TRIES_PER_WINDOW };
+// Board reads: a page view loads one board per tab switch; 120 a minute is
+// far above a person and well below a scraper looping on the route.
+export const BOARD_READS_PER_MINUTE = 120;
+// Run starts: one per round, and the shortest round is about 15 seconds.
+export const STARTS_PER_WINDOW = 60;
+
+type Bucket = 'score' | 'secret' | 'board' | 'start';
+type Rule = { max: number; windowMs: number; window: '1 m' | '10 m' };
+const TEN_MINUTES: Pick<Rule, 'windowMs' | 'window'> = { windowMs: WINDOW_MS, window: '10 m' };
+const RULE: Record<Bucket, Rule> = {
+  score: { max: SUBMITS_PER_WINDOW, ...TEN_MINUTES },
+  secret: { max: SECRET_TRIES_PER_WINDOW, ...TEN_MINUTES },
+  board: { max: BOARD_READS_PER_MINUTE, windowMs: 60_000, window: '1 m' },
+  start: { max: STARTS_PER_WINDOW, ...TEN_MINUTES },
+};
 
 const hits = new Map<string, number[]>();
 
@@ -41,8 +54,9 @@ export function ipBucket(ip: string): string {
 function inMemoryLimit(bucket: Bucket, ip: string): boolean {
   const key = `${bucket}:${ip}`;
   const now = Date.now();
-  const recent = (hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (recent.length >= MAX[bucket]) {
+  const { max, windowMs } = RULE[bucket];
+  const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= max) {
     hits.set(key, recent);
     return true;
   }
@@ -64,7 +78,7 @@ async function getDurable(bucket: Bucket): Promise<Durable | null> {
   const { Redis } = await import('@upstash/redis');
   const limiter = new Ratelimit({
     redis: new Redis({ url, token }),
-    limiter: Ratelimit.slidingWindow(MAX[bucket], '10 m'),
+    limiter: Ratelimit.slidingWindow(RULE[bucket].max, RULE[bucket].window),
     prefix: `arcade:${bucket}:ip`,
   });
   durable[bucket] = { url, limiter };
@@ -93,9 +107,18 @@ export function secretLimited(ip: string): Promise<boolean> {
   return limited('secret', ip);
 }
 
+/** True when this IP has read the board too often this minute. */
+export function boardLimited(ip: string): Promise<boolean> {
+  return limited('board', ip);
+}
+
+/** True when this IP has started too many runs in the window. */
+export function startLimited(ip: string): Promise<boolean> {
+  return limited('start', ip);
+}
+
 /** Tests: forget every IP. */
 export function resetLimiter(): void {
   hits.clear();
-  delete durable.score;
-  delete durable.secret;
+  for (const bucket of Object.keys(durable) as Bucket[]) delete durable[bucket];
 }
