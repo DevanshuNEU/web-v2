@@ -45,9 +45,13 @@ export interface SkyLayer {
 
 export interface Twinkle { x: number; y: number; seed: number; bright: boolean }
 
+/** Where the moon or the sun sits in the sky canvas, so it can be drawn again after the darkness. */
+export interface Disc { x: number; y: number; r: number }
+
 export interface Sky {
   canvas: Canvas;
   twinkles: Twinkle[];
+  disc?: Disc;
   clouds: SkyLayer;
   layers: SkyLayer[];
 }
@@ -473,7 +477,7 @@ function rgba(hexOrRgb: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-export function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: string) => string, sky: SkyPreset): { canvas: Canvas; twinkles: Twinkle[] } {
+export function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: string) => string, sky: SkyPreset): { canvas: Canvas; twinkles: Twinkle[]; disc?: Disc } {
   const r = rng(seed);
   const { canvas, ctx } = makeCanvas(w, h);
   const g = ctx.createLinearGradient?.(0, 0, 0, h);
@@ -515,7 +519,7 @@ export function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: strin
       ctx.fillStyle = col(y < -sr * 0.4 ? '#fff4d6' : y < sr * 0.3 ? '#ffe2a0' : '#ffc070');
       ctx.fillRect(sx - half, sy + y, half * 2, 1);
     }
-    return { canvas, twinkles };
+    return { canvas, twinkles, disc: { x: sx, y: sy, r: sr } };
   }
   if (sky.disc !== 'moon') return { canvas, twinkles };
   // the moon: a pale disc with soft shading and a wide halo
@@ -539,7 +543,7 @@ export function bakeSkyCanvas(w: number, h: number, seed: number, col: (c: strin
   }
   ctx.fillStyle = col('#cbc0f2');
   for (const [cx, cy, cr] of [[-3, -2, 2], [3, 3, 2], [-1, 5, 1], [4, -4, 1]]) ctx.fillRect(mx + cx, my + cy, cr, cr);
-  return { canvas, twinkles };
+  return { canvas, twinkles, disc: { x: mx, y: my, r: mr } };
 }
 
 export interface SkyOpts {
@@ -555,7 +559,7 @@ export interface SkyOpts {
 export function bakeSky(w: number, h: number, mono: boolean, seed = 0, text?: { draw: (c: Ctx, t: string, x: number, y: number) => void; width: (t: string) => number }, opts: SkyOpts = {}): Sky {
   const col = mono ? toMono : (c: string) => c;
   const sd = Math.floor(seed) >>> 0;
-  const { canvas, twinkles } = bakeSkyCanvas(w, h, 11 + sd * 13, col, opts.sky ?? SKY_PRESETS.night);
+  const { canvas, twinkles, disc } = bakeSkyCanvas(w, h, 11 + sd * 13, col, opts.sky ?? SKY_PRESETS.night);
   const neon = opts.neon ?? 1;
   // in Austin the generic towers stay lower, so the landmarks read
   const styles = opts.austin ? LAYERS.map((st, i) => (i === 1 || i === 2 ? { ...st, maxH: Math.round(st.maxH * 0.62), minH: Math.round(st.minH * 0.7) } : st)) : LAYERS;
@@ -564,6 +568,7 @@ export function bakeSky(w: number, h: number, mono: boolean, seed = 0, text?: { 
   return {
     canvas,
     twinkles,
+    disc,
     clouds: bakeClouds(29 + sd * 17, col),
     layers: [
       ...base,

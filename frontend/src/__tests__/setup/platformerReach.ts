@@ -8,6 +8,15 @@
  * fall out of the level ends the move. If this says a goal is reachable, a
  * player with ordinary timing can reach it.
  *
+ * Chapter 4: an awning (A) is never stood on; landing on one makes a spring
+ * node that launches her PHYS.springV up (held-jump gravity on the rise).
+ * Water (W) ends any move that touches it, like a fall out of the level.
+ * Spikes (^) block like any solid tile, but landing on them or touching
+ * their side ends the move, and she never stands or clings on them.
+ * Crane hooks count as one-way cells at both ends and the bottom of their
+ * swing, linked like a moving platform. Gusts and waves are left out: she
+ * can always wait for the calm.
+ *
  * `generous` flips the margins the other way (full speeds, jump from the very
  * edge with coyote time), to prove a gap really needs a move: if even the
  * generous search cannot cross without the dash, the dash is required.
@@ -16,6 +25,7 @@
 import { PHYS } from '@/components/apps/games/platformer/sim/physics';
 import { ROWS, TILE, isOneWayTile, isSolidTile, type Level } from '@/components/apps/games/platformer/sim/level';
 import { PLATFORM_AMP } from '@/components/apps/games/platformer/sim/world';
+import { HOOK_W } from '@/components/apps/games/platformer/sim/hooks';
 
 interface Box { x: number; y: number; w: number; h: number }
 
@@ -44,10 +54,12 @@ export interface ReachOpts {
   vehicles?: boolean;
   /** Cracked panels (%) count as open: a dash smashes them. Only with `dash`. */
   smash?: boolean;
+  /** Crates (R, the beach's sand sculptures) count as open: the blade breaks them. */
+  blade?: boolean;
 }
 
 interface Template { pts: Float64Array }
-interface Spec { dir: number; vx0: number; vy0: number; hold: boolean; steerDelay: number; dashAt: number; lockT: number; dj: number }
+interface Spec { dir: number; vx0: number; vy0: number; hold: boolean; steerDelay: number; dashAt: number; lockT: number; dj: number; spring?: boolean }
 
 const W = PHYS.heroW, H = PHYS.heroH;
 const EPS = 1e-6;
@@ -64,14 +76,15 @@ function simulate(s: Spec, generous: boolean): Template {
   const m = margins(generous);
   const out: number[] = [];
   const dt = 1 / 240;
-  let x = 0, y = 0, vx = s.vx0, vy = s.vy0, t = 0, dashLeft = 0, dashed = false, jumped2 = false;
+  let x = 0, y = 0, vx = s.vx0, vy = s.vy0, t = 0, dashLeft = 0, dashed = false, jumped2 = false, spring = !!s.spring;
   let lx = 0, ly = 0;
   const runMax = PHYS.runMax * m.mx;
   // Every landing in a 14 row level happens well inside 1.6 s.
   while (t < 1.6 && y < ROWS + 2) {
     if (!dashed && s.dashAt >= 0 && t >= s.dashAt) { dashed = true; dashLeft = PHYS.dashTime; }
     // The double jump: a fresh full jump, held.
-    if (!jumped2 && s.dj >= 0 && t >= s.dj && dashLeft <= 0) { jumped2 = true; vy = -PHYS.jumpV * m.mv; }
+    if (!jumped2 && s.dj >= 0 && t >= s.dj && dashLeft <= 0) { jumped2 = true; spring = false; vy = -PHYS.jumpV * m.mv; }
+    if (spring && vy >= 0) spring = false;
     if (dashLeft > 0) {
       vx = s.dir * PHYS.dashSpeed * m.md; vy = 0;
       dashLeft -= dt;
@@ -82,7 +95,8 @@ function simulate(s: Spec, generous: boolean): Template {
         const a = PHYS.accelAir * m.air * dt;
         vx = vx < target ? Math.min(target, vx + a) : Math.max(target, vx - a);
       }
-      const g = vy < 0 && (s.hold || jumped2) ? PHYS.gravityHold : PHYS.gravity;
+      const g = spring ? PHYS.gravityHold * (generous ? PHYS.springHoldK : 1)
+        : vy < 0 && (s.hold || jumped2) ? PHYS.gravityHold : PHYS.gravity;
       vy = Math.min(PHYS.terminal, vy + g * dt);
     }
     x += vx * dt; y += vy * dt; t += dt;
@@ -92,7 +106,7 @@ function simulate(s: Spec, generous: boolean): Template {
   return { pts: Float64Array.from(out) };
 }
 
-interface Templates { jump: Template[][][]; fall: Template[][][]; wall: Template[][]; bounce: Template[][] }
+interface Templates { jump: Template[][][]; fall: Template[][][]; wall: Template[][]; bounce: Template[][]; spring: Template[][] }
 
 const cache = new Map<string, Templates>();
 
@@ -155,7 +169,17 @@ function templates(dash: boolean, dj: boolean, generous: boolean): Templates {
       }
     }
   }
-  const t = { jump, fall, wall, bounce };
+  // Off an awning: up at springV, steering either way now or late, double jump and dash as usual.
+  const spring: Template[][] = [[], []];
+  for (const di of [0, 1]) {
+    const dir = di === 0 ? -1 : 1;
+    for (const steerDelay of [0, 0.15, 0.3, 0.5]) {
+      for (const [dj2, dashAt] of combos(dash, dj, dash ? [-1, 0.2, 0.4, 0.6] : [-1], generous ? fine(0.1, 0.8) : [0.3, 0.5, 0.7])) {
+        spring[di].push(simulate({ dir, vx0: 0, vy0: -PHYS.springV * m.mv, hold: true, steerDelay, dashAt, lockT: 0, dj: dj2, spring: true }, generous));
+      }
+    }
+  }
+  const t = { jump, fall, wall, bounce, spring };
   cache.set(key, t);
   return t;
 }
@@ -170,11 +194,18 @@ function templates(dash: boolean, dj: boolean, generous: boolean): Templates {
 function grid(level: Level, opts: ReachOpts) {
   const cols = level.cols;
   const g = new Uint8Array(cols * ROWS);
+  /** Awning cells (she bounces off them) and water cells (a touch ends the move). */
+  const awning = new Uint8Array(cols * ROWS);
+  const wet = new Uint8Array(cols * ROWS);
+  const spike = new Uint8Array(cols * ROWS);
   const smash = !!opts.smash && opts.dash;
   for (let i = 0; i < g.length; i++) {
     const t = level.tiles[i];
     // Thin clouds count as one-way floors: she has PUFF.wobble seconds on one, plenty to jump on.
-    g[i] = smash && t === TILE.CRACK ? 0 : isSolidTile(t) ? 1 : isOneWayTile(t) ? 2 : 0;
+    g[i] = (smash && t === TILE.CRACK) || (opts.blade && t === TILE.CRATE) ? 0 : isSolidTile(t) ? 1 : isOneWayTile(t) ? 2 : 0;
+    if (t === TILE.AWNING) awning[i] = 1;
+    if (t === TILE.WATER) wet[i] = 1;
+    if (t === TILE.SPIKE) spike[i] = 1;
   }
   /** Lane roof cells: cell index to lane number (+1); and each lane's direction. */
   const lane = new Int16Array(cols * ROWS);
@@ -191,19 +222,44 @@ function grid(level: Level, opts: ReachOpts) {
       }
     });
   }
-  const rides = new Map<number, number[]>();
+  /** Standing cell (x * ROWS + y) to the standing cells a ride takes her to. */
+  const rides = new Map<number, [number, number][]>();
+  /** The cells a moving floor `w` wide with its left edge at lo fully covers on row `row`, as standing cells above it. */
+  const span = (lo: number, w: number, row: number) => {
+    const out: [number, number][] = [];
+    for (let c = Math.ceil(lo - EPS); c <= Math.floor(lo + w + EPS) - 1; c++) if (c >= 0 && c < cols) out.push([c, row - 1]);
+    return out;
+  };
+  /** Mark each group's cells as one-way floors, and link every cell to the cells of the other groups. */
+  const link = (groups: [number, number][][]) => {
+    for (const gr of groups) for (const [c, y] of gr) if (g[(y + 1) * cols + c] === 0) g[(y + 1) * cols + c] = 2;
+    groups.forEach((gr, i) => {
+      const others = groups.filter((_, j) => j !== i).flat();
+      for (const [c, y] of gr) rides.set(c * ROWS + y, [...(rides.get(c * ROWS + y) ?? []), ...others]);
+    });
+  };
   for (const p of level.platforms) {
     if (p.axis !== 'x') continue;
-    const span = (lo: number) => { const out: number[] = []; for (let c = Math.ceil(lo); c <= Math.floor(lo + p.w) - 1; c++) if (c >= 0 && c < cols) out.push(c); return out; };
-    const a = span(p.x - PLATFORM_AMP), b = span(p.x + PLATFORM_AMP);
-    for (const c of [...a, ...b]) if (g[p.y * cols + c] === 0) g[p.y * cols + c] = 2;
-    for (const c of a) rides.set(c * ROWS + (p.y - 1), b);
-    for (const c of b) rides.set(c * ROWS + (p.y - 1), a);
+    link([span(p.x - PLATFORM_AMP, p.w, p.y), span(p.x + PLATFORM_AMP, p.w, p.y)]);
+  }
+  // Crane hooks: the deck at both ends of its swing and at the bottom. The level puts those on whole rows.
+  for (const hk of level.hooks) {
+    const px = hk.x + 0.5, py = hk.y + 1;
+    const groups = [-hk.amp, 0, hk.amp].map(a => {
+      const top = py + hk.len * Math.cos(a);
+      const row = Math.round(top);
+      if (Math.abs(top - row) > 0.05) throw new Error(`hook at ${hk.x}: deck top ${top.toFixed(2)} is not on a whole row`);
+      return span(px + hk.len * Math.sin(a) - HOOK_W / 2, HOOK_W, row);
+    });
+    link(groups);
   }
   const at = (x: number, y: number) => (x < 0 || x >= cols ? 1 : y < 0 || y >= ROWS ? 0 : g[y * cols + x]);
   /** The lane whose roof is the cell (x, y), -1 for none. */
   const laneAt = (x: number, y: number) => (x < 0 || x >= cols || y < 0 || y >= ROWS ? -1 : lane[y * cols + x] - 1);
-  return { cols, at, rides, laneAt, laneDir };
+  const isAwning = (x: number, y: number) => x >= 0 && x < cols && y >= 0 && y < ROWS && awning[y * cols + x] === 1;
+  const isWet = (x: number, y: number) => x >= 0 && x < cols && y >= 0 && y < ROWS && wet[y * cols + x] === 1;
+  const isSpike = (x: number, y: number) => x >= 0 && x < cols && y >= 0 && y < ROWS && spike[y * cols + x] === 1;
+  return { cols, at, rides, laneAt, laneDir, isAwning, isWet, isSpike };
 }
 
 export interface ReachResult {
@@ -220,7 +276,7 @@ export interface ReachResult {
 }
 
 export function reach(level: Level, opts: ReachOpts): ReachResult {
-  const { cols, at, rides, laneAt, laneDir } = grid(level, opts);
+  const { cols, at, rides, laneAt, laneDir, isAwning, isWet, isSpike } = grid(level, opts);
   const T = templates(opts.dash, !!opts.doubleJump, !!opts.generous);
   const targets = opts.targets ?? [];
   const touched = targets.map(() => false);
@@ -237,12 +293,17 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
   const solid = (x: number, y: number) => at(x, y) === 1;
   const floorAt = (x: number, y: number) => at(x, y) !== 0;
   const clear = (x: number, y: number) => !solid(x, y) && !solid(x, y - 1);
-  const standable = (x: number, y: number) => y >= 1 && y < ROWS && clear(x, y) && floorAt(x, y + 1);
+  const standable = (x: number, y: number) => y >= 1 && y < ROWS && clear(x, y) && floorAt(x, y + 1) && !isAwning(x, y + 1) && !isSpike(x, y + 1);
+  /** Arrive on the floor under cell (x, y): stand there, or bounce off an awning. */
+  const arrive = (x: number, y: number) => {
+    if (isAwning(x, y + 1)) { if (y >= 0 && clear(x, y)) push(x, y, 3); } else if (standable(x, y)) push(x, y, 0);
+  };
 
-  // Node id: (x * ROWS + y) * 3 + kind; kind 0 stand, 1 wall on the left, 2 wall on the right.
+  // Node id: (x * ROWS + y) * K + kind; kind 0 stand, 1 wall on the left, 2 wall on the right, 3 bouncing off an awning.
   // Bounce nodes (one per drone) follow the cell nodes.
+  const K = 4;
   const drones = opts.bounces ? level.enemies.filter(e => e.kind === 'adDrone' || e.kind === 'eliteDrone') : [];
-  const cellNodes = cols * ROWS * 3;
+  const cellNodes = cols * ROWS * K;
   const seen = new Uint8Array(cellNodes + drones.length);
   const pushBounce = (i: number) => {
     const id = cellNodes + i;
@@ -257,7 +318,7 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
   const edges: [number, number][] = [];
   const push = (x: number, y: number, kind: number) => {
     if (x < 0 || x >= cols || y < 0 || y >= ROWS) return;
-    const id = (x * ROWS + y) * 3 + kind;
+    const id = (x * ROWS + y) * K + kind;
     if (opts.graph && cur >= 0) edges.push([cur, id]);
     if (seen[id]) return;
     seen[id] = 1;
@@ -272,6 +333,12 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
     const c0 = Math.floor(x + EPS), c1 = Math.floor(x + W - EPS);
     const r0 = Math.floor(f - H + EPS), r1 = Math.floor(f - EPS);
     for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (solid(c, r)) return true;
+    return false;
+  };
+  const boxWet = (x: number, f: number) => {
+    const c0 = Math.floor(x + 0.05), c1 = Math.floor(x + W - 0.05);
+    const r0 = Math.floor(f - H + EPS), r1 = Math.floor(f - EPS);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (isWet(c, r)) return true;
     return false;
   };
 
@@ -299,17 +366,20 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
           let land = -1;
           for (let c = c0; c <= c1; c++) if (floorAt(c, rf) && !solid(c, rf - 1) && (land < 0 || c === cx)) land = c;
           if (land >= 0) {
-            if (standable(land, rf - 1)) push(land, rf - 1, 0);
+            if (!isSpike(land, rf)) arrive(land, rf - 1);
             return;
           }
         }
       }
+      // Water ends the move (a deck on the water line is a landing, found above).
+      if (boxWet(x, f)) return;
       if (boxHits(x, f)) {
         // Only the sideways part of the move hits: a wall to cling to.
         // Anything else (a head bump, a corner) ends the move.
         const side = x > px + EPS ? 1 : x < px - EPS ? -1 : 0;
         if (side !== 0 && boxHits(x, pf) && !boxHits(px, f)) {
           const cx = Math.floor(px + W / 2), cy = Math.floor(pf - EPS);
+          if (isSpike(cx + side, cy) || isSpike(cx + side, cy - 1)) return;
           if (cy >= 1 && clear(cx, cy) && (solid(cx + side, cy) || solid(cx + side, cy - 1))) push(cx, cy, side < 0 ? 1 : 2);
         }
         return;
@@ -331,15 +401,21 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       for (const di of [0, 1]) for (const tp of T.bounce[di]) sweep(tp, b.x + b.w / 2 - W / 2, b.y);
       continue;
     }
-    const kind = id % 3, cell = (id - kind) / 3;
+    const kind = id % K, cell = (id - kind) / K;
     const x = Math.floor(cell / ROWS), y = cell % ROWS;
     if (atGoal(x, y)) { reached = true; goalNodes.add(id); if (!opts.targets && !opts.graph) break; }
     maxX = Math.max(maxX, x); minX = Math.min(minX, x);
+    if (kind === 3) {
+      // Bouncing off an awning: up she goes.
+      const bx = x + 0.5 - W / 2;
+      for (const di of [0, 1]) for (const tp of T.spring[di]) sweep(tp, bx, y + 1);
+      continue;
+    }
     if (kind === 0) {
       stands.push({ x, y });
       touch(x + 0.5 - W / 2, y + 1);
       const ride = rides.get(x * ROWS + y);
-      if (ride) for (const c of ride) if (standable(c, y)) push(c, y, 0);
+      if (ride) for (const [c, yy] of ride) if (standable(c, yy)) push(c, yy, 0);
       // On a vehicle roof: carried along its lane to any cell further on.
       const ln = laneAt(x, y + 1);
       if (ln >= 0) {
@@ -352,7 +428,7 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
         // Walking back along a moving roof only goes as far as the roof does: not modelled.
         if (ln >= 0 && d !== laneDir[ln] && laneAt(nx, y + 1) === ln) continue;
         if (clear(nx, y)) {
-          if (floorAt(nx, y + 1)) push(nx, y, 0);
+          if (floorAt(nx, y + 1)) arrive(nx, y);
           else {
             const run = standable(x - d, y) ? 1 : 0;
             const bx = x + 0.5 - W / 2 + d * 0.6;
@@ -369,8 +445,8 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       const side = kind === 1 ? -1 : 1;
       // Slide down the wall to the floor below.
       for (let yy = y; yy < ROWS; yy++) {
-        if (!clear(x, yy)) break;
-        if (floorAt(x, yy + 1)) { push(x, yy, 0); break; }
+        if (!clear(x, yy) || isWet(x, yy)) break;
+        if (floorAt(x, yy + 1)) { arrive(x, yy); break; }
       }
       if (opts.wallJump) {
         const bx = side > 0 ? x + 1 - W : x;
@@ -378,7 +454,7 @@ export function reach(level: Level, opts: ReachOpts): ReachResult {
       }
     }
   }
-  const cell = (id: number) => { const c = Math.floor(id / 3); return { x: Math.floor(c / ROWS), y: c % ROWS }; };
+  const cell = (id: number) => { const c = Math.floor(id / K); return { x: Math.floor(c / ROWS), y: c % ROWS }; };
   const graph = opts.graph ? { nodes: queue.slice(), edges, goal: goalNodes, cell } : undefined;
   return { reached, nodes: queue.length, maxX, minX, touched, stands, graph };
 }

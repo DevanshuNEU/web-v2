@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CARD_SECONDS, DYING_SECONDS, FINALE_SECONDS, LIVES, POINTS, SECRET_INDEX, TALLY_RATE,
   createWorld, drainEvents, enterLevel, flagBonus, score, scoreOf, setSecret, stepWorld,
-  timeBonus, touchesPoleTop, unlocksSecret, type World, type EventType,
-} from '@/components/apps/games/platformer/sim/world';
+  timeBonus, touchesPoleTop, unlocksSecret, type World, type EventType, parTime} from '@/components/apps/games/platformer/sim/world';
 import { ROWS, TILE, parseLevel, tileAt } from '@/components/apps/games/platformer/sim/level';
 import { PHYS } from '@/components/apps/games/platformer/sim/physics';
 import { emptyFrame, type InputFrame } from '@/components/apps/games/platformer/input/frame';
@@ -52,16 +51,13 @@ function eventsOf(w: World): EventType[] {
 const G40 = '#'.repeat(40);
 
 describe('platformer scoring rules', () => {
-  it('scores coins 10, stomps 50, bricks 20, clears 1000, plus flag and time bonus', () => {
-    expect(scoreOf({ coins: 3, stomps: 2, bricks: 1, flag: 400, clears: 1, time: 870, bonus: 500, deaths: 0 })).toBe(30 + 100 + 20 + 400 + 1000 + 870 + 500);
+  it('scores coins 10, kill points as earned, bricks 20, clears 1000, plus flag and time bonus', () => {
+    expect(scoreOf({ coins: 3, stomps: 2, kills: 300, bricks: 1, flag: 400, clears: 1, time: 870, bonus: 500, deaths: 0 })).toBe(30 + 300 + 20 + 400 + 1000 + 870 + 500);
   });
 
-  it('time bonus starts at 1000 and falls 5 points per whole second to 0', () => {
-    expect(timeBonus(0)).toBe(1000);
-    expect(timeBonus(0.99)).toBe(1000);
-    expect(timeBonus(10)).toBe(950);
-    expect(timeBonus(199)).toBe(5);
-    expect(timeBonus(500)).toBe(0);
+  it('time bonus is measured in whole seconds against par', () => {
+    expect(timeBonus(0.99, 60)).toBe(timeBonus(0, 60));
+    expect(timeBonus(60.5, 60)).toBe(1000);
   });
 
   const pole = { x: 50, top: 2, base: 11 };
@@ -158,7 +154,7 @@ describe('platformer world: enemies', () => {
     expect(e.x).toBeGreaterThan(14.5);
   });
 
-  it('landing on an enemy from above stomps it for 50 and bounces the hero', () => {
+  it('landing on an enemy from above stomps it for 100 and bounces the hero', () => {
     const w = worldOn(['.P........n.............................', G40, G40]);
     const e = w.enemies[0];
     run(w, 0.05);
@@ -167,7 +163,7 @@ describe('platformer world: enemies', () => {
     run(w, 1, {}, (ww) => { if (ww.events.some(ev => ev.type === 'stomp')) stomped = true; if (stomped) return; drainEvents(ww); });
     expect(stomped).toBe(true);
     expect(w.stats.stomps).toBe(1);
-    expect(score(w)).toBe(50);
+    expect(score(w)).toBe(100);
     expect(w.lives).toBe(LIVES);
   });
 
@@ -345,6 +341,7 @@ describe('platformer world: the flag, the tally and the next level', () => {
   it('the flag ends the level, tallies the time bonus and the clear, then loads world 2', () => {
     const w = createWorld({ rand: () => 0.5 });
     const p = w.level.pole;
+    const par = parTime(w.level);
     w.levelTime = 40;
     w.hero.x = p.x - 0.1; w.hero.y = 7.8;
     run(w, DT);
@@ -354,7 +351,7 @@ describe('platformer world: the flag, the tally and the next level', () => {
     run(w, 8);
     expect(w.levelIndex).toBe(1);
     expect(w.stats.clears).toBe(1);
-    expect(w.stats.time).toBe(timeBonus(40));
+    expect(w.stats.time).toBe(timeBonus(40, par));
     expect(w.cardT).toBeGreaterThan(CARD_SECONDS - 3);
   });
 

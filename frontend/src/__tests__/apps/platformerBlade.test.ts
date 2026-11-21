@@ -122,7 +122,7 @@ describe('Main Character blade: hits', () => {
     run(w, 0.3);
     expect(e.deadT).not.toBe(-1);
     expect(w.stats.stomps).toBe(1);
-    expect(score(w)).toBe(50);
+    expect(score(w)).toBe(100);
 
     const d = bladeOn(['.P..........................................', '...d........................................', '............................................', G40 + '....', G40 + '....']);
     expect(d.enemies[0].hp).toBe(1);

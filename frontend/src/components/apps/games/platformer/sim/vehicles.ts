@@ -1,17 +1,21 @@
 /**
- * Vehicles: the Green Line trolley and the trains under the footbridge. One
- * mechanic for all of them. A vehicle runs along a lane (the tile row of its
+ * Vehicles: the Green Line trolley, the trains under the footbridge, and the
+ * boats on the Charles (a rowing shell, a sailboat). One mechanic for all of
+ * them. A vehicle runs along a lane (the tile row of its
  * roof, between two columns) at a steady speed: in from beyond one end of
  * the lane, out past the other, then it waits `gap` seconds off the lane and
  * runs again. Its roof is a one-way floor that carries whatever stands on it;
  * its body is scenery (she passes in front of it) and never hurts her.
+ *
+ * A boat may bob: its deck rises and falls `bob` tiles around its row, one
+ * swing every BOB_PERIOD seconds (the sailboat; the shell sits flat).
  *
  * Where a vehicle is depends only on the time, never on what she does, so a
  * replay sees the same timetable. Signals (`s` in the level) on a lane turn
  * green for SIGNAL_LEAD seconds before a vehicle reaches them.
  */
 
-export type VehicleKind = 'trolley' | 'orangeTrain' | 'commuterTrain';
+export type VehicleKind = 'trolley' | 'orangeTrain' | 'commuterTrain' | 'shell' | 'sailboat';
 
 /** A lane and its timetable, as the level writes it (tile units, seconds). */
 export interface VehicleDef {
@@ -29,6 +33,8 @@ export interface VehicleDef {
   gap: number;
   /** Seconds before the first run starts (0 when unset). */
   offset?: number;
+  /** Tiles the deck rises and falls around `row` (a sailboat on the water); 0 when unset. */
+  bob?: number;
 }
 
 /** A vehicle now. x is the left edge, y the roof top (tile units); px, py where it was a step ago. */
@@ -42,12 +48,22 @@ export interface Vehicle {
   px: number; py: number;
 }
 
-/** Sizes in tiles. */
+/**
+ * Sizes in tiles. y is always the top of the floor she stands on: a roof, a
+ * shell's deck, a sailboat's deck. The sailboat's 3 tiles of height are its
+ * mast and sail above the deck (2) and the hull below it (1); the shell is a
+ * needle hull half a tile tall under its deck line.
+ */
 export const VEHICLE_SIZE: Readonly<Record<VehicleKind, { w: number; h: number }>> = {
   trolley: { w: 6, h: 2 },
   orangeTrain: { w: 8, h: 2 },
   commuterTrain: { w: 8, h: 2.5 },
+  shell: { w: 8, h: 0.5 },
+  sailboat: { w: 4, h: 3 },
 };
+
+/** Seconds per bob of a boat's deck (down, up and back). */
+export const BOB_PERIOD = 2.4;
 
 /** Seconds a signal shows green before a vehicle reaches it. */
 export const SIGNAL_LEAD = 1;
@@ -80,6 +96,7 @@ export function placeVehicle(v: Vehicle, d: VehicleDef, t: number) {
   const p = u < 0 ? -1 : u % period(d);
   v.active = p >= 0 && p < runTime(d);
   v.x = edgeAt(d, v.active ? p : 0);
+  v.y = d.bob ? d.row + d.bob * Math.sin((t / BOB_PERIOD) * Math.PI * 2) : d.row;
   v.vx = v.active ? d.dir * d.speed : 0;
 }
 

@@ -5,9 +5,9 @@ import { drainEvents } from '@/components/apps/games/platformer/sim/world';
 import { FLAT, G40, run, runUntil, worldOn } from '../setup/platformerWorld';
 
 describe('Main Character powers: one table, optional, one at a time', () => {
-  it('has Bat Wings, Taco Rush, Priority Boarding and Wicked Fast live, the concert\'s row marked later', () => {
-    expect([...POWER_KINDS]).toEqual(['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore']);
-    expect(POWER_KINDS.filter(k => POWERS[k].live)).toEqual(['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast']);
+  it('has Bat Wings, Taco Rush, Priority Boarding, Wicked Fast and the Cannoli Shield live, the concert\'s row marked later', () => {
+    expect([...POWER_KINDS]).toEqual(['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore', 'cannoliShield']);
+    expect(POWER_KINDS.filter(k => POWERS[k].live)).toEqual(['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'cannoliShield']);
     expect(POWERS.batWings.duration).toBe(10);
     expect(POWERS.tacoRush.duration).toBe(8);
     expect(POWERS.tacoRush.runMul).toBeCloseTo(1.4, 9);

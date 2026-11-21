@@ -53,6 +53,8 @@ export interface Hero extends Body {
    * she lands on plain floor or steers against it.
    */
   carry: number;
+  /** Rising from an awning bounce (until the top of the rise or a fresh jump). */
+  spring: boolean;
 }
 
 /** The part of the input frame the hero's body reads each step. */
@@ -63,7 +65,7 @@ export function createHero(x: number, feetY: number): Hero {
     x: x + (1 - PHYS.heroW) / 2, y: feetY - PHYS.heroH, w: PHYS.heroW, h: PHYS.heroH,
     vx: 0, vy: 0, onGround: true, facing: 1, coyote: PHYS.coyote, buffer: 0, cuttable: false,
     state: 'ground', dashReady: true, dashT: 0, dashDir: 1, wallDir: 0, landT: 1, animT: 0, lockT: 0, airJumps: PHYS.airJumps,
-    abilities: { wallJump: true, dash: true, blade: true }, runMul: 1, glideFall: 0, carry: 0,
+    abilities: { wallJump: true, dash: true, blade: true }, runMul: 1, glideFall: 0, carry: 0, spring: false,
   };
 }
 
@@ -205,6 +207,7 @@ export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, 
   if (h.buffer > 0 && !h.onGround && h.coyote <= 0 && !r.wallJumped && h.airJumps > 0
     && !landsWithin(h, h.buffer, solid, PHYS.gravity * gravityScale)) {
     h.vy = -PHYS.jumpV;
+    h.spring = false;
     h.airJumps--;
     h.buffer = 0;
     h.cuttable = true;
@@ -220,7 +223,9 @@ export function stepHero(h: Hero, input: HeroInput, dt: number, solid: SolidFn, 
   }
   if (h.vy >= 0) h.cuttable = false;
 
-  const g = (h.vy < 0 && input.jumpHeld ? PHYS.gravityHold : PHYS.gravity) * gravityScale;
+  if (h.spring && (h.vy >= 0 || r.jumped || r.wallJumped)) h.spring = false;
+  const g = (h.spring ? PHYS.gravityHold * (input.jumpHeld ? PHYS.springHoldK : 1)
+    : h.vy < 0 && input.jumpHeld ? PHYS.gravityHold : PHYS.gravity) * gravityScale;
   h.vy = Math.min(PHYS.terminal, h.vy + g * dt);
 
   // A glide (Bat Wings): holding jump on the way down caps the fall.
@@ -286,6 +291,19 @@ function stepDash(h: Hero, dt: number, solid: SolidFn, c: Contacts, r: StepResul
 export function stompBounce(h: Hero, holdingJump: boolean) {
   h.vy = -(holdingJump ? PHYS.stompBounceHeld : PHYS.stompBounce);
   h.cuttable = holdingJump;
+  h.spring = false;
   h.onGround = false;
   h.coyote = 0;
+}
+
+/** An awning's bounce: up at PHYS.springV, the double jump and the dash charged again. */
+export function springBounce(h: Hero) {
+  h.vy = -PHYS.springV;
+  h.spring = true;
+  h.cuttable = false;
+  h.onGround = false;
+  h.coyote = 0;
+  h.buffer = 0;
+  h.airJumps = PHYS.airJumps;
+  h.dashReady = true;
 }

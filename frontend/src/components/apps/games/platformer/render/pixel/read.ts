@@ -12,7 +12,7 @@ import type { World } from '../../sim/world';
 export type HeroState = 'ground' | 'air' | 'dash' | 'wallSlide' | 'pound' | 'hurt' | 'dead' | 'victory'
   | 'attack1' | 'attack2' | 'attack3' | 'airSlash' | 'downStrike' | 'upSlash';
 /** Power kinds: chapter 1 places Bat Wings and Taco Rush; the rest come later. */
-export type PickupKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore';
+export type PickupKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore' | 'cannoliShield';
 
 export interface Pt { x: number; y: number }
 export interface Afterimage { x: number; y: number; facing: 1 | -1; t: number }

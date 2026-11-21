@@ -10,7 +10,7 @@ import {
   PHYS, approach, contacts, moveBody, moveX, moveY, overlaps, stompOrHurt,
   type Body, type Contacts, type SolidFn,
 } from './physics';
-import { ABILITIES, createHero, pressJump, setState, stepHero, stompBounce, tryDash, worldOwned, type Abilities, type Ability, type Hero, type HeroInput } from './hero';
+import { ABILITIES, createHero, pressJump, setState, springBounce, stepHero, stompBounce, tryDash, worldOwned, type Abilities, type Ability, type Hero, type HeroInput } from './hero';
 
 export type { Abilities, Ability, Hero, HeroState } from './hero';
 import { consumeEdges, type InputFrame } from '../input/frame';
@@ -23,15 +23,23 @@ import { createScarf, neckOf, resetScarf, stepScarf, torsoOf, type ScarfPoint } 
 import { MAIN_LEVELS, MAIN_LEVEL_COUNT, ROWS, mainLevel, SECRET_FALLBACK, TILE, isOneWayTile, isSolidTile, secretLevel, parseLevel, type DecorKind, type Level, type Light } from './level';
 import { ENEMY_KINDS, enemyFrom, type Enemy, type EnemyCtx } from './enemies';
 import { SIGNAL_LEAD, arrivalIn, createVehicle, placeVehicle, type Vehicle } from './vehicles';
+import { createGust, gustPush, placeGust, type Gust } from './gusts';
+import { createHook, placeHook, type Hook } from './hooks';
+import { createWave, placeWave, wavePush, type Wave } from './waves';
 
 export type { Enemy, EnemyKind, EnemyMode } from './enemies';
 export type { Vehicle, VehicleDef, VehicleKind } from './vehicles';
+export type { Gust, GustDef } from './gusts';
+export type { Hook, HookDef } from './hooks';
+export type { Wave, WaveDef } from './waves';
 export { shouldTurnAtLedge } from './enemies';
 
 export const LIVES = 3;
-export const POINTS = { coin: 10, stomp: 50, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500, death: 50 } as const;
-/** Time bonus lost per whole second spent in a level. */
+export const POINTS = { coin: 10, stomp: 50, kill: 100, killMax: 500, timeTop: 3000, timeUnder: 25, brick: 20, clear: 1000, timeMax: 1000, flagTop: 2000, flagMax: 1000, sigma: 500, death: 50 } as const;
+/** Old flat time decay, kept for reference: the bonus is now measured against par. */
 export const TIME_DECAY = 5;
+/** A kill chain carries on for this long after a kill even on the ground (a quick blade combo). */
+export const CHAIN_SECONDS = 1.2;
 /** Points per second the clear tally counts up at. */
 export const TALLY_RATE = 1500;
 export const DYING_SECONDS = 1.4;
@@ -49,17 +57,32 @@ export const SECRET_INDEX = 3;
  * `bonus` holds points outside the counted items: Sigma coins and the Double
  * Aura coin extra. `deaths` counts story deaths (Endless has lives instead).
  */
-export interface Stats { coins: number; stomps: number; bricks: number; flag: number; clears: number; time: number; bonus: number; deaths: number }
+export interface Stats { coins: number; stomps: number; bricks: number; flag: number; clears: number; time: number; bonus: number; deaths: number; /** Points from kills, chains included. */ kills: number }
 
 /** Every item's points, less 50 per story death, never below 0. */
 export function scoreOf(s: Stats): number {
-  const earned = s.coins * POINTS.coin + s.stomps * POINTS.stomp + s.bricks * POINTS.brick + s.flag + s.clears * POINTS.clear + s.time + s.bonus;
+  const earned = s.coins * POINTS.coin + s.kills + s.bricks * POINTS.brick + s.flag + s.clears * POINTS.clear + s.time + s.bonus;
   return Math.max(0, earned - s.deaths * POINTS.death);
 }
 
-/** 1000 at the start, 5 points less for each whole second, never below 0. */
-export function timeBonus(seconds: number): number {
-  return Math.max(0, POINTS.timeMax - TIME_DECAY * Math.floor(Math.max(0, seconds)));
+/**
+ * The time bonus against a par time: 1000 at par, 25 more for each whole
+ * second under it (up to 3000), fading to 0 at twice par.
+ */
+export function timeBonus(seconds: number, par: number): number {
+  const t = Math.floor(Math.max(0, seconds));
+  if (t <= par) return Math.min(POINTS.timeTop, POINTS.timeMax + POINTS.timeUnder * (par - t));
+  return Math.max(0, Math.round(POINTS.timeMax * (1 - (t - par) / par)));
+}
+
+/** Par for a level: about 3 tiles a second from the start to the goal, at least 30 s. */
+export function parTime(level: Pick<Level, 'start' | 'goal'>): number {
+  return Math.max(30, Math.ceil(Math.abs(level.goal.x - level.start.x) / 3));
+}
+
+/** Points for the nth kill in a chain: 100, 200, ... up to 500. */
+export function killPoints(n: number): number {
+  return Math.min(POINTS.killMax, POINTS.kill * Math.max(1, n));
 }
 
 type Pole = Level['pole'];
@@ -116,6 +139,8 @@ export type EventType =
   | 'jump' | 'land' | 'skid' | 'coin' | 'stomp' | 'bump' | 'break' | 'crown' | 'power'
   | 'hurt' | 'die' | 'respawn' | 'checkpoint' | 'flag' | 'secret' | 'tick' | 'clear'
   | 'level' | 'over' | 'win' | 'dash' | 'wallJump' | 'doubleJump'
+  /** An enemy is out: n is the points it scored (its place in the kill chain). */
+  | 'kill'
   /** A shrine unlocked an ability: n is its index in ABILITIES (0 wall jump, 1 dash). */
   | 'unlock'
   /** A memory was found: n is its index in world.memories. */
@@ -129,7 +154,9 @@ export type EventType =
   /** An elite drone fired. */
   | 'shot'
   /** A power started or ran out: n is its index in POWER_KINDS. */
-  | 'powerOn' | 'powerOff';
+  | 'powerOn' | 'powerOff'
+  /** An awning bounced her up (x, y: where her feet met it). */
+  | 'bounce';
 
 export interface GameEvent { type: EventType; x: number; y: number; n: number }
 
@@ -167,8 +194,12 @@ export interface World {
   /** Memory ids found before on this device. */
   memoriesTaken: readonly string[];
   combo: number;
+  /** Kills in the current chain, seconds since the last kill, and whether she has landed since. */
+  chain: number; chainT: number; chainLanded: boolean;
   stats: Stats;
   pendingTime: number;
+  /** The time bonus this clear earned (the tally counts up to it), and kill points banked before this level. */
+  timeAward: number; killsBefore: number;
   pendingClear: boolean;
   /** 0 flag at the top, 1 lowered. */
   flagDrop: number;
@@ -263,7 +294,22 @@ export interface World {
   vehicles: Vehicle[];
   /** Signals by the lanes, green for SIGNAL_LEAD seconds before a vehicle reaches them. */
   signals: Signal[];
+  /**
+   * One per awning tile (A), in reading order: t is seconds since the awning
+   * it belongs to last bounced her (large until the first bounce), for the
+   * squash. A bounce restarts every tile of that awning together.
+   */
+  bounces: { x: number; y: number; t: number }[];
+  /** Harbor wind zones now: `warn` GUST_WARN seconds before each blow, `on` while it blows (see ./gusts.ts). */
+  gusts: Gust[];
+  /** Crane hooks now: pivot x, y, angle, rope len, block top centre px, py, width w, and the deck she rides (see ./hooks.ts). */
+  hooks: Hook[];
+  /** Waves now: the front column, `warn` while the water draws back, `on` while it covers sand (see ./waves.ts). */
+  waves: Wave[];
 }
+
+/** An awning's squash clock rests here until the first bounce. */
+const BOUNCE_IDLE = 99;
 
 /** Thin clouds: seconds from her first landing to the puff, and seconds gone. */
 export const PUFF = { wobble: 0.4, gone: 3 } as const;
@@ -324,9 +370,9 @@ export function createWorld(o: WorldOptions = {}): World {
     hero: createHero(level.start.x, level.start.y), heroPx: 0, heroPy: 0, hidden: false,
     enemies: [], platforms: [], crowns: [], pops: [], bumps: [], riding: null,
     phase: 'play', phaseT: 0, pitDeath: false, t: 0, levelTime: 0,
-    lives: LIVES, crowned: false, invuln: 0, checkpointHit: false, checkpointIdx: -1, memories: [], memoriesTaken: o.memoriesTaken ?? [], combo: 0,
-    stats: { coins: 0, stomps: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0, deaths: 0 },
-    pendingTime: 0, pendingClear: false, flagDrop: 0,
+    lives: LIVES, crowned: false, invuln: 0, checkpointHit: false, checkpointIdx: -1, memories: [], memoriesTaken: o.memoriesTaken ?? [], combo: 0, chain: 0, chainT: 9, chainLanded: true,
+    stats: { coins: 0, stomps: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0, deaths: 0, kills: 0 },
+    pendingTime: 0, timeAward: 0, killsBefore: 0, pendingClear: false, flagDrop: 0,
     secretUnlocked: false, secret: o.secret ?? { ...SECRET_FALLBACK }, result: null,
     events: [], cam: { x: 0, y: 0, look: 0, px: 0, py: 0 },
     viewCols: o.viewCols ?? 17, viewRows: o.viewRows ?? 13,
@@ -338,7 +384,7 @@ export function createWorld(o: WorldOptions = {}): World {
     abilities: abilitiesFor(o), shrines: [], sword: null,
     swing: null, attackBuffer: 0, comboNext: 0, comboT: 99, serial: 0, pogoSafe: 0, decor: [], lights: [], decoys: [],
     shots: Array.from({ length: SHOT_POOL }, () => ({ x: 0, y: 0, vx: 0, vy: 0, t: 0 })),
-    modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1, puffs: [], vehicles: [], signals: [],
+    modifier: { id: 'none', name: '' }, forcedModifier: o.modifier, wind: 0, windDir: 1, gravityScale: 1, coinMul: 1, puffs: [], vehicles: [], signals: [], bounces: [], gusts: [], hooks: [], waves: [],
     afterimages: Array.from({ length: AFTERIMAGE_POOL }, () => ({ x: 0, y: 0, facing: 1 as const, t: 0 })),
   };
   w.scarf = createScarf(neckOf(w.hero));
@@ -382,13 +428,19 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
   w.tiles = level.tiles.slice();
   w.solid = makeSolid(w.tiles, level.cols);
   w.puffs = [];
+  w.bounces = [];
   for (let i = 0; i < w.tiles.length; i++) {
     if (w.tiles[i] === TILE.PUFF) w.puffs.push({ x: i % level.cols, y: Math.floor(i / level.cols), t: 0, solid: true });
+    if (w.tiles[i] === TILE.AWNING) w.bounces.push({ x: i % level.cols, y: Math.floor(i / level.cols), t: BOUNCE_IDLE });
   }
   w.enemies = level.enemies.map(e => enemyFrom(e.kind, e.x, e.y));
   w.vehicles = level.vehicles.map(createVehicle);
   w.signals = level.signals.map(sg => ({ x: sg.x, y: sg.y, green: false, watch: lanesOf(level, sg) }));
+  w.gusts = level.gusts.map(createGust);
+  w.hooks = level.hooks.map(createHook);
+  w.waves = level.waves.map(createWave);
   stepVehicles(w);
+  stepTimed(w);
   w.platforms = level.platforms.map(p => ({ x0: p.x, y0: p.y, x: p.x, y: p.y, w: p.w, h: PLATFORM_H, axis: p.axis, px: p.x, py: p.y }));
   w.crowns = []; w.pops = []; w.bumps = [];
   for (const sh of w.shots) sh.t = 0;
@@ -410,7 +462,7 @@ export function enterLevel(w: World, index: number, level: Level, modifier: Modi
   });
   w.levelTime = 0;
   w.flagDrop = 0;
-  w.pendingTime = 0; w.pendingClear = false;
+  w.pendingTime = 0; w.timeAward = 0; w.killsBefore = w.stats.kills; w.pendingClear = false;
   w.cardT = CARD_SECONDS;
   placeHero(w, level.start);
   w.invuln = 0;
@@ -532,7 +584,9 @@ export function stepWorld(w: World, input: InputFrame, fixedDt: number) {
 
   stepPlatforms(w);
   stepVehicles(w);
+  stepTimed(w);
   stepPuffs(w, dt);
+  for (const b of w.bounces) if (b.t < BOUNCE_IDLE) b.t += dt;
   for (const b of w.bumps) b.t += dt;
   if (w.bumps.length && w.bumps[0].t > 0.18) w.bumps = w.bumps.filter(b => b.t <= 0.18);
   for (const p of w.pops) p.t += dt;
@@ -594,6 +648,15 @@ function holdStill(w: World, dt: number) {
   for (const e of w.enemies) { e.px = e.x; e.py = e.y; }
   for (const p of w.platforms) { p.px = p.x; p.py = p.y; }
   for (const v of w.vehicles) { v.px = v.x; v.py = v.y; }
+  for (const hk of w.hooks) { hk.deck.px = hk.deck.x; hk.deck.py = hk.deck.y; }
+}
+
+/** Wind, hooks and waves to the world clock. */
+function stepTimed(w: World) {
+  const l = w.level;
+  for (let i = 0; i < w.gusts.length; i++) placeGust(w.gusts[i], l.gusts[i], w.t);
+  for (let i = 0; i < w.hooks.length; i++) placeHook(w.hooks[i], l.hooks[i], w.t);
+  for (let i = 0; i < w.waves.length; i++) placeWave(w.waves[i], l.waves[i], w.t);
 }
 
 function stepPlatforms(w: World) {
@@ -670,6 +733,7 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const h = w.hero;
   const c = w.c;
   w.levelTime += dt;
+  w.chainT += dt;
   if (w.invuln > 0) w.invuln = Math.max(0, w.invuln - dt);
   stepPower(w, dt);
 
@@ -697,6 +761,15 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
     moveX(h, w.wind * (h.onGround ? 0.5 : 1) * dt, w.solid, c);
     h.vx = vx;
   }
+  // Harbor gusts and beach waves push her too (never in a dash).
+  let push = 0;
+  for (const g of w.gusts) push += gustPush(g, h.x + h.w / 2, h.onGround);
+  for (const wv of w.waves) push += wavePush(wv, h.x, h.x + h.w, h.y + h.h);
+  if (push !== 0 && h.dashT <= 0) {
+    const vx = h.vx;
+    moveX(h, push * dt, w.solid, c);
+    h.vx = vx;
+  }
   if (r.jumped) { emit(w, 'jump', h.x + h.w / 2, prevBottom); w.jumpT = 0.16; }
   if (r.dashEnded && c.wall !== 0 && tile(w, c.wallTx, c.wallTy) === TILE.CRACK) smash(w, c.wallTx, c.wallTy);
   if (r.doubleJumped) emit(w, 'doubleJump', h.x + h.w / 2, h.y + h.h, h.facing);
@@ -714,9 +787,16 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
         if (v.active && rideOn(w, v, v.w, prevBottom, wasGround, r.landedAt)) break;
       }
     }
+    if (!w.riding) {
+      for (const hk of w.hooks) {
+        if (rideOn(w, hk.deck, hk.w, prevBottom, wasGround, r.landedAt)) break;
+      }
+    }
   }
-  if (c.landed && !wasGround) landed(w, r.landedAt);
-  if (h.onGround) w.combo = 0;
+  const sprung = c.landed && h.onGround && tile(w, c.groundTx, c.groundTy) === TILE.AWNING;
+  if (sprung) bounceOff(w, c.groundTx, c.groundTy);
+  else if (c.landed && !wasGround) landed(w, r.landedAt);
+  if (h.onGround) { w.combo = 0; w.chainLanded = true; }
 
   if (c.ceiling) hitBlock(w, c.ceilTx, c.ceilTy);
 
@@ -731,7 +811,7 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   collectPickups(w);
   pullCoins(w, dt);
 
-  if (h.y > ROWS + 0.5) { die(w, true); return; }
+  if (h.y > ROWS + 0.5 || inWater(w, h)) { die(w, true); return; }
 
   passCheckpoints(w);
   touchMemories(w);
@@ -745,6 +825,26 @@ function stepPlay(w: World, input: HeroInput, dt: number) {
   const pole = w.level.pole;
   const zone = { x: pole.x + 0.4, y: pole.top, w: 0.2, h: pole.base + 1 - pole.top };
   if (overlaps(h, zone)) grabPole(w);
+}
+
+/** Does a body touch water? (Standing flush on its surface line does not count.) */
+function inWater(w: World, b: Body): boolean {
+  const x0 = Math.floor(b.x + 0.05), x1 = Math.floor(b.x + b.w - 0.05);
+  const y0 = Math.floor(b.y + 1e-6), y1 = Math.floor(b.y + b.h - 1e-6);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (tile(w, tx, ty) === TILE.WATER) return true;
+  return false;
+}
+
+/** An awning under her feet: up she goes, and the whole awning restarts its squash. */
+function bounceOff(w: World, tx: number, ty: number) {
+  const h = w.hero;
+  springBounce(h);
+  w.riding = null;
+  let x0 = tx, x1 = tx;
+  while (tile(w, x0 - 1, ty) === TILE.AWNING) x0--;
+  while (tile(w, x1 + 1, ty) === TILE.AWNING) x1++;
+  for (const b of w.bounces) if (b.y === ty && b.x >= x0 && b.x <= x1) b.t = 0;
+  emit(w, 'bounce', h.x + h.w / 2, ty);
 }
 
 /** Land on (or keep standing on) a moving floor `width` tiles wide if her feet crossed its top this step. */
@@ -1153,14 +1253,32 @@ function gainCoin(w: World) {
   w.stats.bonus += POINTS.coin * (w.coinMul - 1);
 }
 
+/** An enemy is out: it scores by its place in the kill chain, and says so in a 'kill' event. */
 function killEnemy(w: World, e: Enemy) {
   e.deadT = 0.45;
   e.vx = 0; e.vy = 0;
   w.stats.stomps++;
+  // the chain carries on through the air, or for a moment on the ground
+  w.chain = !w.chainLanded || w.chainT < CHAIN_SECONDS ? w.chain + 1 : 1;
+  w.chainT = 0;
+  w.chainLanded = !!w.hero.onGround;
+  const pts = killPoints(w.chain);
+  w.stats.kills += pts;
+  emit(w, 'kill', e.x + e.w / 2, e.y, pts);
 }
 
 export function hurt(w: World) {
   if (w.invuln > 0 || w.phase !== 'play') return;
+  const p = w.power;
+  if (p && POWERS[p.kind].shield) {
+    // The Cannoli Shield takes the hit and is gone.
+    w.power = null;
+    w.invuln = INVULN_HIT;
+    w.hurtT = HURT_LOOK;
+    emit(w, 'powerOff', w.hero.x + w.hero.w / 2, w.hero.y, POWER_KINDS.indexOf(p.kind));
+    emit(w, 'hurt', w.hero.x + w.hero.w / 2, w.hero.y);
+    return;
+  }
   if (w.crowned) {
     w.crowned = false;
     w.invuln = INVULN_HIT;
@@ -1235,7 +1353,7 @@ function stepEnemies(w: World, dt: number, prevBottom: number, jumpHeld: boolean
       const d = walkwayUnder(w, e);
       if (d !== 0) moveX(e, d * WALKWAY_SPEED * dt, w.solid, k.c);
     }
-    if (e.y > ROWS + 2) { e.deadT = 0; continue; }
+    if (e.y > ROWS + 2 || (!ENEMY_KINDS[e.kind].flies && inWater(w, e))) { e.deadT = 0; continue; }
 
     if (w.phase !== 'play') continue;
     const hit = stompOrHurt(h, prevBottom, e);
@@ -1288,7 +1406,7 @@ function grabPole(w: World) {
   }
   w.stats.flag += bonus;
   emit(w, 'flag', pole.x + 0.5, h.y, bonus);
-  w.pendingTime = timeBonus(w.levelTime);
+  w.pendingTime = w.timeAward = timeBonus(w.levelTime, parTime(w.level));
   w.pendingClear = true;
   w.phase = 'pole';
   w.phaseT = 0;
@@ -1327,6 +1445,11 @@ function stepWalk(w: World, dt: number) {
     w.phase = 'tally';
     w.phaseT = 0;
   }
+}
+
+/** What the level clear card shows: kill points this level, the time bonus counted so far (rising to the award), and par. */
+export function tallyView(w: World): { kills: number; time: number; par: number } {
+  return { kills: w.stats.kills - w.killsBefore, time: Math.round(w.timeAward - w.pendingTime), par: parTime(w.level) };
 }
 
 /** Count the time bonus into the score, then the clear bonus. True when done. */

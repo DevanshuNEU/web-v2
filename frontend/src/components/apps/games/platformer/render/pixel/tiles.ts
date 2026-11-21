@@ -20,7 +20,7 @@ import type { Decor } from './read';
 import { hash2 } from './skyline';
 import type { PixelTheme } from './themes';
 
-export const K = { EMPTY: 0, ROOF: 1, BRICK: 2, AURA: 3, USED: 4, STONE: 5, SPIKE: 6, COIN: 7, ONEWAY: 8, SIGMA: 9, CRACK: 10, CRATE: 11, WALK: 12, PUFF: 13 } as const;
+export const K = { EMPTY: 0, ROOF: 1, BRICK: 2, AURA: 3, USED: 4, STONE: 5, SPIKE: 6, COIN: 7, ONEWAY: 8, SIGMA: 9, CRACK: 10, CRATE: 11, WALK: 12, PUFF: 13, AWNING: 14, WATER: 15 } as const;
 
 /** Tile code to kind. */
 export const KIND = new Uint8Array(256);
@@ -42,6 +42,9 @@ export const KIND = new Uint8Array(256);
     // moving walkways animate and thin clouds come and go: both drawn per frame
     else if (n.startsWith('WALK')) k = K.WALK;
     else if (n.includes('PUFF')) k = K.PUFF;
+    // awnings squash on a bounce and water moves: the theme draws both
+    else if (n.includes('AWNING')) k = K.AWNING;
+    else if (n.includes('WATER')) k = K.WATER;
     else if (n.includes('ONE') || n.includes('WAY') || n.includes('LEDGE')) k = K.ONEWAY;
     else if (n === 'EMPTY') k = K.EMPTY;
     else if (isSolidTile(code)) k = K.ROOF;

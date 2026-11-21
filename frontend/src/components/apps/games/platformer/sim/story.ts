@@ -1,7 +1,9 @@
 /**
  * Story mode's running order: one row per level, in play order. `world` is
- * the chapter. Chapters 1 (Austin), 2 (the trip) and 3 (Northeastern) are
- * built; the rest are placeholders until their levels exist. `cardId` names
+ * the chapter. Chapters 1 (Austin), 2 (the trip), 3 (Northeastern) and 4
+ * (Boston nights, all but the gorilla) are built; the rest are placeholders
+ * until their levels exist. Built is not released: ui/release.ts decides
+ * which chapters ship. `cardId` names
  * the story card the view shows after the level (see story/text.ts).
  */
 
@@ -9,6 +11,7 @@ import type { LevelDef, WorldTheme } from './levels';
 import { AUSTIN } from './story/austin';
 import { TRIP } from './story/trip';
 import { CAMPUS } from './story/campus';
+import { BOSTON } from './story/boston';
 
 export interface StoryEntry {
   id: string;
@@ -25,7 +28,7 @@ export interface StoryEntry {
 const entry = (id: string, world: number, level: number, name: string, theme: WorldTheme, built = false, cardId = `card-${id}`): StoryEntry =>
   ({ id, world, level, name, theme, cardId, built });
 
-/** Season 1: her trip from Austin to Boston, then home. Chapters 1 to 3 are built. */
+/** Season 1: her trip from Austin to Boston, then home. Chapters 1 to 4 are built, the gorilla aside. */
 export const STORY: readonly StoryEntry[] = [
   entry('1-1', 1, 1, 'First Steps on Congress', 'austin', true),
   entry('1-2', 1, 2, 'Sixth Street', 'austin', true),
@@ -38,10 +41,10 @@ export const STORY: readonly StoryEntry[] = [
   entry('3-2', 3, 2, 'Snell After Midnight', 'library', true),
   entry('3-3', 3, 3, 'Over the Tracks', 'tracks', true),
   // Chapter 4, Boston nights, and the gorilla.
-  entry('4-1', 4, 1, 'Newbury Street', 'rooftops'),
-  entry('4-2', 4, 2, 'The Charles', 'rooftops'),
-  entry('4-3', 4, 3, 'Seaport Sunrise', 'rooftops'),
-  entry('4-4', 4, 4, 'Revere Beach', 'rooftops'),
+  entry('4-1', 4, 1, 'Newbury Street', 'newbury', true),
+  entry('4-2', 4, 2, 'The Charles', 'river', true),
+  entry('4-3', 4, 3, 'Seaport Sunrise', 'harbor', true),
+  entry('4-4', 4, 4, 'Revere Beach', 'beach', true),
   entry('4-boss', 4, 5, 'The Ex-Bestie', 'rooftops', false, 'card-boss'),
   // Chapter 5, Jamaica Plain.
   entry('5-1', 5, 1, 'Jamaica Pond', 'rooftops'),
@@ -51,7 +54,7 @@ export const STORY: readonly StoryEntry[] = [
   entry('season-boss', 7, 1, 'Job Hunting', 'stars'),
 ];
 
-const BUILT: Readonly<Record<string, LevelDef>> = { ...AUSTIN, ...TRIP, ...CAMPUS };
+const BUILT: Readonly<Record<string, LevelDef>> = { ...AUSTIN, ...TRIP, ...CAMPUS, ...BOSTON };
 
 /** The level data of a built story level. */
 export function storyLevelDef(id: string): LevelDef {

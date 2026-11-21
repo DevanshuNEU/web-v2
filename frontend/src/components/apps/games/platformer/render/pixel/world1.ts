@@ -37,9 +37,10 @@ import type { Juice } from '../../../shared/juice';
 import { hypeFont } from '../../../shared/theme';
 import { ROWS, type Level } from '../../sim/level';
 import type { World } from '../../sim/world';
+import { ENEMY_KINDS } from '../../sim/enemies';
 import { toMono } from '../bake';
-import { drawCards, type View } from '../pipeline';
-import { CARD_SECONDS } from '../../sim/world';
+import type { View } from '../view';
+import { CARD_SECONDS, tallyView } from '../../sim/world';
 import { bakeTally, bakeTitle, cardWipe, drawCard, drawTallyNumbers, type CardArt, type Wipe } from './card';
 import { BREAKABLES, HERO, HERO_NECK, PICKUPS, POWERUPS, type HeroAnim, type SpriteSet } from '../sprites';
 import { pickHeroAnim, type AnimPick } from './anim';
@@ -53,7 +54,7 @@ import {
 } from './read';
 import { signWord } from './signs';
 import { STRIP_W, drawStrip, flicker, hash2, type Sky, type SkyLayer } from './skyline';
-import { atlas, drawFrame, drawTinted, tinted, type Atlas } from './sprites';
+import { atlas, drawFrame, drawTinted, rectOf, tinted, type Atlas } from './sprites';
 import { K, KIND, bakeChunk, bakeChunkPart, decorAtlas, decorBottom, isStaticDecor, tileAtlas, type Chunk } from './tiles';
 import { loadTheme, themeFor, type PixelTheme, type ThemeFrame } from './themes';
 import { Motes, Rain, SLANT, Sparks, type RainOpts } from './weather';
@@ -193,6 +194,7 @@ const AFTERIMAGE_LIFE = 0.18;
 
 /** Night colours. Light colours become white under Mono. */
 const COL = {
+  moonHalo: '#b9a8ff',
   ambient: '#6a6496',
   ambientDark: '#15111f',
   lightning: '#c9d8ff',
@@ -214,7 +216,7 @@ function pickupSet(kind: string): SpriteSet<string> {
   return PICKUPS.sparkOrb as SpriteSet<string>;
 }
 export const POWER_COLOR: Readonly<Record<PickupKind, string>> = {
-  batWings: '#9d62ff', tacoRush: '#ff8c3a', priorityBoarding: '#3df2ff', wickedFast: '#d4ff3a', encore: '#ff5c95',
+  batWings: '#9d62ff', tacoRush: '#ff8c3a', priorityBoarding: '#3df2ff', wickedFast: '#d4ff3a', encore: '#ff5c95', cannoliShield: '#ffd9a0',
 };
 /** Glowing keys per sprite set. */
 const HERO_GLOW = 'eE';
@@ -245,6 +247,8 @@ export interface FrameStats {
   rings: number;
   /** The time-of-day preset in use. */
   sky: string;
+  /** The moon or sun drawn over the darkness this frame (0 or 1). */
+  discs: number;
   /** Bats in the swarm on screen, memories flying to the corner. */
   bats: number;
   flights: number;
@@ -313,6 +317,8 @@ interface State {
   sparkAcc: number;
   sx: Float32Array; sy: Float32Array;
   fonts: Map<number, string>;
+  /** A small canvas for the moon or sun redrawn over the darkness, masked by what stands in front of it. */
+  discMask: { canvas: Canvas; ctx: Ctx } | null;
   /** The pixel canvas in use, its context and CSS size, and cached transform strings. */
   pixel: HTMLCanvasElement | null;
   pixelCtx: CanvasRenderingContext2D | null;
@@ -351,7 +357,7 @@ function state(): State {
     tally: { art: null, title: '', bw: 0, mono: false, t: 0 },
     wipe: { from: 0, to: 1 },
     seed: 0, motes: new Motes(lcg(19)), rainOpts: { density: 1, speed: 1, slant: SLANT },
-    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '', card: '', rims: 0, rings: 0, bats: 0, flights: 0, rumble: 0, sky: 'night' },
+    stats: { lights: 0, levelLights: 0, ambient: 0, rain: 0, rainSpeed: 0, motes: 0, lightning: 0, coinGlow: 0, skylineSeed: 0, signText: '', card: '', rims: 0, rings: 0, bats: 0, flights: 0, rumble: 0, sky: 'night', discs: 0 },
     blackout: false, flash: 0,
     bw: 0, bh: 0, mono: false, q: 1,
     level: null, decor: null, decorSrc: null, memShown: [],
@@ -368,7 +374,7 @@ function state(): State {
     world: null, lastT: 0, lastRx: 0, lastRy: 0, sparkAcc: 0,
     sx: new Float32Array(SCARF_N), sy: new Float32Array(SCARF_N),
     fonts: new Map(),
-    pixel: null, pixelCtx: null, pixelW: 0, pixelH: 0, transforms: new Map(), overlayDirty: true,
+    discMask: null, pixel: null, pixelCtx: null, pixelW: 0, pixelH: 0, transforms: new Map(), overlayDirty: true,
     rings: Array.from({ length: RING_CAP }, () => ({ x: 0, y: 0, t0: -1, pending: false })), flickAt: -9, pendingFlick: false,
     story: new StoryFx(), action: new ActionFx(),
   };
@@ -552,6 +558,42 @@ function drawBackground(c: Ctx, s: State, rx: number, ry: number, t: number, red
  */
 function drawBackgroundGlow(c: Ctx, s: State, rx: number, ry: number, t: number, reduced: boolean, mono: boolean) {
   const sky = s.sky as Sky;
+  // the moon (or the sun) gives light, so it is drawn again over the darkness:
+  // its disc as baked, and a soft halo around it
+  const d = sky.disc;
+  s.stats.discs = 0;
+  if (d && !s.blackout) {
+    // the disc on a small mask, with whatever stands in front of it (the
+    // clouds, the skyline: a low sun behind the cranes) cut out again
+    const R = Math.ceil(d.r) + 2, size = R * 2 + 1, ox = d.x - R, oy = d.y - R;
+    if (!s.discMask) s.discMask = makeCanvas(size, size);
+    else if (s.discMask.canvas.width < size) resize(s.discMask.canvas, size, size);
+    const mc = s.discMask.ctx;
+    mc.globalCompositeOperation = 'source-over';
+    mc.clearRect(0, 0, size, size);
+    mc.save();
+    mc.beginPath?.();
+    mc.arc?.(R + 0.5, R + 0.5, d.r + 0.6, 0, Math.PI * 2);
+    mc.clip?.();
+    mc.drawImage(sky.canvas, ox, oy, size, size, 0, 0, size, size);
+    mc.restore();
+    mc.globalCompositeOperation = 'destination-out';
+    const cl = sky.clouds;
+    const drift = reduced ? 0 : t * (s.rainOpts.density > 1 ? 5 : 1.5);
+    drawStrip(mc, cl, mod(-mod(Math.floor((rx * cl.f + drift) * s.q) / s.q, STRIP_W) - ox, STRIP_W) - STRIP_W, Math.round(s.bh * 0.3) - oy, size);
+    for (let li = 0; li < sky.layers.length; li++) {
+      const L = sky.layers[li];
+      drawStrip(mc, L, mod(-mod(Math.floor(rx * L.f * s.q) / s.q, STRIP_W) - ox, STRIP_W) - STRIP_W, stripY(s, L, ry) - oy, size);
+    }
+    mc.globalCompositeOperation = 'source-over';
+    c.drawImage(s.discMask.canvas, 0, 0, size, size, ox, oy, size, size);
+    c.globalCompositeOperation = 'lighter';
+    c.globalAlpha = 0.18;
+    c.drawImage(lightSprite(lightCol(COL.moonHalo, mono)), d.x - d.r * 4, d.y - d.r * 4, d.r * 8, d.r * 8);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+    s.stats.discs = 1;
+  }
   if (s.flash > 0.5) drawBolt(c, s, t, s.flash, mono);
   for (let li = 0; li < sky.layers.length; li++) {
     const L = sky.layers[li];
@@ -706,7 +748,7 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
     for (let tx = c0; tx <= c1; tx++) {
       const k = KIND[w.tiles[ty * cols + tx]];
       // walkways and thin clouds belong to the theme's own tile layer
-      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY || k === K.WALK || k === K.PUFF) continue;
+      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY || k === K.WALK || k === K.PUFF || k === K.AWNING || k === K.WATER) continue;
       const x = tx * ART_TILE - s.ox, y = ty * ART_TILE - s.oy;
       if (k === K.COIN || k === K.SIGMA) {
         if (!coin) continue;
@@ -729,7 +771,7 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
         continue;
       }
       if (k === K.CRATE) {
-        if (layer === 'base') drawFrame(c, atlas(BREAKABLES.crate, s.mono), 'idle', (tx + ty) % 2, x + 8, y + 16, 1);
+        if (layer === 'base' && !(s.theme as PixelTheme).drawsCrates) drawFrame(c, atlas(BREAKABLES.crate, s.mono), 'idle', (tx + ty) % 2, x + 8, y + 16, 1);
         continue;
       }
       const anim = k === K.BRICK ? 'brick' : k === K.AURA ? 'auraBlock' : 'auraBlockUsed';
@@ -788,7 +830,7 @@ function drawDecor(c: Ctx, s: State, w: World, th: PixelTheme, layer: 'base' | '
     if (th.frontDecor?.[d.kind]) continue;
     const sign = d.kind === 'neonSign';
     if (!sign && d.kind !== goalKind && isStaticDecor(th, d.kind)) continue;
-    const a = sign ? atlas(th.sign(s.seed, w.levelIndex, i), s.mono, th.glow) : decorAtlas(th, d.kind, s.mono);
+    const a = sign ? atlas(th.sign(s.seed, w.levelIndex, i), s.mono, th.signGlow ?? th.glow) : decorAtlas(th, d.kind, s.mono);
     if (!a) continue;
     const x = Math.round(d.x * ART_TILE) - s.ox;
     const bottom = Math.round(decorBottom(d) * ART_TILE) - s.oy;
@@ -905,7 +947,21 @@ function drawGoalPiece(c: Ctx, s: State, w: World, th: PixelTheme, a: Atlas, x: 
     const dist = Math.abs(x + a.w / 2 - (w.hero.x + w.hero.w / 2) * ART_TILE + s.ox) / ART_TILE;
     frame = Math.max(0, Math.min(n - 1, Math.floor(((14 - dist) / 10) * n)));
   }
-  drawFrame(c, a, 'idle', frame, x, bottom, 1, layer);
+  x += g.dx ?? 0;
+  const lift = g.lift ?? 0;
+  if (lift > 0) {
+    // a raised goal: one row (its columns, or its plinth) carried down so its roof meets the level's
+    const r = rectOf(a, 'idle', frame);
+    const src = layer === 'glow' ? a.glow : a.sheet;
+    const k = Math.max(0, Math.min(r.h - 1, g.liftRow ?? r.h - 1));
+    const top = bottom - lift - r.h;
+    if (src) {
+      c.drawImage(src, r.x, r.y, r.w, k, x, top, r.w, k);
+      c.drawImage(src, r.x, r.y + k, r.w, 1, x, top + k, r.w, lift + 1);
+      c.drawImage(src, r.x, r.y + k + 1, r.w, r.h - k - 1, x, top + k + lift + 1, r.w, r.h - k - 1);
+    }
+    bottom -= lift;
+  } else drawFrame(c, a, 'idle', frame, x, bottom, 1, layer);
   if (layer !== 'base') return;
   for (let i = 0; i < g.lights.length; i++) {
     const L = g.lights[i];
@@ -963,12 +1019,12 @@ function drawEnemies(c: Ctx, s: State, w: World, th: PixelTheme, a: number, t: n
     if (ex < -20 || ex > s.bw + 20) continue;
     const kind = e.kind as string;
     const elite = kind === 'eliteDrone';
-    const isDrone = elite || kind === 'adDrone' || kind === 'frog';
+    const isDrone = elite || kind === 'frog' || !!(ENEMY_KINDS as Readonly<Record<string, { flies: boolean }>>)[kind]?.flies;
     const dead = e.deadT !== -1;
     if (dead) c.globalAlpha = clamp01(e.deadT / 0.45);
     if (isDrone) {
       const mode = (e as { mode?: string }).mode;
-      const anim = dead ? fly.dead : (mode ? mode === 'dive' : e.vy > 2) ? 'dive' : fly.move;
+      const anim = dead ? fly.dead : (mode ? mode === 'dive' : e.vy > 2) ? (fly.dive ?? 'dive') : fly.move;
       drawFrame(c, drone, anim, t * 12 + i, ex, ey, e.dir, layer);
       if (elite && layer === 'base') {
         // the rare gold drone: the same body washed in gold
@@ -979,7 +1035,11 @@ function drawEnemies(c: Ctx, s: State, w: World, th: PixelTheme, a: number, t: n
       }
       if (layer === 'base' && !dead) levelLight(s, ex, ey - 8, elite ? 28 : 20, lightCol(elite ? COL.elite : fly.light, s.mono), elite ? 0.9 : 0.7, elite ? 1 : 0, elite ? 0.6 : 0.45);
     } else {
-      drawFrame(c, crawler, dead ? walk.dead : walk.move, t * 8 + i * 0.5, ex, ey, e.dir, layer);
+      // a hopper plays its hop once per sim hop and stands still between them
+      const hop = walk.hop, hopT = (e as { hopT?: number }).hopT;
+      const since = hop && typeof hopT === 'number' ? hop.every - hopT : -1;
+      const frame = !hop ? t * 8 + i * 0.5 : since >= 0 && since * hop.fps < hop.frames ? since * hop.fps : 0;
+      drawFrame(c, crawler, dead ? walk.dead : walk.move, frame, ex, ey, e.dir, layer);
       if (layer === 'base' && !dead) levelLight(s, ex + e.dir * 3, ey - 6, 14, lightCol(walk.light, s.mono), 0.8, 0, 0.5);
     }
     c.globalAlpha = 1;
@@ -1271,7 +1331,10 @@ function drawPixelCards(c: Ctx, s: State, w: World, dt: number, reduced: boolean
     cardWipe(s.wipe, tl.t, 9, reduced);
     const top = Math.max(26, Math.round(s.bh * 0.36 - tl.art.h / 2));
     drawCard(c, tl.art, s.bw, top, s.wipe, tl.t, w.t, reduced);
-    if (s.wipe.to >= 1) drawTallyNumbers(c, tl.art, s.bw, top, Math.ceil(w.pendingTime), !w.pendingClear, mono);
+    if (s.wipe.to >= 1) {
+      const tv = tallyView(w);
+      drawTallyNumbers(c, tl.art, s.bw, top, tv.kills, tv.time, tv.par, !w.pendingClear, mono);
+    }
   } else tl.t = 0;
 }
 
@@ -1628,7 +1691,7 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
     ctx.restore();
   }
   // the secret world's finale card stays the full-resolution one
-  if (finale) drawCards(ctx, world, v, mono);
+  if (finale && finaleCards) finaleCards(ctx, world, v, mono);
 }
 
 /** A plain dark frame (a theme still loading), on the pixel canvas or the screen. */
@@ -1686,6 +1749,11 @@ function showOnPixelCanvas(s: State, P: HTMLCanvasElement, m: ViewMetrics, offX:
   if (!tr) { tr = `translate(${offX / m.dpr}px, ${offY / m.dpr}px)`; s.transforms.set(key, tr); }
   if (P.style.transform !== tr) P.style.transform = tr;
 }
+
+/** The full-resolution finale card, from the cartoon renderer once its chunk has loaded (see ../frame.ts). */
+type FinaleCards = (ctx: CanvasRenderingContext2D, world: World, v: View, mono: boolean) => void;
+let finaleCards: FinaleCards | null = null;
+export function setFinaleCards(fn: FinaleCards) { finaleCards = fn; }
 
 /** What the last frame drew. */
 export function frameStats(): FrameStats { return state().stats; }

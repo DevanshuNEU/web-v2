@@ -13,11 +13,15 @@
  *                player can watch the dive first
  *   eliteDrone   a rare gold drone: flies like adDrone and fires slow shots
  *                at a hero within 8 tiles
+ *   pigeon       Boston walker: stands, then hops a short way every
+ *                PIGEON.every seconds; turns at walls, ledges and water
+ *   gull         Boston flyer: hovers like a drone, then swoops in a fast arc
+ *                down through where she was and up the other side
  */
 
 import { PHYS, moveBody, type Body, type Contacts, type SolidFn } from './physics';
 
-export type EnemyKind = 'pebble' | 'frog' | 'doomCrawler' | 'adDrone' | 'eliteDrone';
+export type EnemyKind = 'pebble' | 'frog' | 'doomCrawler' | 'adDrone' | 'eliteDrone' | 'pigeon' | 'gull';
 export type EnemyMode = 'walk' | 'hop' | 'hover' | 'dive' | 'climb';
 
 export interface Enemy extends Body {
@@ -45,6 +49,8 @@ export interface Enemy extends Body {
   stunT: number;
   /** The current (or last) dive was at a decoy, not the hero. */
   decoy: boolean;
+  /** A gull's swoop: where it started (centre), the reach to her (centre to centre), and its length in seconds. */
+  sx: number; sy: number; ax: number; ay: number; dur: number;
 }
 
 /** What a behaviour may look at. Reused, never allocated per step. */
@@ -90,6 +96,16 @@ export const ELITE = {
   every: 2.4,
   shotSpeed: 3.5,
 } as const;
+
+/** Pigeon: a hop this often, this fast across and up (about 0.8 tiles long). */
+export const PIGEON = { every: 1.2, vx: 3.2, vy: 8.5 } as const;
+
+/**
+ * Gull: swoops when she is within `reach` tiles and not above it, along an
+ * arc at about `speed` tiles per second (faster than the drone's dive),
+ * then waits `cooldown` seconds back on its spot.
+ */
+export const GULL = { reach: 7, speed: 13, cooldown: 1.6, minDur: 0.45 } as const;
 
 const CRAWLER_SPEED = 2.4;
 const PEBBLE_SPEED = 2.0;
@@ -144,6 +160,29 @@ function frogStep(e: Enemy, k: EnemyCtx, dt: number) {
   if (k.c.wall !== 0) { e.dir = (-k.c.wall) as 1 | -1; e.vx = 0; }
 }
 
+/** Is there ground for a hop that way: a floor ahead, no wall in the way? */
+function hopClear(e: Enemy, k: EnemyCtx, dir: number): boolean {
+  const ax = Math.floor(e.x + e.w / 2 + dir * 0.9);
+  const fy = Math.floor(e.y + e.h + 0.05);
+  return ground(k.solid, ax, fy) && !k.solid(ax, fy - 1);
+}
+
+/** Stand, hop, stand: a short hop every PIGEON.every seconds, never off a ledge. */
+function pigeonStep(e: Enemy, k: EnemyCtx, dt: number) {
+  if (e.onGround) {
+    e.vx = 0;
+    e.hopT -= dt;
+    if (e.hopT <= 0) {
+      if (!hopClear(e, k, e.dir)) e.dir = -e.dir as 1 | -1;
+      e.vx = hopClear(e, k, e.dir) ? e.dir * PIGEON.vx : 0;
+      e.vy = -PIGEON.vy;
+      e.hopT = PIGEON.every;
+    }
+  }
+  fall(e, k, dt);
+  if (k.c.wall !== 0) { e.dir = (-k.c.wall) as 1 | -1; e.vx = 0; }
+}
+
 function diveAt(e: Enemy, dx: number, dy: number, decoy: boolean) {
   const d = Math.hypot(dx, dy) || 1;
   e.mode = 'dive';
@@ -190,7 +229,11 @@ function droneStep(e: Enemy, k: EnemyCtx, dt: number) {
     if (k.c.landed || k.c.wall !== 0 || k.c.ceiling || e.cool >= DRONE.diveMax) { e.mode = 'climb'; e.cool = 0; }
     return;
   }
-  // Climb back to the point on its path it would be at now.
+  climbHome(e, dt, e.decoy ? DRONE.decoyCooldown : DRONE.cooldown);
+}
+
+/** Climb back to the point on its hover path it would be at now, then hover after `cooldown` seconds. */
+function climbHome(e: Enemy, dt: number, cooldown: number) {
   const p = hoverAt(e, e.t);
   const dx = p.x - e.x, dy = p.y - e.y;
   const d = Math.hypot(dx, dy);
@@ -198,12 +241,50 @@ function droneStep(e: Enemy, k: EnemyCtx, dt: number) {
   if (d <= stepLen) {
     e.x = p.x; e.y = p.y; e.vx = 0; e.vy = 0;
     e.mode = 'hover';
-    e.cool = e.decoy ? DRONE.decoyCooldown : DRONE.cooldown;
+    e.cool = cooldown;
     return;
   }
   e.vx = (dx / d) * DRONE.climbSpeed; e.vy = (dy / d) * DRONE.climbSpeed;
   e.x += e.vx * dt; e.y += e.vy * dt;
   e.dir = dx >= 0 ? 1 : -1;
+}
+
+/** Where a swoop puts the gull's centre, u from 0 to 1: across twice the reach, down to her and back up. */
+function swoopX(e: Enemy, u: number) { return e.sx + 2 * e.ax * u; }
+function swoopY(e: Enemy, u: number) { return e.sy + e.ay * Math.sin(Math.PI * u); }
+
+function gullStep(e: Enemy, k: EnemyCtx, dt: number) {
+  const h = k.hero;
+  e.onGround = false;
+  if (e.mode === 'hover') {
+    e.t += dt;
+    if (e.cool > 0) e.cool -= dt;
+    const p = hoverAt(e, e.t);
+    e.vx = (p.x - e.x) / dt; e.vy = (p.y - e.y) / dt;
+    e.x = p.x; e.y = p.y;
+    e.dir = Math.cos(e.t * DRONE.wX) >= 0 ? 1 : -1;
+    if (e.cool > 0) return;
+    const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    const dx = h.x + h.w / 2 - cx, dy = h.y + h.h / 2 - cy;
+    if (dy < -0.5 || Math.hypot(dx, dy) >= GULL.reach) return;
+    e.mode = 'dive';
+    e.sx = cx; e.sy = cy; e.ax = dx; e.ay = Math.max(0, dy);
+    e.dur = Math.max(GULL.minDur, (Math.PI / 2) * Math.hypot(e.ax, e.ay) * 2 / GULL.speed);
+    e.cool = 0;
+    e.decoy = false;
+    e.dir = dx >= 0 ? 1 : -1;
+    return;
+  }
+  if (e.mode === 'dive') {
+    e.cool += dt;
+    const u = Math.min(1, e.cool / e.dur);
+    e.vx = (swoopX(e, u) - e.w / 2 - e.x) / dt;
+    e.vy = (swoopY(e, u) - e.h / 2 - e.y) / dt;
+    moveBody(e, dt, k.solid, k.c);
+    if (u >= 1 || k.c.landed || k.c.wall !== 0 || k.c.ceiling) { e.mode = 'climb'; e.cool = 0; }
+    return;
+  }
+  climbHome(e, dt, GULL.cooldown);
 }
 
 /** A drone that also fires. `hopT` is its reload timer. */
@@ -227,6 +308,8 @@ export const ENEMY_KINDS: Readonly<Record<EnemyKind, EnemyKindDef>> = {
   doomCrawler: { w: 0.9, h: 0.7, hp: 2, flies: false, mode: 'walk', step: walker(CRAWLER_SPEED) },
   adDrone: { w: 0.8, h: 0.7, hp: 1, flies: true, mode: 'hover', step: droneStep },
   eliteDrone: { w: 0.8, h: 0.7, hp: 2, flies: true, mode: 'hover', step: eliteStep },
+  pigeon: { w: 0.7, h: 0.6, hp: 1, flies: false, mode: 'hop', step: pigeonStep },
+  gull: { w: 0.9, h: 0.6, hp: 1, flies: true, mode: 'hover', step: gullStep },
 };
 
 /** A fresh enemy for a spawn at tile (x, y): walkers stand on the tile below, drones float in it. */
@@ -237,6 +320,6 @@ export function enemyFrom(kind: EnemyKind, x: number, y: number): Enemy {
   return {
     kind, x: ex, y: ey, w: def.w, h: def.h, vx: 0, vy: 0, onGround: !def.flies, dir: -1, active: false,
     deadT: -1, hopT: 0.8, px: ex, py: ey, landT: 0, mode: def.mode, homeX: ex, homeY: ey, t: 0, cool: 0,
-    hp: def.hp, lastHit: 0, stunT: 0, decoy: false,
+    hp: def.hp, lastHit: 0, stunT: 0, decoy: false, sx: 0, sy: 0, ax: 0, ay: 0, dur: 0,
   };
 }

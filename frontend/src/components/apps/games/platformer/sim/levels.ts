@@ -54,13 +54,27 @@
  *   k  Wicked Fast (optional power: dashes chain)
  *   The trolley and trains are not drawn in the rows: `vehicles` in the
  *   level lists their lanes and timetables.
+ *
+ * Boston nights (chapter 4)
+ *   A  shop awning (one-way; landing on it bounces her up about 1.6 full
+ *      jumps high, see PHYS.springV; she never stands on one)
+ *   W  water (not solid; touching it is a fall: respawn at the checkpoint)
+ *   p  pigeon (walker: hops every PIGEON.every seconds, turns at walls and ledges)
+ *   g  gull (flyer: hovers, then swoops in a fast arc through her)
+ *   v  Cannoli Shield (optional power: absorbs one hit)
+ *   R  crates are sand sculptures on the beach (the blade breaks them)
+ *   Boats (shell, sailboat) are vehicles in `vehicles`; wind gusts, crane
+ *   hooks and waves are listed in the level's `gusts`, `hooks` and `waves`.
  */
 
 import type { Ability } from './hero';
 import type { VehicleDef } from './vehicles';
+import type { GustDef } from './gusts';
+import type { HookDef } from './hooks';
+import type { WaveDef } from './waves';
 
 export type WorldTheme = 'grass' | 'rooftops' | 'austin' | 'cave' | 'sky' | 'stars' | 'airport' | 'clouds'
-  | 'campus' | 'library' | 'tracks';
+  | 'campus' | 'library' | 'tracks' | 'newbury' | 'river' | 'harbor' | 'beach';
 
 /** The sky a level is played under; the season moves it forward level by level. */
 export type SkyId = 'night' | 'lateNight' | 'preDawn' | 'sunrise' | 'morning';
@@ -89,6 +103,12 @@ export interface LevelDef {
   sky?: SkyId;
   /** The trolley and trains: lanes and timetables (see ./vehicles.ts). */
   vehicles?: readonly VehicleDef[];
+  /** Harbor wind zones and their timetables (see ./gusts.ts). */
+  gusts?: readonly GustDef[];
+  /** Crane hooks swinging from booms (see ./hooks.ts). */
+  hooks?: readonly HookDef[];
+  /** Waves rolling up the sand (see ./waves.ts). */
+  waves?: readonly WaveDef[];
   rows: readonly string[];
 }
 

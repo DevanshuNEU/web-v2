@@ -37,3 +37,22 @@ describe('time of day', () => {
     }
   });
 });
+
+describe('the moon and the sun glow (they are not darkened like buildings)', () => {
+  it('the bake reports where the disc is: the moon at night, the sun at sunrise, none in the morning', async () => {
+    stubCanvas();
+    const { bakeSkyCanvas } = await import('@/components/apps/games/platformer/render/pixel/skyline');
+    const id = (c: string) => c;
+    expect(bakeSkyCanvas(200, 300, 1, id, SKY_PRESETS.night).disc).toMatchObject({ r: 10 });
+    expect(bakeSkyCanvas(200, 300, 1, id, SKY_PRESETS.sunrise).disc).toMatchObject({ r: 14 });
+    expect(bakeSkyCanvas(200, 300, 1, id, SKY_PRESETS.morning).disc).toBeUndefined();
+  });
+
+  it('a night frame draws the disc again after the light pass, so it stays bright', () => {
+    stubCanvas();
+    resetWorld1();
+    const w = createWorld({ mode: 'story', levelId: '1-1' });
+    drawFrame(document.createElement('canvas').getContext('2d') as unknown as CanvasRenderingContext2D, w, { w: 390, h: 844, mono: false, reduced: true, alpha: 1, dpr: 3 }, new Juice());
+    expect(frameStats().discs).toBe(1);
+  });
+});

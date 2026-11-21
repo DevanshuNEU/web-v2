@@ -7,12 +7,14 @@
  * switches on a power's name.
  *
  * Chapter 1 (Austin) places Bat Wings and Taco Rush, chapter 2 (the trip)
- * Priority Boarding, chapter 3 (Northeastern) Wicked Fast. Encore belongs to
- * the concert and stays `live: false` until its effect is built.
+ * Priority Boarding, chapter 3 (Northeastern) Wicked Fast, chapter 4 (Boston
+ * nights) the Cannoli Shield. Encore belongs to the concert and stays
+ * `live: false` until its effect is built. New kinds go at the end of
+ * POWER_KINDS: events carry the index.
  */
 
-export type PowerKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore';
-export const POWER_KINDS: readonly PowerKind[] = ['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore'];
+export type PowerKind = 'batWings' | 'tacoRush' | 'priorityBoarding' | 'wickedFast' | 'encore' | 'cannoliShield';
+export const POWER_KINDS: readonly PowerKind[] = ['batWings', 'tacoRush', 'priorityBoarding', 'wickedFast', 'encore', 'cannoliShield'];
 
 export interface PowerDef {
   /** Card and HUD name. */
@@ -31,9 +33,11 @@ export interface PowerDef {
   knockout: boolean;
   /** The dash recharges the moment one ends, so dashes chain in the air. */
   chainDash: boolean;
+  /** The next hit (an enemy, spikes, a shot) is absorbed and ends the power. Water and falls still count. */
+  shield: boolean;
 }
 
-const BASE = { live: true, runMul: 1, magnet: 0, glideFall: 0, knockout: false, chainDash: false } as const;
+const BASE = { live: true, runMul: 1, magnet: 0, glideFall: 0, knockout: false, chainDash: false, shield: false } as const;
 
 export const POWERS: Readonly<Record<PowerKind, PowerDef>> = {
   batWings: { ...BASE, name: 'Bat Wings', duration: 10, glideFall: 2.2 },
@@ -42,7 +46,8 @@ export const POWERS: Readonly<Record<PowerKind, PowerDef>> = {
   wickedFast: { ...BASE, name: 'Wicked Fast', duration: 8, chainDash: true },
   // TODO(chapter 4): every landing sends a shockwave that stuns enemies nearby.
   encore: { ...BASE, name: 'Encore', duration: 10, live: false },
+  cannoliShield: { ...BASE, name: 'Cannoli Shield', duration: 15, shield: true },
 };
 
 /** The legend char of each placed power. */
-export const POWER_CHARS: Readonly<Record<string, PowerKind>> = { w: 'batWings', t: 'tacoRush', b: 'priorityBoarding', k: 'wickedFast' };
+export const POWER_CHARS: Readonly<Record<string, PowerKind>> = { w: 'batWings', t: 'tacoRush', b: 'priorityBoarding', k: 'wickedFast', v: 'cannoliShield' };

@@ -7,8 +7,8 @@ import { DT, G40, custom, run, runUntil, worldOn } from '../setup/platformerWorl
 const SKY = '........................................';
 
 describe('Main Character enemies: one table', () => {
-  it('has a row for every kind, worlds 2 and 3 included', () => {
-    expect(Object.keys(ENEMY_KINDS).sort()).toEqual(['adDrone', 'doomCrawler', 'eliteDrone', 'frog', 'pebble']);
+  it('has a row for every kind, worlds 2 and 3 and Boston included', () => {
+    expect(Object.keys(ENEMY_KINDS).sort()).toEqual(['adDrone', 'doomCrawler', 'eliteDrone', 'frog', 'gull', 'pebble', 'pigeon']);
   });
 });
 
@@ -58,13 +58,13 @@ describe('Main Character enemies: the doom crawler', () => {
     expect(maxX).toBeLessThanOrEqual(15 + 0.05);
   });
 
-  it('a stomp kills it for 50, a side touch costs a life', () => {
+  it('a stomp kills it for 100, a side touch costs a life', () => {
     const a = worldOn(['.P........c.............................', G40, G40]);
     const e = a.enemies[0];
     a.hero.x = e.x; a.hero.y = e.y - a.hero.h - 0.4; a.hero.vy = 3; a.hero.onGround = false;
     run(a, 0.3);
     expect(a.stats.stomps).toBe(1);
-    expect(score(a)).toBe(50);
+    expect(score(a)).toBe(100);
     const b = worldOn(['.P....c.................................', G40, G40]);
     expect(runUntil(b, ww => ww.phase === 'dying', { move: 1 })).toBe(true);
     run(b, DYING_SECONDS + 0.1);

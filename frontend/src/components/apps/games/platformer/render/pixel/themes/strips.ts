@@ -19,6 +19,8 @@ export interface Backdrop { far: Grid; mid: Grid; near: Grid; palette: Palette; 
 let D: ThemeKit;
 /** Hand the kit over (the first chunk to load does). */
 export function setKit(kit: ThemeKit) { if (!D) D = kit; }
+/** The kit, for the other shared modules (set before any of them draws). */
+export function kit(): ThemeKit { return D; }
 
 export function mod(a: number, m: number) { return ((a % m) + m) % m; }
 export const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -99,9 +101,9 @@ export function wispBand(seed: number, mono: boolean, lit: string, body: string)
 }
 
 export function backdropSky(b: Backdrop, w: number, h: number, mono: boolean, seed: number, sky: SkyPreset, clouds: SkyLayer, f: readonly [number, number, number], o: readonly StripOpts[]): Sky {
-  const { canvas, twinkles } = D.bakeSkyCanvas(w, h, 11 + (Math.floor(seed) >>> 0) * 13, c => col(c, mono), sky);
+  const { canvas, twinkles, disc } = D.bakeSkyCanvas(w, h, 11 + (Math.floor(seed) >>> 0) * 13, c => col(c, mono), sky);
   return {
-    canvas, twinkles, clouds,
+    canvas, twinkles, disc, clouds,
     layers: [
       stripLayer(b.far, b.palette, b.glow, f[0], mono, o[0]),
       stripLayer(b.mid, b.palette, b.glow, f[1], mono, o[1]),

@@ -14,12 +14,13 @@
 import type { SpriteSet } from '../../sprites';
 import type { Level } from '../../../sim/level';
 import type { Decor } from '../read';
-import type { Canvas, Ctx } from '../canvas';
+import type { Ctx } from '../canvas';
 import type { Sky, SkyLayer } from '../skyline';
 import type { FacadeCell } from '../tiles';
 import type { PixelTheme, ThemeFrame, ThemeKit, EnemyArt } from '../themes';
 import type { SkyPreset } from '../timeofday';
-import { backdropSky, clamp01, col, setKit, stripLayer } from './strips';
+import { backdropSky, col, setKit, stripLayer } from './strips';
+import { drawRails, drawVehicles, type VehicleArt } from './vehicles';
 import { CAMPUS_BACKDROP, CAMPUS_GLOW, CAMPUS_TILES, TROLLEY } from '../../sprites/campus';
 import { LIBRARY_BACKDROP, LIBRARY_GLOW, LIBRARY_TILES } from '../../sprites/library';
 import { COMMUTER_TRAIN, ORANGE_TRAIN, TRACKS_BACKDROP, TRACKS_GLOW, TRACKS_TILES } from '../../sprites/tracks';
@@ -33,120 +34,23 @@ const WARM = '#ffcf8a', CREAM = '#fff1c2', COOL = '#bfe6ff', SODIUM = '#ffb347',
 // Vehicles
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface VehicleLike { kind: string; x: number; y: number; w: number; h: number; vx: number; active: boolean; px?: number; py?: number }
-interface VehicleArt { set: SpriteSet<'idle'>; glow: string; window: string; rumble: number }
+/** The trolley and the trains, cab on the right: headlight ahead, windows glowing, the trains rumble. */
+function landVehicle(set: SpriteSet<'idle'>, glow: string, bodyH: number, window: string, rumble: number): VehicleArt {
+  const w = set.size.w, top = set.anchor.y;
+  return {
+    set, glow, rumble,
+    lights: [
+      { dx: w + 10, dy: top + bodyH * 0.55, r: 70, color: CREAM, k: 0.95, halo: 0.5 },
+      { dx: w * 0.3, dy: top + bodyH * 0.45, r: 46, color: window, k: 0.55, halo: 0 },
+      { dx: w * 0.7, dy: top + bodyH * 0.45, r: 46, color: window, k: 0.55, halo: 0 },
+    ],
+  };
+}
 const VEHICLE_ART: Readonly<Record<string, VehicleArt>> = {
-  trolley: { set: TROLLEY, glow: CAMPUS_GLOW, window: '#ffe2a8', rumble: 0.35 },
-  orangeTrain: { set: ORANGE_TRAIN, glow: TRACKS_GLOW, window: '#dff0ff', rumble: 1.4 },
-  commuterTrain: { set: COMMUTER_TRAIN, glow: TRACKS_GLOW, window: '#ffe9c9', rumble: 1.6 },
+  trolley: landVehicle(TROLLEY, CAMPUS_GLOW, 32, '#ffe2a8', 0.35),
+  orangeTrain: landVehicle(ORANGE_TRAIN, TRACKS_GLOW, 32, '#dff0ff', 1.4),
+  commuterTrain: landVehicle(COMMUTER_TRAIN, TRACKS_GLOW, 40, '#ffe9c9', 1.6),
 };
-const NO_VEHICLES: readonly VehicleLike[] = [];
-
-interface LaneLike { row: number; x0: number; x1: number }
-const NO_LANES: readonly LaneLike[] = [];
-const lanesOf = (f: ThemeFrame) => (f.world.level as unknown as { vehicles?: readonly LaneLike[] }).vehicles ?? NO_LANES;
-
-const shadeArt: (Canvas | null)[] = [null, null];
-/** A tunnel mouth's shadow, dark at x 0 fading to clear at 15 (flip it for the other end). */
-function shade(mono: boolean): Canvas {
-  const hit = shadeArt[mono ? 1 : 0];
-  if (hit) return hit;
-  const { canvas, ctx } = D.makeCanvas(16, 1);
-  for (let x = 0; x < 16; x++) {
-    ctx.globalAlpha = Math.pow(1 - x / 16, 1.6) * 0.92;
-    ctx.fillStyle = mono ? '#050505' : '#05040b';
-    ctx.fillRect(x, 0, 1, 1);
-  }
-  shadeArt[mono ? 1 : 0] = canvas;
-  return canvas;
-}
-
-/**
- * Vehicles on their lanes: behind her, in front of the tiles. Cabs face right
- * in the art and are mirrored running left. Each is clipped to its lane, so it
- * comes out of the wall (a tunnel, the station) at one end and goes into the
- * other, with the mouth's shadow over it as it passes.
- */
-function drawVehicles(c: Ctx, f: ThemeFrame, layer: 'base' | 'glow') {
-  const list = (f.world as unknown as { vehicles?: readonly VehicleLike[] }).vehicles ?? NO_VEHICLES;
-  const lanes = lanesOf(f);
-  const T = D.ART_TILE;
-  const hx = (f.heroX + f.ox) / T, hy = (f.heroY + f.oy) / T;
-  for (let i = 0; i < list.length; i++) {
-    const v = list[i];
-    if (!v.active) continue;
-    const art = VEHICLE_ART[v.kind];
-    if (!art) continue;
-    const a = D.atlas(art.set, f.mono, art.glow);
-    const vx = typeof v.px === 'number' ? v.px + (v.x - v.px) * f.alpha : v.x;
-    const vy = typeof v.py === 'number' ? v.py + (v.y - v.py) * f.alpha : v.y;
-    const x = Math.round(vx * T) - f.ox, y = Math.round(vy * T) - f.oy;
-    const lane = lanes[i];
-    const left = lane ? lane.x0 * T - f.ox : -1e4, right = lane ? (lane.x1 + 1) * T - f.ox : 1e4;
-    if (x > Math.min(f.bw + 40, right) || x + a.w < Math.max(-40, left)) continue;
-    const dir = v.vx < 0 ? -1 : 1;
-    const bodyH = Math.round(v.h * T);
-    c.save();
-    c.beginPath();
-    c.rect(left, y - a.h, right - left, a.h * 3);
-    c.clip();
-    D.drawFrame(c, a, 'idle', 0, dir > 0 ? x : x + a.w, y, dir, layer);
-    if (layer === 'base' && lane) {
-      const sh = shade(f.mono);
-      if (x < left + 16) c.drawImage(sh, left, y - 8, 16, bodyH + 10);
-      if (x + a.w > right - 16) { c.translate(right, 0); c.scale(-1, 1); c.drawImage(sh, 0, y - 8, 16, bodyH + 10); }
-    }
-    c.restore();
-    if (layer !== 'base') continue;
-    // the headlight throws light ahead; the cars glow from inside
-    const front = dir > 0 ? x + a.w : x;
-    if (front >= left - 8 && front <= right + 8) f.light(front + dir * 10, y + bodyH * 0.55, 70, CREAM, 0.95, 0.5);
-    f.light(Math.max(left, Math.min(right, x + a.w * 0.3)), y + bodyH * 0.45, 46, art.window, 0.55, 0);
-    f.light(Math.max(left, Math.min(right, x + a.w * 0.7)), y + bodyH * 0.45, 46, art.window, 0.55, 0);
-    // a train passing close rumbles the view
-    if (art.rumble > 0) {
-      const dx = Math.abs(vx + v.w / 2 - hx), dy = Math.abs(vy - hy);
-      if (dx < v.w / 2 + 6 && dy < 5) {
-        const k = (1 - clamp01((dx - v.w / 2) / 6)) * (1 - dy / 5) * Math.min(1, Math.abs(v.vx) / 6);
-        if (art.rumble * k > f.shake) f.shake = art.rumble * k;
-      }
-    }
-  }
-}
-
-/**
- * Rails along the bottom of each lane where it crosses open air (a trench):
- * steel rails on sleepers over a dark girder, drawn once per lane however
- * many timetables share it.
- */
-function drawRails(c: Ctx, f: ThemeFrame) {
-  const lanes = lanesOf(f);
-  if (!lanes.length) return;
-  const list = (f.world as unknown as { vehicles?: readonly VehicleLike[] }).vehicles ?? NO_VEHICLES;
-  const level = f.world.level, cols = level.cols, T = D.ART_TILE;
-  const steel = col('#8a93a8', f.mono), web = col('#3a3f52', f.mono), sleeper = col('#2a2230', f.mono), girder = col('#141824', f.mono);
-  for (let i = 0; i < lanes.length; i++) {
-    const L = lanes[i];
-    let dup = false;
-    for (let j = 0; j < i && !dup; j++) dup = lanes[j].row === L.row && lanes[j].x0 === L.x0 && lanes[j].x1 === L.x1;
-    if (dup) continue;
-    const h = list[i] ? list[i].h : 2;
-    const row = Math.floor(L.row + h);
-    if (row < 0 || row >= D.ROWS) continue;
-    const y = Math.round((L.row + h) * T) - f.oy;
-    if (y < -8 || y > f.bh + 4) continue;
-    const c0 = Math.max(L.x0, Math.floor(f.ox / T)), c1 = Math.min(L.x1, Math.floor((f.ox + f.bw) / T));
-    for (let tx = c0; tx <= c1; tx++) {
-      if (D.KIND[level.tiles[row * cols + tx]] !== 0) continue;
-      const x = tx * T - f.ox;
-      c.fillStyle = girder; c.fillRect(x, y + 3, 16, 2);
-      c.fillStyle = sleeper;
-      for (let k = 1; k < 16; k += 5) c.fillRect(x + k, y + 1, 3, 2);
-      c.fillStyle = web; c.fillRect(x, y + 1, 16, 1);
-      c.fillStyle = steel; c.fillRect(x, y, 16, 1);
-    }
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Signals and panels
@@ -394,7 +298,7 @@ export const CAMPUS: PixelTheme = {
   checkpoint: 'lampPost',
   dressing: campusDressing,
   layers: {
-    tiles(c, f, layer) { drawPanels(c, f, layer); if (layer === 'base') drawRails(c, f); drawVehicles(c, f, layer); },
+    tiles(c, f, layer) { drawPanels(c, f, layer); if (layer === 'base') drawRails(c, f, col); drawVehicles(c, f, layer, VEHICLE_ART); },
   },
 };
 
@@ -451,7 +355,7 @@ export const TRACKS: PixelTheme = {
   },
   checkpoint: 'stationLamp',
   layers: {
-    tiles(c, f, layer) { if (layer === 'base') drawRails(c, f); drawSignals(c, f, layer); drawVehicles(c, f, layer); },
+    tiles(c, f, layer) { if (layer === 'base') drawRails(c, f, col); drawSignals(c, f, layer); drawVehicles(c, f, layer, VEHICLE_ART); },
   },
 };
 

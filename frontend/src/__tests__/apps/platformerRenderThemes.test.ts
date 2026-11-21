@@ -53,14 +53,16 @@ beforeEach(() => {
 
 describe('the theme seam', () => {
   it('every theme but the old cartoon worlds draws with the pixel renderer', () => {
-    for (const t of ['rooftops', 'austin', 'airport', 'clouds', 'campus', 'library', 'tracks', 'backbay']) expect(rendererFor(t)).toBe('pixel');
+    for (const t of ['rooftops', 'austin', 'airport', 'clouds', 'campus', 'library', 'tracks', 'newbury', 'river', 'harbor', 'beach', 'backbay']) expect(rendererFor(t)).toBe('pixel');
     for (const t of ['grass', 'cave', 'sky', 'stars']) expect(rendererFor(t)).toBe('cartoon');
   });
 
-  it('the rooftops and Austin are bundled; an unknown pixel theme falls back to the rooftops', () => {
+  it('the rooftops and Austin are bundled; an unknown pixel theme falls back to the rooftops', async () => {
     expect(themeFor('rooftops')?.id).toBe('rooftops');
     expect(themeFor('austin')?.id).toBe('austin');
     expect(themeFor('backbay')?.id).toBe('rooftops');
+    // the old cartoon worlds' renderer is a lazy chunk too
+    await preloadTheme('grass');
     expect(themeReady('grass')).toBe(true);
   });
 
@@ -220,6 +222,86 @@ describe('chapter 3: campus, library, tracks', () => {
             resetWorld1();
             const ctx = screen();
             const w = chapter3(theme, { bare });
+            for (let f = 0; f < 4; f++) {
+              w.t += 1 / 60;
+              expect(() => drawFrame(ctx as unknown as CanvasRenderingContext2D, w, { w: v.w, h: v.h, mono, reduced: f === 3, alpha: 0.5, dpr: v.dpr }, new Juice())).not.toThrow();
+            }
+          }
+          const saves = allContexts().reduce((n, c) => n + (c.save as Mock).mock.calls.length, 0);
+          const restores = allContexts().reduce((n, c) => n + (c.restore as Mock).mock.calls.length, 0);
+          expect(saves).toBe(restores);
+        });
+      }
+    }
+  }
+});
+
+/** A chapter 4 world: awnings, water, boats, a hook, gusts warning and blowing, a wave, sculptures (one broken), a pigeon and a gull. */
+function chapter4(theme: string, o: { bare?: boolean } = {}): World {
+  const w = createWorld({ levelIndex: 0 });
+  w.level = { ...w.level, theme } as World['level'];
+  const cols = w.level.cols, hx = Math.floor(w.hero.x), floor = Math.floor(w.hero.y + w.hero.h);
+  if (!o.bare) {
+    const level = { ...w.level, tiles: w.level.tiles.slice() } as World['level'] & Record<string, unknown>;
+    const put = (x: number, y: number, t: number) => { level.tiles[y * cols + x] = t; w.tiles[y * cols + x] = t; };
+    for (let i = 0; i < 3; i++) put(hx + 2 + i, floor - 3, TILE.AWNING);
+    for (let i = 0; i < 4; i++) { put(hx + 8 + i, floor, TILE.WATER); put(hx + 8 + i, floor + 1, TILE.WATER); }
+    for (let i = 0; i < 3; i++) put(hx + 4 + i, floor - 1, TILE.CRATE);
+    w.tiles[(floor - 1) * cols + hx + 5] = TILE.EMPTY;
+    level.vehicles = [
+      { kind: 'shell', row: floor, x0: hx - 4, x1: hx + 20, speed: 7, dir: 1, gap: 1 },
+      { kind: 'sailboat', row: floor - 1, x0: hx - 4, x1: hx + 20, speed: 2, dir: -1, gap: 1, bob: 0.25 },
+    ];
+    w.level = level;
+    const extra = w as unknown as Record<string, unknown>;
+    extra.bounces = [0, 1, 2].map(i => ({ x: hx + 2 + i, y: floor - 3, t: i === 0 ? 0.05 : 0.05 }));
+    extra.vehicles = [
+      { kind: 'shell', x: hx, y: floor, w: 8, h: 0.5, vx: 7, active: true, px: hx - 0.1, py: floor },
+      { kind: 'sailboat', x: hx + 6, y: floor - 1.2, w: 4, h: 3, vx: -2, active: true, px: hx + 6.02, py: floor - 1.2 },
+    ];
+    extra.hooks = [{ x: hx + 3.5, y: 2, angle: 0.3, len: 5, px: hx + 4.9, py: 6.7, w: 2 }];
+    extra.gusts = [{ x0: hx - 5, x1: hx + 10, dir: -1, strength: 5, warn: true, on: false }, { x0: hx + 11, x1: hx + 30, dir: 1, strength: 5, warn: false, on: true }];
+    extra.waves = [{ x0: hx - 2, x1: hx + 12, row: floor, dir: -1, front: hx + 3, on: true, warn: false, pushing: true }];
+    if (w.enemies[0]) {
+      w.enemies.push({ ...w.enemies[0], kind: 'pigeon' as World['enemies'][number]['kind'], x: hx + 2, y: floor - 0.6 });
+      w.enemies.push({ ...w.enemies[0], kind: 'gull' as World['enemies'][number]['kind'], x: hx + 3, y: floor - 4 });
+    }
+  }
+  w.t = 4.2;
+  return w;
+}
+
+describe('chapter 4: newbury, river, harbor, beach', () => {
+  it('one chunk brings all four themes', async () => {
+    expect(themeReady('beach')).toBe(false);
+    const t = await loadTheme('river');
+    expect(t.id).toBe('river');
+    for (const id of ['newbury', 'harbor', 'beach']) expect(themeFor(id)?.id).toBe(id);
+  });
+
+  it('water and awnings are drawn by the theme, never baked as ground', () => {
+    expect(KIND[TILE.WATER]).toBe(K.WATER);
+    expect(KIND[TILE.AWNING]).toBe(K.AWNING);
+    expect(isStaticKind(K.WATER)).toBe(false);
+    expect(isStaticKind(K.AWNING)).toBe(false);
+  });
+
+  it('the beach draws its crates as sand sculptures; the chapter borrows the neon sign with its own glow', async () => {
+    const beach = await loadTheme('beach');
+    expect(beach.drawsCrates).toBe(true);
+    expect(beach.signGlow).toBeTruthy();
+    expect(beach.sign(1, 0, 0).size.w).toBe(48);
+  });
+
+  for (const theme of ['newbury', 'river', 'harbor', 'beach']) {
+    for (const v of VIEWS) {
+      for (const mono of [false, true]) {
+        it(`${theme}, ${v.name}, ${mono ? 'mono' : 'colour'}, with every moving part, or none`, async () => {
+          await loadTheme(theme);
+          for (const bare of [false, true]) {
+            resetWorld1();
+            const ctx = screen();
+            const w = chapter4(theme, { bare });
             for (let f = 0; f < 4; f++) {
               w.t += 1 / 60;
               expect(() => drawFrame(ctx as unknown as CanvasRenderingContext2D, w, { w: v.w, h: v.h, mono, reduced: f === 3, alpha: 0.5, dpr: v.dpr }, new Juice())).not.toThrow();

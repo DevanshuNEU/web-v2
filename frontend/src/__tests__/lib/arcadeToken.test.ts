@@ -122,10 +122,10 @@ describe('score caps sit near what a perfect run can reach', () => {
   it('snake: a 20x20 board holds at most 399 snacks', () => {
     expect(RULES.snake.cap).toBe(399);
   });
-  it('platformer: covers a perfect Story run (40,490 for chapters 1 to 3) and sits within 15 percent above it', () => {
+  it('platformer: covers a perfect Story run (128,230 for chapters 1 to 4) and sits within 15 percent above it', () => {
     // Derived from the level data in src/__tests__/apps/platformerScore.test.ts.
-    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(40_490);
-    expect(RULES.platformer.cap).toBeLessThanOrEqual(40_490 * 1.15);
+    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(128_230);
+    expect(RULES.platformer.cap).toBeLessThanOrEqual(128_230 * 1.15);
   });
 });
 

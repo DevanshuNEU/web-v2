@@ -75,6 +75,7 @@ const POWER_LINE: Readonly<Record<PowerKind, string>> = {
   priorityBoarding: 'Enemies bounce right off you',
   wickedFast: 'Dash again and again',
   encore: 'Every landing stuns enemies nearby',
+  cannoliShield: 'Shrugs off one hit',
 };
 const TYPE_RATE = 32;
 
@@ -103,13 +104,19 @@ const memoriesOf = (w: World): { id: string; taken: boolean }[] => {
   return Array.isArray(m) ? m : [];
 };
 
-function hudOf(w: World): Hud {
+/** The HUD's numbers; `banked` is the story run's score from earlier levels, so the total keeps growing. */
+function hudOf(w: World, banked = 0): Hud {
   const mem = memoriesOf(w);
   const a = abilitiesOf(w);
   return {
-    score: worldScore(w), coins: w.stats.coins, lives: Math.max(0, w.lives), level: w.levelIndex, time: Math.floor(w.levelTime),
+    score: banked + worldScore(w), coins: w.stats.coins, lives: Math.max(0, w.lives), level: w.levelIndex, time: Math.floor(w.levelTime),
     memories: mem.filter(m => m.taken).length, memTotal: mem.length, blade: !!a.blade, dash: !!a.dash,
   };
+}
+
+/** The story score banked before this world: a cleared world is already in the bank, so it is not counted twice. */
+export function bankedFor(run: { score: number; counted: unknown }, w: World): number {
+  return run.counted === w ? run.score - worldScore(w) : run.score;
 }
 
 const sameHud = (a: Hud, b: Hud) =>
@@ -128,7 +135,8 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   const [best, setBest] = useState(() => ({ story: bestScore(HS_KEY), endless: bestScore(HS_ENDLESS) }));
   const [result, setResult] = useState<{ kind: Result; score: number; message: string; mode: Mode } | null>(null);
   // a Story run: the score of the levels played in one sitting, posted at the end of the built story
-  const storyRun = useRef({ score: 0 });
+  // the story run's score from cleared levels, and the world already counted in it
+  const storyRun = useRef<{ score: number; counted: World | null }>({ score: 0, counted: null });
   const [showBoard, setShowBoard] = useState(false);
   const [announce, setAnnounce] = useState('');
   const [progress, setProgressState] = useState<Progress>(() => loadProgress());
@@ -260,7 +268,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
     worldRef.current = w;
     juiceRef.current.clear();
     drainEvents(w);
-    hudRef.current = hudOf(w);
+    hudRef.current = hudOf(w, m === 'story' ? bankedFor(storyRun.current, w) : 0);
     setHud(hudRef.current);
     setResult(null);
     setShowBoard(false);
@@ -278,6 +286,8 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   }, [fitView, clearInput, setMode, runEndless, setStatus, refocus]);
 
   const startEndless = useCallback((levelIndex = 0) => {
+    // Endless runs on into the cartoon worlds: fetch their renderer now
+    preloadTheme('cave').catch(() => {});
     seedRef.current = newSeed();
     begin(createWorld({ mode: 'endless', levelIndex, secret: secretRef.current, seed: seedRef.current, noFreeze: !!reduced }), 'endless');
   }, [begin, reduced]);
@@ -310,6 +320,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
   /** A fresh Story run from the title or the map: its score starts at 0 and gets a start token. */
   const freshStory = useCallback((id: string) => {
     storyRun.current.score = 0;
+    storyRun.current.counted = null;
     runStory.begin();
     playStory(id);
   }, [playStory, runStory]);
@@ -356,9 +367,15 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       case 'stomp':
         sfx('stomp'); buzz(12);
         j.burst(x, y, th.pink, 14, 200, 4);
-        j.float(x, y - T * 0.3, '+50', th.lime, Math.max(15, T * 0.7));
         if (e.n >= 2) j.float(x, y - T * 1.3, hype(comboTier(e.n)), th.sun, Math.max(17, T * 0.85), 1.1);
         break;
+      case 'kill': {
+        // every kill shows what it scored; a chain grows the number and the type
+        const chain = Math.round(e.n / 100);
+        const big = chain >= 2;
+        j.float(x, y - T * 0.3, big ? `+${e.n} x${chain}` : `+${e.n}`, big ? th.sun : th.lime, Math.max(15, T * (big ? 0.8 + 0.05 * chain : 0.7)), big ? 1 : 0.8);
+        break;
+      }
       case 'bump': sfx('bump'); break;
       case 'break':
         sfx('bump'); sfx('slice'); buzz(12);
@@ -450,6 +467,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       const fresh = found.filter(id => !(progressRef.current.levels[levelId]?.memories ?? []).includes(id));
       setProgress(recordClear(progressRef.current, levelId, w.levelTime, found));
       storyRun.current.score += worldScore(w);
+      storyRun.current.counted = w;
       const caption = fresh.length ? storyText(memoryCaptionId(fresh[0]), overrides.current) : undefined;
       const next = (w as { next?: string | null }).next ?? nextStoryId(levelId);
       clearInput();
@@ -533,7 +551,7 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
         prompts: s === 'playing' ? prompts.current : undefined,
       }, juiceRef.current);
     }
-    const next = hudOf(w);
+    const next = hudOf(w, modeRef.current === 'story' ? bankedFor(storyRun.current, w) : 0);
     if (!sameHud(next, hudRef.current)) { hudRef.current = next; setHud(next); }
     if (w.phase === 'done' && s === 'playing') finish();
     if (meterRef.current) { const t1 = performance.now(); meterRef.current.frame(t1, t1 - t0); }

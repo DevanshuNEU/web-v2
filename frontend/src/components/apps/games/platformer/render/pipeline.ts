@@ -9,30 +9,14 @@ import { arcadeTheme, hypeFont } from '../../shared/theme';
 import type { Juice } from '../../shared/juice';
 import { PHYS } from '../sim/physics';
 import { ROWS, TILE, isSolidTile, tileAt } from '../sim/level';
-import { CARD_SECONDS, type World } from '../sim/world';
+import { CARD_SECONDS, tallyView, type World } from '../sim/world';
 import type { WorldTheme } from '../sim/levels';
 
-/** Rows of tiles the view shows; the tile size comes from the view height. */
-export const VIEW_ROWS = 13;
+import { VIEW_ROWS, tileFor, type View } from './view';
+
+export { VIEW_ROWS, tileFor, type View };
 const INK = '#120b1f';
 const HERO_SIZE = PHYS.heroH / 0.96;
-
-export interface View {
-  w: number; h: number;
-  mono: boolean; reduced: boolean;
-  /** 0..1 between the last two physics steps. */
-  alpha: number;
-}
-
-/**
- * Tile size for a w by h view. Wide views show VIEW_ROWS rows, as before.
- * Tall portrait views (a phone) size tiles from the width so about 13
- * columns show and the world stays chunky; the extra rows are sky. Never
- * more than 17 rows, so a very tall window does not shrink the world.
- */
-export function tileFor(w: number, h: number): number {
-  return Math.max(8, Math.max(h / 17, Math.min(h / VIEW_ROWS, w / 13)));
-}
 
 interface Pal {
   skyTop: string; skyBottom: string; far: string; near: string; deco: string;
@@ -521,7 +505,7 @@ export function drawCards(ctx: CanvasRenderingContext2D, world: World, v: View, 
     ctx.font = hypeFont(size * 0.55);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = th.text;
-    ctx.fillText(`Time bonus ${Math.ceil(world.pendingTime)}`, w / 2, h * 0.36 + size * 0.2);
+    ctx.fillText(`Time bonus ${tallyView(world).time}`, w / 2, h * 0.36 + size * 0.2);
     ctx.fillText(world.pendingClear ? 'Clear bonus 1000' : 'Clear bonus +1000', w / 2, h * 0.36 + size * 1.0);
   }
   if (world.phase === 'finale' || (world.phase === 'done' && world.result === 'secret')) {

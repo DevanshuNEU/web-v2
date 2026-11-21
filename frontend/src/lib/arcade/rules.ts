@@ -19,14 +19,15 @@ export type ScoreRule = {
 // keeps a forged score from sitting above every honest one.
 //   snake: a 20x20 board holds at most 399 snacks.
 //   platformer: the leaderboard uses the fixed Story levels. A perfect run of
-//     the built chapters (every coin, crate, sign and enemy, goal tops, clears,
-//     full time bonuses, no deaths) is 40,490 with chapters 1 to 3;
+//     the built chapters (every coin, crate, sign and goal top, every kill at
+//     the top of a chain, clears, the top time bonus, no deaths) is 128,230
+//     with chapters 1 to 4;
 //     platformerScore.test.ts derives it and fails when a new chapter needs a
 //     higher cap.
 //   stacker: one floor per drop; nobody honest drops 12 a second.
 export const RULES: Record<GameId, ScoreRule> = {
   snake: { maxPerSecond: 12, base: 10, cap: 399 },
-  platformer: { maxPerSecond: 600, base: 3000, cap: 44_000 },
+  platformer: { maxPerSecond: 600, base: 3000, cap: 140_000 },
   stacker: { maxPerSecond: 12, base: 10, cap: 3000 },
   // Endless: seeded levels with modifiers, the Sigma coin and breakables; a
   // perfect run reaches about 22,000 (platformerScore.test.ts).

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, type Mock } from 'vitest';
 import { stubCanvas } from '../setup/canvas';
 import { Juice } from '@/components/apps/games/shared/juice';
 import { createWorld, type World } from '@/components/apps/games/platformer/sim/world';
 import { TILE } from '@/components/apps/games/platformer/sim/level';
 import { tileFor } from '@/components/apps/games/platformer/render/pipeline';
-import { drawFrame, noteEvent, rendererFor, viewTile } from '@/components/apps/games/platformer/render/frame';
+import { drawFrame, noteEvent, preloadTheme, rendererFor, themeReady, viewTile } from '@/components/apps/games/platformer/render/frame';
 import { frameStats, resetWorld1 } from '@/components/apps/games/platformer/render/pixel/world1';
 import { viewMetrics } from '@/components/apps/games/platformer/render/pixel/camera';
 import { MAX_LIGHTS } from '@/components/apps/games/platformer/render/pixel/lights';
@@ -73,6 +73,17 @@ beforeEach(() => {
   stubCanvas();
   resetWorld1();
 });
+
+describe('the cartoon renderer is a lazy chunk', () => {
+  it('loads on demand; a cartoon world draws without throwing either way', async () => {
+    const ctx = screen();
+    expect(() => drawFrame(ctx as unknown as CanvasRenderingContext2D, createWorld({ levelIndex: 1 }), { w: 390, h: 520, mono: false, reduced: false, alpha: 1 }, new Juice())).not.toThrow();
+    await preloadTheme('cave');
+    expect(themeReady('stars')).toBe(true);
+  });
+});
+
+beforeAll(async () => { await preloadTheme('cave'); });
 
 describe('render seam: routing by theme', () => {
   it('rooftops get the pixel renderer, every other world the cartoon one', () => {

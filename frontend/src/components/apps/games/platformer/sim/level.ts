@@ -36,6 +36,10 @@ export const TILE = {
   WALK_L: 14,
   /** Thin cloud: one-way; puffs away a moment after she lands on it, then comes back. */
   PUFF: 15,
+  /** Shop awning: one-way; landing on it bounces her up. */
+  AWNING: 16,
+  /** Water: not solid; touching it is a fall. */
+  WATER: 17,
 } as const;
 
 export function isSolidTile(t: number): boolean {
@@ -44,11 +48,14 @@ export function isSolidTile(t: number): boolean {
 
 /** Tiles that only stop a body falling onto them from above. */
 export function isOneWayTile(t: number): boolean {
-  return t === TILE.ONEWAY || t === TILE.PUFF;
+  return t === TILE.ONEWAY || t === TILE.PUFF || t === TILE.AWNING;
 }
 
 import type { EnemyKind } from './enemies';
 import type { VehicleDef } from './vehicles';
+import type { GustDef } from './gusts';
+import type { HookDef } from './hooks';
+import type { WaveDef } from './waves';
 import type { Ability } from './hero';
 import { POWER_CHARS, type PowerKind } from './powers';
 
@@ -63,7 +70,9 @@ export interface Shrine { x: number; y: number; ability: Ability }
 export interface Goal { x: number; top: number; base: number; kind: 'flag' | 'beacon' }
 export type DecorKind = 'waterTower' | 'antenna' | 'acUnit' | 'neonSign' | 'chimney'
   | 'departureBoard' | 'plant' | 'seats' | 'kiosk' | 'cloudTower' | 'wingLight'
-  | 'tree' | 'lampPost' | 'bench' | 'bikeRack' | 'ladder' | 'studyLamp' | 'studyTable' | 'cart' | 'gantry' | 'stationLamp';
+  | 'tree' | 'lampPost' | 'bench' | 'bikeRack' | 'ladder' | 'studyLamp' | 'studyTable' | 'cart' | 'gantry' | 'stationLamp'
+  | 'gasLamp' | 'treeInPlanter' | 'stoop' | 'mailbox' | 'bridgeLamp' | 'boatDock' | 'lifebuoy'
+  | 'bollard' | 'craneLeg' | 'containerStack' | 'fishCrates' | 'boulevardLamp' | 'lifeguardChair' | 'sandCastle' | 'umbrella';
 export interface Decor { kind: DecorKind; x: number; y: number }
 export interface Light { x: number; y: number; r: number; color: string; flicker: number }
 
@@ -80,6 +89,10 @@ export const DECOR_BY_THEME: Readonly<Record<WorldTheme, Readonly<Partial<Record
   campus: { T: 'tree', N: 'lampPost', U: 'bench', H: 'bikeRack' },
   library: { T: 'ladder', N: 'studyLamp', U: 'studyTable', H: 'cart' },
   tracks: { T: 'gantry', N: 'stationLamp', U: 'bench' },
+  newbury: { T: 'gasLamp', N: 'treeInPlanter', U: 'stoop', H: 'mailbox' },
+  river: { T: 'bridgeLamp', N: 'bench', U: 'boatDock', H: 'lifebuoy' },
+  harbor: { T: 'bollard', N: 'craneLeg', U: 'containerStack', H: 'fishCrates' },
+  beach: { T: 'boulevardLamp', N: 'lifeguardChair', U: 'sandCastle', H: 'umbrella' },
 };
 
 type SignLight = { color: string; flicker: number; r: number };
@@ -92,7 +105,10 @@ const NEON: readonly SignLight[] = [
 /**
  * The light of a sign (L) by theme: neon on the roofs, fluorescent and amber
  * gate signs in the terminal, moonlight in the clouds, warm lamps on the
- * campus, green and warm study lamps in the library, amber and cold at the tracks.
+ * campus, green and warm study lamps in the library, amber and cold at the
+ * tracks; gas lamps and shop windows on Newbury Street, cool bridge lights and
+ * warm lamps in the river fog, sunrise gold and red crane beacons at the
+ * harbor, a soft lamp in the low morning sun at the beach.
  */
 const SIGN_LIGHTS: Readonly<Partial<Record<WorldTheme, readonly SignLight[]>>> = {
   airport: [{ color: '#bfe6ff', flicker: 0.04, r: 5 }, { color: '#ffb347', flicker: 0.02, r: 4.5 }, { color: '#7ad0ff', flicker: 0.06, r: 4.5 }],
@@ -100,6 +116,10 @@ const SIGN_LIGHTS: Readonly<Partial<Record<WorldTheme, readonly SignLight[]>>> =
   campus: [{ color: '#ffcf8a', flicker: 0.03, r: 5 }, { color: '#fff1c2', flicker: 0.02, r: 4.5 }],
   library: [{ color: '#9fe0a0', flicker: 0, r: 4.5 }, { color: '#ffd59a', flicker: 0.02, r: 5 }],
   tracks: [{ color: '#ffb347', flicker: 0.05, r: 5 }, { color: '#bfe6ff', flicker: 0.04, r: 5 }],
+  newbury: [{ color: '#ffd38a', flicker: 0.03, r: 5 }, { color: '#ffe3b0', flicker: 0.02, r: 4.5 }],
+  river: [{ color: '#e6ecff', flicker: 0.02, r: 6 }, { color: '#ffd38a', flicker: 0.03, r: 6 }],
+  harbor: [{ color: '#ffc58a', flicker: 0.02, r: 5 }, { color: '#ff3b3b', flicker: 0.3, r: 4 }],
+  beach: [{ color: '#ffe6b0', flicker: 0, r: 3.5 }],
 };
 const BEACON_LIGHT = { color: '#3df2ff', flicker: 0.1, r: 5 };
 
@@ -160,11 +180,16 @@ export interface Level {
   vehicles: VehicleDef[];
   /** Signals (s) in goal order: tile x, y top left. Each watches the nearest lane over its column. */
   signals: { x: number; y: number }[];
+  /** Wind zones, crane hooks and waves, copied from the level. */
+  gusts: GustDef[];
+  hooks: HookDef[];
+  waves: WaveDef[];
 }
 
 const CODES: Record<string, number> = {
   '#': TILE.GROUND, '=': TILE.GROUND, _: TILE.ONEWAY, B: TILE.BRICK, '?': TILE.AURA, C: TILE.AURA_CROWN, X: TILE.STONE, '^': TILE.SPIKE, o: TILE.COIN,
   $: TILE.SIGMA, '%': TILE.CRACK, R: TILE.CRATE, '>': TILE.WALK_R, '<': TILE.WALK_L, '~': TILE.PUFF,
+  A: TILE.AWNING, W: TILE.WATER,
 };
 
 export function parseLevel(def: LevelDef, gravity = 1): Level {
@@ -238,9 +263,11 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         case 'c': enemies.push({ kind: 'doomCrawler', x, y }); break;
         case 'd': enemies.push({ kind: 'adDrone', x, y }); break;
         case 'e': enemies.push({ kind: 'eliteDrone', x, y }); break;
+        case 'p': enemies.push({ kind: 'pigeon', x, y }); break;
+        case 'g': enemies.push({ kind: 'gull', x, y }); break;
         case 'M': memories.push({ x, y }); break;
         case 's': signals.push({ x, y }); break;
-        case 'w': case 't': case 'b': case 'k': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
+        case 'w': case 't': case 'b': case 'k': case 'v': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
         case 'Q':
           if (!def.shrine) throw new Error(`${def.name}: a shrine (Q) needs the level's shrine ability`);
           shrines.push({ x, y, ability: def.shrine });
@@ -282,6 +309,7 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
     goalDir, decor, lights, shrines, pickups, sword, setPieces: def.setPieces ? [...def.setPieces] : [], decoys: (def.decoys ?? []).map(d => ({ x: d.x, y: d.y })), crates, signs: decor.filter(d => d.kind === 'neonSign').length,
     enemies, platforms, coinTotal, bricks, sigmas, gravity,
     vehicles: (def.vehicles ?? []).map(v => ({ ...v })), signals,
+    gusts: (def.gusts ?? []).map(g => ({ ...g })), hooks: (def.hooks ?? []).map(k => ({ ...k })), waves: (def.waves ?? []).map(v => ({ ...v })),
   };
 }
 

@@ -36,7 +36,7 @@ describe('Main Character story rules', () => {
 
   it('each death costs 50 points, and the score never goes below 0', () => {
     expect(POINTS.death).toBe(50);
-    const base = { coins: 10, stomps: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0 };
+    const base = { coins: 10, stomps: 0, kills: 0, bricks: 0, flag: 0, clears: 0, time: 0, bonus: 0 };
     expect(scoreOf({ ...base, deaths: 1 })).toBe(50);
     expect(scoreOf({ ...base, deaths: 3 })).toBe(0);
     const w = storyOn(['.Poo...^^...............................', G40, G40]);

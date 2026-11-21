@@ -55,8 +55,8 @@ export interface CardArt {
   canvas: Canvas;
   w: number; h: number;
   frame: string; corner: string;
-  /** Tally only: where the two numbers go (right edge x, top y). */
-  numX: number; timeY: number; clearY: number;
+  /** Tally only: where the numbers go (right edge x, top y of each row) and the left edge of the labels. */
+  numX: number; killsY: number; timeY: number; clearY: number; left: number;
 }
 
 const ACCENT: Readonly<Record<string, string>> = {
@@ -121,7 +121,7 @@ export function bakeTitle(label: string, name: string, modName: string, modifier
     ctx.fillRect(mx - 7, y + 3, 4, 1);
     ctx.fillRect(mx + mw + 3, y + 3, 4, 1);
   }
-  return { canvas, w, h, frame: col('#3df2ff'), corner: col('#ff3d9a'), numX: 0, timeY: 0, clearY: 0 };
+  return { canvas, w, h, frame: col('#3df2ff'), corner: col('#ff3d9a'), numX: 0, killsY: 0, timeY: 0, clearY: 0, left: 0 };
 }
 
 /** Bake the level-clear card: the headline and the two bonus labels; numbers are drawn live. */
@@ -129,9 +129,9 @@ export function bakeTally(title: string, bw: number, mono: boolean): CardArt {
   const col = mono ? toMono : (s: string) => s;
   const lay = cardLayout(title, bw);
   const nameW = Math.max(...lay.lines.map(l => textWidth(l, lay.scale)));
-  const w = Math.min(bw - 8, Math.max(nameW, textWidth('CLEAR BONUS +0000', 1)) + 28);
+  const w = Math.min(bw - 8, Math.max(nameW, textWidth('TIME BONUS PAR 0:00 +0000', 1)) + 28);
   const lineH = GLYPH_H * lay.scale;
-  const h = 9 + lay.lines.length * lineH + (lay.lines.length - 1) * 3 * lay.scale + 9 + GLYPH_H + 5 + GLYPH_H + 9;
+  const h = 9 + lay.lines.length * lineH + (lay.lines.length - 1) * 3 * lay.scale + 9 + (GLYPH_H + 5) * 2 + GLYPH_H + 9;
   const { canvas, ctx } = makeCanvas(w, h);
   panel(ctx, w, h);
   let y = 9;
@@ -142,11 +142,14 @@ export function bakeTally(title: string, bw: number, mono: boolean): CardArt {
   y += 9 - 3 * lay.scale;
   const left = 14;
   ctx.fillStyle = col('#9d8fd6');
+  drawText(ctx, 'KILLS', left, y);
+  const killsY = y;
+  y += GLYPH_H + 5;
   drawText(ctx, 'TIME BONUS', left, y);
   const timeY = y;
   y += GLYPH_H + 5;
   drawText(ctx, 'CLEAR BONUS', left, y);
-  return { canvas, w, h, frame: col('#ff3d9a'), corner: col('#3df2ff'), numX: w - 14, timeY, clearY: y };
+  return { canvas, w, h, frame: col('#ff3d9a'), corner: col('#3df2ff'), numX: w - 14, killsY, timeY, clearY: y, left };
 }
 
 /**
@@ -198,9 +201,14 @@ export function drawCard(c: Ctx, art: CardArt, bw: number, top: number, wipe: Wi
 }
 
 /** The tally's two numbers, right aligned, drawn live. */
-export function drawTallyNumbers(c: Ctx, art: CardArt, bw: number, top: number, time: number, clearDone: boolean, mono: boolean) {
+/** The tally's numbers: kill points, the time bonus counting up (with par beside its label), and the clear. */
+export function drawTallyNumbers(c: Ctx, art: CardArt, bw: number, top: number, kills: number, time: number, par: number, clearDone: boolean, mono: boolean) {
   const x = Math.round((bw - art.w) / 2);
+  c.fillStyle = mono ? '#bbbbbb' : '#6a5ea8';
+  const parText = `PAR ${Math.floor(par / 60)}:${String(par % 60).padStart(2, '0')}`;
+  drawText(c, parText, x + art.left + textWidth('TIME BONUS ', 1), top + art.timeY);
   c.fillStyle = mono ? '#ffffff' : '#ffd23f';
+  drawNumber(c, kills, x + art.numX - numberWidth(kills), top + art.killsY);
   drawNumber(c, time, x + art.numX - numberWidth(time), top + art.timeY);
   const w = numberWidth(1000);
   drawNumber(c, 1000, x + art.numX - w, top + art.clearY);

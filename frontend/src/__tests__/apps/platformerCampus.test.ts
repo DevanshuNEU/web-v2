@@ -320,9 +320,9 @@ function play(w: World, seconds: number, f: Partial<InputFrame> = {}, each?: (w:
   return deaths;
 }
 
-describe('Story: chapter 3 is built, chapters 4 to 6 wait their turn', () => {
+describe('Story: chapter 3 is built, chapters 5 and 6 wait their turn', () => {
   it('3-1 Huntington Avenue, 3-2 Snell After Midnight and 3-3 Over the Tracks follow the trip', () => {
-    expect(STORY.filter(s => s.built).map(s => s.id)).toEqual(['1-1', '1-2', '1-3', '2-1', '2-2', '3-1', '3-2', '3-3']);
+    expect(STORY.filter(s => s.built && s.world <= 3).map(s => s.id)).toEqual(['1-1', '1-2', '1-3', '2-1', '2-2', '3-1', '3-2', '3-3']);
     expect(IDS.map(id => [storyEntry(id).name, storyEntry(id).theme, storyEntry(id).world])).toEqual([
       ['Huntington Avenue', 'campus', 3], ['Snell After Midnight', 'library', 3], ['Over the Tracks', 'tracks', 3],
     ]);
@@ -331,15 +331,14 @@ describe('Story: chapter 3 is built, chapters 4 to 6 wait their turn', () => {
     for (const id of IDS) expect(storyLevelDef(id)).toBe(CAMPUS[id]);
   });
 
-  it('Boston nights, Jamaica Plain, the concert and the season boss are placeholders, in that order', () => {
+  it('the gorilla, Jamaica Plain, the concert and the season boss are placeholders, in that order', () => {
     expect(STORY.filter(s => !s.built).map(s => [s.id, s.world, s.name])).toEqual([
-      ['4-1', 4, 'Newbury Street'], ['4-2', 4, 'The Charles'], ['4-3', 4, 'Seaport Sunrise'], ['4-4', 4, 'Revere Beach'],
       ['4-boss', 4, 'The Ex-Bestie'], ['5-1', 5, 'Jamaica Pond'], ['5-2', 5, 'Home'], ['6-1', 6, 'The Headliner'],
       ['season-boss', 7, 'Job Hunting'],
     ]);
     expect(storyEntry('4-boss').cardId).toBe('card-boss');
     expect(storyEntry('5-2').cardId).toBe('card-5-2');
-    expect(() => storyLevelDef('4-1')).toThrow(/not built/);
+    expect(() => storyLevelDef('4-boss')).toThrow(/not built/);
   });
 
   it('createWorld loads each level under its sky, with its memories named by level', () => {
@@ -530,8 +529,8 @@ describe('Story 3-2: Snell After Midnight', () => {
     expect(g.nodes.filter(n => !ok.has(n)).map(g.cell)).toEqual([]);
   }, 30_000);
 
-  it('quiet: one ticket drone at most, no walkers', () => {
-    expect(l.enemies.length).toBeLessThanOrEqual(1);
+  it('quiet: two ticket drones at most, no walkers', () => {
+    expect(l.enemies.length).toBeLessThanOrEqual(2);
     expect(l.enemies.every(e => e.kind === 'adDrone')).toBe(true);
   });
 

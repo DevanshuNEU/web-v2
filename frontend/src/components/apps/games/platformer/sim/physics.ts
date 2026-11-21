@@ -56,6 +56,13 @@ export const PHYS = {
   wallGrace: 0.35,
   /** Extra jumps in the air (the double jump), back on landing or a wall. */
   airJumps: 1,
+  /**
+   * An awning's bounce: up this fast, rising under the held-jump gravity
+   * whether or not Jump is held (about 1.6 full jumps high); holding Jump
+   * scales that gravity by springHoldK for a little more.
+   */
+  springV: 22.8,
+  springHoldK: 0.88,
 } as const;
 
 /**

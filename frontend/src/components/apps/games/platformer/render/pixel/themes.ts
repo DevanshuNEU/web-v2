@@ -9,7 +9,9 @@
  *
  * `rooftops` (Endless) and `austin` (chapter 1) are bundled. Each later
  * chapter is one lazy chunk (`airport` and `clouds`; `campus`, `library` and
- * `tracks`), fetched by `loadTheme` when its chapter card shows, so the platformer's first download does not grow.
+ * `tracks`; `newbury`, `river`, `harbor` and `beach`), fetched by
+ * `loadTheme` when its chapter card shows, so the platformer's first
+ * download does not grow.
  * Until it lands `themeFor` returns null and the renderer draws a plain dark
  * frame. Any other pixel theme id falls back to the rooftops.
  */
@@ -36,6 +38,10 @@ export interface EnemyArt {
   /** The anim while it moves ('walk', 'roll'; flyers 'hover', and 'dive' when diving). */
   move: string;
   dead: string;
+  /** A flyer's anim while it dives (default 'dive'). */
+  dive?: string;
+  /** A hopper: plays its `frames` at `fps` once per hop (`every` seconds, from the sim's hopT), still between hops. */
+  hop?: { every: number; fps: number; frames: number };
   /** The colour of the light it carries (an eye, a screen, a tag). */
   light: string;
 }
@@ -50,6 +56,12 @@ export interface GoalArt {
   mast: boolean;
   /** Frames per second, looping; 0 plays the frames once as she comes near (a board settling). */
   fps: number;
+  /** Shift right in art pixels from the goal's column (a wide goal centred on it, or ending at it). */
+  dx?: number;
+  /** Raise the sprite's top this many pixels by carrying one row down (a roof that must meet the level's roof row). */
+  lift?: number;
+  /** The row carried (default the bottom row): a row through the columns makes them taller instead of the plinth. */
+  liftRow?: number;
   lights: readonly SpriteLight[];
 }
 
@@ -118,12 +130,16 @@ export interface PixelTheme {
   cityGlow?: string;
   /** The theme draws the dash-breakable walls itself (in its tiles layer). */
   drawsCracks?: boolean;
+  /** The theme draws the blade's breakables (crates) itself, as its own art. */
+  drawsCrates?: boolean;
   /** Art for the sim's walker (doomCrawler) and flyer (adDrone). */
   enemies: { walker: EnemyArt; flyer: EnemyArt };
   goal: GoalArt;
   /** The breakable sign (L): its art by run seed, level and index, and the colour it spills. */
   sign(seed: number, level: number, i: number): SpriteSet<'idle'>;
   signLight: string;
+  /** Glowing keys of the sign art when they differ from the theme's (a borrowed neon sign). */
+  signGlow?: string;
   /** Lights cast by static decor, by kind. */
   decorLights: Readonly<Record<string, DecorLight>>;
   /**
@@ -153,6 +169,8 @@ const READY = new Map<string, PixelTheme>([
  */
 export const THEME_KIT = {
   toMono, bakeGrid, ART_TILE, ROWS, makeCanvas, lightSprite, STRIP_W, bakeSkyCanvas, hash2, rng, atlas, drawFrame, K, KIND, WALK_DIR,
+  /** The rooftops' slang neon sign and its glowing keys, for a theme without sign art of its own. */
+  neonSign: ROOFTOPS_THEME.sign, neonGlow: ROOFTOPS_THEME.glow,
 };
 export type ThemeKit = typeof THEME_KIT;
 /** The kit as the trip chunk names it. */
@@ -161,8 +179,13 @@ export type TripKit = ThemeKit;
 type Loader = () => Promise<Readonly<Record<string, PixelTheme>>>;
 const trip: Loader = () => import('./themes/trip').then(m => m.tripThemes(THEME_KIT));
 const campus: Loader = () => import('./themes/campus').then(m => m.campusThemes(THEME_KIT));
+const boston: Loader = () => import('./themes/boston').then(m => m.bostonThemes(THEME_KIT));
 /** Lazy chunks by theme id: one per chapter. */
-const LAZY: Readonly<Record<string, Loader>> = { airport: trip, clouds: trip, campus, library: campus, tracks: campus };
+const LAZY: Readonly<Record<string, Loader>> = {
+  airport: trip, clouds: trip,
+  campus, library: campus, tracks: campus,
+  newbury: boston, river: boston, harbor: boston, beach: boston,
+};
 const pending = new Map<string, Promise<PixelTheme>>();
 
 /** The theme for an id, or null while its chunk is loading. Unknown ids get the rooftops. */

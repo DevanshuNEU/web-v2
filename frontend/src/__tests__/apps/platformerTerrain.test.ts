@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TILE, isSolidTile, parseLevel, tileAt } from '@/components/apps/games/platformer/sim/level';
-import { POINTS, flagBonus, stepWorld, timeBonus } from '@/components/apps/games/platformer/sim/world';
+import { POINTS, flagBonus, parTime, stepWorld, timeBonus } from '@/components/apps/games/platformer/sim/world';
 import { DT, G40, custom, eventsOf, run, runUntil, worldOn } from '../setup/platformerWorld';
 
 /** A one-way platform at row 8, columns 4 to 9, over flat ground. */
@@ -127,6 +127,7 @@ describe('Main Character terrain: the goal beacon', () => {
     const w = worldOn(END, 0, 'rooftops');
     const g = w.level.goal;
     expect(g.top).toBe(5);
+    const par = parTime(w.level);
     w.levelTime = 40;
     w.hero.x = g.x - 0.1; w.hero.y = 9.5;
     run(w, DT);
@@ -137,7 +138,7 @@ describe('Main Character terrain: the goal beacon', () => {
     expect(eventsOf(w)).toContain('flag');
     run(w, 8);
     expect(w.stats.clears).toBe(1);
-    expect(w.stats.time).toBe(timeBonus(40));
+    expect(w.stats.time).toBe(timeBonus(40, par));
     expect(w.levelIndex).toBe(1);
   });
 

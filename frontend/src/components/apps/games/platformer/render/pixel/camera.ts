@@ -12,7 +12,7 @@
  * a 60 Hz run from shaking. Art stays on whole art pixels within itself.
  */
 
-import { tileFor } from '../pipeline';
+import { tileFor } from '../view';
 import { pagePerf } from '../../ui/perf';
 
 export const ART_TILE = 16;
