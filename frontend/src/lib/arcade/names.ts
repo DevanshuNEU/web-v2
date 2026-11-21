@@ -17,22 +17,53 @@ const ALLOWED = /^[\p{L}\p{M}\p{N} _]+$/u;
 const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]|\uDB40[\uDC00-\uDDEF]/u;
 
 // Letters from other scripts that look like Latin ones, for the
-// impersonation check only (the name itself is stored as typed).
+// impersonation check only (the name itself is stored as typed). Drawn from
+// the Unicode confusables list (UTS #39), limited to letters and digits a
+// name may hold. Capitals that lowercase into a letter with a different
+// look go in CONFUSABLE_UPPER, checked before lowercasing.
+const CONFUSABLE_UPPER: Record<string, string> = {
+  '\u0397': 'h', // Greek Eta (lowercases to eta, which looks like n)
+  '\u039D': 'n', // Greek Nu
+  '\u03A5': 'y', // Greek Upsilon
+  '\u039C': 'm', // Greek Mu
+  '\u0396': 'z', // Greek Zeta
+};
 const CONFUSABLE: Record<string, string> = {
-  а: 'a', в: 'b', е: 'e', ё: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x',
-  і: 'i', ї: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w', һ: 'h', ү: 'y', ӏ: 'l',
-  α: 'a', β: 'b', ε: 'e', η: 'n', ι: 'i', κ: 'k', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', ω: 'w',
-  ı: 'i', ł: 'l', ø: 'o', đ: 'd', ħ: 'h', ŀ: 'l', ɡ: 'g', ɑ: 'a', ʀ: 'r',
+  // Cyrillic
+  а: 'a', в: 'b', ь: 'b', е: 'e', ё: 'e', ҽ: 'e', г: 'r', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c',
+  т: 't', у: 'y', х: 'x', і: 'i', ї: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w', ѡ: 'w', һ: 'h', ү: 'y',
+  ӏ: 'l', ѵ: 'v', ԍ: 'g', ꙇ: 'i',
+  // Greek
+  α: 'a', β: 'b', ε: 'e', η: 'n', ι: 'i', κ: 'k', ν: 'v', ο: 'o', σ: 'o', ρ: 'p', ϱ: 'p', τ: 't', υ: 'u',
+  χ: 'x', ω: 'w', γ: 'y', ϲ: 'c', ϳ: 'j',
+  // Armenian
+  օ: 'o', ս: 'u', հ: 'h', ո: 'n', ց: 'g', գ: 'q', ա: 'w', ք: 'p',
+  // Latin letters and small capitals
+  ı: 'i', ɩ: 'i', ł: 'l', ŀ: 'l', ǀ: 'l', ø: 'o', đ: 'd', ħ: 'h', ɡ: 'g', ɑ: 'a', ʀ: 'r', ʋ: 'u', ɯ: 'w',
+  ĸ: 'k', ƅ: 'b', ᴄ: 'c', ᴏ: 'o', ᴜ: 'u', ᴠ: 'v', ᴡ: 'w', ᴢ: 'z', ꜱ: 's', ʏ: 'y',
+  // Hebrew, Arabic, NKo, Georgian
+  ו: 'l', ן: 'l', ס: 'o', ا: 'l', ه: 'o', ߊ: 'l', ყ: 'y',
+  // Digits that look like l or o
+  '\u0661': 'l', '\u06F1': 'l', '\u0665': 'o', '\u06F5': 'o', '\u0966': 'o', '\u09E6': 'o', '\u0A66': 'o',
+  '\u0AE6': 'o', '\u0BE6': 'o', '\u0C66': 'o', '\u0CE6': 'o', '\u0D66': 'o', '\u0E50': 'o', '\u0ED0': 'o',
+  '\u1040': 'o',
 };
 
 /**
  * What a name looks like: compatibility-folded (full-width letters become
  * ASCII), accents stripped, look-alike letters mapped to Latin, then
- * squashed. Two names with the same skeleton read the same on the board.
+ * squashed. Capital I, lowercase l and the digit 1 share one character, and
+ * rn reads as m, vv as w. Two names with the same skeleton read the same on
+ * the board.
  */
 export function skeleton(s: string): string {
-  const folded = s.normalize('NFKD').replace(/\p{M}+/gu, '').toLowerCase();
-  return squash(Array.from(folded, (ch) => CONFUSABLE[ch] ?? ch).join(''));
+  const folded = Array.from(s.normalize('NFKD').replace(/\p{M}+/gu, ''), (ch) => CONFUSABLE_UPPER[ch] ?? ch)
+    .join('')
+    .toLowerCase();
+  return squash(Array.from(folded, (ch) => CONFUSABLE[ch] ?? ch).join(''))
+    .replace(/l/g, 'i')
+    .replace(/rn/g, 'm')
+    .replace(/vv/g, 'w');
 }
 const HAS_ALNUM = /[\p{L}\p{N}]/u;
 
@@ -93,18 +124,21 @@ export type NameCheck =
 
 const TAKEN = 'That name is taken. Pick another.';
 
-export function crownEnv(): { code: string | null; herName: string | null } {
-  return {
-    code: process.env.ARCADE_CROWN_CODE?.trim() || null,
-    herName: process.env.ARCADE_HER_NAME?.trim() || null,
-  };
+export function crownEnv(): { herName: string | null } {
+  return { herName: process.env.ARCADE_HER_NAME?.trim() || null };
+}
+
+/** Her name as stored on the board, when the crown code resolves to it. */
+export function crownedName(herName: string): Extract<NameCheck, { ok: true }> {
+  const display = herName.normalize('NFC');
+  return { ok: true, display, key: nameKey(display), crowned: true };
 }
 
 /**
  * Turn a submitted name into the stored display name and key, or say what to
- * change. The crown code is checked first so it may be any string, and it
- * never reaches the board: it stores under ARCADE_HER_NAME instead. Typing
- * her name without the code is refused so nobody can wear her crown.
+ * change. Typing her name is refused so nobody can wear her crown; only the
+ * crown code (lib/arcade/crown.ts, checked by the service before this) posts
+ * under it.
  */
 export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
   if (typeof raw !== 'string') {
@@ -115,13 +149,6 @@ export function resolveName(raw: unknown, env = crownEnv()): NameCheck {
     return { ok: false, code: 'bad_name', message: 'That name has an invisible character in it. Type it again without it.' };
   }
   const trimmed = raw.normalize('NFC').trim();
-
-  if (env.code && trimmed.toLowerCase() === env.code.toLowerCase()) {
-    // A code with no name to store under would leak the code onto the board.
-    if (!env.herName) return { ok: false, code: 'name_taken', message: TAKEN };
-    const display = env.herName.normalize('NFC');
-    return { ok: true, display, key: nameKey(display), crowned: true };
-  }
 
   const display = trimmed.replace(/ {2,}/g, ' ');
   const length = Array.from(display).length;

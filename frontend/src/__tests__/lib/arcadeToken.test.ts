@@ -83,11 +83,12 @@ describe('token secret', () => {
 describe('plausibility rules', () => {
   it('accepts an honest snake run', () => {
     expect(checkPlausible('snake', 40, 60_000)).toEqual({ ok: true });
-    expect(checkPlausible('snake', 0, 100)).toEqual({ ok: true });
+    expect(checkPlausible('snake', 0, 2000)).toEqual({ ok: true });
   });
 
-  it('rejects a non-zero score under two seconds', () => {
+  it('rejects any score under two seconds, zero included', () => {
     expect(checkPlausible('snake', 1, 1999)).toEqual({ ok: false, reason: 'too_fast' });
+    expect(checkPlausible('snake', 0, 100)).toEqual({ ok: false, reason: 'too_fast' });
   });
 
   it('rejects more points than the run length allows', () => {
@@ -122,10 +123,11 @@ describe('score caps sit near what a perfect run can reach', () => {
   it('snake: a 20x20 board holds at most 399 snacks', () => {
     expect(RULES.snake.cap).toBe(399);
   });
-  it('platformer: covers a perfect Story run (128,230 for chapters 1 to 4) and sits within 15 percent above it', () => {
+  it('platformer: exactly a perfect Story run (128,230 for chapters 1 to 4)', () => {
     // Derived from the level data in src/__tests__/apps/platformerScore.test.ts.
-    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(128_230);
-    expect(RULES.platformer.cap).toBeLessThanOrEqual(128_230 * 1.15);
+    expect(RULES.platformer.cap).toBe(128_230);
+    expect(checkPlausible('platformer', 128_230, 3_600_000)).toEqual({ ok: true });
+    expect(checkPlausible('platformer', 128_231, 3_600_000)).toEqual({ ok: false, reason: 'over_cap' });
   });
 });
 

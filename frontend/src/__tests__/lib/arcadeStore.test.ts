@@ -16,6 +16,7 @@ function fakeRedis() {
     get: vi.fn(async () => null),
     set: vi.fn(async () => 'OK'),
     expire: vi.fn(async () => 1),
+    incr: vi.fn(async () => 1),
   };
 }
 
@@ -43,6 +44,17 @@ describe('Upstash store adapter', () => {
     expect(r.set).toHaveBeenCalledWith('n', '1', { nx: true, ex: 60 });
     r.set.mockResolvedValueOnce(null as unknown as string);
     expect(await s.setNx('n', '1', 60)).toBe(false);
+  });
+
+  it('counts with INCR and sets the TTL only when the count starts', async () => {
+    const r = fakeRedis();
+    const s = createUpstashStore(r as unknown as Redis);
+    expect(await s.incr('c', 60)).toBe(1);
+    expect(r.expire).toHaveBeenCalledWith('c', 60);
+    r.incr.mockResolvedValueOnce(2);
+    r.expire.mockClear();
+    expect(await s.incr('c', 60)).toBe(2);
+    expect(r.expire).not.toHaveBeenCalled();
   });
 
   it('uses memory without Upstash env and the same instance across calls', async () => {

@@ -23,6 +23,8 @@ export interface ArcadeStore {
   /** SET NX EX. True when this call created the key. */
   setNx(key: string, value: string, ttlSeconds: number): Promise<boolean>;
   expire(key: string, ttlSeconds: number): Promise<void>;
+  /** INCR, and EXPIRE when this call created the key. Returns the new count. */
+  incr(key: string, ttlSeconds: number): Promise<number>;
 }
 
 // ---------- in-memory ----------
@@ -114,6 +116,13 @@ export function createMemoryStore(): ArcadeStore {
     async expire(key, ttlSeconds) {
       if (live(key)) expiry.set(key, Date.now() + ttlSeconds * 1000);
     },
+    async incr(key, ttlSeconds) {
+      const e = live(key);
+      const next = (e?.kind === 'string' ? Number(e.value) || 0 : 0) + 1;
+      data.set(key, { kind: 'string', value: String(next) });
+      if (next === 1) expiry.set(key, Date.now() + ttlSeconds * 1000);
+      return next;
+    },
   };
 }
 
@@ -171,6 +180,11 @@ export function createUpstashStore(redis: Redis): ArcadeStore {
     },
     async expire(key, ttlSeconds) {
       await redis.expire(key, ttlSeconds);
+    },
+    async incr(key, ttlSeconds) {
+      const n = toNum(await redis.incr(key)) ?? 0;
+      if (n === 1) await redis.expire(key, ttlSeconds);
+      return n;
     },
   };
 }
