@@ -831,9 +831,11 @@ export default function PlatformerGame({ onBack, isMobile }: { onBack: () => voi
       onKeyUp={onKeyUp}
       onBlur={onBlur}
       data-testid="platformer-root"
+      // focus here is for the keys; the accent ring around the whole game read as a glitch
+      data-no-focus-ring
       data-layout={layout}
       data-status={status}
-      className="h-full flex flex-col overflow-hidden overscroll-contain select-none touch-manipulation [-webkit-touch-callout:none] focus-visible:[outline-offset:-2px]"
+      className="h-full flex flex-col overflow-hidden overscroll-contain select-none touch-manipulation [-webkit-touch-callout:none]"
     >
       <GameStatus>{announce}</GameStatus>
       {layout !== 'landscape' && (
