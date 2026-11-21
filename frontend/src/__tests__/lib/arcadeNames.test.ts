@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveName, isProfane } from '@/lib/arcade/names';
+import { resolveName, isProfane, skeleton } from '@/lib/arcade/names';
 
 const noCrown = { herName: null };
 const crown = { herName: 'Juniper' };
@@ -77,6 +77,46 @@ describe('invisible characters', () => {
   it('still allows real accented and non-Latin names', () => {
     for (const n of ['Zoë', 'José', 'देव', 'Ана', '小明']) {
       expect(resolveName(n, { herName: null })).toMatchObject({ ok: true });
+    }
+  });
+});
+
+describe('look-alikes of her name', () => {
+  // A placeholder with an h, o, l and u in it.
+  const hollow = { herName: 'Hollow Sun' };
+  const taken = { ok: false, code: 'name_taken' };
+
+  it('gives capital I, lowercase l and digit 1 one skeleton', () => {
+    expect(skeleton('Il1')).toBe(skeleton('lll'));
+    for (const fake of ['HoIIow Sun', 'Ho11ow Sun', 'HolIow Sun', 'Ho1low Sun']) {
+      expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    }
+  });
+
+  it('blocks Armenian o, u and h', () => {
+    for (const fake of ['\u0570ollow Sun', 'H\u0585llow Sun', 'Hollow S\u057Dn']) {
+      expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    }
+  });
+
+  it('blocks other common Latin look-alikes from the Unicode confusables list', () => {
+    const fakes = [
+      '\u0397ollow Sun', // Greek capital eta
+      'Ho\u01C0low Sun', // Latin letter dental click
+      'Hollow \u0405un', // Cyrillic capital dze
+      'Hollo\u0461 Sun', // Cyrillic omega
+      'Hollow Su\u0578', // Armenian vo
+      'H\u03C3llow Sun', // Greek small sigma
+      'Hollow S\u028Bn', // Latin v with hook
+      'Ho\u0627low Sun', // Arabic alef
+    ];
+    for (const fake of fakes) expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    expect(resolveName('Ho\u217Clow Sun', hollow)).toMatchObject({ ok: false }); // small roman fifty
+  });
+
+  it('still lets genuinely different names through', () => {
+    for (const ok of ['Hallow Sun', 'Hollow Son', 'Mellow Sun', 'Willow']) {
+      expect(resolveName(ok, hollow), ok).toMatchObject({ ok: true });
     }
   });
 });
