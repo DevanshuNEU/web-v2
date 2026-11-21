@@ -1,6 +1,7 @@
 import { GAMES, isGame, type GameId } from './games';
 import { checkPlausible, MIN_DURATION_MS } from './rules';
-import { crownEnv, nameKey, resolveName } from './names';
+import { crownEnv, crownedName, nameKey, resolveName, type NameCheck } from './names';
+import { checkCrownCode, crownCode, isCodeAttempt, sameCode } from './crown';
 import { getStore, type ArcadeStore } from './store';
 import { issueToken, tokenSecret, verifyToken, TOKEN_TTL_MS } from './token';
 import { isoWeek } from './week';
@@ -60,6 +61,13 @@ const UNCONFIGURED = fail(
   503,
   'unconfigured',
   'The leaderboard has no signing secret configured. Set ARCADE_TOKEN_SECRET on the server.',
+);
+
+// One answer for every refused code: wrong, over today's cap, or crown off.
+const NOT_CROWNED = fail(
+  403,
+  'not_crowned',
+  'That is too long for a name (12 characters at most) and it did not work as a code, so this round was not posted. Play another round to post under a name.',
 );
 
 type NameRecord = { name: string; crown: boolean };
@@ -140,27 +148,40 @@ export async function submitScore(input: SubmitInput, ctx: { ip: string; now?: n
     );
   }
 
-  const resolved = resolveName(input.name);
-  if (!resolved.ok) return fail(400, resolved.code, resolved.message);
+  let resolved: Extract<NameCheck, { ok: true }>;
+  if (isCodeAttempt(input.name)) {
+    // Too long for a name, so it is a crown code attempt. Every attempt uses
+    // up the run first, so each guess costs a fresh /start token.
+    if (!(await store.setNx(nonceKey(nonce), '1', NONCE_TTL_SECONDS))) return fail(409, 'token_used', usedMsg);
+    const herName = crownEnv().herName;
+    // A code with no name to store under would leak the code onto the board.
+    if (!(await checkCrownCode(input.name, now)) || !herName) return NOT_CROWNED;
+    resolved = crownedName(herName);
+  } else {
+    const named = resolveName(input.name);
+    if (!named.ok) return fail(400, named.code, named.message);
+    resolved = named;
+    // Claim the nonce last, so a bad name does not burn the run: the player
+    // can fix the name and post the same run again. A zero writes nothing,
+    // not even the nonce.
+    if (score > 0 && !(await store.setNx(nonceKey(nonce), '1', NONCE_TTL_SECONDS))) {
+      return fail(409, 'token_used', usedMsg);
+    }
+  }
   const { key, crowned } = resolved;
 
-  // Claim the nonce last, so a bad name does not burn the run: the player
-  // can fix the name and post the same run again.
-  if (!(await store.setNx(nonceKey(nonce), '1', NONCE_TTL_SECONDS))) return fail(409, 'token_used', usedMsg);
-
   const existing = parseRecord(await store.hget(NAMES_KEY, key));
-  let display = existing?.name ?? resolved.display;
-  if (crowned) {
-    display = resolved.display;
-    await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: true }));
-  } else if (!existing) {
-    await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: false }));
-  }
-
+  const display = crowned ? resolved.display : (existing?.name ?? resolved.display);
   const aKey = allKey(game);
   const wKey = weekKey(game, now);
-  await Promise.all([store.zaddGt(aKey, score, key), store.zaddGt(wKey, score, key)]);
-  await store.expire(wKey, WEEK_TTL_SECONDS);
+
+  // A zero can never place on the board, so it is answered (with any
+  // standing the name already has) without storing a name or a score.
+  if (score > 0) {
+    if (crowned || !existing) await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: crowned }));
+    await Promise.all([store.zaddGt(aKey, score, key), store.zaddGt(wKey, score, key)]);
+    await store.expire(wKey, WEEK_TTL_SECONDS);
+  }
 
   const [best, allRank, weekRank] = await Promise.all([
     store.zscore(aKey, key),
@@ -189,8 +210,8 @@ export async function submitScore(input: SubmitInput, ctx: { ip: string; now?: n
 
 /** The storage key for a name typed by the admin (the crown code resolves to her name). */
 function lookupKey(raw: string): string {
-  const { code, herName } = crownEnv();
-  if (code && herName && raw.toLowerCase() === code.toLowerCase()) return nameKey(herName.normalize('NFC'));
+  const { herName } = crownEnv();
+  if (herName && sameCode(raw, crownCode())) return nameKey(herName.normalize('NFC'));
   return nameKey(raw.replace(/ {2,}/g, ' '));
 }
 

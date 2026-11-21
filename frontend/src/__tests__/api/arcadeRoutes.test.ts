@@ -19,7 +19,7 @@ function post(path: string, body: unknown, headers: Record<string, string> = {},
   }) as any;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const get = (path: string) => new Request(`http://localhost${path}`) as any;
+const get = (path: string, ip?: string) => new Request(`http://localhost${path}`, ip ? { headers: { 'x-real-ip': ip } } : {}) as any;
 
 async function run(game: string, name: string, points: number) {
   const res = await start(post('/api/arcade/start', { game }));
@@ -54,6 +54,21 @@ describe('POST /api/arcade/start', () => {
     const json = await res.json();
     expect(typeof json.token).toBe('string');
     expect(json.expiresAt).toBe(Date.now() + 2 * 60 * 60 * 1000);
+  });
+
+  it('is never cached', async () => {
+    expect((await start(post('/api/arcade/start', { game: 'snake' }))).headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rate limits one network to 60 run starts in 10 minutes', async () => {
+    const ip = { 'x-real-ip': '203.0.113.50' };
+    for (let i = 0; i < 60; i++) expect((await start(post('/api/arcade/start', { game: 'snake' }, ip))).status).toBe(200);
+    const limited = await start(post('/api/arcade/start', { game: 'snake' }, ip));
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error.code).toBe('rate_limited');
+    expect((await start(post('/api/arcade/start', { game: 'snake' }))).status).toBe(200);
+    vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1);
+    expect((await start(post('/api/arcade/start', { game: 'snake' }, ip))).status).toBe(200);
   });
 
   it('rejects an unknown game or a missing body', async () => {
@@ -113,6 +128,32 @@ describe('GET /api/arcade/board', () => {
     const res = await board(get('/api/arcade/board?game=pong'));
     expect(res.status).toBe(400);
   });
+  it('lets the CDN cache the public board for 10 seconds, with nothing personal in it', async () => {
+    await run('snake', 'Dev', 42);
+    const res = await board(get('/api/arcade/board?game=snake'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('public, s-maxage=10, stale-while-revalidate=30');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    const json = await res.json();
+    expect(json.me).toBeNull();
+    expect(Object.keys(json).sort()).toEqual(['all', 'game', 'me', 'week']);
+  });
+
+  it('never caches a board asked for with a name, or an error', async () => {
+    expect((await board(get('/api/arcade/board?game=snake&name=Dev'))).headers.get('cache-control')).toBe('no-store');
+    expect((await board(get('/api/arcade/board?game=pong'))).headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rate limits one network to 120 board reads a minute', async () => {
+    const ip = '203.0.113.40';
+    for (let i = 0; i < 120; i++) expect((await board(get('/api/arcade/board?game=snake', ip))).status).toBe(200);
+    const limited = await board(get('/api/arcade/board?game=snake', ip));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('cache-control')).toBe('no-store');
+    expect((await board(get('/api/arcade/board?game=snake', '203.0.113.41'))).status).toBe(200);
+    vi.setSystemTime(Date.now() + 61_000);
+    expect((await board(get('/api/arcade/board?game=snake', ip))).status).toBe(200);
+  });
 });
 
 describe('DELETE /api/arcade/admin', () => {
@@ -128,6 +169,19 @@ describe('DELETE /api/arcade/admin', () => {
     expect((await del({ game: 'snake', name: 'Dev' })).status).toBe(401);
     expect((await del({ game: 'snake', name: 'Dev' }, 'Bearer wrong')).status).toBe(401);
     expect((await del({ game: 'snake', name: 'Dev' }, 'admin-secret')).status).toBe(401);
+  });
+
+  it('rate limits one network to 10 admin calls in 10 minutes, before checking the token', async () => {
+    vi.stubEnv('ARCADE_ADMIN_TOKEN', 'admin-secret');
+    const ip = { 'x-real-ip': '203.0.113.60' };
+    const call = (auth: string) =>
+      admin(post('/api/arcade/admin', { game: 'snake', name: 'Dev' }, { ...ip, authorization: auth }, 'DELETE'));
+    for (let i = 0; i < 10; i++) expect((await call(`Bearer guess${i}`)).status).toBe(401);
+    const limited = await call('Bearer admin-secret');
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error.code).toBe('rate_limited');
+    vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1);
+    expect((await call('Bearer admin-secret')).status).toBe(200);
   });
 
   it('removes a name from that game', async () => {
@@ -161,14 +215,14 @@ describe('GET /api/arcade/secret: the public part', () => {
 
 describe('POST /api/arcade/secret: only for the crowned device', () => {
   beforeEach(() => {
-    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight');
+    vi.stubEnv('ARCADE_CROWN_CODE', 'moonlight over the bay');
     vi.stubEnv('ARCADE_HER_NAME', 'Juniper');
     vi.stubEnv('ARCADE_SECRET_MESSAGE', 'hello');
     vi.stubEnv('ARCADE_STORY', JSON.stringify({ 'card-1': 'where we met', 'mem-1-1-a': 'the first song' }));
   });
 
   it('opens the message and the personal story with the right code, any case and spacing', async () => {
-    const res = await unlock(post('/api/arcade/secret', { code: '  MoonLight ' }));
+    const res = await unlock(post('/api/arcade/secret', { code: '  MoonLight Over The Bay ' }));
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(await res.json()).toEqual({
@@ -183,7 +237,7 @@ describe('POST /api/arcade/secret: only for the crowned device', () => {
       const json = await res.json();
       expect(json.error.code).toBe('not_crowned');
       expect(JSON.stringify(json)).not.toContain('hello');
-      expect(JSON.stringify(json)).not.toContain('moonlight');
+      expect(JSON.stringify(json)).not.toContain('moonlight over');
     }
   });
 
@@ -199,14 +253,14 @@ describe('POST /api/arcade/secret: only for the crowned device', () => {
     for (let i = 0; i < 12; i++) last = (await unlock(post('/api/arcade/secret', { code: `guess${i}` }, ip))).status;
     expect(last).toBe(429);
     // The right code is still refused while the network is limited.
-    expect((await unlock(post('/api/arcade/secret', { code: 'moonlight' }, ip))).status).toBe(429);
+    expect((await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }, ip))).status).toBe(429);
   });
 
   it('ignores a malformed story and caps long or non-string lines', async () => {
     vi.stubEnv('ARCADE_STORY', '{not json');
-    expect((await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story).toEqual({});
+    expect((await (await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }))).json()).story).toEqual({});
     vi.stubEnv('ARCADE_STORY', JSON.stringify({ a: 'x'.repeat(500), b: 7, c: 'ok' }));
-    const story = (await (await unlock(post('/api/arcade/secret', { code: 'moonlight' }))).json()).story;
+    const story = (await (await unlock(post('/api/arcade/secret', { code: 'moonlight over the bay' }))).json()).story;
     expect(story.a.length).toBe(280);
     expect(story).not.toHaveProperty('b');
     expect(story.c).toBe('ok');

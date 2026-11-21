@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { resolveName, isProfane } from '@/lib/arcade/names';
+import { resolveName, isProfane, skeleton } from '@/lib/arcade/names';
 
-const noCrown = { code: null, herName: null };
-const crown = { code: 'moonlight', herName: 'Juniper' };
+const noCrown = { herName: null };
+const crown = { herName: 'Juniper' };
 
 describe('arcade name filter', () => {
   it('accepts and trims a valid name', () => {
@@ -52,18 +52,14 @@ describe('arcade name filter', () => {
 });
 
 describe('crown', () => {
-  it('stores the crown code under her name with a crown', () => {
-    expect(resolveName(' MoonLight ', crown)).toEqual({ ok: true, display: 'Juniper', key: 'juniper', crowned: true });
+  it('is never a name: the crown code is too long for one (the service checks codes, see arcadeCrown.test.ts)', () => {
+    expect(resolveName('moonlight over the bay', crown)).toMatchObject({ ok: false, code: 'bad_name' });
   });
 
   it('refuses her name without the code', () => {
     for (const fake of ['Juniper', 'juniper', 'JUNIPER', 'jun1per', 'Juni_per']) {
       expect(resolveName(fake, crown), fake).toEqual({ ok: false, code: 'name_taken', message: 'That name is taken. Pick another.' });
     }
-  });
-
-  it('refuses the code when there is no name to store it under', () => {
-    expect(resolveName('moonlight', { code: 'moonlight', herName: null })).toMatchObject({ ok: false, code: 'name_taken' });
   });
 
   it('treats her name as an ordinary name when no crown is configured', () => {
@@ -74,13 +70,53 @@ describe('crown', () => {
 describe('invisible characters', () => {
   it('refuses zero-width and other invisible characters in any name', () => {
     for (const n of ['Dev\u200B', 'De\u034Fv', 'Dev\uFEFF', 'D\u2060ev', 'Dev\uFE0F']) {
-      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: false, code: 'bad_name' });
+      expect(resolveName(n, { herName: null })).toMatchObject({ ok: false, code: 'bad_name' });
     }
   });
 
   it('still allows real accented and non-Latin names', () => {
     for (const n of ['Zoë', 'José', 'देव', 'Ана', '小明']) {
-      expect(resolveName(n, { code: null, herName: null })).toMatchObject({ ok: true });
+      expect(resolveName(n, { herName: null })).toMatchObject({ ok: true });
+    }
+  });
+});
+
+describe('look-alikes of her name', () => {
+  // A placeholder with an h, o, l and u in it.
+  const hollow = { herName: 'Hollow Sun' };
+  const taken = { ok: false, code: 'name_taken' };
+
+  it('gives capital I, lowercase l and digit 1 one skeleton', () => {
+    expect(skeleton('Il1')).toBe(skeleton('lll'));
+    for (const fake of ['HoIIow Sun', 'Ho11ow Sun', 'HolIow Sun', 'Ho1low Sun']) {
+      expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    }
+  });
+
+  it('blocks Armenian o, u and h', () => {
+    for (const fake of ['\u0570ollow Sun', 'H\u0585llow Sun', 'Hollow S\u057Dn']) {
+      expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    }
+  });
+
+  it('blocks other common Latin look-alikes from the Unicode confusables list', () => {
+    const fakes = [
+      '\u0397ollow Sun', // Greek capital eta
+      'Ho\u01C0low Sun', // Latin letter dental click
+      'Hollow \u0405un', // Cyrillic capital dze
+      'Hollo\u0461 Sun', // Cyrillic omega
+      'Hollow Su\u0578', // Armenian vo
+      'H\u03C3llow Sun', // Greek small sigma
+      'Hollow S\u028Bn', // Latin v with hook
+      'Ho\u0627low Sun', // Arabic alef
+    ];
+    for (const fake of fakes) expect(resolveName(fake, hollow), fake).toMatchObject(taken);
+    expect(resolveName('Ho\u217Clow Sun', hollow)).toMatchObject({ ok: false }); // small roman fifty
+  });
+
+  it('still lets genuinely different names through', () => {
+    for (const ok of ['Hallow Sun', 'Hollow Son', 'Mellow Sun', 'Willow']) {
+      expect(resolveName(ok, hollow), ok).toMatchObject({ ok: true });
     }
   });
 });

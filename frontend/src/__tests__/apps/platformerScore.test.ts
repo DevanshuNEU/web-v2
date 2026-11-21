@@ -23,10 +23,9 @@ const built = STORY.filter(s => s.built).map(s => parseLevel(storyLevelDef(s.id)
 const storyMax = built.reduce((s, l) => s + perfect(l), 0);
 
 describe('Main Character leaderboard cap (the leaderboard uses the fixed Story levels)', () => {
-  it('covers a perfect run of every built story level and sits within 15 percent above it', () => {
+  it('caps the board at exactly a perfect run of every built story level', () => {
     expect(storyMax).toBe(128_230);
-    expect(RULES.platformer.cap).toBeGreaterThanOrEqual(storyMax);
-    expect(RULES.platformer.cap).toBeLessThanOrEqual(storyMax * 1.15);
+    expect(RULES.platformer.cap).toBe(storyMax);
   });
 
   it('a perfect speed run stays inside the per-second rule (running at Taco Rush speed the whole way)', () => {
