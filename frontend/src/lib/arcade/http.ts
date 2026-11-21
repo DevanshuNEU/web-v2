@@ -7,12 +7,19 @@ export function errorResponse(status: number, code: string, message: string): Ne
   return NextResponse.json({ error: { code, message } }, { status, headers: NO_STORE });
 }
 
-export function toResponse<T>(result: Result<T>): NextResponse {
+/**
+ * For a response that is the same for everyone (the board without a name):
+ * the CDN serves it for 10 seconds and refreshes it in the background.
+ */
+export const SHARED_CACHE = { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' };
+
+/** Errors are never cached. Success is no-store unless `cache` says otherwise. */
+export function toResponse<T>(result: Result<T>, cache: Record<string, string> = NO_STORE): NextResponse {
   if (!result.ok) {
     const e = result as ArcadeError;
     return errorResponse(e.status, e.code, e.message);
   }
-  return NextResponse.json(result.data, { headers: NO_STORE });
+  return NextResponse.json(result.data, { headers: cache });
 }
 
 /**
