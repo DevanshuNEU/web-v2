@@ -35,14 +35,14 @@ export const RULES: Record<GameId, ScoreRule> = {
   endless: { maxPerSecond: 600, base: 3000, cap: 25_000 },
 };
 
-/** Runs shorter than this cannot post a non-zero score. */
+/** Runs shorter than this cannot post at all, not even a zero. */
 export const MIN_DURATION_MS = 2000;
 
 export type PlausibilityResult = { ok: true } | { ok: false; reason: 'too_fast' | 'too_high' | 'over_cap' };
 
 export function checkPlausible(game: GameId, score: number, durationMs: number): PlausibilityResult {
   const rule = RULES[game];
-  if (score > 0 && durationMs < MIN_DURATION_MS) return { ok: false, reason: 'too_fast' };
+  if (durationMs < MIN_DURATION_MS) return { ok: false, reason: 'too_fast' };
   if (score > rule.cap) return { ok: false, reason: 'over_cap' };
   const seconds = Math.max(0, durationMs) / 1000;
   if (score > rule.maxPerSecond * seconds + rule.base) return { ok: false, reason: 'too_high' };

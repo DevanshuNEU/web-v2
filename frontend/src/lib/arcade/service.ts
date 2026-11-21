@@ -162,24 +162,26 @@ export async function submitScore(input: SubmitInput, ctx: { ip: string; now?: n
     if (!named.ok) return fail(400, named.code, named.message);
     resolved = named;
     // Claim the nonce last, so a bad name does not burn the run: the player
-    // can fix the name and post the same run again.
-    if (!(await store.setNx(nonceKey(nonce), '1', NONCE_TTL_SECONDS))) return fail(409, 'token_used', usedMsg);
+    // can fix the name and post the same run again. A zero writes nothing,
+    // not even the nonce.
+    if (score > 0 && !(await store.setNx(nonceKey(nonce), '1', NONCE_TTL_SECONDS))) {
+      return fail(409, 'token_used', usedMsg);
+    }
   }
   const { key, crowned } = resolved;
 
   const existing = parseRecord(await store.hget(NAMES_KEY, key));
-  let display = existing?.name ?? resolved.display;
-  if (crowned) {
-    display = resolved.display;
-    await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: true }));
-  } else if (!existing) {
-    await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: false }));
-  }
-
+  const display = crowned ? resolved.display : (existing?.name ?? resolved.display);
   const aKey = allKey(game);
   const wKey = weekKey(game, now);
-  await Promise.all([store.zaddGt(aKey, score, key), store.zaddGt(wKey, score, key)]);
-  await store.expire(wKey, WEEK_TTL_SECONDS);
+
+  // A zero can never place on the board, so it is answered (with any
+  // standing the name already has) without storing a name or a score.
+  if (score > 0) {
+    if (crowned || !existing) await store.hset(NAMES_KEY, key, JSON.stringify({ name: display, crown: crowned }));
+    await Promise.all([store.zaddGt(aKey, score, key), store.zaddGt(wKey, score, key)]);
+    await store.expire(wKey, WEEK_TTL_SECONDS);
+  }
 
   const [best, allRank, weekRank] = await Promise.all([
     store.zscore(aKey, key),
