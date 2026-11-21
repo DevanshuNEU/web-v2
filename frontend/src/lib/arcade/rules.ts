@@ -14,23 +14,24 @@ export type ScoreRule = {
   cap: number;
 };
 
-// Caps sit just above what a perfect run can reach. A cheater can bank a
-// start token and wait out the per-second rule, so the cap is what really
-// keeps a forged score from sitting above every honest one.
-//   snake: a 20x20 board holds at most 399 snacks.
-//   platformer: the leaderboard uses the fixed Story levels. A perfect run of
-//     the built chapters (every coin, crate, sign and goal top, every kill at
-//     the top of a chain, clears, the top time bonus, no deaths) is 128,230
-//     with chapters 1 to 4;
-//     platformerScore.test.ts derives it and fails when a new chapter needs a
-//     higher cap.
-//   stacker: one floor per drop; nobody honest drops 12 a second.
+// A cheater can bank a start token and wait out the per-second rule, so the
+// cap is what really keeps a forged score from sitting above every honest
+// one. Where a perfect score is known exactly, the cap is that score.
+//   snake: exact. The snake starts one cell long on a 20x20 board, so it
+//     can eat at most 399 snacks.
+//   platformer: exact. The leaderboard uses the fixed Story levels. A perfect
+//     run of the built chapters (every coin, crate, sign and goal top, every
+//     kill at the top of a chain, clears, the top time bonus, no deaths) is
+//     128,230 with chapters 1 to 4. platformerScore.test.ts derives it from
+//     the level data and fails when a new chapter changes it.
+//   stacker: no fixed perfect score (the tower has no top); one floor per
+//     drop, and nobody honest drops 12 a second.
 export const RULES: Record<GameId, ScoreRule> = {
   snake: { maxPerSecond: 12, base: 10, cap: 399 },
-  platformer: { maxPerSecond: 600, base: 3000, cap: 140_000 },
+  platformer: { maxPerSecond: 600, base: 3000, cap: 128_230 },
   stacker: { maxPerSecond: 12, base: 10, cap: 3000 },
-  // Endless: seeded levels with modifiers, the Sigma coin and breakables; a
-  // perfect run reaches about 22,000 (platformerScore.test.ts).
+  // Endless: seeded levels with modifiers, the Sigma coin and breakables, so
+  // there is no single perfect score; a great run reaches about 22,000.
   endless: { maxPerSecond: 600, base: 3000, cap: 25_000 },
 };
 
