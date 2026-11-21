@@ -100,7 +100,30 @@ describe('submitScore', () => {
     expect(await play('Dev', 131, { ms: 10_000 })).toMatchObject({ status: 422, code: 'implausible' });
     expect(await play('Dev', 401, { ms: 3_600_000 })).toMatchObject({ status: 422, code: 'implausible' });
     expect((await play('Dev', 130, { ms: 10_000 })).ok).toBe(true);
-    expect((await play('Dev', 0, { ms: 500 })).ok).toBe(true);
+  });
+
+  it('needs the minimum round length for every post, a zero too', async () => {
+    expect(await play('Dev', 0, { ms: 500 })).toMatchObject({ status: 422, code: 'implausible' });
+    expect((await play('Dev', 0, { ms: 2000 })).ok).toBe(true);
+  });
+
+  it('answers a zero score ok without writing anything', async () => {
+    const r = await play('Zed', 0);
+    expect(r).toEqual({
+      ok: true,
+      data: { ok: true, name: 'Zed', score: 0, best: 0, crowned: false, rank: { all: null, week: null }, isTop: false },
+    });
+    const board = await getBoard('snake', 'Zed');
+    expect(board.ok && board.data).toMatchObject({ all: [], week: [], me: { name: 'Zed', all: null, week: null } });
+    expect(await (await getStore()).hget('arcade:names', 'zed')).toBeNull();
+  });
+
+  it('a zero after a real score reports the real best and rank, and changes nothing', async () => {
+    await play('Dev', 40);
+    const r = await play('Dev', 0);
+    expect(r).toMatchObject({ ok: true, data: { name: 'Dev', score: 0, best: 40, rank: { all: 1, week: 1 }, isTop: true } });
+    const store = await getStore();
+    expect(await store.zscore(allKey('snake'), 'dev')).toBe(40);
   });
 
   it('keeps the best score when a lower one follows', async () => {

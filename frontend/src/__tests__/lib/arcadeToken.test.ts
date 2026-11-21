@@ -83,11 +83,12 @@ describe('token secret', () => {
 describe('plausibility rules', () => {
   it('accepts an honest snake run', () => {
     expect(checkPlausible('snake', 40, 60_000)).toEqual({ ok: true });
-    expect(checkPlausible('snake', 0, 100)).toEqual({ ok: true });
+    expect(checkPlausible('snake', 0, 2000)).toEqual({ ok: true });
   });
 
-  it('rejects a non-zero score under two seconds', () => {
+  it('rejects any score under two seconds, zero included', () => {
     expect(checkPlausible('snake', 1, 1999)).toEqual({ ok: false, reason: 'too_fast' });
+    expect(checkPlausible('snake', 0, 100)).toEqual({ ok: false, reason: 'too_fast' });
   });
 
   it('rejects more points than the run length allows', () => {
