@@ -302,6 +302,8 @@ export default function TetrisGame({ onBack, isMobile }: { onBack: () => void; i
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
       data-testid="tetris-root"
+      // focus here is for the keys; the accent ring around the whole game read as a glitch
+      data-no-focus-ring
       className="h-full flex flex-col overflow-hidden focus-visible:[outline-offset:-2px]"
     >
       <GameStatus>

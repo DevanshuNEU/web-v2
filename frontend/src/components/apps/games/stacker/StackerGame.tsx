@@ -457,6 +457,8 @@ export default function StackerGame({ onBack, isMobile }: { onBack: () => void; 
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
       data-testid="stacker-root"
+      // focus here is for the keys; the accent ring around the whole game read as a glitch
+      data-no-focus-ring
       className="h-full flex flex-col overflow-hidden overscroll-contain select-none focus-visible:[outline-offset:-2px]"
     >
       <GameStatus>{announce}</GameStatus>

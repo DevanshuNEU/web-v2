@@ -601,7 +601,7 @@ describe('Story: chapter 4 is built', () => {
     ]);
     expect(nextStoryId('3-3')).toBe('4-1');
     expect(nextStoryId('4-4')).toBe('4-boss');
-    expect(storyEntry('4-boss').built).toBe(false);
+    expect(storyEntry('4-boss').built).toBe(true);
     for (const id of IDS) expect(storyLevelDef(id)).toBe(BOSTON[id]);
   });
 

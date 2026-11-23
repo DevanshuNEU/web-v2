@@ -28,6 +28,7 @@ import { lightSprite } from './lights';
 import { STRIP_W, bakeSkyCanvas, hash2, rng, type Sky } from './skyline';
 import { atlas, drawFrame } from './sprites';
 import { K, KIND, WALK_DIR, type FacadeCell } from './tiles';
+import { GLYPH_H, drawText, textWidth } from './font';
 import type { SkyPreset } from './timeofday';
 import { AUSTIN_THEME, ROOFTOPS_THEME } from './themes/rooftops';
 
@@ -92,6 +93,10 @@ export interface ThemeFrame {
   /** The hero's feet, buffer pixels. */
   heroX: number; heroY: number;
   mono: boolean; reduced: boolean;
+  /** Resolves a story text id (private overrides included): a boss's name and lines. */
+  text: (id: string) => string;
+  /** Art px at the top the page's own HUD covers: drawn HUD art (a boss bar) goes under it. */
+  insetTop: number;
   /** A layer may set a rumble here (CSS px of camera shake); reset every frame, ignored under reduced motion. */
   shake: number;
   light: (x: number, y: number, r: number, color: string, k: number, halo: number) => void;
@@ -105,8 +110,10 @@ export interface ThemeLayers {
   backGlow?(c: Ctx, f: ThemeFrame): void;
   /** On the playfield, base pass then glow pass (walkways, thin clouds). */
   tiles?(c: Ctx, f: ThemeFrame, layer: 'base' | 'glow'): void;
-  /** In front of everything but the screen effects and cards (drifting wisps). */
+  /** In front of everything but the screen effects and cards (drifting wisps, a boss's bar and lines). */
   front?(c: Ctx, f: ThemeFrame): void;
+  /** Every game event the view forwards (positions in tiles): a boss's hit flash. Must not allocate. */
+  event?(type: string, x: number, y: number, n: number): void;
 }
 
 export interface PixelTheme {
@@ -171,6 +178,10 @@ export const THEME_KIT = {
   toMono, bakeGrid, ART_TILE, ROWS, makeCanvas, lightSprite, STRIP_W, bakeSkyCanvas, hash2, rng, atlas, drawFrame, K, KIND, WALK_DIR,
   /** The rooftops' slang neon sign and its glowing keys, for a theme without sign art of its own. */
   neonSign: ROOFTOPS_THEME.sign, neonGlow: ROOFTOPS_THEME.glow,
+  /** The bundled rooftops theme, for art a chapter borrows (the beacon goal). */
+  rooftops: ROOFTOPS_THEME,
+  /** The renderer's 5 by 7 pixel font. */
+  drawText, textWidth, GLYPH_H,
 };
 export type ThemeKit = typeof THEME_KIT;
 /** The kit as the trip chunk names it. */
@@ -180,11 +191,13 @@ type Loader = () => Promise<Readonly<Record<string, PixelTheme>>>;
 const trip: Loader = () => import('./themes/trip').then(m => m.tripThemes(THEME_KIT));
 const campus: Loader = () => import('./themes/campus').then(m => m.campusThemes(THEME_KIT));
 const boston: Loader = () => import('./themes/boston').then(m => m.bostonThemes(THEME_KIT));
+const zakim: Loader = () => import('./themes/zakim').then(m => m.zakimThemes(THEME_KIT));
 /** Lazy chunks by theme id: one per chapter. */
 const LAZY: Readonly<Record<string, Loader>> = {
   airport: trip, clouds: trip,
   campus, library: campus, tracks: campus,
   newbury: boston, river: boston, harbor: boston, beach: boston,
+  zakim,
 };
 const pending = new Map<string, Promise<PixelTheme>>();
 

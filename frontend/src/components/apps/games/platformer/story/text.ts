@@ -10,8 +10,12 @@
  * chapter's first level), `card-<level>` (after it), `card-boss` (after the
  * gorilla, level id `4-boss`), `card-season-boss`, `card-ending`; captions
  * `mem-<memory id>`; chapter titles `chapter-<n>`; names
- * `boss-gorilla-name`, `concert-headliner-name`. Cards are 2 or 3 lines,
- * captions one; every line fits the pixel font on a phone (28 characters).
+ * `boss-gorilla-name`, `concert-headliner-name`; the gorilla's lines
+ * `boss-taunt-1` to `boss-taunt-8` and `boss-beaten` (one line each: 1 when
+ * he wakes, 3 when he wakes again after she fell, 2, 4 and 7 on his chest
+ * beats, 5 and 6 as he roars into phases 2 and 3, 8 when he goes down, and
+ * the beaten line a moment later). Cards are 2 or 3 lines, captions one;
+ * every line fits the pixel font on a phone (28 characters).
  */
 
 export const STORY_TEXT: Readonly<Record<string, string>> = {
@@ -56,6 +60,17 @@ export const STORY_TEXT: Readonly<Record<string, string>> = {
   // Names: public here, personal on a crowned device
   'boss-gorilla-name': 'The Ex-Bestie',
   'concert-headliner-name': 'The Headliner',
+
+  // The gorilla's lines: attitude, one line each
+  'boss-taunt-1': 'You came all this way?',
+  'boss-taunt-2': 'Nobody likes a tourist.',
+  'boss-taunt-3': 'Still here? Cute.',
+  'boss-taunt-4': 'I do this every morning.',
+  'boss-taunt-5': 'Okay. Warm up is over.',
+  'boss-taunt-6': 'My bridge, my rules.',
+  'boss-taunt-7': 'Is that a sword or a fork?',
+  'boss-taunt-8': 'Lucky shot. Total fluke.',
+  'boss-beaten': 'Okay. Fine. You win.',
 
   // Memory captions, one line each
   'mem-1-1-a': 'The first hello.',

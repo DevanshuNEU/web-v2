@@ -1,7 +1,7 @@
 /**
  * Story mode's running order: one row per level, in play order. `world` is
  * the chapter. Chapters 1 (Austin), 2 (the trip), 3 (Northeastern) and 4
- * (Boston nights, all but the gorilla) are built; the rest are placeholders
+ * (Boston nights, the gorilla included) are built; the rest are placeholders
  * until their levels exist. Built is not released: ui/release.ts decides
  * which chapters ship. `cardId` names
  * the story card the view shows after the level (see story/text.ts).
@@ -12,6 +12,7 @@ import { AUSTIN } from './story/austin';
 import { TRIP } from './story/trip';
 import { CAMPUS } from './story/campus';
 import { BOSTON } from './story/boston';
+import { BOSS_LEVEL } from './story/boss';
 
 export interface StoryEntry {
   id: string;
@@ -28,7 +29,7 @@ export interface StoryEntry {
 const entry = (id: string, world: number, level: number, name: string, theme: WorldTheme, built = false, cardId = `card-${id}`): StoryEntry =>
   ({ id, world, level, name, theme, cardId, built });
 
-/** Season 1: her trip from Austin to Boston, then home. Chapters 1 to 4 are built, the gorilla aside. */
+/** Season 1: her trip from Austin to Boston, then home. Chapters 1 to 4 are built, the gorilla too. */
 export const STORY: readonly StoryEntry[] = [
   entry('1-1', 1, 1, 'First Steps on Congress', 'austin', true),
   entry('1-2', 1, 2, 'Sixth Street', 'austin', true),
@@ -45,7 +46,7 @@ export const STORY: readonly StoryEntry[] = [
   entry('4-2', 4, 2, 'The Charles', 'river', true),
   entry('4-3', 4, 3, 'Seaport Sunrise', 'harbor', true),
   entry('4-4', 4, 4, 'Revere Beach', 'beach', true),
-  entry('4-boss', 4, 5, 'The Ex-Bestie', 'rooftops', false, 'card-boss'),
+  entry('4-boss', 4, 5, 'The Ex-Bestie', 'zakim', true, 'card-boss'),
   // Chapter 5, Jamaica Plain.
   entry('5-1', 5, 1, 'Jamaica Pond', 'rooftops'),
   entry('5-2', 5, 2, 'Home', 'rooftops'),
@@ -54,7 +55,7 @@ export const STORY: readonly StoryEntry[] = [
   entry('season-boss', 7, 1, 'Job Hunting', 'stars'),
 ];
 
-const BUILT: Readonly<Record<string, LevelDef>> = { ...AUSTIN, ...TRIP, ...CAMPUS, ...BOSTON };
+const BUILT: Readonly<Record<string, LevelDef>> = { ...AUSTIN, ...TRIP, ...CAMPUS, ...BOSTON, ...BOSS_LEVEL };
 
 /** The level data of a built story level. */
 export function storyLevelDef(id: string): LevelDef {

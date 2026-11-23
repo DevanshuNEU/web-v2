@@ -17,6 +17,9 @@
  * swing, linked like a moving platform. Gusts and waves are left out: she
  * can always wait for the calm.
  *
+ * The boss arena: bridge cables (/) are one-way floors like any ledge; the
+ * arena gates (TILE.GATE) are solid unless `gatesOpen` (he is beaten).
+ *
  * `generous` flips the margins the other way (full speeds, jump from the very
  * edge with coyote time), to prove a gap really needs a move: if even the
  * generous search cannot cross without the dash, the dash is required.
@@ -56,6 +59,8 @@ export interface ReachOpts {
   smash?: boolean;
   /** Crates (R, the beach's sand sculptures) count as open: the blade breaks them. */
   blade?: boolean;
+  /** Boss arena gates (TILE.GATE) count as open: he is beaten. */
+  gatesOpen?: boolean;
 }
 
 interface Template { pts: Float64Array }
@@ -202,7 +207,7 @@ function grid(level: Level, opts: ReachOpts) {
   for (let i = 0; i < g.length; i++) {
     const t = level.tiles[i];
     // Thin clouds count as one-way floors: she has PUFF.wobble seconds on one, plenty to jump on.
-    g[i] = (smash && t === TILE.CRACK) || (opts.blade && t === TILE.CRATE) ? 0 : isSolidTile(t) ? 1 : isOneWayTile(t) ? 2 : 0;
+    g[i] = (smash && t === TILE.CRACK) || (opts.blade && t === TILE.CRATE) || (opts.gatesOpen && t === TILE.GATE) ? 0 : isSolidTile(t) ? 1 : isOneWayTile(t) ? 2 : 0;
     if (t === TILE.AWNING) awning[i] = 1;
     if (t === TILE.WATER) wet[i] = 1;
     if (t === TILE.SPIKE) spike[i] = 1;

@@ -7,7 +7,7 @@
 
 import type { StoryEntry } from '../sim/story';
 
-export const RELEASED_CHAPTERS = 3;
+export const RELEASED_CHAPTERS = 4;
 
 /** Built and in a released chapter. */
 export function released(e: StoryEntry): boolean {

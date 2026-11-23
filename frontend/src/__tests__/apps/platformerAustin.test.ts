@@ -16,8 +16,8 @@ const memBoxes = (l: Level) => l.memories.map(m => ({ x: m.x + 0.1, y: m.y + 0.1
 const count = (l: Level, ch: string, id: AustinId) => AUSTIN[id].rows.join('').split(ch).length - 1 + 0 * l.cols;
 
 describe('Story: the running order', () => {
-  it('chapters 1 to 4 are built; the gorilla, Jamaica Plain, the concert and the season boss are placeholders', () => {
-    expect(STORY.filter(s => s.built).map(s => s.id)).toEqual(['1-1', '1-2', '1-3', '2-1', '2-2', '3-1', '3-2', '3-3', '4-1', '4-2', '4-3', '4-4']);
+  it('chapters 1 to 4 are built, the gorilla too; Jamaica Plain, the concert and the season boss are placeholders', () => {
+    expect(STORY.filter(s => s.built).map(s => s.id)).toEqual(['1-1', '1-2', '1-3', '2-1', '2-2', '3-1', '3-2', '3-3', '4-1', '4-2', '4-3', '4-4', '4-boss']);
     expect(STORY.map(s => s.id)).toEqual(['1-1', '1-2', '1-3', '2-1', '2-2', '3-1', '3-2', '3-3', '4-1', '4-2', '4-3', '4-4', '4-boss', '5-1', '5-2', '6-1', 'season-boss']);
     for (const id of IDS) {
       const e = storyEntry(id);

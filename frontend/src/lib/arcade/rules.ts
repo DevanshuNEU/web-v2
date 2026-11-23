@@ -20,7 +20,7 @@ export type ScoreRule = {
 //   snake: a 20x20 board holds at most 399 snacks.
 //   platformer: the leaderboard uses the fixed Story levels. A perfect run of
 //     the built chapters (every coin, crate, sign and goal top, every kill at
-//     the top of a chain, clears, the top time bonus, no deaths) is 128,230
+//     the top of a chain, clears, the top time bonus, no deaths, the boss) is 137,370
 //     with chapters 1 to 4;
 //     platformerScore.test.ts derives it and fails when a new chapter needs a
 //     higher cap.

@@ -82,10 +82,15 @@ export interface PixelView extends View {
   notice?: { title: string; line: string; accent: string } | null;
   /** Beginner and move prompts anchored in the world (text in capitals). */
   prompts?: readonly Prompt[];
+  /** Resolves a story text id (with the device's private overrides): a boss's name and lines. */
+  text?: (id: string) => string;
+  /** CSS px at the top the page covers (the landscape HUD strip), kept clear of drawn HUD art. */
+  insetTop?: number;
 }
 
 const LEVEL_H = ROWS * ART_TILE;
 const NO_LIGHT = () => {};
+const NO_TEXT = (id: string) => id;
 function shrineLight(x: number, y: number, k: number) {
   if (S) levelLight(S, x, y, 30, lightCol(COL.cyan, S.mono), k, 2, 0.6);
 }
@@ -124,6 +129,8 @@ const RING_PTS = Array.from({ length: 16 }, (_, i) => [Math.cos((i / 16) * Math.
  */
 export function pixelEvent(type: string, x: number, y: number, n = 0) {
   const s = state();
+  // the theme hears every event (a boss's hit flash)
+  s.theme?.layers?.event?.(type, x, y, n);
   if (type === 'memory') { s.story.memory(x * ART_TILE, y * ART_TILE); return; }
   if (type === 'unlock') { s.story.unlock(n); return; }
   if (type === 'swing' || type === 'hit' || type === 'break' || type === 'coinPull' || type === 'pogo' || type === 'decoyDive') { s.action.event(type, x, y, n); return; }
@@ -351,7 +358,7 @@ function state(): State {
     skyOpts: { neon: 1, sky: SKY_PRESETS.night }, fog: null,
     theme: null,
     tf: {
-      world: null as unknown as World, t: 0, dt: 0, alpha: 1, shake: 0, ox: 0, oy: 0, bw: 0, bh: 0, rx: 0, ry: 0, camDx: 0, camDy: 0, heroX: 0, heroY: 0, mono: false, reduced: false,
+      world: null as unknown as World, t: 0, dt: 0, alpha: 1, shake: 0, ox: 0, oy: 0, bw: 0, bh: 0, rx: 0, ry: 0, camDx: 0, camDy: 0, heroX: 0, heroY: 0, mono: false, reduced: false, text: (id: string) => id, insetTop: 0,
       light: (x, y, r, color, k, halo) => { if (S) levelLight(S, x, y, r, lightCol(color, S.mono), k, 2, halo); },
     },
     tally: { art: null, title: '', bw: 0, mono: false, t: 0 },
@@ -748,7 +755,7 @@ function drawDynamicTiles(c: Ctx, s: State, w: World, ta: Atlas, layer: 'base' |
     for (let tx = c0; tx <= c1; tx++) {
       const k = KIND[w.tiles[ty * cols + tx]];
       // walkways and thin clouds belong to the theme's own tile layer
-      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY || k === K.WALK || k === K.PUFF || k === K.AWNING || k === K.WATER) continue;
+      if (k === K.EMPTY || k === K.ROOF || k === K.STONE || k === K.SPIKE || k === K.ONEWAY || k === K.WALK || k === K.PUFF || k === K.AWNING || k === K.WATER || k === K.GATE || k === K.CABLE) continue;
       const x = tx * ART_TILE - s.ox, y = ty * ART_TILE - s.oy;
       if (k === K.COIN || k === K.SIGMA) {
         if (!coin) continue;
@@ -1506,7 +1513,8 @@ export function drawWorld1(ctx: CanvasRenderingContext2D, world: World, v: Pixel
   tf.world = world; tf.t = t; tf.dt = dt; tf.ox = s.ox; tf.oy = s.oy; tf.bw = s.bw; tf.bh = s.bh;
   tf.rx = rx; tf.ry = ry; tf.camDx = camDx; tf.camDy = camDy; tf.mono = mono; tf.reduced = reduced;
   tf.heroX = snapTo(anchorX, m.q) - s.ox; tf.heroY = snapTo(anchorY, m.q) - s.oy;
-  tf.shake = 0; tf.alpha = a;
+  tf.shake = 0; tf.alpha = a; tf.text = v.text ?? NO_TEXT;
+  tf.insetTop = ((v.insetTop ?? 0) * dpr) / m.k;
   const layers = th.layers;
 
   // ── back to front ──

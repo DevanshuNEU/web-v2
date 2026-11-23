@@ -40,15 +40,19 @@ export const TILE = {
   AWNING: 16,
   /** Water: not solid; touching it is a fall. */
   WATER: 17,
+  /** A boss arena gate: solid while shut; the fight opens and shuts it (see ./boss.ts). */
+  GATE: 18,
+  /** A bridge cable: a one-way ledge on a diagonal run (land from above, pass from below and the side). */
+  CABLE: 19,
 } as const;
 
 export function isSolidTile(t: number): boolean {
-  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK || t === TILE.CRATE || t === TILE.WALK_R || t === TILE.WALK_L;
+  return (t >= TILE.GROUND && t <= TILE.SPIKE) || t === TILE.CRACK || t === TILE.CRATE || t === TILE.WALK_R || t === TILE.WALK_L || t === TILE.GATE;
 }
 
 /** Tiles that only stop a body falling onto them from above. */
 export function isOneWayTile(t: number): boolean {
-  return t === TILE.ONEWAY || t === TILE.PUFF || t === TILE.AWNING;
+  return t === TILE.ONEWAY || t === TILE.PUFF || t === TILE.AWNING || t === TILE.CABLE;
 }
 
 import type { EnemyKind } from './enemies';
@@ -93,6 +97,7 @@ export const DECOR_BY_THEME: Readonly<Record<WorldTheme, Readonly<Partial<Record
   river: { T: 'bridgeLamp', N: 'bench', U: 'boatDock', H: 'lifebuoy' },
   harbor: { T: 'bollard', N: 'craneLeg', U: 'containerStack', H: 'fishCrates' },
   beach: { T: 'boulevardLamp', N: 'lifeguardChair', U: 'sandCastle', H: 'umbrella' },
+  zakim: { T: 'bridgeLamp' },
 };
 
 type SignLight = { color: string; flicker: number; r: number };
@@ -108,7 +113,7 @@ const NEON: readonly SignLight[] = [
  * campus, green and warm study lamps in the library, amber and cold at the
  * tracks; gas lamps and shop windows on Newbury Street, cool bridge lights and
  * warm lamps in the river fog, sunrise gold and red crane beacons at the
- * harbor, a soft lamp in the low morning sun at the beach.
+ * harbor, a soft lamp in the low morning sun at the beach and on the bridge.
  */
 const SIGN_LIGHTS: Readonly<Partial<Record<WorldTheme, readonly SignLight[]>>> = {
   airport: [{ color: '#bfe6ff', flicker: 0.04, r: 5 }, { color: '#ffb347', flicker: 0.02, r: 4.5 }, { color: '#7ad0ff', flicker: 0.06, r: 4.5 }],
@@ -120,6 +125,7 @@ const SIGN_LIGHTS: Readonly<Partial<Record<WorldTheme, readonly SignLight[]>>> =
   river: [{ color: '#e6ecff', flicker: 0.02, r: 6 }, { color: '#ffd38a', flicker: 0.03, r: 6 }],
   harbor: [{ color: '#ffc58a', flicker: 0.02, r: 5 }, { color: '#ff3b3b', flicker: 0.3, r: 4 }],
   beach: [{ color: '#ffe6b0', flicker: 0, r: 3.5 }],
+  zakim: [{ color: '#ffe6b0', flicker: 0, r: 3.5 }],
 };
 const BEACON_LIGHT = { color: '#3df2ff', flicker: 0.1, r: 5 };
 
@@ -134,6 +140,8 @@ export interface Level {
   theme: WorldTheme;
   /** The level's sky preset, if it sets one (the renderer defaults to night). */
   sky?: SkyId;
+  /** Par override from the level data (see LevelDef). */
+  par?: number;
   cols: number;
   rows: number;
   /** Row-major tile codes, `cols * rows`. Copy it before mutating. */
@@ -184,12 +192,22 @@ export interface Level {
   gusts: GustDef[];
   hooks: HookDef[];
   waves: WaveDef[];
+  /** The boss spawn (Y): its column and the y of its floor; null in a level with no boss. */
+  boss: { x: number; y: number } | null;
+  /**
+   * Arena gate tiles: `closed` is how each starts. An entry gate (z) starts
+   * open (its tile is EMPTY) and shuts when the fight starts; an exit gate
+   * (Z) starts shut (TILE.GATE) and opens when the boss is beaten.
+   */
+  gates: { x: number; y: number; closed: boolean }[];
+  /** Debris spots (:) in reading order: tile x, y where a ground pound shakes debris loose. */
+  debris: { x: number; y: number }[];
 }
 
 const CODES: Record<string, number> = {
   '#': TILE.GROUND, '=': TILE.GROUND, _: TILE.ONEWAY, B: TILE.BRICK, '?': TILE.AURA, C: TILE.AURA_CROWN, X: TILE.STONE, '^': TILE.SPIKE, o: TILE.COIN,
   $: TILE.SIGMA, '%': TILE.CRACK, R: TILE.CRATE, '>': TILE.WALK_R, '<': TILE.WALK_L, '~': TILE.PUFF,
-  A: TILE.AWNING, W: TILE.WATER,
+  A: TILE.AWNING, W: TILE.WATER, Z: TILE.GATE, '/': TILE.CABLE,
 };
 
 export function parseLevel(def: LevelDef, gravity = 1): Level {
@@ -213,6 +231,9 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   const enemies: EnemySpawn[] = [];
   const platforms: PlatformSpawn[] = [];
   const signals: { x: number; y: number }[] = [];
+  const bosses: { x: number; y: number }[] = [];
+  const gates: { x: number; y: number; closed: boolean }[] = [];
+  const debris: { x: number; y: number }[] = [];
   let coinTotal = 0;
   let bricks = 0;
   let sigmas = 0;
@@ -232,6 +253,7 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         if (code === TILE.SIGMA) sigmas++;
         if (code === TILE.CRATE) crates++;
         if (code === TILE.AURA_CROWN) crowns++;
+        if (code === TILE.GATE) gates.push({ x, y, closed: true });
         continue;
       }
       switch (ch) {
@@ -267,6 +289,9 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
         case 'g': enemies.push({ kind: 'gull', x, y }); break;
         case 'M': memories.push({ x, y }); break;
         case 's': signals.push({ x, y }); break;
+        case 'Y': bosses.push({ x, y: y + 1 }); break;
+        case 'z': gates.push({ x, y, closed: false }); break;
+        case ':': debris.push({ x, y }); break;
         case 'w': case 't': case 'b': case 'k': case 'v': pickups.push({ kind: POWER_CHARS[ch], x, y }); break;
         case 'Q':
           if (!def.shrine) throw new Error(`${def.name}: a shrine (Q) needs the level's shrine ability`);
@@ -286,6 +311,7 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   if (starts.length !== 1) throw new Error(`${def.name}: needs exactly one start, found ${starts.length}`);
   if (goals.length !== 1) throw new Error(`${def.name}: needs exactly one goal (flag F or beacon G), found ${goals.length}`);
   if (crowns > 1) throw new Error(`${def.name}: at most one crown block`);
+  if (bosses.length > 1) throw new Error(`${def.name}: at most one boss (Y), found ${bosses.length}`);
   const f = goals[0];
   let base = f.y;
   if (f.kind === 'flag') {
@@ -303,13 +329,14 @@ export function parseLevel(def: LevelDef, gravity = 1): Level {
   signals.sort((a, b) => along(a, b) || a.y - b.y);
 
   return {
-    id: def.id, label: def.label, name: def.name, theme: def.theme, ...(def.sky ? { sky: def.sky } : {}),
+    id: def.id, label: def.label, name: def.name, theme: def.theme, ...(def.sky ? { sky: def.sky } : {}), ...(def.par ? { par: def.par } : {}),
     cols, rows: ROWS, tiles, start: starts[0], checkpoints, checkpoint: checkpoints[0] ?? null, memories,
     goal: { x: f.x, top: f.y, base, kind: f.kind }, pole: { x: f.x, top: f.y, base },
     goalDir, decor, lights, shrines, pickups, sword, setPieces: def.setPieces ? [...def.setPieces] : [], decoys: (def.decoys ?? []).map(d => ({ x: d.x, y: d.y })), crates, signs: decor.filter(d => d.kind === 'neonSign').length,
     enemies, platforms, coinTotal, bricks, sigmas, gravity,
     vehicles: (def.vehicles ?? []).map(v => ({ ...v })), signals,
     gusts: (def.gusts ?? []).map(g => ({ ...g })), hooks: (def.hooks ?? []).map(k => ({ ...k })), waves: (def.waves ?? []).map(v => ({ ...v })),
+    boss: bosses[0] ?? null, gates: gates.sort((a, b) => a.x - b.x || a.y - b.y), debris,
   };
 }
 

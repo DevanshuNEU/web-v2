@@ -105,7 +105,7 @@ describe('platformer levels: data', () => {
     expect(() => parseLevel({ ...base, rows: base.rows.map((r, i) => (i === 3 ? r + '.' : r)) })).toThrow(/wide/);
     expect(() => parseLevel({ ...base, rows: base.rows.map(r => r.replace('P', '.')) })).toThrow(/start/);
     expect(() => parseLevel({ ...base, rows: base.rows.map(r => r.replace('F', '|')) })).toThrow(/flag/);
-    expect(() => parseLevel({ ...base, rows: base.rows.map((r, i) => (i === 0 ? 'Z' + r.slice(1) : r)) })).toThrow(/unknown/);
+    expect(() => parseLevel({ ...base, rows: base.rows.map((r, i) => (i === 0 ? '@' + r.slice(1) : r)) })).toThrow(/unknown/);
   });
 });
 
